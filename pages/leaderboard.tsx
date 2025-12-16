@@ -3,14 +3,9 @@ import axios from 'axios';
 import { Trophy, Medal, ArrowLeft, Search, Wallet } from 'lucide-react';
 import Link from 'next/link';
 
-interface RankedNode {
-  rank: number;
-  pubkey: string;
-  credits: number;
-}
-
 export default function Leaderboard() {
-  const [ranking, setRanking] = useState<RankedNode[]>([]);
+  const [debugData, setDebugData] = useState<any>(null); // DEBUG
+  const [ranking, setRanking] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -18,112 +13,67 @@ export default function Leaderboard() {
     const fetchCredits = async () => {
       try {
         const res = await axios.get('/api/credits');
-        // The API might return { pods_credits: [...] } or just [...]
         const rawData = res.data.pods_credits || res.data;
         
-        let parsedList: RankedNode[] = [];
+        // 🚨 CAPTURE DEBUG DATA (First 2 entries)
+        let sample = {};
+        if (Array.isArray(rawData)) sample = rawData.slice(0, 2);
+        else if (typeof rawData === 'object') sample = Object.entries(rawData).slice(0, 2);
+        setDebugData(sample);
 
-        // 🛠️ CRITICAL FIX: Handle ARRAY response correctly
+        let parsedList: any[] = [];
+
+        // Logic (Trying our best)
         if (Array.isArray(rawData)) {
           parsedList = rawData.map((item: any) => ({
-            // Try every possible name for the key
-            pubkey: item.pubkey || item.node || item.address || 'Unknown',
+            pubkey: item.pubkey || item.node || item.address || item.id || 'Unknown',
             credits: Number(item.credits || item.amount || 0),
-            rank: 0 // placeholder
+            rank: 0 
           }));
         } else if (typeof rawData === 'object') {
-          // Handle OBJECT response { "pubkey": amount }
           parsedList = Object.entries(rawData).map(([key, val]: [string, any]) => {
-             // Skip status messages
              if (key === 'status' || key === 'success') return null;
              return {
-                pubkey: key,
+                pubkey: key, // Assuming key is the ID/Pubkey
                 credits: typeof val === 'number' ? val : Number(val?.credits || 0),
                 rank: 0
              };
-          }).filter(Boolean) as RankedNode[];
+          }).filter(Boolean);
         }
 
-        // Sort descending by credits
-        const sorted = parsedList
-            .sort((a, b) => b.credits - a.credits)
-            .map((node, index) => ({ ...node, rank: index + 1 }));
-
+        const sorted = parsedList.sort((a, b) => b.credits - a.credits).map((node, index) => ({ ...node, rank: index + 1 }));
         setRanking(sorted);
       } catch (err) {
-        console.error("Leaderboard Error:", err);
+        console.error(err);
       } finally {
         setLoading(false);
       }
     };
-
     fetchCredits();
   }, []);
 
   const filtered = ranking.filter(n => n.pubkey.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-4 md:p-8 selection:bg-yellow-500/30">
+    <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-4 md:p-8">
+      <Link href="/" className="flex items-center gap-2 text-zinc-500 mb-8"><ArrowLeft size={16} /> Back to Monitor</Link>
       
-      {/* HEADER */}
-      <div className="max-w-4xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
-        <Link href="/" className="flex items-center gap-2 text-zinc-500 hover:text-white transition text-sm font-bold uppercase tracking-wider">
-          <ArrowLeft size={16} /> Back to Monitor
-        </Link>
-        <h1 className="text-3xl font-extrabold flex items-center gap-3 text-yellow-500">
-          <Trophy size={32} /> LEADERBOARD
-        </h1>
+      {/* 🚨 DEBUG BOX */}
+      <div className="bg-red-900/30 border border-red-500 text-red-200 p-4 mb-8 font-mono text-xs overflow-auto max-h-60 rounded-xl">
+        <h3 className="font-bold mb-2">DIAGNOSTIC DATA (SEND SCREENSHOT)</h3>
+        <pre>{JSON.stringify(debugData, null, 2)}</pre>
       </div>
 
-      {/* SEARCH */}
-      <div className="max-w-4xl mx-auto mb-6 relative">
-        <Search className="absolute left-4 top-3.5 text-zinc-500" size={20} />
-        <input 
-            type="text" 
-            placeholder="Find Public Key..." 
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-12 text-white focus:border-yellow-500 outline-none transition placeholder-zinc-600"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-      </div>
-
-      {/* TABLE */}
-      <div className="max-w-4xl mx-auto bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden backdrop-blur-sm">
-        <div className="grid grid-cols-12 gap-4 p-4 border-b border-zinc-800 text-xs font-bold text-zinc-500 uppercase tracking-widest">
-          <div className="col-span-2 md:col-span-1 text-center">Rank</div>
-          <div className="col-span-7 md:col-span-8">Node Public Key</div>
-          <div className="col-span-3 text-right">Credits</div>
-        </div>
-
-        {loading ? (
-          <div className="p-20 text-center animate-pulse text-zinc-500 font-mono">CALCULATING FORTUNES...</div>
-        ) : (
-          <div className="divide-y divide-zinc-800/50">
-            {filtered.slice(0, 100).map((node) => (
-              <div key={node.pubkey} className="grid grid-cols-12 gap-4 p-4 hover:bg-white/5 transition items-center group">
-                
-                {/* RANK BADGE */}
-                <div className="col-span-2 md:col-span-1 flex justify-center">
-                  {node.rank === 1 && <Medal className="text-yellow-400" size={24} />}
-                  {node.rank === 2 && <Medal className="text-gray-300" size={24} />}
-                  {node.rank === 3 && <Medal className="text-amber-700" size={24} />}
-                  {node.rank > 3 && <span className="font-mono text-zinc-500">#{node.rank}</span>}
-                </div>
-
-                {/* ADDRESS */}
-                <div className="col-span-7 md:col-span-8 font-mono text-sm text-zinc-300 truncate group-hover:text-white transition">
-                  {node.pubkey}
-                </div>
-
-                {/* CREDITS */}
-                <div className="col-span-3 text-right font-bold font-mono text-yellow-500 flex items-center justify-end gap-2">
-                  {node.credits.toLocaleString()}
-                  <Wallet size={14} className="text-zinc-600 group-hover:text-yellow-500 transition" />
-                </div>
-              </div>
-            ))}
+      <h1 className="text-3xl font-extrabold flex items-center gap-3 text-yellow-500 mb-6"><Trophy size={32} /> LEADERBOARD</h1>
+      
+      <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
+        {filtered.slice(0, 50).map((node) => (
+          <div key={node.rank} className="grid grid-cols-12 gap-4 p-4 border-b border-zinc-800 hover:bg-white/5">
+            <div className="col-span-1 text-center font-bold text-zinc-500">#{node.rank}</div>
+            <div className="col-span-8 font-mono text-sm truncate">{node.pubkey}</div>
+            <div className="col-span-3 text-right font-bold text-yellow-500">{node.credits.toLocaleString()}</div>
           </div>
-        )}
+        ))}
       </div>
     </div>
   );
