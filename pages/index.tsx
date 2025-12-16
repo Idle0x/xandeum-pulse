@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, ExternalLink, Copy, Check } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -61,16 +61,15 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
-  // --- NEW: FAVORITES SYSTEM ---
+  // --- NEW: FAVORITES & COPY ---
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [copied, setCopied] = useState(false);
 
   // --- CYCLING LOGIC ---
   const [cycleStep, setCycleStep] = useState(0);
 
   useEffect(() => {
     fetchStats();
-    
-    // Load Favorites from LocalStorage on mount
     const saved = localStorage.getItem('xandeum_favorites');
     if (saved) setFavorites(JSON.parse(saved));
 
@@ -81,7 +80,7 @@ export default function Home() {
   }, []);
 
   const toggleFavorite = (e: React.MouseEvent, address: string) => {
-    e.stopPropagation(); // Don't open the modal
+    e.stopPropagation();
     let newFavs;
     if (favorites.includes(address)) {
       newFavs = favorites.filter(f => f !== address);
@@ -90,6 +89,12 @@ export default function Home() {
     }
     setFavorites(newFavs);
     localStorage.setItem('xandeum_favorites', JSON.stringify(newFavs));
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const fetchStats = async () => {
@@ -114,13 +119,11 @@ export default function Home() {
       node.version.toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
-      // 1. Sort by Favorites FIRST
       const isFavA = favorites.includes(a.address);
       const isFavB = favorites.includes(b.address);
-      if (isFavA && !isFavB) return -1; // A comes first
-      if (!isFavA && isFavB) return 1;  // B comes first
+      if (isFavA && !isFavB) return -1; 
+      if (!isFavA && isFavB) return 1;
 
-      // 2. Then sort by selected metric
       let valA = a[sortBy === 'storage' ? 'storage_used' : sortBy];
       let valB = b[sortBy === 'storage' ? 'storage_used' : sortBy];
       return sortOrder === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
@@ -158,9 +161,9 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-4 md:p-8 relative selection:bg-blue-500/30 selection:text-blue-200">
       
-      {/* HEADER */}
-      <header className="flex flex-col md:flex-row justify-between items-center mb-10 border-b border-zinc-800 pb-6">
-        <div className="text-center md:text-left mb-4 md:mb-0">
+      {/* HEADER (Simplified) */}
+      <header className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-zinc-800 pb-6">
+        <div className="text-center md:text-left">
           <h1 className="text-4xl font-extrabold tracking-tight text-white flex items-center gap-3 justify-center md:justify-start">
             <Activity className="text-blue-500" />
             XANDEUM PULSE
@@ -172,22 +175,10 @@ export default function Home() {
             SYNC: {lastUpdated || '--:--'}
           </div>
         </div>
-        
-        <div className="flex gap-3">
-          <Link href="/leaderboard" className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-yellow-500 hover:text-yellow-500 rounded-lg transition text-xs font-semibold tracking-wide flex items-center gap-2">
-            <Trophy size={14} className="text-yellow-600" /> LEADERS
-          </Link>
-          <button onClick={fetchStats} className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-semibold tracking-wide flex items-center gap-2">
-            <Zap size={14} className="text-yellow-500" /> REFRESH
-          </button>
-          <button onClick={exportCSV} className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-semibold tracking-wide flex items-center gap-2">
-            <Download size={14} className="text-zinc-400" /> CSV
-          </button>
-        </div>
       </header>
 
       {/* STATS OVERVIEW */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
           <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Active Nodes</div>
           <div className="text-3xl font-bold text-white mt-1">{nodes.length}</div>
@@ -202,22 +193,42 @@ export default function Home() {
         </div>
         <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
           <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Watchlist</div>
-          {/* Shows count of starred nodes */}
           <div className="text-3xl font-bold text-yellow-500 mt-1">{favorites.length}</div>
         </div>
       </div>
 
-      {/* SEARCH */}
-      <div className="flex flex-col md:flex-row gap-4 mb-8">
-        <div className="relative flex-1">
+      {/* CONTROLS (MOVED HERE) */}
+      <div className="mb-8 space-y-4">
+        {/* Search Bar */}
+        <div className="relative">
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
             type="text" 
-            placeholder="Search Node IP or Version..." 
-            className="w-full bg-zinc-900/80 border border-zinc-800 rounded-lg p-2.5 pl-10 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition placeholder-zinc-600"
+            placeholder="Search Node IP, Version, or Key..." 
+            className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 pl-10 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition placeholder-zinc-600"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+        </div>
+
+        {/* Action Buttons Row */}
+        <div className="flex justify-between items-center">
+            {/* Left: Leaderboard */}
+            <Link href="/leaderboard" className="px-5 py-2.5 bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 text-yellow-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2">
+                <Trophy size={16} /> RICH LIST
+            </Link>
+
+            {/* Right: Tools */}
+            <div className="flex gap-2">
+                <button onClick={fetchStats} className="px-4 py-2.5 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2 text-zinc-300">
+                    <Zap size={16} className={loading ? "text-zinc-500" : "text-blue-500"} /> 
+                    <span className="hidden md:inline">REFRESH</span>
+                </button>
+                <button onClick={exportCSV} className="px-4 py-2.5 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2 text-zinc-300">
+                    <Download size={16} /> 
+                    <span className="hidden md:inline">CSV</span>
+                </button>
+            </div>
         </div>
       </div>
 
@@ -247,7 +258,6 @@ export default function Home() {
                     </div>
                  </div>
                  
-                 {/* STAR BUTTON */}
                  <button 
                    onClick={(e) => toggleFavorite(e, node.address)}
                    className={`p-1.5 rounded-full transition ${isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'}`}
@@ -262,7 +272,6 @@ export default function Home() {
                   <span className="text-zinc-300 bg-zinc-800 px-2 py-0.5 rounded">{node.version}</span>
                 </div>
                 
-                {/* CYCLING HERO SECTION */}
                 <div className="pt-3 mt-3 border-t border-white/5 flex justify-between items-end">
                   <div className="transition-all duration-500 ease-in-out">
                     <span className="text-[10px] text-zinc-500 uppercase font-bold block mb-0.5 flex items-center gap-1">
@@ -273,7 +282,6 @@ export default function Home() {
                     </span>
                   </div>
                   
-                  {/* Status Indicator */}
                    <span className={`text-[10px] px-2 py-1 rounded-md font-bold flex items-center gap-1.5 ${
                     node.uptime > 600 
                     ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
@@ -295,11 +303,16 @@ export default function Home() {
           <div className="bg-[#09090b] border border-zinc-700 w-full max-w-lg p-0 rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
             
             <div className="bg-zinc-900/50 p-6 border-b border-zinc-800 flex justify-between items-start">
-              <div>
+              <div className="flex-1 overflow-hidden mr-4">
                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
                   <Server size={20} className="text-blue-500" /> Node Inspector
                 </h2>
-                <p className="text-zinc-500 font-mono text-xs mt-1">{selectedNode.address}</p>
+                <div className="flex items-center gap-2 mt-1">
+                    <p className="text-zinc-500 font-mono text-xs truncate">{selectedNode.address}</p>
+                    <button onClick={() => copyToClipboard(selectedNode.address)} className="text-zinc-600 hover:text-white transition">
+                        {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                    </button>
+                </div>
               </div>
               <button onClick={() => setSelectedNode(null)} className="text-zinc-500 hover:text-white transition">
                 <X size={24} />
@@ -307,7 +320,6 @@ export default function Home() {
             </div>
 
             <div className="p-6">
-              {/* STAR BUTTON IN MODAL */}
               <button 
                  onClick={(e) => toggleFavorite(e, selectedNode.address)}
                  className={`w-full mb-6 py-3 rounded-xl border flex items-center justify-center gap-2 font-bold transition ${
@@ -343,7 +355,7 @@ export default function Home() {
                       <span className="text-blue-400 font-mono font-bold">{formatBytes(selectedNode.storage_used)}</span>
                    </div>
                    <div className="flex justify-between items-center">
-                      <span className="text-zinc-400 text-sm">Capacity (Committed)</span>
+                      <span className="text-zinc-400 text-sm">Capacity</span>
                       <span className="text-purple-400 font-mono font-bold">{formatBytes(selectedNode.storage_committed || 0)}</span>
                    </div>
                    <div className="flex justify-between items-center">
@@ -359,20 +371,31 @@ export default function Home() {
               <div className="space-y-3 text-sm border-t border-white/5 pt-4">
                 <div className="flex justify-between py-1">
                   <span className="text-zinc-500">Public Key</span>
-                  <span className="text-zinc-300 font-mono truncate w-32 text-right">{selectedNode.pubkey}</span>
+                  <div className="flex items-center gap-2">
+                     <span className="text-zinc-300 font-mono truncate w-24 text-right">{selectedNode.pubkey}</span>
+                     <button onClick={() => copyToClipboard(selectedNode.pubkey)}>
+                        {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} className="text-zinc-600 hover:text-white" />}
+                     </button>
+                  </div>
                 </div>
                 <div className="flex justify-between py-1">
                   <span className="text-zinc-500">Current Session</span>
                   <span className="text-white font-mono">{formatUptime(selectedNode.uptime)}</span>
                 </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-zinc-500">Last Seen</span>
-                  <span className="text-white flex items-center gap-2">
-                    <Clock size={12} className="text-zinc-600" />
-                    {selectedNode.last_seen_timestamp ? formatLastSeen(selectedNode.last_seen_timestamp) : 'Now'}
-                  </span>
-                </div>
               </div>
+              
+              {/* EXPLORER BUTTON */}
+              <div className="mt-6 pt-4 border-t border-white/5">
+                 <a 
+                   href={`https://explorer.solana.com/address/${selectedNode.pubkey}`} 
+                   target="_blank" 
+                   rel="noopener noreferrer"
+                   className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition"
+                 >
+                   <ExternalLink size={18} /> VIEW ON EXPLORER
+                 </a>
+              </div>
+              
             </div>
           </div>
         </div>
