@@ -3,10 +3,6 @@ import axios from 'axios';
 import { Trophy, Medal, ArrowLeft, Search, Wallet } from 'lucide-react';
 import Link from 'next/link';
 
-interface CreditData {
-  [pubkey: string]: number; // The API returns { "pubkey": amount, ... }
-}
-
 interface RankedNode {
   rank: number;
   pubkey: string;
@@ -22,18 +18,38 @@ export default function Leaderboard() {
     const fetchCredits = async () => {
       try {
         const res = await axios.get('/api/credits');
-        const data: CreditData = res.data;
+        const data = res.data;
         
-        // Convert the object { key: val } into an array [ {key, val} ]
-        // Then sort by credits (Highest first)
-        const sorted = Object.entries(data)
-          .map(([pubkey, credits]) => ({ pubkey, credits }))
-          .sort((a, b) => b.credits - a.credits)
-          .map((node, index) => ({ ...node, rank: index + 1 }));
+        let processedData: RankedNode[] = [];
 
-        setRanking(sorted);
+        // --- INTELLIGENT PARSER ---
+        if (Array.isArray(data)) {
+          // If it's an Array [ { pubkey: '...', credits: 100 }, ... ]
+          processedData = data.map((item: any, index: number) => ({
+            rank: index + 1,
+            // Try to find the key in common variations
+            pubkey: item.pubkey || item.node || item.address || 'Unknown', 
+            credits: Number(item.credits || item.amount || item.balance || 0)
+          }));
+        } else {
+           // If it's an Object { "abc": 100, "xyz": 200 }
+           processedData = Object.entries(data).map(([key, val]: [string, any], index) => ({
+             rank: index + 1,
+             pubkey: key,
+             // If val is a number, use it. If it's an object, look inside.
+             credits: typeof val === 'number' ? val : Number(val?.credits || val?.amount || 0)
+           }));
+        }
+
+        // Sort Highest to Lowest
+        const sorted = processedData.sort((a, b) => b.credits - a.credits);
+        
+        // Re-assign ranks after sort
+        const finalRanked = sorted.map((node, i) => ({ ...node, rank: i + 1 }));
+
+        setRanking(finalRanked);
       } catch (err) {
-        console.error(err);
+        console.error("Leaderboard Error:", err);
       } finally {
         setLoading(false);
       }
@@ -45,7 +61,7 @@ export default function Leaderboard() {
   const filtered = ranking.filter(n => n.pubkey.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-4 md:p-8">
+    <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-4 md:p-8 selection:bg-yellow-500/30">
       
       {/* HEADER */}
       <div className="max-w-4xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
@@ -78,7 +94,7 @@ export default function Leaderboard() {
         </div>
 
         {loading ? (
-          <div className="p-20 text-center animate-pulse text-zinc-500">CALCULATING FORTUNES...</div>
+          <div className="p-20 text-center animate-pulse text-zinc-500 font-mono">CALCULATING FORTUNES...</div>
         ) : (
           <div className="divide-y divide-zinc-800/50">
             {filtered.slice(0, 100).map((node) => (
