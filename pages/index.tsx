@@ -129,7 +129,6 @@ export default function Home() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch both APIs
       const [statsRes, creditsRes] = await Promise.all([
         axios.get('/api/stats'),
         axios.get('/api/credits')
@@ -138,18 +137,19 @@ export default function Home() {
       if (statsRes.data.result && statsRes.data.result.pods) {
         let podList: Node[] = statsRes.data.result.pods;
         
-        // --- 1. ROBUST CREDITS PARSING ---
+        // --- 1. ROBUST CREDITS PARSING (MATCHES LEADERBOARD LOGIC) ---
         const creditsData = creditsRes.data.pods_credits || creditsRes.data;
         const creditMap = new Map<string, number>();
         
-        // Handle Array vs Object response
         if (Array.isArray(creditsData)) {
+            // ARRAY MODE
             creditsData.forEach((item: any) => {
                 const key = item.pubkey || item.node || item.address;
                 const val = Number(item.credits || item.amount || 0);
                 if (key) creditMap.set(key, val);
             });
         } else if (typeof creditsData === 'object' && creditsData !== null) {
+            // OBJECT MODE
             Object.entries(creditsData).forEach(([key, val]: [string, any]) => {
                 if (key === 'status' || key === 'success') return;
                 const numVal = typeof val === 'number' ? val : Number(val?.credits || val?.amount || 0);
@@ -162,17 +162,11 @@ export default function Home() {
             .sort((a, b) => b[1] - a[1])
             .map(entry => entry[0]);
 
-        // --- 3. MERGE LOGIC ---
+        // --- 3. MERGE ---
         podList = podList.map(node => {
-            // Try to find credits by Pubkey OR Address (fallback)
-            const credits = creditMap.get(node.pubkey) || creditMap.get(node.address) || 0;
-            
-            // Find rank
-            let rankIndex = rankedPubkeys.indexOf(node.pubkey);
-            if (rankIndex === -1) rankIndex = rankedPubkeys.indexOf(node.address);
-            
+            const credits = creditMap.get(node.pubkey) || 0;
+            const rankIndex = rankedPubkeys.indexOf(node.pubkey);
             const rank = rankIndex !== -1 ? rankIndex + 1 : 9999;
-            
             return { ...node, credits, rank };
         });
 
@@ -238,7 +232,7 @@ export default function Home() {
   };
 
   const getCycleContent = (node: Node, index: number) => {
-    const step = (cycleStep + index) % 4; // 4 Steps now
+    const step = (cycleStep + index) % 4;
     if (step === 0) {
       return { label: 'Storage Used', value: formatBytes(node.storage_used), color: 'text-blue-400', icon: Database };
     } else if (step === 1) {
@@ -332,7 +326,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans relative selection:bg-blue-500/30 selection:text-blue-200 flex flex-col">
       
-      {/* LIVE WIRE LOADER */}
       {loading && <div className="fixed top-0 left-0 right-0 z-50"><LiveWireLoader /></div>}
 
       <div className="p-4 md:p-8 flex-grow">
@@ -357,7 +350,6 @@ export default function Home() {
         </button>
       </header>
 
-      {/* ERROR DISPLAY */}
       {error && (
         <div className="mb-8 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center justify-between text-red-400">
           <div className="flex items-center gap-2">
@@ -368,7 +360,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* STATS OVERVIEW */}
+      {/* STATS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
           <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Total Storage</div>
@@ -388,7 +380,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* WATCHLIST SECTION */}
       {watchListNodes.length > 0 && (
         <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
            <div className="flex items-center gap-2 mb-4">
@@ -401,7 +392,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* CONTROLS */}
       <div className="mb-8 space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex gap-2 w-full md:w-auto">
@@ -454,7 +444,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* MAIN NODE GRID */}
       {filteredNodes.length === 0 && !loading ? (
         <div className="py-20 text-center text-zinc-500">
             <Server size={48} className="mx-auto mb-4 opacity-50" />
@@ -466,7 +455,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- DETAIL MODAL --- */}
+      {/* MODAL */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
           <div className="bg-[#09090b] border border-zinc-700 w-full max-w-lg p-0 rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -501,7 +490,6 @@ export default function Home() {
                 {favorites.includes(selectedNode.address) ? 'REMOVE FROM WATCHLIST' : 'ADD TO WATCHLIST'}
               </button>
 
-              {/* ROW 1: STATUS & HEALTH */}
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl text-center">
                   <div className="text-xs text-zinc-500 mb-1 font-bold">HEALTH SCORE</div>
@@ -515,7 +503,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* ROW 2: FINANCIALS (NEW) */}
               <div className="grid grid-cols-2 gap-4 mb-6">
                  <div className="bg-zinc-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3">
                     <Trophy size={20} className="text-yellow-500" />
@@ -533,7 +520,6 @@ export default function Home() {
                  </div>
               </div>
 
-              {/* ROW 3: STORAGE */}
               <div className="mb-6">
                 <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">
                   <Database size={12} /> Storage Metrics
@@ -557,7 +543,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* DETAILS */}
               <div className="space-y-3 text-sm border-t border-white/5 pt-4">
                 <div className="flex justify-between py-1">
                   <span className="text-zinc-500">RPC Endpoint</span>
@@ -619,4 +604,3 @@ export default function Home() {
     </div>
   );
 }
-
