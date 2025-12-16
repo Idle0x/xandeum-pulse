@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, ExternalLink, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Wallet, Medal } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, ExternalLink, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Twitter, Medal, Wallet } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -48,7 +48,6 @@ const formatLastSeen = (timestamp: number) => {
   return '>1d ago';
 };
 
-// --- LOGIC: ROBUST VERSION COMPARISON ---
 const compareVersions = (v1: string, v2: string) => {
   const parts1 = v1.split('.').map(Number);
   const parts2 = v2.split('.').map(Number);
@@ -61,28 +60,17 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
-// --- LOGIC: HEALTH SCORE ---
 const getHealthScore = (node: Node, latestVersion: string) => {
   let score = 100;
-  
-  // 1. Uptime (3 Days = Perfect)
-  if (node.uptime < 3600) score -= 40;       // < 1h
-  else if (node.uptime < 86400) score -= 20; // < 24h
-  else if (node.uptime < 259200) score -= 5; // < 3d
-  
-  // 2. Version Check
+  if (node.uptime < 3600) score -= 40;
+  else if (node.uptime < 86400) score -= 20;
+  else if (node.uptime < 259200) score -= 5;
   if (latestVersion !== 'N/A' && compareVersions(node.version, latestVersion) < 0) score -= 15;
-  
-  // 3. Visibility
   if (!node.is_public) score -= 10;
-  
-  // 4. Storage Usage Bonus
   if (node.storage_used > 1000000) score += 5; 
-  
   return Math.max(0, Math.min(100, score));
 };
 
-// --- COMPONENT: LIVE WIRE LOADER ---
 const LiveWireLoader = () => (
   <div className="w-full h-1 relative overflow-hidden bg-zinc-900 border-b border-zinc-800">
     <div className="absolute inset-0 bg-blue-500/20 blur-[2px]"></div>
@@ -105,7 +93,6 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [cycleStep, setCycleStep] = useState(0);
 
-  // Stats State
   const [networkHealth, setNetworkHealth] = useState('0.00');
   const [mostCommonVersion, setMostCommonVersion] = useState('N/A');
   const [totalStorage, setTotalStorage] = useState(0);
@@ -153,8 +140,11 @@ export default function Home() {
         
         // --- PROCESS CREDITS & RANKING ---
         const creditsData = creditsRes.data.pods_credits || creditsRes.data;
+        
+        // Create a map of pubkey -> credits
         const creditMap = new Map<string, number>();
         
+        // Handle array vs object response from credits API
         if (Array.isArray(creditsData)) {
             creditsData.forEach((item: any) => {
                 const key = item.pubkey || item.node || item.address;
@@ -168,14 +158,17 @@ export default function Home() {
             });
         }
 
+        // Calculate Ranks globally (sort all known credits)
+        // We create a sorted list of pubkeys based on credits
         const rankedPubkeys = Array.from(creditMap.entries())
             .sort((a, b) => b[1] - a[1])
             .map(entry => entry[0]);
 
+        // Merge into Nodes
         podList = podList.map(node => {
             const credits = creditMap.get(node.pubkey) || 0;
-            const rank = rankedPubkeys.indexOf(node.pubkey) + 1; 
-            return { ...node, credits, rank: rank > 0 ? rank : 9999 };
+            const rank = rankedPubkeys.indexOf(node.pubkey) + 1; // 0-index to 1-index
+            return { ...node, credits, rank: rank > 0 ? rank : 9999 }; // 9999 if unranked
         });
 
         setNodes(podList);
@@ -217,6 +210,7 @@ export default function Home() {
       if (sortBy === 'version') {
          return sortOrder === 'asc' ? compareVersions(a.version, b.version) : compareVersions(b.version, a.version);
       }
+      // For Rank, Lower is Better (1 is better than 10)
       if (sortBy === 'rank') {
           return sortOrder === 'asc' ? valA - valB : valB - valA;
       }
@@ -294,6 +288,7 @@ export default function Home() {
             </div>
           </div>
 
+          {/* NEW: RANK & CREDITS ROW */}
           <div className="flex justify-between items-center text-xs bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
              <div className="flex items-center gap-1.5">
                 <Medal size={12} className={node.rank === 1 ? 'text-yellow-400' : 'text-zinc-500'} />
@@ -567,25 +562,19 @@ export default function Home() {
       </div>
       
       {/* FOOTER */}
-      <footer className="mt-20 border-t border-zinc-800 bg-zinc-900/30 pt-10 pb-10">
-        <div className="max-w-2xl mx-auto text-center">
-            <h3 className="text-zinc-400 font-bold mb-2 tracking-widest text-xs uppercase">Xandeum Pulse</h3>
-            <p className="text-zinc-600 text-sm mb-6 max-w-md mx-auto leading-relaxed">
-            A community-built dashboard for monitoring Xandeum pNode health, storage consensus, and network metrics.
+      <footer className="border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto">
+        <div className="max-w-4xl mx-auto text-center">
+            <h3 className="text-white font-bold mb-2">XANDEUM PULSE MONITOR</h3>
+            <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">
+                Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.
             </p>
-
-            <div className="flex items-center justify-center gap-6 text-xs text-zinc-500 font-mono">
-            <div className="flex items-center gap-2">
-                <span>Built by</span>
-                <a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="text-zinc-300 hover:text-white transition font-bold">riot'</a>
-            </div>
-            <span>•</span>
-            <a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition">@33xp_</a>
-            <span>•</span>
-            <span className="opacity-70">Discord: @idle0x</span>
+            <div className="flex justify-center items-center gap-4 text-xs font-mono text-zinc-600">
+                <span>built by <span className="text-zinc-400 font-bold">riot'</span> (@33xp_ | @idle0x)</span>
+                <span>•</span>
+                <span>pRPC Powered</span>
             </div>
         </div>
-     </footer>
+      </footer>
     </div>
   );
 }
