@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, ExternalLink, Copy, Check, Globe, AlertTriangle } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, ExternalLink, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Twitter } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -35,32 +35,49 @@ const formatUptime = (seconds: number) => {
 
 const formatLastSeen = (timestamp: number) => {
   const now = Date.now();
+  // Handle potentially different timestamp formats (sec vs ms)
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
   const diff = now - time;
+  
   if (diff < 60000) return 'Just now';
   const mins = Math.floor(diff / 60000);
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
-  return `${hours}h ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return '>1d ago';
 };
 
-// --- LOGIC: THE GOLD STANDARD SCORING ---
+// --- LOGIC: ROBUST VERSION COMPARISON ---
+const compareVersions = (v1: string, v2: string) => {
+  const parts1 = v1.split('.').map(Number);
+  const parts2 = v2.split('.').map(Number);
+  
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const num1 = parts1[i] || 0;
+    const num2 = parts2[i] || 0;
+    if (num1 > num2) return 1;
+    if (num1 < num2) return -1;
+  }
+  return 0;
+};
+
+// --- LOGIC: HEALTH SCORE ---
 const getHealthScore = (node: Node, latestVersion: string) => {
   let score = 100;
   
-  // 1. Uptime Penalties (Baseline: 3 Days is perfect)
-  if (node.uptime < 3600) score -= 40;       // < 1 hour (Critical)
-  else if (node.uptime < 86400) score -= 20; // < 24 hours (Warming up)
-  else if (node.uptime < 259200) score -= 5; // < 3 days (Stable but new)
+  // 1. Uptime (3 Days = Perfect)
+  if (node.uptime < 3600) score -= 40;       // < 1h
+  else if (node.uptime < 86400) score -= 20; // < 24h
+  else if (node.uptime < 259200) score -= 5; // < 3d
   
-  // 2. Version Penalties
-  if (latestVersion !== 'N/A' && node.version !== latestVersion) score -= 15;
+  // 2. Version Check
+  if (latestVersion !== 'N/A' && compareVersions(node.version, latestVersion) < 0) score -= 15;
   
   // 3. Visibility
   if (!node.is_public) score -= 10;
   
   // 4. Storage Usage Bonus
-  if (node.storage_used > 1000000) score += 5; // Bonus for storing > 1MB
+  if (node.storage_used > 1000000) score += 5; 
   
   return Math.max(0, Math.min(100, score));
 };
@@ -99,7 +116,7 @@ export default function Home() {
     if (saved) setFavorites(JSON.parse(saved));
 
     const interval = setInterval(() => {
-      setCycleStep(prev => (prev + 1) % 1000); // Prevent overflow
+      setCycleStep(prev => (prev + 1) % 1000); 
     }, 4000);
     return () => clearInterval(interval);
   }, []);
@@ -131,14 +148,13 @@ export default function Home() {
         setNodes(podList);
         setLastUpdated(new Date().toLocaleTimeString());
         
-        // --- REAL MATH CALCULATIONS ---
-        
-        // 1. Network Health: % of nodes with > 24 Hours uptime
+        // --- REAL MATH ---
+        // 1. Health: > 24 Hours uptime
         const stableNodes = podList.filter(n => n.uptime > 86400).length;
         const healthCalc = podList.length > 0 ? (stableNodes / podList.length) * 100 : 0;
         setNetworkHealth(healthCalc.toFixed(2));
 
-        // 2. Average (Mode) Version
+        // 2. Most Common Version
         if (podList.length > 0) {
             const versionCounts = podList.reduce((acc, n) => {
                 acc[n.version] = (acc[n.version] || 0) + 1;
@@ -148,7 +164,7 @@ export default function Home() {
             setMostCommonVersion(topVersion);
         }
 
-        // 3. Total Network Storage
+        // 3. Total Storage
         const totalBytes = podList.reduce((sum, n) => sum + (n.storage_used || 0), 0);
         setTotalStorage(totalBytes);
 
@@ -171,9 +187,8 @@ export default function Home() {
       let valA = a[sortBy === 'storage' ? 'storage_used' : sortBy];
       let valB = b[sortBy === 'storage' ? 'storage_used' : sortBy];
       
-      // Fix version sorting (strings)
       if (sortBy === 'version') {
-         return sortOrder === 'asc' ? a.version.localeCompare(b.version) : b.version.localeCompare(a.version);
+         return sortOrder === 'asc' ? compareVersions(a.version, b.version) : compareVersions(b.version, a.version);
       }
       return sortOrder === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
     });
@@ -198,9 +213,7 @@ export default function Home() {
     if (step === 0) {
       return { label: 'Storage Used', value: formatBytes(node.storage_used), color: 'text-blue-400', icon: Database };
     } else if (step === 1) {
-      // If Committed is 0, show Health Score instead
-      const score = getHealthScore(node, mostCommonVersion);
-      return { label: 'Health Score', value: `${score}/100`, color: score > 80 ? 'text-green-400' : 'text-yellow-400', icon: Activity };
+      return { label: 'Capacity', value: formatBytes(node.storage_committed || 0), color: 'text-purple-400', icon: HardDrive };
     } else {
       return { 
         label: 'Last Seen', 
@@ -214,7 +227,7 @@ export default function Home() {
   const renderNodeCard = (node: Node, i: number) => {
     const cycleData = getCycleContent(node, i);
     const isFav = favorites.includes(node.address);
-    const isLatest = node.version === mostCommonVersion;
+    const isLatest = mostCommonVersion !== 'N/A' && node.version === mostCommonVersion;
     
     return (
       <div 
@@ -278,12 +291,12 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans relative selection:bg-blue-500/30 selection:text-blue-200">
+    <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans relative selection:bg-blue-500/30 selection:text-blue-200 flex flex-col">
       
       {/* LIVE WIRE LOADER */}
       {loading && <div className="fixed top-0 left-0 right-0 z-50"><LiveWireLoader /></div>}
 
-      <div className="p-4 md:p-8">
+      <div className="p-4 md:p-8 flex-grow">
       {/* HEADER */}
       <header className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-zinc-800 pb-6">
         <div className="text-center md:text-left mb-4 md:mb-0">
@@ -304,6 +317,17 @@ export default function Home() {
             CSV EXPORT
         </button>
       </header>
+
+      {/* ERROR DISPLAY */}
+      {error && (
+        <div className="mb-8 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center justify-between text-red-400">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={20} />
+            <span>{error}</span>
+          </div>
+          <button onClick={fetchStats} className="text-xs underline hover:text-white">Retry</button>
+        </div>
+      )}
 
       {/* STATS OVERVIEW - REAL DATA */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -340,17 +364,47 @@ export default function Home() {
 
       {/* CONTROLS */}
       <div className="mb-8 space-y-4">
-        <div className="flex justify-between items-center">
-            <Link href="/leaderboard" className="px-5 py-2.5 bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 text-yellow-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2">
-                <Trophy size={16} /> RICH LIST
-            </Link>
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            {/* ACTION BUTTONS */}
+            <div className="flex gap-2 w-full md:w-auto">
+                <Link href="/leaderboard" className="flex-1 md:flex-none justify-center px-5 py-2.5 bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 text-yellow-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2">
+                    <Trophy size={16} /> RICH LIST
+                </Link>
 
-            <button onClick={fetchStats} className="px-4 py-2.5 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2 text-zinc-300">
-                <Zap size={16} className={loading ? "text-blue-500 animate-pulse" : "text-blue-500"} /> 
-                REFRESH
-            </button>
+                <button onClick={fetchStats} className="flex-1 md:flex-none justify-center px-4 py-2.5 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2 text-zinc-300">
+                    <Zap size={16} className={loading ? "text-blue-500 animate-pulse" : "text-blue-500"} /> 
+                    REFRESH
+                </button>
+            </div>
+
+            {/* RESTORED: SORT BUTTONS */}
+            <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 w-full md:w-auto justify-end">
+                {[
+                    { id: 'uptime', label: 'UPTIME', icon: Clock },
+                    { id: 'version', label: 'VERSION', icon: Server },
+                    { id: 'storage', label: 'STORAGE', icon: Database },
+                ].map((opt) => (
+                    <button
+                    key={opt.id}
+                    onClick={() => {
+                        if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                        else setSortBy(opt.id as any);
+                    }}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${
+                        sortBy === opt.id 
+                        ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' 
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'
+                    }`}
+                    >
+                    <opt.icon size={12} />
+                    {opt.label}
+                    {sortBy === opt.id && <ArrowUpDown size={10} className="ml-1" />}
+                    </button>
+                ))}
+            </div>
         </div>
 
+        {/* SEARCH BAR */}
         <div className="relative">
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
@@ -423,8 +477,31 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* STORAGE METRICS SECTION */}
+              <div className="mb-6">
+                <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">
+                  <Database size={12} /> Storage Metrics
+                </h3>
+                <div className="bg-zinc-900/50 rounded-xl p-4 border border-zinc-800 space-y-3">
+                   <div className="flex justify-between items-center">
+                      <span className="text-zinc-400 text-sm">Used</span>
+                      <span className="text-blue-400 font-mono font-bold">{formatBytes(selectedNode.storage_used)}</span>
+                   </div>
+                   <div className="flex justify-between items-center">
+                      <span className="text-zinc-400 text-sm">Capacity</span>
+                      <span className="text-purple-400 font-mono font-bold">{formatBytes(selectedNode.storage_committed || 0)}</span>
+                   </div>
+                   <div className="flex justify-between items-center">
+                      <span className="text-zinc-400 text-sm">Efficiency</span>
+                      <span className="text-white font-mono font-bold">{selectedNode.storage_usage_percentage || 0}%</span>
+                   </div>
+                   <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-2">
+                      <div className="h-full bg-blue-500" style={{ width: `${selectedNode.storage_usage_percentage || 0}%` }}></div>
+                   </div>
+                </div>
+              </div>
+
               <div className="space-y-3 text-sm border-t border-white/5 pt-4">
-                {/* NEW: RPC Endpoint */}
                 <div className="flex justify-between py-1">
                   <span className="text-zinc-500">RPC Endpoint</span>
                   <div className="flex items-center gap-2">
@@ -449,10 +526,6 @@ export default function Home() {
                    <span className="text-zinc-500">Uptime</span>
                    <span className="text-white font-mono">{formatUptime(selectedNode.uptime)}</span>
                 </div>
-                 <div className="flex justify-between py-1">
-                   <span className="text-zinc-500">Storage Used</span>
-                   <span className="text-blue-400 font-bold font-mono">{formatBytes(selectedNode.storage_used)}</span>
-                </div>
               </div>
               
               <div className="mt-6 pt-4 border-t border-white/5">
@@ -471,6 +544,21 @@ export default function Home() {
         </div>
       )}
       </div>
+      
+      {/* FOOTER */}
+      <footer className="border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto">
+        <div className="max-w-4xl mx-auto text-center">
+            <h3 className="text-white font-bold mb-2">XANDEUM PULSE MONITOR</h3>
+            <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">
+                Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.
+            </p>
+            <div className="flex justify-center items-center gap-4 text-xs font-mono text-zinc-600">
+                <span>BUILT BY RIOT <span className="text-yellow-600">(@33xp_ & @idle0x)</span></span>
+                <span>•</span>
+                <span>POWERED BY pRPC</span>
+            </div>
+        </div>
+      </footer>
     </div>
   );
 }
