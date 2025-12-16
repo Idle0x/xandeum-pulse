@@ -129,7 +129,7 @@ export default function Home() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch both APIs in parallel
+      // Fetch both APIs
       const [statsRes, creditsRes] = await Promise.all([
         axios.get('/api/stats'),
         axios.get('/api/credits')
@@ -138,11 +138,11 @@ export default function Home() {
       if (statsRes.data.result && statsRes.data.result.pods) {
         let podList: Node[] = statsRes.data.result.pods;
         
-        // --- 1. ROBUST CREDITS PARSING (FIXED) ---
+        // --- 1. ROBUST CREDITS PARSING ---
         const creditsData = creditsRes.data.pods_credits || creditsRes.data;
         const creditMap = new Map<string, number>();
         
-        // Force conversion to a standard Map format
+        // Handle Array vs Object response
         if (Array.isArray(creditsData)) {
             creditsData.forEach((item: any) => {
                 const key = item.pubkey || item.node || item.address;
@@ -151,25 +151,26 @@ export default function Home() {
             });
         } else if (typeof creditsData === 'object' && creditsData !== null) {
             Object.entries(creditsData).forEach(([key, val]: [string, any]) => {
-                // Skip status keys if any
                 if (key === 'status' || key === 'success') return;
-                
                 const numVal = typeof val === 'number' ? val : Number(val?.credits || val?.amount || 0);
                 creditMap.set(key, numVal);
             });
         }
 
-        // --- 2. CALCULATE RANKS (FIXED) ---
-        // Sort all credits descending to determine rank
+        // --- 2. CALCULATE RANKS ---
         const rankedPubkeys = Array.from(creditMap.entries())
             .sort((a, b) => b[1] - a[1])
             .map(entry => entry[0]);
 
-        // --- 3. MERGE DATA INTO NODES ---
+        // --- 3. MERGE LOGIC ---
         podList = podList.map(node => {
-            const credits = creditMap.get(node.pubkey) || 0;
-            const rankIndex = rankedPubkeys.indexOf(node.pubkey);
-            // If found in list, rank is index + 1. If not found, unranked.
+            // Try to find credits by Pubkey OR Address (fallback)
+            const credits = creditMap.get(node.pubkey) || creditMap.get(node.address) || 0;
+            
+            // Find rank
+            let rankIndex = rankedPubkeys.indexOf(node.pubkey);
+            if (rankIndex === -1) rankIndex = rankedPubkeys.indexOf(node.address);
+            
             const rank = rankIndex !== -1 ? rankIndex + 1 : 9999;
             
             return { ...node, credits, rank };
@@ -237,9 +238,7 @@ export default function Home() {
   };
 
   const getCycleContent = (node: Node, index: number) => {
-    // 4-Step Cycle to include everything
-    const step = (cycleStep + index) % 4;
-    
+    const step = (cycleStep + index) % 4; // 4 Steps now
     if (step === 0) {
       return { label: 'Storage Used', value: formatBytes(node.storage_used), color: 'text-blue-400', icon: Database };
     } else if (step === 1) {
@@ -502,25 +501,64 @@ export default function Home() {
                 {favorites.includes(selectedNode.address) ? 'REMOVE FROM WATCHLIST' : 'ADD TO WATCHLIST'}
               </button>
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl text-center">
-                  <div className="text-xs text-zinc-500 mb-1 font-bold">GLOBAL RANK</div>
-                  <div className="text-3xl font-bold text-yellow-500">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</div>
-                </div>
+              {/* ROW 1: STATUS & HEALTH */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
                 <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl text-center">
                   <div className="text-xs text-zinc-500 mb-1 font-bold">HEALTH SCORE</div>
                   <div className="text-3xl font-bold text-white">{getHealthScore(selectedNode, mostCommonVersion)}</div>
                 </div>
+                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl text-center">
+                  <div className="text-xs text-zinc-500 mb-1 font-bold">VISIBILITY</div>
+                  <div className={`text-lg font-bold mt-1 flex justify-center items-center gap-2 ${selectedNode.is_public ? 'text-green-400' : 'text-orange-400'}`}>
+                    {selectedNode.is_public ? <><Globe size={16} /> PUBLIC</> : <><Shield size={16} /> PRIVATE</>}
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-3 text-sm border-t border-white/5 pt-4">
-                <div className="flex justify-between py-1">
-                  <span className="text-zinc-500">Credits Earned</span>
-                  <span className="text-yellow-500 font-mono font-bold flex items-center gap-2">
-                     <Wallet size={14} />
-                     {selectedNode.credits?.toLocaleString() || 0}
-                  </span>
+              {/* ROW 2: FINANCIALS (NEW) */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                 <div className="bg-zinc-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3">
+                    <Trophy size={20} className="text-yellow-500" />
+                    <div>
+                        <div className="text-[10px] text-zinc-500 font-bold uppercase">Global Rank</div>
+                        <div className="text-xl font-bold text-white">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</div>
+                    </div>
+                 </div>
+                 <div className="bg-zinc-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3">
+                    <Wallet size={20} className="text-yellow-500" />
+                    <div>
+                        <div className="text-[10px] text-zinc-500 font-bold uppercase">Credits</div>
+                        <div className="text-xl font-bold text-white">{selectedNode.credits?.toLocaleString() || 0}</div>
+                    </div>
+                 </div>
+              </div>
+
+              {/* ROW 3: STORAGE */}
+              <div className="mb-6">
+                <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">
+                  <Database size={12} /> Storage Metrics
+                </h3>
+                <div className="bg-zinc-900/50 rounded-xl p-4 border border-zinc-800 space-y-3">
+                   <div className="flex justify-between items-center">
+                      <span className="text-zinc-400 text-sm">Used</span>
+                      <span className="text-blue-400 font-mono font-bold">{formatBytes(selectedNode.storage_used)}</span>
+                   </div>
+                   <div className="flex justify-between items-center">
+                      <span className="text-zinc-400 text-sm">Capacity</span>
+                      <span className="text-purple-400 font-mono font-bold">{formatBytes(selectedNode.storage_committed || 0)}</span>
+                   </div>
+                   <div className="flex justify-between items-center">
+                      <span className="text-zinc-400 text-sm">Efficiency</span>
+                      <span className="text-white font-mono font-bold">{selectedNode.storage_usage_percentage || 0}%</span>
+                   </div>
+                   <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-2">
+                      <div className="h-full bg-blue-500" style={{ width: `${selectedNode.storage_usage_percentage || 0}%` }}></div>
+                   </div>
                 </div>
+              </div>
+
+              {/* DETAILS */}
+              <div className="space-y-3 text-sm border-t border-white/5 pt-4">
                 <div className="flex justify-between py-1">
                   <span className="text-zinc-500">RPC Endpoint</span>
                   <div className="flex items-center gap-2">
@@ -544,10 +582,6 @@ export default function Home() {
                 <div className="flex justify-between py-1">
                    <span className="text-zinc-500">Uptime</span>
                    <span className="text-white font-mono">{formatUptime(selectedNode.uptime)}</span>
-                </div>
-                 <div className="flex justify-between py-1">
-                   <span className="text-zinc-500">Storage Used</span>
-                   <span className="text-blue-400 font-bold font-mono">{formatBytes(selectedNode.storage_used)}</span>
                 </div>
               </div>
               
@@ -585,3 +619,4 @@ export default function Home() {
     </div>
   );
 }
+
