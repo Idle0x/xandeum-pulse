@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap } from 'lucide-react';
+import Link from 'next/link'; // NEW IMPORT
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy } from 'lucide-react'; // ADDED TROPHY
 
 // --- TYPES ---
 interface Node {
@@ -30,7 +31,6 @@ const formatUptime = (seconds: number) => {
 
 const formatLastSeen = (timestamp: number) => {
   const now = Date.now();
-  // Handle micro/milli seconds automatically
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
   const diff = now - time;
   
@@ -105,7 +105,6 @@ export default function Home() {
   };
 
   return (
-    // UPDATED: Background is now a rich zinc-black, not pure black. Text is clearer.
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-4 md:p-8 relative selection:bg-blue-500/30 selection:text-blue-200">
       
       {/* HEADER */}
@@ -124,6 +123,11 @@ export default function Home() {
         </div>
         
         <div className="flex gap-3">
+          {/* NEW LEADERBOARD BUTTON */}
+          <Link href="/leaderboard" className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-yellow-500 hover:text-yellow-500 rounded-lg transition text-xs font-semibold tracking-wide flex items-center gap-2">
+            <Trophy size={14} className="text-yellow-600" /> LEADERS
+          </Link>
+
           <button onClick={fetchStats} className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-semibold tracking-wide flex items-center gap-2">
             <Zap size={14} className="text-yellow-500" /> REFRESH
           </button>
@@ -133,7 +137,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* STATS OVERVIEW - UPDATED COLORS */}
+      {/* STATS OVERVIEW */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
         <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
           <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Active Nodes</div>
@@ -191,7 +195,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* NODE GRID - THE NEW "FLOATING CARD" LOOK */}
+      {/* NODE GRID */}
       {loading ? (
         <div className="py-20 text-center animate-pulse">
           <Activity className="mx-auto mb-4 text-blue-500" size={48} />
@@ -203,7 +207,6 @@ export default function Home() {
             <div 
               key={i} 
               onClick={() => setSelectedNode(node)}
-              // THIS IS THE NEW CARD STYLE: Darker, Subtle Border, Lift on Hover
               className="group relative bg-zinc-900/40 border border-white/5 rounded-xl p-5 cursor-pointer hover:bg-zinc-800/60 hover:border-blue-500/30 hover:-translate-y-1 hover:shadow-2xl transition-all duration-300"
             >
               <div className="mb-4 flex justify-between items-start">
@@ -213,7 +216,6 @@ export default function Home() {
                       {node.address}
                     </div>
                  </div>
-                 {/* PROFESSIONAL STATUS BADGE */}
                  <span className={`text-[10px] px-2 py-1 rounded-md font-bold flex items-center gap-1.5 ${
                     node.uptime > 600 
                     ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
@@ -234,11 +236,9 @@ export default function Home() {
                   <span className="text-zinc-300">{formatUptime(node.uptime)}</span>
                 </div>
                 
-                {/* HERO STORAGE SECTION */}
                 <div className="pt-3 mt-3 border-t border-white/5 flex justify-between items-end">
                   <div>
                     <span className="text-[10px] text-zinc-500 uppercase font-bold block mb-0.5">Storage Used</span>
-                    {/* BLUE HERO TEXT */}
                     <span className="text-lg font-bold text-blue-400 font-mono tracking-tight">{formatBytes(node.storage_used)}</span>
                   </div>
                   
@@ -252,12 +252,11 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- DETAIL MODAL - UPDATED --- */}
+      {/* --- DETAIL MODAL --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
           <div className="bg-[#09090b] border border-zinc-700 w-full max-w-lg p-0 rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
             
-            {/* Modal Header */}
             <div className="bg-zinc-900/50 p-6 border-b border-zinc-800 flex justify-between items-start">
               <div>
                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -270,7 +269,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-6">
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl text-center">
