@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, ExternalLink, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Twitter } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, ExternalLink, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Twitter, Medal, Wallet } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -14,6 +14,9 @@ interface Node {
   storage_used: number;
   storage_committed?: number; 
   storage_usage_percentage?: number;
+  // Merged Data
+  rank?: number;
+  credits?: number;
 }
 
 // --- HELPER FUNCTIONS ---
@@ -35,10 +38,8 @@ const formatUptime = (seconds: number) => {
 
 const formatLastSeen = (timestamp: number) => {
   const now = Date.now();
-  // Handle potentially different timestamp formats (sec vs ms)
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
   const diff = now - time;
-  
   if (diff < 60000) return 'Just now';
   const mins = Math.floor(diff / 60000);
   if (mins < 60) return `${mins}m ago`;
@@ -47,11 +48,9 @@ const formatLastSeen = (timestamp: number) => {
   return '>1d ago';
 };
 
-// --- LOGIC: ROBUST VERSION COMPARISON ---
 const compareVersions = (v1: string, v2: string) => {
   const parts1 = v1.split('.').map(Number);
   const parts2 = v2.split('.').map(Number);
-  
   for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
     const num1 = parts1[i] || 0;
     const num2 = parts2[i] || 0;
@@ -61,28 +60,17 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
-// --- LOGIC: HEALTH SCORE ---
 const getHealthScore = (node: Node, latestVersion: string) => {
   let score = 100;
-  
-  // 1. Uptime (3 Days = Perfect)
-  if (node.uptime < 3600) score -= 40;       // < 1h
-  else if (node.uptime < 86400) score -= 20; // < 24h
-  else if (node.uptime < 259200) score -= 5; // < 3d
-  
-  // 2. Version Check
+  if (node.uptime < 3600) score -= 40;
+  else if (node.uptime < 86400) score -= 20;
+  else if (node.uptime < 259200) score -= 5;
   if (latestVersion !== 'N/A' && compareVersions(node.version, latestVersion) < 0) score -= 15;
-  
-  // 3. Visibility
   if (!node.is_public) score -= 10;
-  
-  // 4. Storage Usage Bonus
   if (node.storage_used > 1000000) score += 5; 
-  
   return Math.max(0, Math.min(100, score));
 };
 
-// --- COMPONENT: LIVE WIRE LOADER ---
 const LiveWireLoader = () => (
   <div className="w-full h-1 relative overflow-hidden bg-zinc-900 border-b border-zinc-800">
     <div className="absolute inset-0 bg-blue-500/20 blur-[2px]"></div>
@@ -97,7 +85,7 @@ export default function Home() {
   const [lastUpdated, setLastUpdated] = useState('');
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage'>('uptime');
+  const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'rank'>('uptime');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
@@ -105,13 +93,12 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [cycleStep, setCycleStep] = useState(0);
 
-  // Stats State
   const [networkHealth, setNetworkHealth] = useState('0.00');
   const [mostCommonVersion, setMostCommonVersion] = useState('N/A');
   const [totalStorage, setTotalStorage] = useState(0);
 
   useEffect(() => {
-    fetchStats();
+    fetchData();
     const saved = localStorage.getItem('xandeum_favorites');
     if (saved) setFavorites(JSON.parse(saved));
 
@@ -139,22 +126,58 @@ export default function Home() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const fetchStats = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/stats');
-      if (res.data.result && res.data.result.pods) {
-        const podList: Node[] = res.data.result.pods;
+      // Fetch both APIs in parallel
+      const [statsRes, creditsRes] = await Promise.all([
+        axios.get('/api/stats'),
+        axios.get('/api/credits')
+      ]);
+
+      if (statsRes.data.result && statsRes.data.result.pods) {
+        let podList: Node[] = statsRes.data.result.pods;
+        
+        // --- PROCESS CREDITS & RANKING ---
+        const creditsData = creditsRes.data.pods_credits || creditsRes.data;
+        
+        // Create a map of pubkey -> credits
+        const creditMap = new Map<string, number>();
+        
+        // Handle array vs object response from credits API
+        if (Array.isArray(creditsData)) {
+            creditsData.forEach((item: any) => {
+                const key = item.pubkey || item.node || item.address;
+                const val = Number(item.credits || item.amount || 0);
+                if (key) creditMap.set(key, val);
+            });
+        } else {
+            Object.entries(creditsData).forEach(([key, val]: [string, any]) => {
+                const numVal = typeof val === 'number' ? val : Number(val?.credits || val?.amount || 0);
+                creditMap.set(key, numVal);
+            });
+        }
+
+        // Calculate Ranks globally (sort all known credits)
+        // We create a sorted list of pubkeys based on credits
+        const rankedPubkeys = Array.from(creditMap.entries())
+            .sort((a, b) => b[1] - a[1])
+            .map(entry => entry[0]);
+
+        // Merge into Nodes
+        podList = podList.map(node => {
+            const credits = creditMap.get(node.pubkey) || 0;
+            const rank = rankedPubkeys.indexOf(node.pubkey) + 1; // 0-index to 1-index
+            return { ...node, credits, rank: rank > 0 ? rank : 9999 }; // 9999 if unranked
+        });
+
         setNodes(podList);
         setLastUpdated(new Date().toLocaleTimeString());
         
-        // --- REAL MATH ---
-        // 1. Health: > 24 Hours uptime
+        // --- CALCULATIONS ---
         const stableNodes = podList.filter(n => n.uptime > 86400).length;
-        const healthCalc = podList.length > 0 ? (stableNodes / podList.length) * 100 : 0;
-        setNetworkHealth(healthCalc.toFixed(2));
+        setNetworkHealth((podList.length > 0 ? (stableNodes / podList.length) * 100 : 0).toFixed(2));
 
-        // 2. Most Common Version
         if (podList.length > 0) {
             const versionCounts = podList.reduce((acc, n) => {
                 acc[n.version] = (acc[n.version] || 0) + 1;
@@ -164,10 +187,8 @@ export default function Home() {
             setMostCommonVersion(topVersion);
         }
 
-        // 3. Total Storage
         const totalBytes = podList.reduce((sum, n) => sum + (n.storage_used || 0), 0);
         setTotalStorage(totalBytes);
-
         setError('');
       }
     } catch (err: any) {
@@ -177,18 +198,21 @@ export default function Home() {
     }
   };
 
-  // Filter List
   const filteredNodes = nodes
     .filter(node => 
       node.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
       node.version.toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
-      let valA = a[sortBy === 'storage' ? 'storage_used' : sortBy];
-      let valB = b[sortBy === 'storage' ? 'storage_used' : sortBy];
+      let valA = a[sortBy === 'storage' ? 'storage_used' : (sortBy === 'rank' ? 'rank' : sortBy)] as any;
+      let valB = b[sortBy === 'storage' ? 'storage_used' : (sortBy === 'rank' ? 'rank' : sortBy)] as any;
       
       if (sortBy === 'version') {
          return sortOrder === 'asc' ? compareVersions(a.version, b.version) : compareVersions(b.version, a.version);
+      }
+      // For Rank, Lower is Better (1 is better than 10)
+      if (sortBy === 'rank') {
+          return sortOrder === 'asc' ? valA - valB : valB - valA;
       }
       return sortOrder === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
     });
@@ -196,9 +220,9 @@ export default function Home() {
   const watchListNodes = nodes.filter(node => favorites.includes(node.address));
 
   const exportCSV = () => {
-    const headers = 'Address,Version,Uptime(s),Storage Used,Is Public,Is Favorite,RPC Endpoint\n';
+    const headers = 'Address,Rank,Credits,Version,Uptime(s),Storage Used,Is Public,Is Favorite,RPC Endpoint\n';
     const rows = filteredNodes.map(n => 
-      `${n.address},${n.version},${n.uptime},${n.storage_used},${n.is_public},${favorites.includes(n.address)},http://${n.address.split(':')[0]}:6000`
+      `${n.address},${n.rank},${n.credits},${n.version},${n.uptime},${n.storage_used},${n.is_public},${favorites.includes(n.address)},http://${n.address.split(':')[0]}:6000`
     );
     const blob = new Blob([headers + rows.join('\n')], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -213,7 +237,8 @@ export default function Home() {
     if (step === 0) {
       return { label: 'Storage Used', value: formatBytes(node.storage_used), color: 'text-blue-400', icon: Database };
     } else if (step === 1) {
-      return { label: 'Capacity', value: formatBytes(node.storage_committed || 0), color: 'text-purple-400', icon: HardDrive };
+      const score = getHealthScore(node, mostCommonVersion);
+      return { label: 'Health Score', value: `${score}/100`, color: score > 80 ? 'text-green-400' : 'text-yellow-400', icon: Activity };
     } else {
       return { 
         label: 'Last Seen', 
@@ -259,12 +284,20 @@ export default function Home() {
             <span className="text-zinc-500">Version</span>
             <div className="flex items-center gap-2">
                <span className="text-zinc-300 bg-zinc-800 px-2 py-0.5 rounded">{node.version}</span>
-               {isLatest ? (
-                   <CheckCircle size={12} className="text-green-500" />
-               ) : (
-                   <AlertTriangle size={12} className="text-yellow-600" />
-               )}
+               {isLatest ? <CheckCircle size={12} className="text-green-500" /> : <AlertTriangle size={12} className="text-yellow-600" />}
             </div>
+          </div>
+
+          {/* NEW: RANK & CREDITS ROW */}
+          <div className="flex justify-between items-center text-xs bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
+             <div className="flex items-center gap-1.5">
+                <Medal size={12} className={node.rank === 1 ? 'text-yellow-400' : 'text-zinc-500'} />
+                <span className="text-zinc-400 font-bold">#{node.rank && node.rank < 9999 ? node.rank : '-'}</span>
+             </div>
+             <div className="flex items-center gap-1.5">
+                <span className="text-zinc-300 font-mono">{node.credits?.toLocaleString() || 0}</span>
+                <Wallet size={12} className="text-yellow-600" />
+             </div>
           </div>
           
           <div className="pt-3 mt-3 border-t border-white/5 flex justify-between items-end">
@@ -277,7 +310,7 @@ export default function Home() {
               </span>
             </div>
             
-              <span className={`text-[10px] px-2 py-1 rounded-md font-bold flex items-center gap-1.5 ${
+            <span className={`text-[10px] px-2 py-1 rounded-md font-bold flex items-center gap-1.5 ${
               node.uptime > 86400 
               ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
               : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
@@ -325,11 +358,11 @@ export default function Home() {
             <AlertTriangle size={20} />
             <span>{error}</span>
           </div>
-          <button onClick={fetchStats} className="text-xs underline hover:text-white">Retry</button>
+          <button onClick={fetchData} className="text-xs underline hover:text-white">Retry</button>
         </div>
       )}
 
-      {/* STATS OVERVIEW - REAL DATA */}
+      {/* STATS OVERVIEW */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
           <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Total Storage</div>
@@ -365,24 +398,23 @@ export default function Home() {
       {/* CONTROLS */}
       <div className="mb-8 space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            {/* ACTION BUTTONS */}
             <div className="flex gap-2 w-full md:w-auto">
                 <Link href="/leaderboard" className="flex-1 md:flex-none justify-center px-5 py-2.5 bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 text-yellow-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2">
-                    <Trophy size={16} /> RICH LIST
+                    <Trophy size={16} /> LEADERBOARD
                 </Link>
 
-                <button onClick={fetchStats} className="flex-1 md:flex-none justify-center px-4 py-2.5 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2 text-zinc-300">
+                <button onClick={fetchData} className="flex-1 md:flex-none justify-center px-4 py-2.5 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2 text-zinc-300">
                     <Zap size={16} className={loading ? "text-blue-500 animate-pulse" : "text-blue-500"} /> 
                     REFRESH
                 </button>
             </div>
 
-            {/* RESTORED: SORT BUTTONS */}
             <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 w-full md:w-auto justify-end">
                 {[
                     { id: 'uptime', label: 'UPTIME', icon: Clock },
                     { id: 'version', label: 'VERSION', icon: Server },
                     { id: 'storage', label: 'STORAGE', icon: Database },
+                    { id: 'rank', label: 'RANK', icon: Trophy },
                 ].map((opt) => (
                     <button
                     key={opt.id}
@@ -404,7 +436,6 @@ export default function Home() {
             </div>
         </div>
 
-        {/* SEARCH BAR */}
         <div className="relative">
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
@@ -466,42 +497,23 @@ export default function Home() {
 
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl text-center">
-                  <div className="text-xs text-zinc-500 mb-1 font-bold">HEALTH SCORE</div>
-                  <div className="text-3xl font-bold text-white">{getHealthScore(selectedNode, mostCommonVersion)}</div>
+                  <div className="text-xs text-zinc-500 mb-1 font-bold">GLOBAL RANK</div>
+                  <div className="text-3xl font-bold text-yellow-500">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</div>
                 </div>
                 <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl text-center">
-                  <div className="text-xs text-zinc-500 mb-1 font-bold">VISIBILITY</div>
-                  <div className={`text-lg font-bold mt-1 flex justify-center items-center gap-2 ${selectedNode.is_public ? 'text-green-400' : 'text-orange-400'}`}>
-                    {selectedNode.is_public ? <><Globe size={16} /> PUBLIC</> : <><Shield size={16} /> PRIVATE</>}
-                  </div>
-                </div>
-              </div>
-
-              {/* STORAGE METRICS SECTION */}
-              <div className="mb-6">
-                <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">
-                  <Database size={12} /> Storage Metrics
-                </h3>
-                <div className="bg-zinc-900/50 rounded-xl p-4 border border-zinc-800 space-y-3">
-                   <div className="flex justify-between items-center">
-                      <span className="text-zinc-400 text-sm">Used</span>
-                      <span className="text-blue-400 font-mono font-bold">{formatBytes(selectedNode.storage_used)}</span>
-                   </div>
-                   <div className="flex justify-between items-center">
-                      <span className="text-zinc-400 text-sm">Capacity</span>
-                      <span className="text-purple-400 font-mono font-bold">{formatBytes(selectedNode.storage_committed || 0)}</span>
-                   </div>
-                   <div className="flex justify-between items-center">
-                      <span className="text-zinc-400 text-sm">Efficiency</span>
-                      <span className="text-white font-mono font-bold">{selectedNode.storage_usage_percentage || 0}%</span>
-                   </div>
-                   <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-2">
-                      <div className="h-full bg-blue-500" style={{ width: `${selectedNode.storage_usage_percentage || 0}%` }}></div>
-                   </div>
+                  <div className="text-xs text-zinc-500 mb-1 font-bold">HEALTH SCORE</div>
+                  <div className="text-3xl font-bold text-white">{getHealthScore(selectedNode, mostCommonVersion)}</div>
                 </div>
               </div>
 
               <div className="space-y-3 text-sm border-t border-white/5 pt-4">
+                <div className="flex justify-between py-1">
+                  <span className="text-zinc-500">Credits Earned</span>
+                  <span className="text-yellow-500 font-mono font-bold flex items-center gap-2">
+                     <Wallet size={14} />
+                     {selectedNode.credits?.toLocaleString() || 0}
+                  </span>
+                </div>
                 <div className="flex justify-between py-1">
                   <span className="text-zinc-500">RPC Endpoint</span>
                   <div className="flex items-center gap-2">
@@ -525,6 +537,10 @@ export default function Home() {
                 <div className="flex justify-between py-1">
                    <span className="text-zinc-500">Uptime</span>
                    <span className="text-white font-mono">{formatUptime(selectedNode.uptime)}</span>
+                </div>
+                 <div className="flex justify-between py-1">
+                   <span className="text-zinc-500">Storage Used</span>
+                   <span className="text-blue-400 font-bold font-mono">{formatBytes(selectedNode.storage_used)}</span>
                 </div>
               </div>
               
@@ -553,9 +569,9 @@ export default function Home() {
                 Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.
             </p>
             <div className="flex justify-center items-center gap-4 text-xs font-mono text-zinc-600">
-                <span>BUILT BY RIOT <span className="text-yellow-600">(@33xp_ & @idle0x)</span></span>
+                <span>built by <span className="text-zinc-400 font-bold">riot'</span> (@33xp_ | @idle0x)</span>
                 <span>•</span>
-                <span>POWERED BY pRPC</span>
+                <span>pRPC Powered</span>
             </div>
         </div>
       </footer>
