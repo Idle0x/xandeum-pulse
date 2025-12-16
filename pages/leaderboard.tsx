@@ -18,31 +18,38 @@ export default function Leaderboard() {
     const fetchCredits = async () => {
       try {
         const res = await axios.get('/api/credits');
-        const data = res.data;
+        // The API might return { pods_credits: [...] } or just [...]
+        const rawData = res.data.pods_credits || res.data;
         
-        // 🛠️ FIX: Look inside 'pods_credits' if it exists
-        const creditsMap = data.pods_credits || data;
-        
-        let processedData: RankedNode[] = [];
+        let parsedList: RankedNode[] = [];
 
-        // Handle Object { "pubkey": 100 }
-        processedData = Object.entries(creditsMap).map(([key, val]: [string, any], index) => ({
-             rank: index + 1,
-             pubkey: key,
-             // Ensure we get a number, even if it's 0
-             credits: typeof val === 'number' ? val : Number(val?.credits || val?.amount || 0)
-        }));
+        // 🛠️ CRITICAL FIX: Handle ARRAY response correctly
+        if (Array.isArray(rawData)) {
+          parsedList = rawData.map((item: any) => ({
+            // Try every possible name for the key
+            pubkey: item.pubkey || item.node || item.address || 'Unknown',
+            credits: Number(item.credits || item.amount || 0),
+            rank: 0 // placeholder
+          }));
+        } else if (typeof rawData === 'object') {
+          // Handle OBJECT response { "pubkey": amount }
+          parsedList = Object.entries(rawData).map(([key, val]: [string, any]) => {
+             // Skip status messages
+             if (key === 'status' || key === 'success') return null;
+             return {
+                pubkey: key,
+                credits: typeof val === 'number' ? val : Number(val?.credits || 0),
+                rank: 0
+             };
+          }).filter(Boolean) as RankedNode[];
+        }
 
-        // Filter out "status" or non-node keys just in case
-        processedData = processedData.filter(node => node.pubkey !== 'status' && node.pubkey !== 'success');
+        // Sort descending by credits
+        const sorted = parsedList
+            .sort((a, b) => b.credits - a.credits)
+            .map((node, index) => ({ ...node, rank: index + 1 }));
 
-        // Sort Highest to Lowest
-        const sorted = processedData.sort((a, b) => b.credits - a.credits);
-        
-        // Re-assign ranks after sort
-        const finalRanked = sorted.map((node, i) => ({ ...node, rank: i + 1 }));
-
-        setRanking(finalRanked);
+        setRanking(sorted);
       } catch (err) {
         console.error("Leaderboard Error:", err);
       } finally {
@@ -64,7 +71,7 @@ export default function Leaderboard() {
           <ArrowLeft size={16} /> Back to Monitor
         </Link>
         <h1 className="text-3xl font-extrabold flex items-center gap-3 text-yellow-500">
-          <Trophy size={32} /> RICH LIST
+          <Trophy size={32} /> LEADERBOARD
         </h1>
       </div>
 
