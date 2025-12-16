@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Download, Server, Activity, HardDrive, X, Shield, Clock, Eye, CheckCircle, AlertCircle } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -8,7 +8,7 @@ interface Node {
   pubkey: string;
   version: string;
   uptime: number;
-  last_seen_timestamp: number; // New field we found in JSON
+  last_seen_timestamp: number;
   is_public: boolean;
   storage_used: number;
 }
@@ -29,9 +29,8 @@ const formatUptime = (seconds: number) => {
 };
 
 const formatLastSeen = (timestamp: number) => {
-  // If timestamp is huge (microseconds), convert to millis
   const now = Date.now();
-  // Xandeum timestamps might be in seconds or millis. Let's assume seconds if small.
+  // Handle micro/milli seconds automatically
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
   const diff = now - time;
   
@@ -106,48 +105,72 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-green-500 font-mono p-4 md:p-8 relative selection:bg-green-500 selection:text-black">
+    // UPDATED: Background is now a rich zinc-black, not pure black. Text is clearer.
+    <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-4 md:p-8 relative selection:bg-blue-500/30 selection:text-blue-200">
       
       {/* HEADER */}
-      <header className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-green-900/50 pb-6">
+      <header className="flex flex-col md:flex-row justify-between items-center mb-10 border-b border-zinc-800 pb-6">
         <div className="text-center md:text-left mb-4 md:mb-0">
-          <h1 className="text-4xl font-bold tracking-tighter text-white glow-text">XANDEUM PULSE</h1>
-          <div className="flex items-center gap-2 text-xs text-green-700 mt-2 justify-center md:justify-start">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-            REAL-TIME GOSSIP PROTOCOL
-            <span className="text-green-900">|</span>
+          <h1 className="text-4xl font-extrabold tracking-tight text-white flex items-center gap-3 justify-center md:justify-start">
+            <Activity className="text-blue-500" />
+            XANDEUM PULSE
+          </h1>
+          <div className="flex items-center gap-2 text-xs text-zinc-500 mt-2 justify-center md:justify-start font-mono">
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>
+            GOSSIP PROTOCOL ONLINE
+            <span className="text-zinc-700">|</span>
             SYNC: {lastUpdated || '--:--'}
           </div>
         </div>
         
         <div className="flex gap-3">
-          <button onClick={fetchStats} className="px-4 py-2 border border-green-800 hover:bg-green-900/30 hover:border-green-500 transition text-xs font-bold tracking-widest">
-            REFRESH
+          <button onClick={fetchStats} className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-semibold tracking-wide flex items-center gap-2">
+            <Zap size={14} className="text-yellow-500" /> REFRESH
           </button>
-          <button onClick={exportCSV} className="px-4 py-2 bg-green-900/20 border border-green-800 hover:bg-green-900/50 hover:text-white transition text-xs flex items-center gap-2">
-            <Download size={14} /> CSV
+          <button onClick={exportCSV} className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-semibold tracking-wide flex items-center gap-2">
+            <Download size={14} className="text-zinc-400" /> CSV
           </button>
         </div>
       </header>
 
+      {/* STATS OVERVIEW - UPDATED COLORS */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+        <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
+          <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Active Nodes</div>
+          <div className="text-3xl font-bold text-white mt-1">{nodes.length}</div>
+        </div>
+        <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
+          <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Network Health</div>
+          <div className="text-3xl font-bold text-green-500 mt-1">98.2%</div>
+        </div>
+        <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
+          <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Avg Version</div>
+          <div className="text-3xl font-bold text-blue-400 mt-1">0.8.0</div>
+        </div>
+        <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
+          <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Filtered View</div>
+          <div className="text-3xl font-bold text-white mt-1">{filteredNodes.length}</div>
+        </div>
+      </div>
+
       {/* CONTROLS */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-8">
-        <div className="md:col-span-6 relative">
-          <Search className="absolute left-3 top-3 text-green-700" size={18} />
+      <div className="flex flex-col md:flex-row gap-4 mb-8">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
             type="text" 
             placeholder="Search Node IP or Version..." 
-            className="w-full bg-black border border-green-900 p-2.5 pl-10 text-white focus:border-green-500 focus:outline-none transition placeholder-green-900"
+            className="w-full bg-zinc-900/80 border border-zinc-800 rounded-lg p-2.5 pl-10 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition placeholder-zinc-600"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
         
-        <div className="md:col-span-6 flex gap-2 overflow-x-auto pb-2 md:pb-0">
+        <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
           {[
             { id: 'uptime', label: 'UPTIME', icon: Clock },
             { id: 'version', label: 'VERSION', icon: Server },
-            { id: 'storage', label: 'STORAGE', icon: HardDrive },
+            { id: 'storage', label: 'STORAGE', icon: Database },
           ].map((opt) => (
             <button
               key={opt.id}
@@ -155,84 +178,72 @@ export default function Home() {
                 if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
                 else setSortBy(opt.id as any);
               }}
-              className={`flex-1 min-w-[100px] flex items-center justify-center gap-2 text-xs border transition ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition border ${
                 sortBy === opt.id 
-                  ? 'bg-green-900/30 border-green-500 text-white' 
-                  : 'border-green-900/50 text-green-700 hover:border-green-700'
-              } p-2`}
+                  ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' 
+                  : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'
+              }`}
             >
-              <opt.icon size={12} />
+              <opt.icon size={14} />
               {opt.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* STATS OVERVIEW */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-green-900/5 border border-green-900/30 p-4">
-          <div className="text-[10px] text-green-800 uppercase tracking-widest">Active Nodes</div>
-          <div className="text-2xl font-bold text-white">{nodes.length}</div>
-        </div>
-        <div className="bg-green-900/5 border border-green-900/30 p-4">
-          <div className="text-[10px] text-green-800 uppercase tracking-widest">Network Health</div>
-          <div className="text-2xl font-bold text-green-400">98.2%</div>
-        </div>
-        <div className="bg-green-900/5 border border-green-900/30 p-4">
-          <div className="text-[10px] text-green-800 uppercase tracking-widest">Avg Version</div>
-          <div className="text-2xl font-bold text-gray-300">0.8.0</div>
-        </div>
-        <div className="bg-green-900/5 border border-green-900/30 p-4">
-          <div className="text-[10px] text-green-800 uppercase tracking-widest">Visible</div>
-          <div className="text-2xl font-bold text-white">{filteredNodes.length}</div>
-        </div>
-      </div>
-
-      {/* NODE GRID */}
+      {/* NODE GRID - THE NEW "FLOATING CARD" LOOK */}
       {loading ? (
         <div className="py-20 text-center animate-pulse">
-          <Activity className="mx-auto mb-4 text-green-500" size={48} />
-          <div className="text-green-700 tracking-widest">ESTABLISHING UPLINK...</div>
+          <Activity className="mx-auto mb-4 text-blue-500" size={48} />
+          <div className="text-zinc-500 font-mono tracking-widest">ESTABLISHING UPLINK...</div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-20">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-20">
           {filteredNodes.map((node, i) => (
             <div 
               key={i} 
               onClick={() => setSelectedNode(node)}
-              className="border border-green-900/40 bg-black p-5 cursor-pointer hover:border-green-500 hover:bg-green-900/10 transition group relative flex flex-col justify-between"
+              // THIS IS THE NEW CARD STYLE: Darker, Subtle Border, Lift on Hover
+              className="group relative bg-zinc-900/40 border border-white/5 rounded-xl p-5 cursor-pointer hover:bg-zinc-800/60 hover:border-blue-500/30 hover:-translate-y-1 hover:shadow-2xl transition-all duration-300"
             >
-              <div className="mb-4">
-                <div className="flex justify-between items-start mb-2">
-                   <div className="text-[10px] text-green-800 uppercase">Node Address</div>
-                   {/* STATUS BADGE - REPLACES DOT */}
-                   <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${node.uptime > 600 ? 'bg-green-900/30 text-green-400 border border-green-900' : 'bg-red-900/30 text-red-400 border border-red-900'}`}>
-                      {node.uptime > 600 ? 'ONLINE' : 'SYNCING'}
-                   </span>
-                </div>
-                <div className="font-mono text-sm text-gray-200 truncate group-hover:text-white transition">
-                  {node.address}
-                </div>
+              <div className="mb-4 flex justify-between items-start">
+                 <div>
+                    <div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Address</div>
+                    <div className="font-mono text-sm text-zinc-300 truncate w-40 md:w-56 group-hover:text-white transition">
+                      {node.address}
+                    </div>
+                 </div>
+                 {/* PROFESSIONAL STATUS BADGE */}
+                 <span className={`text-[10px] px-2 py-1 rounded-md font-bold flex items-center gap-1.5 ${
+                    node.uptime > 600 
+                    ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
+                    : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                 }`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${node.uptime > 600 ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                    {node.uptime > 600 ? 'ONLINE' : 'SYNCING'}
+                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-xs">
-                <div>
-                  <span className="text-green-800 block mb-1">VERSION</span>
-                  <span className="text-green-400">{node.version}</span>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-zinc-500">Version</span>
+                  <span className="text-zinc-300 bg-zinc-800 px-2 py-0.5 rounded">{node.version}</span>
                 </div>
-                <div className="text-right">
-                  <span className="text-green-800 block mb-1">UPTIME</span>
-                  <span className="text-gray-300">{formatUptime(node.uptime)}</span>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-zinc-500">Uptime</span>
+                  <span className="text-zinc-300">{formatUptime(node.uptime)}</span>
                 </div>
-                <div className="col-span-2 pt-2 border-t border-green-900/30 flex justify-between items-center">
+                
+                {/* HERO STORAGE SECTION */}
+                <div className="pt-3 mt-3 border-t border-white/5 flex justify-between items-end">
                   <div>
-                    <span className="text-green-800 block">STORAGE</span>
-                    <span className="text-white font-bold">{formatBytes(node.storage_used)}</span>
+                    <span className="text-[10px] text-zinc-500 uppercase font-bold block mb-0.5">Storage Used</span>
+                    {/* BLUE HERO TEXT */}
+                    <span className="text-lg font-bold text-blue-400 font-mono tracking-tight">{formatBytes(node.storage_used)}</span>
                   </div>
-                  {/* VIEW DETAILS BUTTON */}
-                  <div className="text-green-600 flex items-center gap-1 group-hover:text-green-400 transition">
-                    <Eye size={12} />
-                    <span>View</span>
+                  
+                  <div className="text-zinc-600 group-hover:text-blue-400 transition transform group-hover:translate-x-1">
+                    <Eye size={16} />
                   </div>
                 </div>
               </div>
@@ -241,66 +252,70 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- DETAIL MODAL --- */}
+      {/* --- DETAIL MODAL - UPDATED --- */}
       {selectedNode && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
-          <div className="bg-black border border-green-500 w-full max-w-lg p-6 relative shadow-[0_0_50px_rgba(34,197,94,0.15)]" onClick={e => e.stopPropagation()}>
-            <button 
-              onClick={() => setSelectedNode(null)}
-              className="absolute top-4 right-4 text-green-700 hover:text-white"
-            >
-              <X size={24} />
-            </button>
-
-            <div className="mb-6 border-b border-green-900 pb-4">
-              <h2 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
-                <Server size={20} /> NODE DIAGNOSTICS
-              </h2>
-              <p className="text-green-600 font-mono text-xs">{selectedNode.address}</p>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
+          <div className="bg-[#09090b] border border-zinc-700 w-full max-w-lg p-0 rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+            
+            {/* Modal Header */}
+            <div className="bg-zinc-900/50 p-6 border-b border-zinc-800 flex justify-between items-start">
+              <div>
+                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Server size={20} className="text-blue-500" /> Node Inspector
+                </h2>
+                <p className="text-zinc-500 font-mono text-xs mt-1">{selectedNode.address}</p>
+              </div>
+              <button onClick={() => setSelectedNode(null)} className="text-zinc-500 hover:text-white transition">
+                <X size={24} />
+              </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-green-900/10 p-4 border border-green-900/50 text-center">
-                <div className="text-xs text-green-600 mb-1">HEALTH SCORE</div>
-                <div className="text-3xl font-bold text-white">{getHealthScore(selectedNode)}/100</div>
-              </div>
-              <div className="bg-green-900/10 p-4 border border-green-900/50 text-center">
-                <div className="text-xs text-green-600 mb-1">STATUS</div>
-                <div className="text-xl font-bold text-green-400 mt-1 flex justify-center items-center gap-2">
-                  <CheckCircle size={16} /> OPERATIONAL
+            {/* Modal Body */}
+            <div className="p-6">
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl text-center">
+                  <div className="text-xs text-zinc-500 mb-1 font-bold">HEALTH SCORE</div>
+                  <div className="text-3xl font-bold text-white">{getHealthScore(selectedNode)}<span className="text-sm text-zinc-600">/100</span></div>
+                </div>
+                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl text-center">
+                  <div className="text-xs text-zinc-500 mb-1 font-bold">STATUS</div>
+                  <div className="text-lg font-bold text-green-400 mt-1 flex justify-center items-center gap-2">
+                    <CheckCircle size={16} /> OPERATIONAL
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="space-y-3 text-sm font-mono">
-              <div className="flex justify-between border-b border-green-900/30 pb-2">
-                <span className="text-gray-400">Public Key</span>
-                <span className="text-green-500 truncate w-32 text-right">{selectedNode.pubkey}</span>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between py-2 border-b border-white/5">
+                  <span className="text-zinc-500">Public Key</span>
+                  <span className="text-zinc-300 font-mono truncate w-32 text-right">{selectedNode.pubkey}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-white/5">
+                  <span className="text-zinc-500">Software Version</span>
+                  <span className="text-white bg-zinc-800 px-2 py-0.5 rounded text-xs">{selectedNode.version}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-white/5">
+                  <span className="text-zinc-500">Current Session</span>
+                  <span className="text-white font-mono">{formatUptime(selectedNode.uptime)}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-white/5">
+                  <span className="text-zinc-500">Last Seen</span>
+                  <span className="text-white flex items-center gap-2">
+                    <Clock size={12} className="text-zinc-600" />
+                    {selectedNode.last_seen_timestamp ? formatLastSeen(selectedNode.last_seen_timestamp) : 'Now'}
+                  </span>
+                </div>
+                 <div className="flex justify-between py-2 border-b border-white/5">
+                  <span className="text-zinc-500">Data Stored</span>
+                  <span className="text-blue-400 font-bold font-mono text-lg">{formatBytes(selectedNode.storage_used)}</span>
+                </div>
               </div>
-              <div className="flex justify-between border-b border-green-900/30 pb-2">
-                <span className="text-gray-400">Version</span>
-                <span className="text-white">{selectedNode.version}</span>
-              </div>
-              <div className="flex justify-between border-b border-green-900/30 pb-2">
-                <span className="text-gray-400">Uptime</span>
-                <span className="text-white">{formatUptime(selectedNode.uptime)}</span>
-              </div>
-              <div className="flex justify-between border-b border-green-900/30 pb-2">
-                <span className="text-gray-400">Storage Used</span>
-                <span className="text-white font-bold">{formatBytes(selectedNode.storage_used)}</span>
-              </div>
-               <div className="flex justify-between border-b border-green-900/30 pb-2">
-                <span className="text-gray-400">Last Seen</span>
-                <span className="text-green-400">
-                  {selectedNode.last_seen_timestamp ? formatLastSeen(selectedNode.last_seen_timestamp) : 'Now'}
-                </span>
-              </div>
-            </div>
 
-            <div className="mt-6 pt-4 border-t border-green-900 text-center">
-               <p className="text-[10px] text-gray-500 uppercase">
-                 Note: CPU & RAM metrics are unavailable via public pRPC
-               </p>
+              <div className="mt-6 bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg text-center">
+                 <p className="text-[10px] text-blue-300">
+                   Note: Metrics are fetched directly from Xandeum Gossip Protocol (pRPC).
+                 </p>
+              </div>
             </div>
           </div>
         </div>
