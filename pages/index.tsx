@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, BarChart } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -12,7 +12,6 @@ interface Node {
   last_seen_timestamp: number;
   is_public: boolean;
   storage_used: number;
-  // New Fields (Optional checks in case API doesn't have them yet)
   storage_committed?: number; 
   storage_usage_percentage?: number;
 }
@@ -62,17 +61,36 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
+  // --- NEW: FAVORITES SYSTEM ---
+  const [favorites, setFavorites] = useState<string[]>([]);
+
   // --- CYCLING LOGIC ---
   const [cycleStep, setCycleStep] = useState(0);
 
   useEffect(() => {
     fetchStats();
-    // Cycle every 4 seconds
+    
+    // Load Favorites from LocalStorage on mount
+    const saved = localStorage.getItem('xandeum_favorites');
+    if (saved) setFavorites(JSON.parse(saved));
+
     const interval = setInterval(() => {
       setCycleStep(prev => prev + 1);
     }, 4000);
     return () => clearInterval(interval);
   }, []);
+
+  const toggleFavorite = (e: React.MouseEvent, address: string) => {
+    e.stopPropagation(); // Don't open the modal
+    let newFavs;
+    if (favorites.includes(address)) {
+      newFavs = favorites.filter(f => f !== address);
+    } else {
+      newFavs = [...favorites, address];
+    }
+    setFavorites(newFavs);
+    localStorage.setItem('xandeum_favorites', JSON.stringify(newFavs));
+  };
 
   const fetchStats = async () => {
     setLoading(true);
@@ -96,15 +114,22 @@ export default function Home() {
       node.version.toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
+      // 1. Sort by Favorites FIRST
+      const isFavA = favorites.includes(a.address);
+      const isFavB = favorites.includes(b.address);
+      if (isFavA && !isFavB) return -1; // A comes first
+      if (!isFavA && isFavB) return 1;  // B comes first
+
+      // 2. Then sort by selected metric
       let valA = a[sortBy === 'storage' ? 'storage_used' : sortBy];
       let valB = b[sortBy === 'storage' ? 'storage_used' : sortBy];
       return sortOrder === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
     });
 
   const exportCSV = () => {
-    const headers = ['Address,Version,Uptime,StorageUsed,Capacity,LastSeen\n'];
+    const headers = ['Address,Version,Uptime,StorageUsed,Capacity,LastSeen,IsFavorite\n'];
     const rows = filteredNodes.map(n => 
-      `${n.address},${n.version},${n.uptime},${n.storage_used},${n.storage_committed || 0},${n.last_seen_timestamp}`
+      `${n.address},${n.version},${n.uptime},${n.storage_used},${n.storage_committed || 0},${n.last_seen_timestamp},${favorites.includes(n.address)}`
     );
     const blob = new Blob([...headers, ...rows.join('\n')], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -114,18 +139,13 @@ export default function Home() {
     a.click();
   };
 
-  // Helper to get the content for the cycling display
   const getCycleContent = (node: Node, index: number) => {
-    // "Randomize" by offsetting based on index
     const step = (cycleStep + index) % 3;
-    
     if (step === 0) {
       return { label: 'Storage Used', value: formatBytes(node.storage_used), color: 'text-blue-400', icon: Database };
     } else if (step === 1) {
-      // Show Capacity (Committed)
       return { label: 'Capacity', value: formatBytes(node.storage_committed || 0), color: 'text-purple-400', icon: HardDrive };
     } else {
-      // Show Last Seen
       return { 
         label: 'Last Seen', 
         value: node.last_seen_timestamp ? formatLastSeen(node.last_seen_timestamp) : 'Unknown', 
@@ -181,8 +201,9 @@ export default function Home() {
           <div className="text-3xl font-bold text-blue-400 mt-1">0.8.0</div>
         </div>
         <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
-          <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Filtered View</div>
-          <div className="text-3xl font-bold text-white mt-1">{filteredNodes.length}</div>
+          <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Watchlist</div>
+          {/* Shows count of starred nodes */}
+          <div className="text-3xl font-bold text-yellow-500 mt-1">{favorites.length}</div>
         </div>
       </div>
 
@@ -209,14 +230,14 @@ export default function Home() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-20">
           {filteredNodes.map((node, i) => {
-            // Get the cycling content for this specific card
             const cycleData = getCycleContent(node, i);
+            const isFav = favorites.includes(node.address);
             
             return (
             <div 
               key={i} 
               onClick={() => setSelectedNode(node)}
-              className="group relative bg-zinc-900/40 border border-white/5 rounded-xl p-5 cursor-pointer hover:bg-zinc-800/60 hover:border-blue-500/30 hover:-translate-y-1 hover:shadow-2xl transition-all duration-300"
+              className={`group relative bg-zinc-900/40 border rounded-xl p-5 cursor-pointer hover:bg-zinc-800/60 hover:-translate-y-1 hover:shadow-2xl transition-all duration-300 ${isFav ? 'border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.1)]' : 'border-white/5 hover:border-blue-500/30'}`}
             >
               <div className="mb-4 flex justify-between items-start">
                  <div>
@@ -225,14 +246,14 @@ export default function Home() {
                       {node.address}
                     </div>
                  </div>
-                 <span className={`text-[10px] px-2 py-1 rounded-md font-bold flex items-center gap-1.5 ${
-                    node.uptime > 600 
-                    ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
-                    : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
-                 }`}>
-                    <div className={`w-1.5 h-1.5 rounded-full ${node.uptime > 600 ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                    {node.uptime > 600 ? 'ONLINE' : 'SYNCING'}
-                 </span>
+                 
+                 {/* STAR BUTTON */}
+                 <button 
+                   onClick={(e) => toggleFavorite(e, node.address)}
+                   className={`p-1.5 rounded-full transition ${isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'}`}
+                 >
+                   <Star size={16} fill={isFav ? "currentColor" : "none"} />
+                 </button>
               </div>
 
               <div className="space-y-3">
@@ -252,9 +273,14 @@ export default function Home() {
                     </span>
                   </div>
                   
-                  <div className="text-zinc-600 group-hover:text-blue-400 transition transform group-hover:translate-x-1">
-                    <Eye size={16} />
-                  </div>
+                  {/* Status Indicator */}
+                   <span className={`text-[10px] px-2 py-1 rounded-md font-bold flex items-center gap-1.5 ${
+                    node.uptime > 600 
+                    ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
+                    : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                 }`}>
+                    {node.uptime > 600 ? 'ONLINE' : 'SYNC'}
+                 </span>
                 </div>
               </div>
             </div>
@@ -263,12 +289,11 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- DETAIL MODAL (ENHANCED) --- */}
+      {/* --- DETAIL MODAL --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
           <div className="bg-[#09090b] border border-zinc-700 w-full max-w-lg p-0 rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
             
-            {/* Modal Header */}
             <div className="bg-zinc-900/50 p-6 border-b border-zinc-800 flex justify-between items-start">
               <div>
                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -281,8 +306,20 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-6">
+              {/* STAR BUTTON IN MODAL */}
+              <button 
+                 onClick={(e) => toggleFavorite(e, selectedNode.address)}
+                 className={`w-full mb-6 py-3 rounded-xl border flex items-center justify-center gap-2 font-bold transition ${
+                   favorites.includes(selectedNode.address) 
+                   ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500' 
+                   : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:bg-zinc-700'
+                 }`}
+              >
+                <Star size={18} fill={favorites.includes(selectedNode.address) ? "currentColor" : "none"} />
+                {favorites.includes(selectedNode.address) ? 'REMOVE FROM WATCHLIST' : 'ADD TO WATCHLIST'}
+              </button>
+
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl text-center">
                   <div className="text-xs text-zinc-500 mb-1 font-bold">HEALTH SCORE</div>
@@ -296,7 +333,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* ENHANCED STORAGE SECTION */}
               <div className="mb-6">
                 <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">
                   <Database size={12} /> Storage Metrics
@@ -314,7 +350,6 @@ export default function Home() {
                       <span className="text-zinc-400 text-sm">Efficiency</span>
                       <span className="text-white font-mono font-bold">{selectedNode.storage_usage_percentage || 0}%</span>
                    </div>
-                   {/* Mini Bar */}
                    <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-2">
                       <div className="h-full bg-blue-500" style={{ width: `${selectedNode.storage_usage_percentage || 0}%` }}></div>
                    </div>
