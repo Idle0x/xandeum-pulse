@@ -15,6 +15,7 @@ interface Node {
   storage_committed?: number; 
   storage_usage_percentage?: number;
   // Merged Data
+  id?: string | number; // New ID field match
   rank?: number;
   credits?: number;
 }
@@ -137,43 +138,51 @@ export default function Home() {
       if (statsRes.data.result && statsRes.data.result.pods) {
         let podList: Node[] = statsRes.data.result.pods;
         
-        // --- 1. ROBUST CREDITS PARSING (MATCHES LEADERBOARD LOGIC) ---
+        // --- CREDITS PARSING ---
         const creditsData = creditsRes.data.pods_credits || creditsRes.data;
         const creditMap = new Map<string, number>();
         
+        // Helper to extract numeric ID and Amount
+        const parseEntry = (key: string | number, item: any) => {
+            const val = typeof item === 'number' ? item : Number(item?.credits || item?.amount || 0);
+            creditMap.set(String(key), val);
+        };
+
         if (Array.isArray(creditsData)) {
-            // ARRAY MODE
-            creditsData.forEach((item: any) => {
-                const key = item.pubkey || item.node || item.address;
-                const val = Number(item.credits || item.amount || 0);
-                if (key) creditMap.set(key, val);
+            creditsData.forEach((item: any, idx: number) => {
+                // Try to find an explicit ID, or use the index if it matches 204/41 pattern?
+                // For now, assume item has a key, or look at the object entries
+                const key = item.id || item.node_id || item.pubkey; // Trying generic keys
+                if (key) parseEntry(key, item);
             });
         } else if (typeof creditsData === 'object' && creditsData !== null) {
-            // OBJECT MODE
-            Object.entries(creditsData).forEach(([key, val]: [string, any]) => {
-                if (key === 'status' || key === 'success') return;
-                const numVal = typeof val === 'number' ? val : Number(val?.credits || val?.amount || 0);
-                creditMap.set(key, numVal);
+            Object.entries(creditsData).forEach(([key, val]) => {
+                if (key !== 'status' && key !== 'success') parseEntry(key, val);
             });
         }
 
-        // --- 2. CALCULATE RANKS ---
-        const rankedPubkeys = Array.from(creditMap.entries())
+        // --- MERGE LOGIC (Updated to check for ID) ---
+        // We calculate ranks based on the sorted values we found
+        const rankedIds = Array.from(creditMap.entries())
             .sort((a, b) => b[1] - a[1])
             .map(entry => entry[0]);
 
-        // --- 3. MERGE ---
-        podList = podList.map(node => {
-            const credits = creditMap.get(node.pubkey) || 0;
-            const rankIndex = rankedPubkeys.indexOf(node.pubkey);
+        podList = podList.map((node: any) => {
+            // MATCHING ATTEMPT: Check Pubkey, Address, AND internal ID if available
+            // If the API returns 'id' inside the node object, we use it.
+            const matchKey = String(node.id || node.pubkey); 
+            
+            const credits = creditMap.get(matchKey) || 0;
+            const rankIndex = rankedIds.indexOf(matchKey);
             const rank = rankIndex !== -1 ? rankIndex + 1 : 9999;
+            
             return { ...node, credits, rank };
         });
 
         setNodes(podList);
         setLastUpdated(new Date().toLocaleTimeString());
         
-        // --- 4. NETWORK STATS ---
+        // Stats Calculations
         const stableNodes = podList.filter(n => n.uptime > 86400).length;
         setNetworkHealth((podList.length > 0 ? (stableNodes / podList.length) * 100 : 0).toFixed(2));
 
@@ -191,7 +200,7 @@ export default function Home() {
         setError('');
       }
     } catch (err: any) {
-      console.error("Fetch error:", err);
+      console.error(err);
       setError('Connection failed. Retrying...');
     } finally {
       setLoading(false);
@@ -207,12 +216,8 @@ export default function Home() {
       let valA = a[sortBy === 'storage' ? 'storage_used' : (sortBy === 'rank' ? 'rank' : sortBy)] as any;
       let valB = b[sortBy === 'storage' ? 'storage_used' : (sortBy === 'rank' ? 'rank' : sortBy)] as any;
       
-      if (sortBy === 'version') {
-         return sortOrder === 'asc' ? compareVersions(a.version, b.version) : compareVersions(b.version, a.version);
-      }
-      if (sortBy === 'rank') {
-          return sortOrder === 'asc' ? valA - valB : valB - valA;
-      }
+      if (sortBy === 'version') return sortOrder === 'asc' ? compareVersions(a.version, b.version) : compareVersions(b.version, a.version);
+      if (sortBy === 'rank') return sortOrder === 'asc' ? valA - valB : valB - valA;
       return sortOrder === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
     });
 
@@ -233,21 +238,13 @@ export default function Home() {
 
   const getCycleContent = (node: Node, index: number) => {
     const step = (cycleStep + index) % 4;
-    if (step === 0) {
-      return { label: 'Storage Used', value: formatBytes(node.storage_used), color: 'text-blue-400', icon: Database };
-    } else if (step === 1) {
-      return { label: 'Capacity', value: formatBytes(node.storage_committed || 0), color: 'text-purple-400', icon: HardDrive };
-    } else if (step === 2) {
+    if (step === 0) return { label: 'Storage Used', value: formatBytes(node.storage_used), color: 'text-blue-400', icon: Database };
+    if (step === 1) return { label: 'Capacity', value: formatBytes(node.storage_committed || 0), color: 'text-purple-400', icon: HardDrive };
+    if (step === 2) {
       const score = getHealthScore(node, mostCommonVersion);
       return { label: 'Health Score', value: `${score}/100`, color: score > 80 ? 'text-green-400' : 'text-yellow-400', icon: Activity };
-    } else {
-      return { 
-        label: 'Last Seen', 
-        value: node.last_seen_timestamp ? formatLastSeen(node.last_seen_timestamp) : 'Unknown', 
-        color: 'text-zinc-400', 
-        icon: Clock 
-      };
     }
+    return { label: 'Last Seen', value: node.last_seen_timestamp ? formatLastSeen(node.last_seen_timestamp) : 'Unknown', color: 'text-zinc-400', icon: Clock };
   };
 
   const renderNodeCard = (node: Node, i: number) => {
@@ -272,10 +269,7 @@ export default function Home() {
               </div>
             </div>
             
-            <button 
-              onClick={(e) => toggleFavorite(e, node.address)}
-              className={`p-1.5 rounded-full transition ${isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'}`}
-            >
+            <button onClick={(e) => toggleFavorite(e, node.address)} className={`p-1.5 rounded-full transition ${isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'}`}>
               <Star size={16} fill={isFav ? "currentColor" : "none"} />
             </button>
         </div>
@@ -310,11 +304,7 @@ export default function Home() {
               </span>
             </div>
             
-            <span className={`text-[10px] px-2 py-1 rounded-md font-bold flex items-center gap-1.5 ${
-              node.uptime > 86400 
-              ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
-              : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
-            }`}>
+            <span className={`text-[10px] px-2 py-1 rounded-md font-bold flex items-center gap-1.5 ${node.uptime > 86400 ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'}`}>
               {node.uptime > 86400 ? 'STABLE' : 'BOOTING'}
             </span>
           </div>
@@ -325,7 +315,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans relative selection:bg-blue-500/30 selection:text-blue-200 flex flex-col">
-      
       {loading && <div className="fixed top-0 left-0 right-0 z-50"><LiveWireLoader /></div>}
 
       <div className="p-4 md:p-8 flex-grow">
@@ -343,22 +332,10 @@ export default function Home() {
             SYNC: {lastUpdated || '--:--'}
           </div>
         </div>
-
         <button onClick={exportCSV} className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-semibold tracking-wide flex items-center gap-2 text-zinc-300">
-            <Download size={16} /> 
-            CSV EXPORT
+            <Download size={16} /> CSV EXPORT
         </button>
       </header>
-
-      {error && (
-        <div className="mb-8 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center justify-between text-red-400">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={20} />
-            <span>{error}</span>
-          </div>
-          <button onClick={fetchData} className="text-xs underline hover:text-white">Retry</button>
-        </div>
-      )}
 
       {/* STATS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -398,98 +375,53 @@ export default function Home() {
                 <Link href="/leaderboard" className="flex-1 md:flex-none justify-center px-5 py-2.5 bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 text-yellow-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2">
                     <Trophy size={16} /> LEADERBOARD
                 </Link>
-
                 <button onClick={fetchData} className="flex-1 md:flex-none justify-center px-4 py-2.5 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2 text-zinc-300">
-                    <Zap size={16} className={loading ? "text-blue-500 animate-pulse" : "text-blue-500"} /> 
-                    REFRESH
+                    <Zap size={16} className={loading ? "text-blue-500 animate-pulse" : "text-blue-500"} /> REFRESH
                 </button>
             </div>
-
             <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 w-full md:w-auto justify-end">
-                {[
-                    { id: 'uptime', label: 'UPTIME', icon: Clock },
-                    { id: 'version', label: 'VERSION', icon: Server },
-                    { id: 'storage', label: 'STORAGE', icon: Database },
-                    { id: 'rank', label: 'RANK', icon: Trophy },
-                ].map((opt) => (
-                    <button
-                    key={opt.id}
-                    onClick={() => {
-                        if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                        else setSortBy(opt.id as any);
-                    }}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${
-                        sortBy === opt.id 
-                        ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' 
-                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'
-                    }`}
-                    >
-                    <opt.icon size={12} />
-                    {opt.label}
-                    {sortBy === opt.id && <ArrowUpDown size={10} className="ml-1" />}
+                {[{ id: 'uptime', label: 'UPTIME', icon: Clock }, { id: 'version', label: 'VERSION', icon: Server }, { id: 'storage', label: 'STORAGE', icon: Database }, { id: 'rank', label: 'RANK', icon: Trophy }].map((opt) => (
+                    <button key={opt.id} onClick={() => { if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); else setSortBy(opt.id as any); }} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${sortBy === opt.id ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
+                    <opt.icon size={12} /> {opt.label} {sortBy === opt.id && <ArrowUpDown size={10} className="ml-1" />}
                     </button>
                 ))}
             </div>
         </div>
-
         <div className="relative">
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search Node IP, Version, or Key..." 
-            className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 pl-10 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition placeholder-zinc-600"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+          <input type="text" placeholder="Search Node IP, Version, or Key..." className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 pl-10 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition placeholder-zinc-600" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
       </div>
 
       {filteredNodes.length === 0 && !loading ? (
-        <div className="py-20 text-center text-zinc-500">
-            <Server size={48} className="mx-auto mb-4 opacity-50" />
-            <p>No nodes found matching parameters.</p>
-        </div>
+        <div className="py-20 text-center text-zinc-500"><Server size={48} className="mx-auto mb-4 opacity-50" /><p>No nodes found matching parameters.</p></div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-20">
           {filteredNodes.map((node, i) => renderNodeCard(node, i))}
         </div>
       )}
 
-      {/* MODAL */}
+      {/* DETAIL MODAL - 3 Rows Restored */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
           <div className="bg-[#09090b] border border-zinc-700 w-full max-w-lg p-0 rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
-            
             <div className="bg-zinc-900/50 p-6 border-b border-zinc-800 flex justify-between items-start">
               <div className="flex-1 overflow-hidden mr-4">
-                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Server size={20} className="text-blue-500" /> Node Inspector
-                </h2>
-                <div className="flex items-center gap-2 mt-1">
+                 <h2 className="text-xl font-bold text-white flex items-center gap-2"><Server size={20} className="text-blue-500" /> Node Inspector</h2>
+                 <div className="flex items-center gap-2 mt-1">
                     <p className="text-zinc-500 font-mono text-xs truncate">{selectedNode.address}</p>
-                    <button onClick={() => copyToClipboard(selectedNode.address)} className="text-zinc-600 hover:text-white transition">
-                        {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
-                    </button>
-                </div>
+                    <button onClick={() => copyToClipboard(selectedNode.address)} className="text-zinc-600 hover:text-white transition"><Copy size={12} /></button>
+                 </div>
               </div>
-              <button onClick={() => setSelectedNode(null)} className="text-zinc-500 hover:text-white transition">
-                <X size={24} />
-              </button>
+              <button onClick={() => setSelectedNode(null)} className="text-zinc-500 hover:text-white transition"><X size={24} /></button>
             </div>
-
             <div className="p-6">
-              <button 
-                 onClick={(e) => toggleFavorite(e, selectedNode.address)}
-                 className={`w-full mb-6 py-3 rounded-xl border flex items-center justify-center gap-2 font-bold transition ${
-                   favorites.includes(selectedNode.address) 
-                   ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500' 
-                   : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:bg-zinc-700'
-                 }`}
-              >
+              <button onClick={(e) => toggleFavorite(e, selectedNode.address)} className={`w-full mb-6 py-3 rounded-xl border flex items-center justify-center gap-2 font-bold transition ${favorites.includes(selectedNode.address) ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:bg-zinc-700'}`}>
                 <Star size={18} fill={favorites.includes(selectedNode.address) ? "currentColor" : "none"} />
                 {favorites.includes(selectedNode.address) ? 'REMOVE FROM WATCHLIST' : 'ADD TO WATCHLIST'}
               </button>
 
+              {/* ROW 1: HEALTH & VISIBILITY */}
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl text-center">
                   <div className="text-xs text-zinc-500 mb-1 font-bold">HEALTH SCORE</div>
@@ -503,6 +435,7 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* ROW 2: FINANCIALS */}
               <div className="grid grid-cols-2 gap-4 mb-6">
                  <div className="bg-zinc-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3">
                     <Trophy size={20} className="text-yellow-500" />
@@ -520,26 +453,14 @@ export default function Home() {
                  </div>
               </div>
 
+              {/* ROW 3: STORAGE */}
               <div className="mb-6">
-                <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">
-                  <Database size={12} /> Storage Metrics
-                </h3>
+                <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2"><Database size={12} /> Storage Metrics</h3>
                 <div className="bg-zinc-900/50 rounded-xl p-4 border border-zinc-800 space-y-3">
-                   <div className="flex justify-between items-center">
-                      <span className="text-zinc-400 text-sm">Used</span>
-                      <span className="text-blue-400 font-mono font-bold">{formatBytes(selectedNode.storage_used)}</span>
-                   </div>
-                   <div className="flex justify-between items-center">
-                      <span className="text-zinc-400 text-sm">Capacity</span>
-                      <span className="text-purple-400 font-mono font-bold">{formatBytes(selectedNode.storage_committed || 0)}</span>
-                   </div>
-                   <div className="flex justify-between items-center">
-                      <span className="text-zinc-400 text-sm">Efficiency</span>
-                      <span className="text-white font-mono font-bold">{selectedNode.storage_usage_percentage || 0}%</span>
-                   </div>
-                   <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-2">
-                      <div className="h-full bg-blue-500" style={{ width: `${selectedNode.storage_usage_percentage || 0}%` }}></div>
-                   </div>
+                   <div className="flex justify-between items-center"><span className="text-zinc-400 text-sm">Used</span><span className="text-blue-400 font-mono font-bold">{formatBytes(selectedNode.storage_used)}</span></div>
+                   <div className="flex justify-between items-center"><span className="text-zinc-400 text-sm">Capacity</span><span className="text-purple-400 font-mono font-bold">{formatBytes(selectedNode.storage_committed || 0)}</span></div>
+                   <div className="flex justify-between items-center"><span className="text-zinc-400 text-sm">Efficiency</span><span className="text-white font-mono font-bold">{selectedNode.storage_usage_percentage || 0}%</span></div>
+                   <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-2"><div className="h-full bg-blue-500" style={{ width: `${selectedNode.storage_usage_percentage || 0}%` }}></div></div>
                 </div>
               </div>
 
@@ -548,39 +469,24 @@ export default function Home() {
                   <span className="text-zinc-500">RPC Endpoint</span>
                   <div className="flex items-center gap-2">
                      <span className="text-zinc-300 font-mono text-xs truncate max-w-[150px]">http://{selectedNode.address.split(':')[0]}:6000</span>
-                     <button onClick={() => copyToClipboard(`http://${selectedNode.address.split(':')[0]}:6000`)}>
-                        <Copy size={12} className="text-zinc-600 hover:text-white" />
-                     </button>
+                     <button onClick={() => copyToClipboard(`http://${selectedNode.address.split(':')[0]}:6000`)}><Copy size={12} className="text-zinc-600 hover:text-white" /></button>
                   </div>
                 </div>
-
                 <div className="flex justify-between py-1">
                   <span className="text-zinc-500">Public Key</span>
                   <div className="flex items-center gap-2">
                      <span className="text-zinc-300 font-mono truncate w-24 text-right">{selectedNode.pubkey}</span>
-                     <button onClick={() => copyToClipboard(selectedNode.pubkey)}>
-                        <Copy size={12} className="text-zinc-600 hover:text-white" />
-                     </button>
+                     <button onClick={() => copyToClipboard(selectedNode.pubkey)}><Copy size={12} className="text-zinc-600 hover:text-white" /></button>
                   </div>
                 </div>
-                
-                <div className="flex justify-between py-1">
-                   <span className="text-zinc-500">Uptime</span>
-                   <span className="text-white font-mono">{formatUptime(selectedNode.uptime)}</span>
-                </div>
+                <div className="flex justify-between py-1"><span className="text-zinc-500">Uptime</span><span className="text-white font-mono">{formatUptime(selectedNode.uptime)}</span></div>
               </div>
               
               <div className="mt-6 pt-4 border-t border-white/5">
-                 <a 
-                   href={`https://explorer.solana.com/address/${selectedNode.pubkey}`} 
-                   target="_blank" 
-                   rel="noopener noreferrer"
-                   className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition"
-                 >
+                 <a href={`https://explorer.solana.com/address/${selectedNode.pubkey}`} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition">
                    <ExternalLink size={18} /> VIEW ON EXPLORER
                  </a>
               </div>
-              
             </div>
           </div>
         </div>
@@ -591,13 +497,9 @@ export default function Home() {
       <footer className="border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto">
         <div className="max-w-4xl mx-auto text-center">
             <h3 className="text-white font-bold mb-2">XANDEUM PULSE MONITOR</h3>
-            <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">
-                Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.
-            </p>
+            <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.</p>
             <div className="flex justify-center items-center gap-4 text-xs font-mono text-zinc-600">
-                <span>pRPC Powered</span>
-                <span>•</span>
-                <span>Built by <span className="text-zinc-400 font-bold">riot'</span> (<a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition">X: @33xp_</a> | <span className="opacity-70">Discord: @idle0x</span>)</span>
+                <span>pRPC Powered</span><span>•</span><span>Built by <span className="text-zinc-400 font-bold">riot'</span> (<a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition">X: @33xp_</a> | <span className="opacity-70">Discord: @idle0x</span>)</span>
             </div>
         </div>
       </footer>
