@@ -20,26 +20,21 @@ export default function Leaderboard() {
         const res = await axios.get('/api/credits');
         const data = res.data;
         
+        // 🛠️ FIX: Look inside 'pods_credits' if it exists
+        const creditsMap = data.pods_credits || data;
+        
         let processedData: RankedNode[] = [];
 
-        // --- INTELLIGENT PARSER ---
-        if (Array.isArray(data)) {
-          // If it's an Array [ { pubkey: '...', credits: 100 }, ... ]
-          processedData = data.map((item: any, index: number) => ({
-            rank: index + 1,
-            // Try to find the key in common variations
-            pubkey: item.pubkey || item.node || item.address || 'Unknown', 
-            credits: Number(item.credits || item.amount || item.balance || 0)
-          }));
-        } else {
-           // If it's an Object { "abc": 100, "xyz": 200 }
-           processedData = Object.entries(data).map(([key, val]: [string, any], index) => ({
+        // Handle Object { "pubkey": 100 }
+        processedData = Object.entries(creditsMap).map(([key, val]: [string, any], index) => ({
              rank: index + 1,
              pubkey: key,
-             // If val is a number, use it. If it's an object, look inside.
+             // Ensure we get a number, even if it's 0
              credits: typeof val === 'number' ? val : Number(val?.credits || val?.amount || 0)
-           }));
-        }
+        }));
+
+        // Filter out "status" or non-node keys just in case
+        processedData = processedData.filter(node => node.pubkey !== 'status' && node.pubkey !== 'success');
 
         // Sort Highest to Lowest
         const sorted = processedData.sort((a, b) => b.credits - a.credits);
