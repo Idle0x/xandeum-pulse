@@ -1,7 +1,6 @@
-// Triggering new build
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Download, Server, Activity, HardDrive, X, Shield, Clock, AlertTriangle } from 'lucide-react';
+import { Search, Download, Server, Activity, HardDrive, X, Shield, Clock, Eye, CheckCircle, AlertCircle } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -9,6 +8,7 @@ interface Node {
   pubkey: string;
   version: string;
   uptime: number;
+  last_seen_timestamp: number; // New field we found in JSON
   is_public: boolean;
   storage_used: number;
 }
@@ -28,11 +28,18 @@ const formatUptime = (seconds: number) => {
   return `${h}h ${m}m`;
 };
 
-// NEW: Traffic Light Logic
-const getStatusColor = (uptime: number) => {
-  if (uptime === 0) return 'bg-red-500 shadow-[0_0_8px_#ef4444]'; // Offline
-  if (uptime < 600) return 'bg-yellow-500 shadow-[0_0_8px_#eab308]'; // Syncing (<10 mins)
-  return 'bg-green-500 shadow-[0_0_8px_#22c55e]'; // Stable
+const formatLastSeen = (timestamp: number) => {
+  // If timestamp is huge (microseconds), convert to millis
+  const now = Date.now();
+  // Xandeum timestamps might be in seconds or millis. Let's assume seconds if small.
+  const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
+  const diff = now - time;
+  
+  if (diff < 60000) return 'Just now';
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  return `${hours}h ago`;
 };
 
 const getHealthScore = (node: Node) => {
@@ -49,12 +56,9 @@ export default function Home() {
   const [error, setError] = useState('');
   const [lastUpdated, setLastUpdated] = useState('');
   
-  // Search & Sort
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage'>('uptime');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-
-  // Modal
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
   const fetchStats = async () => {
@@ -89,9 +93,9 @@ export default function Home() {
     });
 
   const exportCSV = () => {
-    const headers = ['Address,Version,Uptime(s),Storage(B),Public,Health\n'];
+    const headers = ['Address,Version,Uptime(s),Storage(B),Public,LastSeen\n'];
     const rows = filteredNodes.map(n => 
-      `${n.address},${n.version},${n.uptime},${n.storage_used},${n.is_public},${getHealthScore(n)}`
+      `${n.address},${n.version},${n.uptime},${n.storage_used},${n.is_public},${n.last_seen_timestamp}`
     );
     const blob = new Blob([...headers, ...rows.join('\n')], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -102,7 +106,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-green-500 font-mono p-4 md:p-8 relative">
+    <div className="min-h-screen bg-black text-green-500 font-mono p-4 md:p-8 relative selection:bg-green-500 selection:text-black">
       
       {/* HEADER */}
       <header className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-green-900/50 pb-6">
@@ -110,9 +114,9 @@ export default function Home() {
           <h1 className="text-4xl font-bold tracking-tighter text-white glow-text">XANDEUM PULSE</h1>
           <div className="flex items-center gap-2 text-xs text-green-700 mt-2 justify-center md:justify-start">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-            SYSTEM ONLINE
+            REAL-TIME GOSSIP PROTOCOL
             <span className="text-green-900">|</span>
-            LAST SYNC: {lastUpdated || '--:--'}
+            SYNC: {lastUpdated || '--:--'}
           </div>
         </div>
         
@@ -121,12 +125,12 @@ export default function Home() {
             REFRESH
           </button>
           <button onClick={exportCSV} className="px-4 py-2 bg-green-900/20 border border-green-800 hover:bg-green-900/50 hover:text-white transition text-xs flex items-center gap-2">
-            <Download size={14} /> EXPORT CSV
+            <Download size={14} /> CSV
           </button>
         </div>
       </header>
 
-      {/* CONTROLS BAR */}
+      {/* CONTROLS */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-8">
         <div className="md:col-span-6 relative">
           <Search className="absolute left-3 top-3 text-green-700" size={18} />
@@ -184,7 +188,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* MAIN GRID */}
+      {/* NODE GRID */}
       {loading ? (
         <div className="py-20 text-center animate-pulse">
           <Activity className="mx-auto mb-4 text-green-500" size={48} />
@@ -196,13 +200,16 @@ export default function Home() {
             <div 
               key={i} 
               onClick={() => setSelectedNode(node)}
-              className="border border-green-900/40 bg-black p-5 cursor-pointer hover:border-green-500 hover:bg-green-900/10 transition group relative"
+              className="border border-green-900/40 bg-black p-5 cursor-pointer hover:border-green-500 hover:bg-green-900/10 transition group relative flex flex-col justify-between"
             >
-              {/* TRAFFIC LIGHT STATUS DOT */}
-              <div className={`absolute top-4 right-4 w-3 h-3 rounded-full ${getStatusColor(node.uptime)}`}></div>
-
               <div className="mb-4">
-                <div className="text-[10px] text-green-800 uppercase mb-1">Node Address</div>
+                <div className="flex justify-between items-start mb-2">
+                   <div className="text-[10px] text-green-800 uppercase">Node Address</div>
+                   {/* STATUS BADGE - REPLACES DOT */}
+                   <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${node.uptime > 600 ? 'bg-green-900/30 text-green-400 border border-green-900' : 'bg-red-900/30 text-red-400 border border-red-900'}`}>
+                      {node.uptime > 600 ? 'ONLINE' : 'SYNCING'}
+                   </span>
+                </div>
                 <div className="font-mono text-sm text-gray-200 truncate group-hover:text-white transition">
                   {node.address}
                 </div>
@@ -211,22 +218,21 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-xs">
                 <div>
                   <span className="text-green-800 block mb-1">VERSION</span>
-                  <span className="bg-green-900/20 px-2 py-1 rounded text-green-400">{node.version}</span>
+                  <span className="text-green-400">{node.version}</span>
                 </div>
                 <div className="text-right">
                   <span className="text-green-800 block mb-1">UPTIME</span>
                   <span className="text-gray-300">{formatUptime(node.uptime)}</span>
                 </div>
-                <div className="col-span-2">
-                  <div className="flex justify-between mb-1">
-                     <span className="text-green-800">STORAGE</span>
-                     <span className="text-gray-400">{formatBytes(node.storage_used)}</span>
+                <div className="col-span-2 pt-2 border-t border-green-900/30 flex justify-between items-center">
+                  <div>
+                    <span className="text-green-800 block">STORAGE</span>
+                    <span className="text-white font-bold">{formatBytes(node.storage_used)}</span>
                   </div>
-                  <div className="w-full bg-green-900/20 h-1.5 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-green-600 h-full" 
-                      style={{ width: `${Math.min((node.storage_used / 100000000) * 100, 100)}%` }}
-                    ></div>
+                  {/* VIEW DETAILS BUTTON */}
+                  <div className="text-green-600 flex items-center gap-1 group-hover:text-green-400 transition">
+                    <Eye size={12} />
+                    <span>View</span>
                   </div>
                 </div>
               </div>
@@ -237,8 +243,8 @@ export default function Home() {
 
       {/* --- DETAIL MODAL --- */}
       {selectedNode && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
-          <div className="bg-black border border-green-500 w-full max-w-lg p-6 relative shadow-[0_0_50px_rgba(34,197,94,0.2)]" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
+          <div className="bg-black border border-green-500 w-full max-w-lg p-6 relative shadow-[0_0_50px_rgba(34,197,94,0.15)]" onClick={e => e.stopPropagation()}>
             <button 
               onClick={() => setSelectedNode(null)}
               className="absolute top-4 right-4 text-green-700 hover:text-white"
@@ -247,52 +253,54 @@ export default function Home() {
             </button>
 
             <div className="mb-6 border-b border-green-900 pb-4">
-              <h2 className="text-2xl font-bold text-white mb-1">NODE INSPECTOR</h2>
-              <p className="text-green-600 font-mono text-sm">{selectedNode.address}</p>
+              <h2 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
+                <Server size={20} /> NODE DIAGNOSTICS
+              </h2>
+              <p className="text-green-600 font-mono text-xs">{selectedNode.address}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="bg-green-900/10 p-4 border border-green-900/50 text-center">
                 <div className="text-xs text-green-600 mb-1">HEALTH SCORE</div>
-                <div className="text-3xl font-bold text-white">{getHealthScore(selectedNode)}</div>
+                <div className="text-3xl font-bold text-white">{getHealthScore(selectedNode)}/100</div>
               </div>
               <div className="bg-green-900/10 p-4 border border-green-900/50 text-center">
-                <div className="text-xs text-green-600 mb-1">RISK LEVEL</div>
-                <div className="text-3xl font-bold text-green-400">LOW</div>
+                <div className="text-xs text-green-600 mb-1">STATUS</div>
+                <div className="text-xl font-bold text-green-400 mt-1 flex justify-center items-center gap-2">
+                  <CheckCircle size={16} /> OPERATIONAL
+                </div>
               </div>
             </div>
 
-            <div className="space-y-4 text-sm font-mono">
+            <div className="space-y-3 text-sm font-mono">
               <div className="flex justify-between border-b border-green-900/30 pb-2">
                 <span className="text-gray-400">Public Key</span>
                 <span className="text-green-500 truncate w-32 text-right">{selectedNode.pubkey}</span>
               </div>
               <div className="flex justify-between border-b border-green-900/30 pb-2">
-                <span className="text-gray-400">Software Version</span>
+                <span className="text-gray-400">Version</span>
                 <span className="text-white">{selectedNode.version}</span>
               </div>
               <div className="flex justify-between border-b border-green-900/30 pb-2">
-                <span className="text-gray-400">Session Uptime</span>
-                <span className={`font-bold ${selectedNode.uptime < 600 ? 'text-yellow-500' : 'text-white'}`}>
-                    {formatUptime(selectedNode.uptime)}
-                </span>
+                <span className="text-gray-400">Uptime</span>
+                <span className="text-white">{formatUptime(selectedNode.uptime)}</span>
               </div>
               <div className="flex justify-between border-b border-green-900/30 pb-2">
-                <span className="text-gray-400">Data Stored</span>
-                <span className="text-white">{formatBytes(selectedNode.storage_used)}</span>
+                <span className="text-gray-400">Storage Used</span>
+                <span className="text-white font-bold">{formatBytes(selectedNode.storage_used)}</span>
               </div>
                <div className="flex justify-between border-b border-green-900/30 pb-2">
-                <span className="text-gray-400">Network Status</span>
-                <span className="text-green-400 font-bold flex items-center gap-2">
-                  <Shield size={14} /> SECURE
+                <span className="text-gray-400">Last Seen</span>
+                <span className="text-green-400">
+                  {selectedNode.last_seen_timestamp ? formatLastSeen(selectedNode.last_seen_timestamp) : 'Now'}
                 </span>
               </div>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-green-900 flex gap-3">
-              <button className="flex-1 bg-green-600 hover:bg-green-500 text-black font-bold py-3 text-sm transition">
-                VIEW ON EXPLORER
-              </button>
+            <div className="mt-6 pt-4 border-t border-green-900 text-center">
+               <p className="text-[10px] text-gray-500 uppercase">
+                 Note: CPU & RAM metrics are unavailable via public pRPC
+               </p>
             </div>
           </div>
         </div>
@@ -301,4 +309,3 @@ export default function Home() {
     </div>
   );
 }
-
