@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, ExternalLink, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Twitter, Medal, Wallet } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, ExternalLink, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Wallet, Medal } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -138,43 +138,47 @@ export default function Home() {
       if (statsRes.data.result && statsRes.data.result.pods) {
         let podList: Node[] = statsRes.data.result.pods;
         
-        // --- PROCESS CREDITS & RANKING ---
+        // --- 1. ROBUST CREDITS PARSING (FIXED) ---
         const creditsData = creditsRes.data.pods_credits || creditsRes.data;
-        
-        // Create a map of pubkey -> credits
         const creditMap = new Map<string, number>();
         
-        // Handle array vs object response from credits API
+        // Force conversion to a standard Map format
         if (Array.isArray(creditsData)) {
             creditsData.forEach((item: any) => {
                 const key = item.pubkey || item.node || item.address;
                 const val = Number(item.credits || item.amount || 0);
                 if (key) creditMap.set(key, val);
             });
-        } else {
+        } else if (typeof creditsData === 'object' && creditsData !== null) {
             Object.entries(creditsData).forEach(([key, val]: [string, any]) => {
+                // Skip status keys if any
+                if (key === 'status' || key === 'success') return;
+                
                 const numVal = typeof val === 'number' ? val : Number(val?.credits || val?.amount || 0);
                 creditMap.set(key, numVal);
             });
         }
 
-        // Calculate Ranks globally (sort all known credits)
-        // We create a sorted list of pubkeys based on credits
+        // --- 2. CALCULATE RANKS (FIXED) ---
+        // Sort all credits descending to determine rank
         const rankedPubkeys = Array.from(creditMap.entries())
             .sort((a, b) => b[1] - a[1])
             .map(entry => entry[0]);
 
-        // Merge into Nodes
+        // --- 3. MERGE DATA INTO NODES ---
         podList = podList.map(node => {
             const credits = creditMap.get(node.pubkey) || 0;
-            const rank = rankedPubkeys.indexOf(node.pubkey) + 1; // 0-index to 1-index
-            return { ...node, credits, rank: rank > 0 ? rank : 9999 }; // 9999 if unranked
+            const rankIndex = rankedPubkeys.indexOf(node.pubkey);
+            // If found in list, rank is index + 1. If not found, unranked.
+            const rank = rankIndex !== -1 ? rankIndex + 1 : 9999;
+            
+            return { ...node, credits, rank };
         });
 
         setNodes(podList);
         setLastUpdated(new Date().toLocaleTimeString());
         
-        // --- CALCULATIONS ---
+        // --- 4. NETWORK STATS ---
         const stableNodes = podList.filter(n => n.uptime > 86400).length;
         setNetworkHealth((podList.length > 0 ? (stableNodes / podList.length) * 100 : 0).toFixed(2));
 
@@ -192,6 +196,7 @@ export default function Home() {
         setError('');
       }
     } catch (err: any) {
+      console.error("Fetch error:", err);
       setError('Connection failed. Retrying...');
     } finally {
       setLoading(false);
@@ -210,7 +215,6 @@ export default function Home() {
       if (sortBy === 'version') {
          return sortOrder === 'asc' ? compareVersions(a.version, b.version) : compareVersions(b.version, a.version);
       }
-      // For Rank, Lower is Better (1 is better than 10)
       if (sortBy === 'rank') {
           return sortOrder === 'asc' ? valA - valB : valB - valA;
       }
@@ -233,10 +237,14 @@ export default function Home() {
   };
 
   const getCycleContent = (node: Node, index: number) => {
-    const step = (cycleStep + index) % 3;
+    // 4-Step Cycle to include everything
+    const step = (cycleStep + index) % 4;
+    
     if (step === 0) {
       return { label: 'Storage Used', value: formatBytes(node.storage_used), color: 'text-blue-400', icon: Database };
     } else if (step === 1) {
+      return { label: 'Capacity', value: formatBytes(node.storage_committed || 0), color: 'text-purple-400', icon: HardDrive };
+    } else if (step === 2) {
       const score = getHealthScore(node, mostCommonVersion);
       return { label: 'Health Score', value: `${score}/100`, color: score > 80 ? 'text-green-400' : 'text-yellow-400', icon: Activity };
     } else {
@@ -288,7 +296,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* NEW: RANK & CREDITS ROW */}
           <div className="flex justify-between items-center text-xs bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
              <div className="flex items-center gap-1.5">
                 <Medal size={12} className={node.rank === 1 ? 'text-yellow-400' : 'text-zinc-500'} />
@@ -569,9 +576,9 @@ export default function Home() {
                 Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.
             </p>
             <div className="flex justify-center items-center gap-4 text-xs font-mono text-zinc-600">
-                <span>built by <span className="text-zinc-400 font-bold">riot'</span> (@33xp_ | @idle0x)</span>
-                <span>•</span>
                 <span>pRPC Powered</span>
+                <span>•</span>
+                <span>Built by <span className="text-zinc-400 font-bold">riot'</span> (<a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition">X: @33xp_</a> | <span className="opacity-70">Discord: @idle0x</span>)</span>
             </div>
         </div>
       </footer>
