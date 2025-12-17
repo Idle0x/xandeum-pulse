@@ -48,12 +48,8 @@ const formatLastSeen = (timestamp: number) => {
 };
 
 const compareVersions = (v1: string, v2: string) => {
-  if (!v1 || v1 === 'unknown') return -1;
-  if (!v2 || v2 === 'unknown') return 1;
-  
-  const parts1 = v1.replace(/[^0-9.]/g, '').split('.').map(Number);
-  const parts2 = v2.replace(/[^0-9.]/g, '').split('.').map(Number);
-  
+  const parts1 = v1.split('.').map(Number);
+  const parts2 = v2.split('.').map(Number);
   for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
     const num1 = parts1[i] || 0;
     const num2 = parts2[i] || 0;
@@ -63,13 +59,14 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
+// FIXED: Uses Actual Latest Version for scoring, not just consensus
 const getHealthScore = (node: Node, latestVersion: string) => {
   let score = 100;
   if (node.uptime < 3600) score -= 40;
   else if (node.uptime < 86400) score -= 20;
   else if (node.uptime < 259200) score -= 5;
   
-  // Penalize if node version is lower than the latest known version
+  // If node version is OLDER than latest, penalize
   if (latestVersion !== 'N/A' && compareVersions(node.version, latestVersion) < 0) score -= 15;
   
   if (!node.is_public) score -= 10;
@@ -162,7 +159,8 @@ export default function Home() {
   const [cycleStep, setCycleStep] = useState(0);
 
   const [networkHealth, setNetworkHealth] = useState('0.00');
-  const [latestVersion, setLatestVersion] = useState('N/A');
+  const [mostCommonVersion, setMostCommonVersion] = useState('N/A');
+  const [latestVersion, setLatestVersion] = useState('N/A'); // New State
   const [totalStorage, setTotalStorage] = useState(0);
 
   useEffect(() => {
@@ -171,7 +169,7 @@ export default function Home() {
     if (saved) setFavorites(JSON.parse(saved));
 
     const interval = setInterval(() => {
-      // FIX 2: Removed Modulo limit for smoother long-term cycling
+      // FIXED: Infinite cycle, no reset glitch
       setCycleStep(prev => prev + 1); 
     }, 4000);
     return () => clearInterval(interval);
@@ -265,15 +263,19 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         setNetworkHealth((podList.length > 0 ? (stableNodes / podList.length) * 100 : 0).toFixed(2));
 
         if (podList.length > 0) {
-            // FIX 1: Find ACTUAL latest version, not just most common
-            const versions = podList
-                .map(n => n.version)
-                .filter(v => v && v !== 'unknown')
-                .sort((a, b) => compareVersions(b, a)); // Sort descending
-            
-            if (versions.length > 0) {
-                setLatestVersion(versions[0]);
-            }
+            // FIXED: Calculate Actual Latest Version
+            const allVersions = podList.map(n => n.version);
+            const sortedVersions = allVersions.sort((a, b) => compareVersions(b, a));
+            const trueLatest = sortedVersions[0] || 'N/A';
+            setLatestVersion(trueLatest);
+
+            // Calculate Most Common (Consensus)
+            const versionCounts = podList.reduce((acc, n) => {
+                acc[n.version] = (acc[n.version] || 0) + 1;
+                return acc;
+            }, {} as Record<string, number>);
+            const topVersion = Object.entries(versionCounts).sort((a, b) => b[1] - a[1])[0][0];
+            setMostCommonVersion(topVersion);
         }
 
         const totalBytes = podList.reduce((sum, n) => sum + (n.storage_used || 0), 0);
@@ -332,7 +334,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
     } else if (step === 1) {
       return { label: 'Capacity', value: formatBytes(node.storage_committed || 0), color: 'text-purple-400', icon: HardDrive };
     } else if (step === 2) {
-      const score = getHealthScore(node, latestVersion);
+      const score = getHealthScore(node, latestVersion); // Using Latest Version
       return { label: 'Health Score', value: `${score}/100`, color: score > 80 ? 'text-green-400' : 'text-yellow-400', icon: Activity };
     } else {
       return { 
@@ -472,8 +474,8 @@ Monitor at: https://xandeum-pulse.vercel.app`;
           <div className="text-3xl font-bold text-green-500 mt-1">{networkHealth}%</div>
         </div>
         <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
-          <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Latest Ver</div>
-          <div className="text-3xl font-bold text-blue-400 mt-1">{latestVersion}</div>
+          <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Consensus Ver</div>
+          <div className="text-3xl font-bold text-blue-400 mt-1">{mostCommonVersion}</div>
         </div>
         <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
           <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Active Nodes</div>
@@ -482,35 +484,30 @@ Monitor at: https://xandeum-pulse.vercel.app`;
       </div>
 
       {/* WATCHLIST SECTION - WITH EMPTY STATE */}
-      <div className="mb-10">
-        {watchListNodes.length > 0 ? (
-          <div className="animate-in fade-in slide-in-from-top-4 duration-500">
-             <div className="flex items-center gap-2 mb-4">
-                <Star className="text-yellow-500" fill="currentColor" size={20} />
-                <h3 className="text-lg font-bold text-white tracking-widest uppercase">Your Watchlist</h3>
-             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 border-b border-zinc-800 pb-10">
-                {watchListNodes.map((node, i) => renderNodeCard(node, i))}
-             </div>
-          </div>
-        ) : (
-          favorites.length > 0 && watchListNodes.length === 0 ? null : (
-             // Optional: You can hide this block if you don't want to show anything when empty, 
-             // but per your request, here is the CTA if the user has no favorites at all.
-             // Note: I put a check above to only show if they have nodes. 
-             // If you want the "Empty State" visible when they have 0 favorites, use this:
-             favorites.length === 0 && (
-                <div className="mb-10 p-8 bg-zinc-900/30 border border-zinc-800/50 rounded-xl text-center border-dashed">
-                    <Star size={32} className="mx-auto mb-3 text-zinc-700" />
-                    <h3 className="text-zinc-500 font-bold mb-2">No Favorites Yet</h3>
-                    <p className="text-zinc-600 text-xs">
-                    Click the ⭐ star on any node card to pin it here for quick monitoring.
-                    </p>
-                </div>
-             )
-          )
-        )}
-      </div>
+      {watchListNodes.length > 0 ? (
+        <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
+           <div className="flex items-center gap-2 mb-4">
+              <Star className="text-yellow-500" fill="currentColor" size={20} />
+              <h3 className="text-lg font-bold text-white tracking-widest uppercase">Your Watchlist</h3>
+           </div>
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 border-b border-zinc-800 pb-10">
+              {watchListNodes.map((node, i) => renderNodeCard(node, i))}
+           </div>
+        </div>
+      ) : favorites.length > 0 ? (
+         // If favorites exist but nodes aren't found (rare edge case), show nothing or error. 
+         // But if favorites is empty, we show the educational empty state below.
+         null
+      ) : (
+        // EDUCATIONAL EMPTY STATE
+        <div className="mb-10 p-6 bg-zinc-900/30 border border-zinc-800/50 border-dashed rounded-xl text-center animate-in fade-in">
+            <Star size={24} className="mx-auto mb-2 text-zinc-600" />
+            <h3 className="text-zinc-500 font-bold text-sm mb-1">No Favorites Yet</h3>
+            <p className="text-zinc-600 text-xs">
+            Click the star icon <Star size={10} className="inline text-zinc-500" /> on any node to pin it here.
+            </p>
+        </div>
+      )}
 
       {/* CONTROLS */}
       <div className="mb-8 space-y-4">
@@ -520,7 +517,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     <Trophy size={16} /> LEADERBOARD
                 </Link>
 
-                {/* FIX 4: LOADING STATE ON BUTTON */}
+                {/* REFRESH BUTTON WITH LOADING STATE */}
                 <button 
                     onClick={fetchData} 
                     disabled={loading}
@@ -558,7 +555,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             </div>
         </div>
 
-        {/* SEARCH BAR WITH CLEAR BUTTON */}
         <div className="relative">
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
@@ -748,9 +744,9 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">
                 Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.
             </p>
-            <div className="flex justify-center items-center gap-2 text-xs font-mono text-zinc-600">
-                <span>pRPC Powered</span>
-                <span>•</span>
+            {/* UPDATED FOOTER LAYOUT */}
+            <div className="flex flex-col items-center gap-2 text-xs font-mono text-zinc-600">
+                <span className="opacity-50">pRPC Powered</span>
                 <span>Built by <span className="text-zinc-400 font-bold">riot'</span> (<a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition">X: @33xp_</a> | <span className="opacity-70">Discord: @idle0x</span>)</span>
             </div>
         </div>
