@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, ExternalLink, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Wallet, Medal, Share2, Twitter } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Wallet, Medal, Share2, Twitter } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -70,12 +70,80 @@ const getHealthScore = (node: Node, latestVersion: string) => {
   return Math.max(0, Math.min(100, score));
 };
 
+// --- COMPONENT: TOP LIVE WIRE (For Refreshes) ---
 const LiveWireLoader = () => (
   <div className="w-full h-1 relative overflow-hidden bg-zinc-900 border-b border-zinc-800">
     <div className="absolute inset-0 bg-blue-500/20 blur-[2px]"></div>
     <div className="absolute h-full w-1/3 bg-gradient-to-r from-transparent via-blue-400 to-transparent animate-shimmer" style={{ animationDuration: '1.5s' }}></div>
   </div>
 );
+
+// --- COMPONENT: CENTER PULSE GRAPH (For Initial Load) ---
+const PulseGraphLoader = () => {
+  const [text, setText] = useState("Initializing Uplink...");
+  
+  useEffect(() => {
+    const texts = ["Establishing Connection...", "Parsing Gossip Protocol...", "Syncing Node Storage...", "Decrypting Ledger..."];
+    let i = 0;
+    const interval = setInterval(() => {
+        setText(texts[i % texts.length]);
+        i++;
+    }, 800);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="flex flex-col items-center justify-center py-20 opacity-80">
+        {/* The Graph */}
+        <div className="relative w-64 h-32 mb-6">
+            <svg viewBox="0 0 300 100" className="w-full h-full drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]">
+                <path 
+                    d="M0,50 L20,50 L30,20 L40,80 L50,50 L70,50 L80,30 L90,70 L100,50 L150,50 L160,10 L170,90 L180,50 L220,50 L230,30 L240,70 L250,50 L300,50" 
+                    fill="none" 
+                    stroke="#3b82f6" 
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="animate-draw-graph"
+                />
+            </svg>
+            {/* The Scanner Line */}
+            <div className="absolute top-0 bottom-0 w-1 bg-white/50 blur-[1px] animate-scan-line"></div>
+        </div>
+        
+        {/* The Text */}
+        <div className="font-mono text-blue-400 text-xs tracking-widest uppercase animate-pulse">
+            {text}
+        </div>
+        
+        {/* CSS for this specific component */}
+        <style jsx>{`
+            .animate-draw-graph {
+                stroke-dasharray: 400;
+                stroke-dashoffset: 400;
+                animation: draw 2s ease-in-out infinite;
+            }
+            .animate-scan-line {
+                left: 0;
+                animation: scan 2s ease-in-out infinite;
+            }
+            @keyframes draw {
+                0% { stroke-dashoffset: 400; opacity: 0; }
+                10% { opacity: 1; }
+                50% { stroke-dashoffset: 0; }
+                90% { opacity: 1; }
+                100% { stroke-dashoffset: 0; opacity: 0; }
+            }
+            @keyframes scan {
+                0% { left: 0%; opacity: 0; }
+                10% { opacity: 1; }
+                90% { opacity: 1; }
+                100% { left: 100%; opacity: 0; }
+            }
+        `}</style>
+    </div>
+  );
+};
 
 export default function Home() {
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -368,7 +436,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
           <div className="flex items-center gap-2 text-xs text-zinc-500 mt-2 justify-center md:justify-start font-mono">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>
             GOSSIP PROTOCOL ONLINE
-            <span className="text-zinc-700">|</span>
+            <span className="text-zinc-700 mx-2">|</span>
             SYNC: {lastUpdated || '--:--'}
           </div>
         </div>
@@ -468,7 +536,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
             type="text" 
-            placeholder="Search Node Address..." 
+            placeholder="Search Node IP/Address..." 
             className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 pl-10 pr-10 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition placeholder-zinc-600"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -484,15 +552,22 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
       </div>
 
-      {filteredNodes.length === 0 && !loading ? (
-        <div className="py-20 text-center text-zinc-500">
-            <Server size={48} className="mx-auto mb-4 opacity-50" />
-            <p>No nodes found matching parameters.</p>
-        </div>
+      {/* GRAPH LOADER (Only on initial load) */}
+      {loading && nodes.length === 0 ? (
+        <PulseGraphLoader />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-20">
-          {filteredNodes.map((node, i) => renderNodeCard(node, i))}
-        </div>
+        <>
+          {filteredNodes.length === 0 && !loading ? (
+            <div className="py-20 text-center text-zinc-500">
+                <Server size={48} className="mx-auto mb-4 opacity-50" />
+                <p>No nodes found matching parameters.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-20">
+              {filteredNodes.map((node, i) => renderNodeCard(node, i))}
+            </div>
+          )}
+        </>
       )}
 
       {/* --- DETAIL MODAL --- */}
