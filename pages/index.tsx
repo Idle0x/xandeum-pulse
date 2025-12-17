@@ -14,7 +14,6 @@ interface Node {
   storage_used: number;
   storage_committed?: number; 
   storage_usage_percentage?: number;
-  // Merged Data
   rank?: number;
   credits?: number;
 }
@@ -137,7 +136,6 @@ export default function Home() {
       if (statsRes.data.result && statsRes.data.result.pods) {
         let podList: Node[] = statsRes.data.result.pods;
         
-        // --- 1. CREDITS PARSING ---
         const creditsData = creditsRes.data.pods_credits || creditsRes.data;
         const creditMap = new Map<string, number>();
         
@@ -156,12 +154,10 @@ export default function Home() {
             });
         }
 
-        // --- 2. CALCULATE RANKS ---
         const rankedPubkeys = Array.from(creditMap.entries())
             .sort((a, b) => b[1] - a[1])
             .map(entry => entry[0]);
 
-        // --- 3. MERGE ---
         podList = podList.map(node => {
             const credits = creditMap.get(node.pubkey) || 0;
             const rankIndex = rankedPubkeys.indexOf(node.pubkey);
@@ -172,7 +168,6 @@ export default function Home() {
         setNodes(podList);
         setLastUpdated(new Date().toLocaleTimeString());
         
-        // --- 4. NETWORK STATS ---
         const stableNodes = podList.filter(n => n.uptime > 86400).length;
         setNetworkHealth((podList.length > 0 ? (stableNodes / podList.length) * 100 : 0).toFixed(2));
 
@@ -198,15 +193,10 @@ export default function Home() {
   };
 
   const filteredNodes = nodes
-    .filter(node => {
-      const q = searchQuery.toLowerCase();
-      // Search by Address OR Pubkey OR Rank (e.g. searching "1" finds Rank 1)
-      return (
-        node.address.toLowerCase().includes(q) ||
-        node.pubkey.toLowerCase().includes(q) ||
-        (node.rank && node.rank.toString() === q)
-      );
-    })
+    .filter(node => 
+      node.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      node.version.toLowerCase().includes(searchQuery.toLowerCase())
+    )
     .sort((a, b) => {
       let valA = a[sortBy === 'storage' ? 'storage_used' : (sortBy === 'rank' ? 'rank' : sortBy)] as any;
       let valB = b[sortBy === 'storage' ? 'storage_used' : (sortBy === 'rank' ? 'rank' : sortBy)] as any;
@@ -263,7 +253,6 @@ export default function Home() {
       <div 
         key={node.address} 
         onClick={() => setSelectedNode(node)}
-        // UPDATED: Visible borders, Gradient BG, Scale on Hover
         className={`group relative border rounded-xl p-5 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${
             isFav 
             ? 'bg-gradient-to-b from-zinc-900 to-black border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.1)]' 
@@ -298,14 +287,18 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="flex justify-between items-center text-xs bg-black/40 p-2 rounded-lg border border-zinc-800/50">
-             <div className="flex items-center gap-1.5">
-                <Medal size={12} className={node.rank === 1 ? 'text-yellow-400' : 'text-zinc-500'} />
-                <span className="text-zinc-400 font-bold">#{node.rank && node.rank < 9999 ? node.rank : '-'}</span>
-             </div>
-             <div className="flex items-center gap-1.5">
-                <span className="text-zinc-300 font-mono">{node.credits?.toLocaleString() || 0}</span>
-                <Wallet size={12} className="text-yellow-600" />
+          {/* NEW: SECTION TITLE ON CARD */}
+          <div className="pt-2">
+             <div className="text-[10px] text-zinc-600 uppercase font-bold mb-1 tracking-wider">Network Rewards</div>
+             <div className="flex justify-between items-center text-xs bg-black/40 p-2 rounded-lg border border-zinc-800/50">
+                <div className="flex items-center gap-1.5">
+                    <Medal size={12} className={node.rank === 1 ? 'text-yellow-400' : 'text-zinc-500'} />
+                    <span className="text-zinc-400 font-bold">#{node.rank && node.rank < 9999 ? node.rank : '-'}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <span className="text-zinc-300 font-mono">{node.credits?.toLocaleString() || 0}</span>
+                    <Wallet size={12} className="text-yellow-600" />
+                </div>
              </div>
           </div>
           
@@ -335,7 +328,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans relative selection:bg-blue-500/30 selection:text-blue-200 flex flex-col">
       
-      {/* LIVE WIRE LOADER */}
       {loading && <div className="fixed top-0 left-0 right-0 z-50"><LiveWireLoader /></div>}
 
       <div className="p-4 md:p-8 flex-grow">
@@ -360,7 +352,6 @@ export default function Home() {
         </button>
       </header>
 
-      {/* ERROR DISPLAY */}
       {error && (
         <div className="mb-8 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center justify-between text-red-400">
           <div className="flex items-center gap-2">
@@ -391,7 +382,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* WATCHLIST SECTION */}
       {watchListNodes.length > 0 && (
         <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
            <div className="flex items-center gap-2 mb-4">
@@ -445,7 +435,6 @@ export default function Home() {
             </div>
         </div>
 
-        {/* SEARCH BAR WITH CLEAR BUTTON */}
         <div className="relative">
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
@@ -466,7 +455,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* MAIN NODE GRID */}
       {filteredNodes.length === 0 && !loading ? (
         <div className="py-20 text-center text-zinc-500">
             <Server size={48} className="mx-auto mb-4 opacity-50" />
@@ -478,7 +466,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- DETAIL MODAL --- */}
+      {/* MODAL */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
           <div className="bg-[#09090b] border border-zinc-700 w-full max-w-lg p-0 rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -526,19 +514,25 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                 <div className="bg-zinc-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3">
-                    <Trophy size={20} className="text-yellow-500" />
-                    <div>
-                        <div className="text-[10px] text-zinc-500 font-bold uppercase">Global Rank</div>
-                        <div className="text-xl font-bold text-white">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</div>
+              {/* NEW: SECTION TITLE ON MODAL */}
+              <div className="mb-6">
+                 <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">
+                    <Trophy size={12} /> Network Rewards
+                 </h3>
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-zinc-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3">
+                        <Trophy size={20} className="text-yellow-500" />
+                        <div>
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase">Global Rank</div>
+                            <div className="text-xl font-bold text-white">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</div>
+                        </div>
                     </div>
-                 </div>
-                 <div className="bg-zinc-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3">
-                    <Wallet size={20} className="text-yellow-500" />
-                    <div>
-                        <div className="text-[10px] text-zinc-500 font-bold uppercase">Credits</div>
-                        <div className="text-xl font-bold text-white">{selectedNode.credits?.toLocaleString() || 0}</div>
+                    <div className="bg-zinc-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3">
+                        <Wallet size={20} className="text-yellow-500" />
+                        <div>
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase">Credits</div>
+                            <div className="text-xl font-bold text-white">{selectedNode.credits?.toLocaleString() || 0}</div>
+                        </div>
                     </div>
                  </div>
               </div>
@@ -617,7 +611,7 @@ export default function Home() {
             <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">
                 Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.
             </p>
-            <div className="flex justify-center items-center gap-4 text-xs font-mono text-zinc-600">
+            <div className="flex justify-center items-center gap-2 text-xs font-mono text-zinc-600">
                 <span>pRPC Powered</span>
                 <span>•</span>
                 <span>Built by <span className="text-zinc-400 font-bold">riot'</span> (<a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition">X: @33xp_</a> | <span className="opacity-70">Discord: @idle0x</span>)</span>
