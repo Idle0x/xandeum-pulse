@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Wallet, Medal, Share2, Twitter } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Wallet, Medal, Share2, Twitter, Code } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -13,7 +13,7 @@ interface Node {
   is_public: boolean;
   storage_used: number;
   storage_committed?: number; 
-  storage_usage_percentage?: number;
+  storage_usage_percentage?: string; // Changed to string for "< 0.01%" formatting
   rank?: number;
   credits?: number;
 }
@@ -59,15 +59,15 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
-// FIXED: Uses Actual Latest Version for scoring, not just consensus
-const getHealthScore = (node: Node, latestVersion: string) => {
+// FIXED: Uses "Consensus Version" (Most Common) for scoring
+const getHealthScore = (node: Node, consensusVersion: string) => {
   let score = 100;
   if (node.uptime < 3600) score -= 40;
   else if (node.uptime < 86400) score -= 20;
   else if (node.uptime < 259200) score -= 5;
   
-  // If node version is OLDER than latest, penalize
-  if (latestVersion !== 'N/A' && compareVersions(node.version, latestVersion) < 0) score -= 15;
+  // Only penalize if node is older than the MAJORITY of the network
+  if (consensusVersion !== 'N/A' && compareVersions(node.version, consensusVersion) < 0) score -= 15;
   
   if (!node.is_public) score -= 10;
   if (node.storage_used > 1000000) score += 5; 
@@ -156,11 +156,11 @@ export default function Home() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const [shared, setShared] = useState(false);
+  const [jsonCopied, setJsonCopied] = useState(false);
   const [cycleStep, setCycleStep] = useState(0);
 
   const [networkHealth, setNetworkHealth] = useState('0.00');
   const [mostCommonVersion, setMostCommonVersion] = useState('N/A');
-  const [latestVersion, setLatestVersion] = useState('N/A'); // New State
   const [totalStorage, setTotalStorage] = useState(0);
 
   useEffect(() => {
@@ -168,11 +168,22 @@ export default function Home() {
     const saved = localStorage.getItem('xandeum_favorites');
     if (saved) setFavorites(JSON.parse(saved));
 
+    // NEW: Auto-refresh when user returns to tab
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
     const interval = setInterval(() => {
-      // FIXED: Infinite cycle, no reset glitch
       setCycleStep(prev => prev + 1); 
     }, 4000);
-    return () => clearInterval(interval);
+    
+    return () => {
+        clearInterval(interval);
+        document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   const toggleFavorite = (e: React.MouseEvent, address: string) => {
@@ -191,6 +202,12 @@ export default function Home() {
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyRawJson = (node: Node) => {
+    navigator.clipboard.writeText(JSON.stringify(node, null, 2));
+    setJsonCopied(true);
+    setTimeout(() => setJsonCopied(false), 2000);
   };
 
   const copyStatusReport = (node: Node) => {
@@ -245,32 +262,48 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             });
         }
 
-        const rankedPubkeys = Array.from(creditMap.entries())
-            .sort((a, b) => b[1] - a[1])
-            .map(entry => entry[0]);
+        // --- MERGE LOGIC ---
+        let mergedList = podList.map(node => ({
+            ...node,
+            credits: creditMap.get(node.pubkey) || 0
+        }));
 
-        podList = podList.map(node => {
-            const credits = creditMap.get(node.pubkey) || 0;
-            const rankIndex = rankedPubkeys.indexOf(node.pubkey);
-            const rank = rankIndex !== -1 ? rankIndex + 1 : 9999;
-            return { ...node, credits, rank };
+        // --- OLYMPIC RANKING (Handling Ties) ---
+        mergedList.sort((a, b) => (b.credits || 0) - (a.credits || 0));
+        
+        let currentRank = 1;
+        for (let i = 0; i < mergedList.length; i++) {
+            if (i > 0 && (mergedList[i].credits || 0) < (mergedList[i - 1].credits || 0)) {
+                currentRank = i + 1;
+            }
+            mergedList[i].rank = currentRank;
+        }
+
+        // --- STORAGE MATH (Scientific Precision) ---
+        mergedList = mergedList.map(node => {
+            const used = node.storage_used || 0;
+            const cap = node.storage_committed || 0;
+            let percentStr = "0%";
+            
+            if (cap > 0 && used > 0) {
+                const p = (used / cap) * 100;
+                if (p < 0.01) percentStr = "< 0.01%";
+                else percentStr = `${p.toFixed(2)}%`;
+            } else if (used === 0) {
+                percentStr = "0%";
+            }
+            
+            return { ...node, storage_usage_percentage: percentStr };
         });
 
-        setNodes(podList);
+        setNodes(mergedList);
         setLastUpdated(new Date().toLocaleTimeString());
         
-        const stableNodes = podList.filter(n => n.uptime > 86400).length;
-        setNetworkHealth((podList.length > 0 ? (stableNodes / podList.length) * 100 : 0).toFixed(2));
+        const stableNodes = mergedList.filter(n => n.uptime > 86400).length;
+        setNetworkHealth((mergedList.length > 0 ? (stableNodes / mergedList.length) * 100 : 0).toFixed(2));
 
-        if (podList.length > 0) {
-            // FIXED: Calculate Actual Latest Version
-            const allVersions = podList.map(n => n.version);
-            const sortedVersions = allVersions.sort((a, b) => compareVersions(b, a));
-            const trueLatest = sortedVersions[0] || 'N/A';
-            setLatestVersion(trueLatest);
-
-            // Calculate Most Common (Consensus)
-            const versionCounts = podList.reduce((acc, n) => {
+        if (mergedList.length > 0) {
+            const versionCounts = mergedList.reduce((acc, n) => {
                 acc[n.version] = (acc[n.version] || 0) + 1;
                 return acc;
             }, {} as Record<string, number>);
@@ -278,7 +311,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             setMostCommonVersion(topVersion);
         }
 
-        const totalBytes = podList.reduce((sum, n) => sum + (n.storage_used || 0), 0);
+        const totalBytes = mergedList.reduce((sum, n) => sum + (n.storage_used || 0), 0);
         setTotalStorage(totalBytes);
         setError('');
       }
@@ -334,7 +367,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
     } else if (step === 1) {
       return { label: 'Capacity', value: formatBytes(node.storage_committed || 0), color: 'text-purple-400', icon: HardDrive };
     } else if (step === 2) {
-      const score = getHealthScore(node, latestVersion); // Using Latest Version
+      const score = getHealthScore(node, mostCommonVersion); // Use Consensus Version
       return { label: 'Health Score', value: `${score}/100`, color: score > 80 ? 'text-green-400' : 'text-yellow-400', icon: Activity };
     } else {
       return { 
@@ -349,7 +382,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
   const renderNodeCard = (node: Node, i: number) => {
     const cycleData = getCycleContent(node, i);
     const isFav = favorites.includes(node.address);
-    const isLatest = latestVersion !== 'N/A' && node.version === latestVersion;
+    const isLatest = mostCommonVersion !== 'N/A' && node.version === mostCommonVersion;
     
     return (
       <div 
@@ -494,12 +527,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
               {watchListNodes.map((node, i) => renderNodeCard(node, i))}
            </div>
         </div>
-      ) : favorites.length > 0 ? (
-         // If favorites exist but nodes aren't found (rare edge case), show nothing or error. 
-         // But if favorites is empty, we show the educational empty state below.
-         null
-      ) : (
-        // EDUCATIONAL EMPTY STATE
+      ) : favorites.length === 0 ? (
         <div className="mb-10 p-6 bg-zinc-900/30 border border-zinc-800/50 border-dashed rounded-xl text-center animate-in fade-in">
             <Star size={24} className="mx-auto mb-2 text-zinc-600" />
             <h3 className="text-zinc-500 font-bold text-sm mb-1">No Favorites Yet</h3>
@@ -507,7 +535,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             Click the star icon <Star size={10} className="inline text-zinc-500" /> on any node to pin it here.
             </p>
         </div>
-      )}
+      ) : null}
 
       {/* CONTROLS */}
       <div className="mb-8 space-y-4">
@@ -517,7 +545,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     <Trophy size={16} /> LEADERBOARD
                 </Link>
 
-                {/* REFRESH BUTTON WITH LOADING STATE */}
                 <button 
                     onClick={fetchData} 
                     disabled={loading}
@@ -630,7 +657,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl text-center">
                   <div className="text-xs text-zinc-500 mb-1 font-bold">HEALTH SCORE</div>
-                  <div className="text-3xl font-bold text-white">{getHealthScore(selectedNode, latestVersion)}</div>
+                  <div className="text-3xl font-bold text-white">{getHealthScore(selectedNode, mostCommonVersion)}</div>
                 </div>
                 <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl text-center">
                   <div className="text-xs text-zinc-500 mb-1 font-bold">VISIBILITY</div>
@@ -678,10 +705,10 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                    </div>
                    <div className="flex justify-between items-center">
                       <span className="text-zinc-400 text-sm">Efficiency</span>
-                      <span className="text-white font-mono font-bold">{selectedNode.storage_usage_percentage || 0}%</span>
+                      <span className="text-white font-mono font-bold">{selectedNode.storage_usage_percentage}</span>
                    </div>
                    <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-2">
-                      <div className="h-full bg-blue-500" style={{ width: `${selectedNode.storage_usage_percentage || 0}%` }}></div>
+                      <div className="h-full bg-blue-500" style={{ width: selectedNode.storage_usage_percentage?.includes('<') ? '1%' : selectedNode.storage_usage_percentage }}></div>
                    </div>
                 </div>
               </div>
@@ -714,20 +741,28 @@ Monitor at: https://xandeum-pulse.vercel.app`;
               </div>
               
               {/* SHARE BUTTONS */}
-              <div className="mt-6 pt-4 border-t border-white/5 flex gap-3">
+              <div className="mt-6 pt-4 border-t border-white/5 grid grid-cols-2 gap-3">
                  <button 
                    onClick={() => copyStatusReport(selectedNode)}
-                   className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-xl transition border border-zinc-700"
+                   className="flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold py-3 rounded-xl transition border border-zinc-700"
                  >
-                   {shared ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
-                   {shared ? 'COPIED!' : 'COPY REPORT'}
+                   {shared ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                   {shared ? 'COPIED!' : 'REPORT'}
                  </button>
                  <button 
                    onClick={() => shareToTwitter(selectedNode)}
-                   className="flex-1 flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-400 text-white font-bold py-3 rounded-xl transition"
+                   className="flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold py-3 rounded-xl transition"
                  >
-                   <Twitter size={18} fill="currentColor" />
+                   <Twitter size={14} fill="currentColor" />
                    SHARE ON X
+                 </button>
+                 {/* NEW DEVELOPER PROOF BUTTON */}
+                 <button 
+                   onClick={() => copyRawJson(selectedNode)}
+                   className="col-span-2 flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 text-[10px] font-mono py-2 rounded-lg transition border border-zinc-800"
+                 >
+                   {jsonCopied ? <Check size={12} className="text-green-500" /> : <Code size={12} />}
+                   {jsonCopied ? 'JSON COPIED' : 'COPY RAW JSON (DEV)'}
                  </button>
               </div>
               
