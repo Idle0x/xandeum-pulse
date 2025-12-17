@@ -28,10 +28,6 @@ const formatBytes = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-const formatRawBytes = (bytes: number) => {
-  return bytes ? bytes.toLocaleString() + ' B' : '0 B';
-};
-
 const formatUptime = (seconds: number) => {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
@@ -348,6 +344,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
   const filteredNodes = nodes
     .filter(node => {
       const q = searchQuery.toLowerCase();
+      // Safe navigation to prevent crashes on null values
       return (
         (node.address || '').toLowerCase().includes(q) ||
         (node.pubkey || '').toLowerCase().includes(q) ||
@@ -717,7 +714,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                 </div>
               </div>
 
-              {/* NETWORK REWARDS SECTION - LINKED TO LEADERBOARD */}
+              {/* NETWORK REWARDS SECTION - LINKED */}
               <Link href="/leaderboard">
                 <div className="mb-6 cursor-pointer hover:opacity-90 transition">
                     <div className="flex items-center gap-2 mb-3 group relative w-fit">
@@ -760,9 +757,14 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                 <div className="bg-zinc-900/50 rounded-xl p-4 border border-zinc-800 space-y-3">
                    <div className="flex justify-between items-center">
                       <span className="text-zinc-400 text-sm">Used</span>
-                      <div className="text-right">
-                        <span className="text-blue-400 font-mono font-bold block">{formatBytes(selectedNode.storage_used)}</span>
-                        <span className="text-zinc-600 text-[10px] font-mono">{formatRawBytes(selectedNode.storage_used)}</span>
+                      <div className="flex flex-col items-end">
+                        <span className="text-blue-400 font-mono font-bold">{formatBytes(selectedNode.storage_used)}</span>
+                        <div className="flex items-center gap-1 mt-0.5 opacity-60 hover:opacity-100 transition">
+                            <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">RAW</span>
+                            <span className="text-[10px] font-mono text-zinc-400 bg-zinc-900 px-1.5 rounded border border-zinc-800">
+                                {selectedNode.storage_used?.toLocaleString()}
+                            </span>
+                        </div>
                       </div>
                    </div>
                    <div className="flex justify-between items-center">
