@@ -551,7 +551,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
       </div>
 
-      {/* WATCHLIST SECTION */}
+      {/* WATCHLIST SECTION - WITH EMPTY STATE */}
       {watchListNodes.length > 0 ? (
         <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
            <div className="flex items-center gap-2 mb-4">
@@ -788,7 +788,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
               <div className="space-y-3 text-sm border-t border-white/5 pt-4">
                 <div className="flex justify-between py-1">
                   <span className="text-zinc-500">Last Seen</span>
-                  <span className="text-zinc-300 font-mono text-xs text-right">{formatDetailedTimestamp(selectedNode.last_seen_timestamp)}</span>
+                  <span className="text-white font-mono text-xs text-right">{formatDetailedTimestamp(selectedNode.last_seen_timestamp)}</span>
                 </div>
 
                 <div className="flex justify-between py-1">
@@ -813,7 +813,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                 
                 <div className="flex justify-between py-1">
                    <span className="text-zinc-500">Uptime</span>
-                   <span className="text-zinc-300 font-mono">{formatUptime(selectedNode.uptime)}</span>
+                   <span className="text-white font-mono">{formatUptime(selectedNode.uptime)}</span>
                 </div>
               </div>
               
