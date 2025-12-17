@@ -70,7 +70,6 @@ const getHealthScore = (node: Node, latestVersion: string) => {
   return Math.max(0, Math.min(100, score));
 };
 
-// --- COMPONENT: TOP LIVE WIRE (For Refreshes) ---
 const LiveWireLoader = () => (
   <div className="w-full h-1 relative overflow-hidden bg-zinc-900 border-b border-zinc-800">
     <div className="absolute inset-0 bg-blue-500/20 blur-[2px]"></div>
@@ -94,7 +93,6 @@ const PulseGraphLoader = () => {
 
   return (
     <div className="flex flex-col items-center justify-center py-20 opacity-80">
-        {/* The Graph */}
         <div className="relative w-64 h-32 mb-6">
             <svg viewBox="0 0 300 100" className="w-full h-full drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]">
                 <path 
@@ -107,16 +105,11 @@ const PulseGraphLoader = () => {
                     className="animate-draw-graph"
                 />
             </svg>
-            {/* The Scanner Line */}
             <div className="absolute top-0 bottom-0 w-1 bg-white/50 blur-[1px] animate-scan-line"></div>
         </div>
-        
-        {/* The Text */}
         <div className="font-mono text-blue-400 text-xs tracking-widest uppercase animate-pulse">
             {text}
         </div>
-        
-        {/* CSS for this specific component */}
         <style jsx>{`
             .animate-draw-graph {
                 stroke-dasharray: 400;
@@ -471,9 +464,10 @@ Monitor at: https://xandeum-pulse.vercel.app`;
           <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Consensus Ver</div>
           <div className="text-3xl font-bold text-blue-400 mt-1">{mostCommonVersion}</div>
         </div>
+        {/* REPLACED WATCHLIST WITH ACTIVE NODES */}
         <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
-          <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Watchlist</div>
-          <div className="text-3xl font-bold text-yellow-500 mt-1">{favorites.length}</div>
+          <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Active Nodes</div>
+          <div className="text-3xl font-bold text-white mt-1">{nodes.length}</div>
         </div>
       </div>
 
@@ -497,7 +491,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     <Trophy size={16} /> LEADERBOARD
                 </Link>
 
-                {/* DUAL LOADER: SPINNING ZAP */}
                 <button onClick={fetchData} className="flex-1 md:flex-none justify-center px-4 py-2.5 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2 text-zinc-300">
                     <Zap size={16} className={loading ? "text-yellow-500 animate-spin" : "text-blue-500"} /> 
                     REFRESH
@@ -531,12 +524,11 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             </div>
         </div>
 
-        {/* SEARCH BAR WITH CLEAR BUTTON */}
         <div className="relative">
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
             type="text" 
-            placeholder="Search Node IP/Address..." 
+            placeholder="Search Node Address..." 
             className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 pl-10 pr-10 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition placeholder-zinc-600"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -552,7 +544,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
       </div>
 
-      {/* GRAPH LOADER (Only on initial load) */}
       {loading && nodes.length === 0 ? (
         <PulseGraphLoader />
       ) : (
