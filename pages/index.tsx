@@ -476,8 +476,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                 {cycleData.value}
               </span>
             </div>
-            
-            {/* REMOVED BOOTING/STABLE BADGE */}
           </div>
         </div>
       </div>
@@ -516,7 +514,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
           <div className="flex items-center gap-2 text-xs text-zinc-500 mt-2 justify-center md:justify-start font-mono">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>
             GOSSIP PROTOCOL ONLINE
-            <span className="text-zinc-700 mx-2">|</span>
+            <span className="text-zinc-700 mx-1">|</span>
             SYNC: {lastUpdated || '--:--'}
           </div>
         </div>
@@ -794,7 +792,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
               <div className="space-y-3 text-sm border-t border-white/5 pt-4">
                 <div className="flex justify-between py-1">
                   <span className="text-zinc-500">Last Seen</span>
-                  {/* FIXED: White vital sign */}
                   <span className="text-white font-mono text-xs text-right">{formatDetailedTimestamp(selectedNode.last_seen_timestamp)}</span>
                 </div>
 
@@ -820,7 +817,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                 
                 <div className="flex justify-between py-1">
                    <span className="text-zinc-500">Uptime</span>
-                   {/* FIXED: White vital sign */}
                    <span className="text-white font-mono">{formatUptime(selectedNode.uptime)}</span>
                 </div>
               </div>
@@ -860,10 +856,10 @@ Monitor at: https://xandeum-pulse.vercel.app`;
       <footer className="border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto">
         <div className="max-w-4xl mx-auto text-center">
             <h3 className="text-white font-bold mb-2">XANDEUM PULSE MONITOR</h3>
-            <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">
+            <p className="text-zinc-500 text-sm mb-2 max-w-lg mx-auto">
                 Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.
             </p>
-            <div className="flex items-center justify-center gap-2 text-xs font-mono text-zinc-600">
+            <div className="flex items-center justify-center gap-1.5 text-xs font-mono text-zinc-600">
                 <span className="opacity-50">pRPC Powered</span>
                 <span>•</span>
                 <span>Built by <a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-blue-400 transition font-bold">riot'</a></span>
