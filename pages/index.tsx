@@ -3,6 +3,7 @@ import axios from 'axios';
 import Link from 'next/link';
 import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, ExternalLink, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Wallet, Medal } from 'lucide-react';
 
+// --- TYPES ---
 interface Node {
   address: string;
   pubkey: string;
@@ -13,10 +14,12 @@ interface Node {
   storage_used: number;
   storage_committed?: number; 
   storage_usage_percentage?: number;
+  // Merged Data
   rank?: number;
   credits?: number;
 }
 
+// --- HELPER FUNCTIONS ---
 const formatBytes = (bytes: number) => {
   if (!bytes || bytes === 0) return '0.00 B';
   const k = 1024;
@@ -134,13 +137,12 @@ export default function Home() {
       if (statsRes.data.result && statsRes.data.result.pods) {
         let podList: Node[] = statsRes.data.result.pods;
         
-        // --- PARSING WITH POD_ID (FIXED) ---
+        // --- 1. CREDITS PARSING ---
         const creditsData = creditsRes.data.pods_credits || creditsRes.data;
         const creditMap = new Map<string, number>();
         
         if (Array.isArray(creditsData)) {
             creditsData.forEach((item: any) => {
-                // Key fix: Look for pod_id first!
                 const key = item.pod_id || item.pubkey || item.node || item.address;
                 const val = Number(item.credits || item.amount || 0);
                 if (key) creditMap.set(key, val);
@@ -154,12 +156,13 @@ export default function Home() {
             });
         }
 
+        // --- 2. CALCULATE RANKS ---
         const rankedPubkeys = Array.from(creditMap.entries())
             .sort((a, b) => b[1] - a[1])
             .map(entry => entry[0]);
 
+        // --- 3. MERGE ---
         podList = podList.map(node => {
-            // Find Match by PubKey
             const credits = creditMap.get(node.pubkey) || 0;
             const rankIndex = rankedPubkeys.indexOf(node.pubkey);
             const rank = rankIndex !== -1 ? rankIndex + 1 : 9999;
@@ -169,6 +172,7 @@ export default function Home() {
         setNodes(podList);
         setLastUpdated(new Date().toLocaleTimeString());
         
+        // --- 4. NETWORK STATS ---
         const stableNodes = podList.filter(n => n.uptime > 86400).length;
         setNetworkHealth((podList.length > 0 ? (stableNodes / podList.length) * 100 : 0).toFixed(2));
 
@@ -194,10 +198,15 @@ export default function Home() {
   };
 
   const filteredNodes = nodes
-    .filter(node => 
-      node.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      node.version.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    .filter(node => {
+      const q = searchQuery.toLowerCase();
+      // Search by Address OR Pubkey OR Rank (e.g. searching "1" finds Rank 1)
+      return (
+        node.address.toLowerCase().includes(q) ||
+        node.pubkey.toLowerCase().includes(q) ||
+        (node.rank && node.rank.toString() === q)
+      );
+    })
     .sort((a, b) => {
       let valA = a[sortBy === 'storage' ? 'storage_used' : (sortBy === 'rank' ? 'rank' : sortBy)] as any;
       let valB = b[sortBy === 'storage' ? 'storage_used' : (sortBy === 'rank' ? 'rank' : sortBy)] as any;
@@ -254,7 +263,12 @@ export default function Home() {
       <div 
         key={node.address} 
         onClick={() => setSelectedNode(node)}
-        className={`group relative bg-zinc-900/40 border rounded-xl p-5 cursor-pointer hover:bg-zinc-800/60 hover:-translate-y-1 hover:shadow-2xl transition-all duration-300 ${isFav ? 'border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.1)]' : 'border-white/5 hover:border-blue-500/30'}`}
+        // UPDATED: Visible borders, Gradient BG, Scale on Hover
+        className={`group relative border rounded-xl p-5 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${
+            isFav 
+            ? 'bg-gradient-to-b from-zinc-900 to-black border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.1)]' 
+            : 'bg-gradient-to-b from-zinc-900 to-black border-zinc-800 hover:border-blue-500/50'
+        }`}
       >
         <div className="mb-4 flex justify-between items-start">
             <div>
@@ -284,7 +298,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="flex justify-between items-center text-xs bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
+          <div className="flex justify-between items-center text-xs bg-black/40 p-2 rounded-lg border border-zinc-800/50">
              <div className="flex items-center gap-1.5">
                 <Medal size={12} className={node.rank === 1 ? 'text-yellow-400' : 'text-zinc-500'} />
                 <span className="text-zinc-400 font-bold">#{node.rank && node.rank < 9999 ? node.rank : '-'}</span>
@@ -321,6 +335,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans relative selection:bg-blue-500/30 selection:text-blue-200 flex flex-col">
       
+      {/* LIVE WIRE LOADER */}
       {loading && <div className="fixed top-0 left-0 right-0 z-50"><LiveWireLoader /></div>}
 
       <div className="p-4 md:p-8 flex-grow">
@@ -345,6 +360,7 @@ export default function Home() {
         </button>
       </header>
 
+      {/* ERROR DISPLAY */}
       {error && (
         <div className="mb-8 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center justify-between text-red-400">
           <div className="flex items-center gap-2">
@@ -375,6 +391,7 @@ export default function Home() {
         </div>
       </div>
 
+      {/* WATCHLIST SECTION */}
       {watchListNodes.length > 0 && (
         <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
            <div className="flex items-center gap-2 mb-4">
@@ -428,18 +445,28 @@ export default function Home() {
             </div>
         </div>
 
+        {/* SEARCH BAR WITH CLEAR BUTTON */}
         <div className="relative">
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
             type="text" 
-            placeholder="Search Node IP, Version, or Key..." 
-            className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 pl-10 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition placeholder-zinc-600"
+            placeholder="Search by Node IP/Address or Public Key..." 
+            className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 pl-10 pr-10 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition placeholder-zinc-600"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-3 text-zinc-500 hover:text-white"
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
       </div>
 
+      {/* MAIN NODE GRID */}
       {filteredNodes.length === 0 && !loading ? (
         <div className="py-20 text-center text-zinc-500">
             <Server size={48} className="mx-auto mb-4 opacity-50" />
@@ -451,7 +478,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL */}
+      {/* --- DETAIL MODAL --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
           <div className="bg-[#09090b] border border-zinc-700 w-full max-w-lg p-0 rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
