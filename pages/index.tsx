@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, ExternalLink, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Wallet, Medal } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, ExternalLink, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Wallet, Medal, Share2, Twitter } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -90,6 +90,7 @@ export default function Home() {
 
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
+  const [shared, setShared] = useState(false);
   const [cycleStep, setCycleStep] = useState(0);
 
   const [networkHealth, setNetworkHealth] = useState('0.00');
@@ -123,6 +124,29 @@ export default function Home() {
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyStatusReport = (node: Node) => {
+    const report = `[XANDEUM PULSE REPORT]
+-----------------------
+Node: ${node.address}
+Status: ${node.uptime > 86400 ? 'STABLE' : 'BOOTING'}
+Rank: #${node.rank || '-'}
+Credits: ${node.credits?.toLocaleString() || 0}
+Storage: ${formatBytes(node.storage_used)} / ${formatBytes(node.storage_committed || 0)}
+Uptime: ${formatUptime(node.uptime)}
+Version: ${node.version}
+-----------------------
+Monitor at: https://xandeum-pulse.vercel.app`;
+    navigator.clipboard.writeText(report);
+    setShared(true);
+    setTimeout(() => setShared(false), 2000);
+  };
+
+  const shareToTwitter = (node: Node) => {
+    const text = `Just checked my pNode status on Xandeum Pulse! ⚡\n\n🟢 Status: ${node.uptime > 86400 ? 'Stable' : 'Booting'}\n🏆 Rank: #${node.rank || '-'}\n💰 Credits: ${node.credits?.toLocaleString() || 0}\n💾 Storage: ${formatBytes(node.storage_used)}\n\nMonitor the network here:`;
+    const url = "https://xandeum-pulse.vercel.app";
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
   };
 
   const fetchData = async () => {
@@ -193,10 +217,14 @@ export default function Home() {
   };
 
   const filteredNodes = nodes
-    .filter(node => 
-      node.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      node.version.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    .filter(node => {
+      const q = searchQuery.toLowerCase();
+      return (
+        node.address.toLowerCase().includes(q) ||
+        node.pubkey.toLowerCase().includes(q) ||
+        (node.rank && node.rank.toString() === q)
+      );
+    })
     .sort((a, b) => {
       let valA = a[sortBy === 'storage' ? 'storage_used' : (sortBy === 'rank' ? 'rank' : sortBy)] as any;
       let valB = b[sortBy === 'storage' ? 'storage_used' : (sortBy === 'rank' ? 'rank' : sortBy)] as any;
@@ -287,7 +315,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* NEW: SECTION TITLE ON CARD */}
           <div className="pt-2">
              <div className="text-[10px] text-zinc-600 uppercase font-bold mb-1 tracking-wider">Network Rewards</div>
              <div className="flex justify-between items-center text-xs bg-black/40 p-2 rounded-lg border border-zinc-800/50">
@@ -402,8 +429,9 @@ export default function Home() {
                     <Trophy size={16} /> LEADERBOARD
                 </Link>
 
+                {/* DUAL LOADER: SPINNING ZAP */}
                 <button onClick={fetchData} className="flex-1 md:flex-none justify-center px-4 py-2.5 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2 text-zinc-300">
-                    <Zap size={16} className={loading ? "text-blue-500 animate-pulse" : "text-blue-500"} /> 
+                    <Zap size={16} className={loading ? "text-yellow-500 animate-spin" : "text-blue-500"} /> 
                     REFRESH
                 </button>
             </div>
@@ -435,11 +463,12 @@ export default function Home() {
             </div>
         </div>
 
+        {/* SEARCH BAR WITH CLEAR BUTTON */}
         <div className="relative">
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
             type="text" 
-            placeholder="Search by Node IP/Address or Public Key..." 
+            placeholder="Search Node Address..." 
             className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 pl-10 pr-10 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition placeholder-zinc-600"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -466,7 +495,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL */}
+      {/* --- DETAIL MODAL --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
           <div className="bg-[#09090b] border border-zinc-700 w-full max-w-lg p-0 rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -514,7 +543,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* NEW: SECTION TITLE ON MODAL */}
+              {/* NETWORK REWARDS SECTION */}
               <div className="mb-6">
                  <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">
                     <Trophy size={12} /> Network Rewards
@@ -587,15 +616,22 @@ export default function Home() {
                 </div>
               </div>
               
-              <div className="mt-6 pt-4 border-t border-white/5">
-                 <a 
-                   href={`https://explorer.solana.com/address/${selectedNode.pubkey}`} 
-                   target="_blank" 
-                   rel="noopener noreferrer"
-                   className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition"
+              {/* SHARE BUTTONS */}
+              <div className="mt-6 pt-4 border-t border-white/5 flex gap-3">
+                 <button 
+                   onClick={() => copyStatusReport(selectedNode)}
+                   className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-xl transition border border-zinc-700"
                  >
-                   <ExternalLink size={18} /> VIEW ON EXPLORER
-                 </a>
+                   {shared ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
+                   {shared ? 'COPIED!' : 'COPY REPORT'}
+                 </button>
+                 <button 
+                   onClick={() => shareToTwitter(selectedNode)}
+                   className="flex-1 flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-400 text-white font-bold py-3 rounded-xl transition"
+                 >
+                   <Twitter size={18} fill="currentColor" />
+                   SHARE ON X
+                 </button>
               </div>
               
             </div>
