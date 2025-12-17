@@ -76,21 +76,25 @@ Source: https://podcredits.xandeum.network/api/pods-credits
 
 Returns the accumulated credit balance for reward distribution.
 
-## Installation
+## Running Locally
+
+If you'd like to run Xandeum Pulse on your local machine for development or testing:
 
 ```bash
-# 1. Clone repository
+# Clone the repository
 git clone https://github.com/Idle0x/xandeum-pulse.git
 cd xandeum-pulse
 
-# 2. Install dependencies
+# Install dependencies
 npm install
 
-# 3. Run development server
+# Start the development server
 npm run dev
 ```
 
-Open http://localhost:3000 to view the dashboard.
+The dashboard will be available at http://localhost:3000
+
+Note: The application connects directly to the Xandeum network via pRPC, so no additional configuration or API keys are required.
 
 ## Project Structure
 
