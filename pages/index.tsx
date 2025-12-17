@@ -42,6 +42,7 @@ const formatUptime = (seconds: number) => {
 
 const formatLastSeen = (timestamp: number) => {
   const now = Date.now();
+  // Normalize to milliseconds if needed
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
   const diff = now - time;
   
@@ -61,6 +62,7 @@ const formatDetailedTimestamp = (timestamp: number) => {
   if (!timestamp) return 'N/A';
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
   
+  // FIXED: Logic now handles raw timestamp correctly
   const relative = formatLastSeen(timestamp); 
   
   const date = new Date(time);
@@ -666,10 +668,10 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </>
       )}
 
-      {/* --- ULTIMATE MODAL (RESPONSIVE & ELEVATED) --- */}
+      {/* --- ULTIMATE MODAL (RESPONSIVE & HIGH CONTRAST ZINC) --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
-          <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-zinc-700 w-full max-w-lg md:max-w-4xl p-0 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.7)] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+          <div className="bg-gradient-to-b from-zinc-800 to-zinc-950 border border-zinc-700 w-full max-w-lg md:max-w-4xl p-0 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.7)] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
             
             <div className="bg-white/5 p-6 border-b border-zinc-800 flex justify-between items-start shrink-0">
               <div className="flex-1 overflow-hidden mr-4">
