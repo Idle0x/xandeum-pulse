@@ -667,10 +667,10 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </>
       )}
 
-      {/* --- ULTIMATE MODAL (TITANIUM EDITION) --- */}
+      {/* --- ULTIMATE MODAL (RESPONSIVE & TITANIUM & BLACK GLASS INSETS) --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
-          <div className="bg-gradient-to-b from-slate-900 to-black border border-t-white/10 border-slate-800 w-full max-w-lg md:max-w-4xl p-0 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.9)] shadow-blue-500/5 flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+          <div className="bg-gradient-to-b from-slate-900 to-black border border-t-white/10 border-slate-800 w-full max-w-lg md:max-w-4xl p-0 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.9)] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
             
             <div className="bg-white/5 p-6 border-b border-white/5 flex justify-between items-start shrink-0">
               <div className="flex-1 overflow-hidden mr-4">
@@ -698,7 +698,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                  className={`w-full mb-6 py-3 rounded-xl border flex items-center justify-center gap-2 font-bold transition ${
                    favorites.includes(selectedNode.address) 
                    ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500' 
-                   : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                   : 'bg-black/40 border-white/5 text-slate-400 hover:bg-black/60'
                  }`}
               >
                 <Star size={18} fill={favorites.includes(selectedNode.address) ? "currentColor" : "none"} />
@@ -710,7 +710,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                 {/* LEFT COLUMN */}
                 <div>
                     <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="bg-slate-900/50 border border-slate-700/50 p-4 rounded-xl text-center group relative">
+                        <div className="bg-black/40 border border-white/5 p-4 rounded-xl text-center group relative backdrop-blur-md">
                         <div className="text-xs text-slate-500 mb-1 font-bold flex justify-center items-center gap-1 cursor-help">
                             HEALTH SCORE <Info size={10} />
                         </div>
@@ -719,7 +719,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         </div>
                         <div className="text-3xl font-bold text-white">{getHealthScore(selectedNode, mostCommonVersion)}</div>
                         </div>
-                        <div className="bg-slate-900/50 border border-slate-700/50 p-4 rounded-xl text-center">
+                        <div className="bg-black/40 border border-white/5 p-4 rounded-xl text-center backdrop-blur-md">
                         <div className="text-xs text-slate-500 mb-1 font-bold">VISIBILITY</div>
                         <div className={`text-lg font-bold mt-1 flex justify-center items-center gap-2 ${selectedNode.is_public ? 'text-green-400' : 'text-orange-400'}`}>
                             {selectedNode.is_public ? <><Globe size={16} /> PUBLIC</> : <><Shield size={16} /> PRIVATE</>}
@@ -739,14 +739,14 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-slate-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3 hover:border-yellow-500/40 transition">
+                                <div className="bg-black/40 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3 hover:border-yellow-500/40 transition backdrop-blur-md">
                                     <Trophy size={20} className="text-yellow-500" />
                                     <div>
                                         <div className="text-[10px] text-slate-500 font-bold uppercase">Global Rank</div>
                                         <div className="text-xl font-bold text-white">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</div>
                                     </div>
                                 </div>
-                                <div className="bg-slate-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3 hover:border-yellow-500/40 transition">
+                                <div className="bg-black/40 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3 hover:border-yellow-500/40 transition backdrop-blur-md">
                                     <Wallet size={20} className="text-yellow-500" />
                                     <div>
                                         <div className="text-[10px] text-slate-500 font-bold uppercase">Credits</div>
@@ -770,7 +770,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                                 Real-time storage allocation and commitment.
                             </div>
                         </div>
-                        <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700/50 space-y-3">
+                        <div className="bg-black/40 rounded-xl p-4 border border-white/5 space-y-3 backdrop-blur-md">
                         <div className="flex justify-between items-center">
                             <span className="text-slate-400 text-sm">Used</span>
                             <div className="flex flex-col items-end">
