@@ -666,12 +666,12 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </>
       )}
 
-      {/* --- ULTIMATE MODAL (RESPONSIVE) --- */}
+      {/* --- ULTIMATE MODAL (RESPONSIVE & ELEVATED) --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
-          <div className="bg-[#09090b] border border-zinc-700 w-full max-w-lg md:max-w-4xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+          <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-zinc-700 w-full max-w-lg md:max-w-4xl p-0 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.7)] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
             
-            <div className="bg-zinc-900/50 p-6 border-b border-zinc-800 flex justify-between items-start shrink-0">
+            <div className="bg-white/5 p-6 border-b border-zinc-800 flex justify-between items-start shrink-0">
               <div className="flex-1 overflow-hidden mr-4">
                  <div className="flex justify-between items-start">
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
