@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Wallet, Medal, Share2, Twitter, Code, Info } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -40,27 +40,10 @@ const formatUptime = (seconds: number) => {
   return `${h}h ${m}m`;
 };
 
-const formatLastSeen = (timestamp: number) => {
-  const now = Date.now();
-  const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
-  const diff = now - time;
-  if (diff < 60000) return 'Just now';
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return '>1d ago';
-};
-
-// NEW: Combined "Relative (Absolute)" format
 const formatDetailedTimestamp = (timestamp: number) => {
   if (!timestamp) return 'N/A';
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
-  
-  // 1. Get Relative Time
-  const relative = formatLastSeen(timestamp / 1000); // reuse existing logic
-  
-  // 2. Get Absolute Date (No milliseconds)
+  const relative = formatLastSeen(timestamp / 1000); 
   const date = new Date(time);
   const dateStr = date.toLocaleString('en-US', {
     month: 'long',
@@ -71,8 +54,19 @@ const formatDetailedTimestamp = (timestamp: number) => {
     second: '2-digit',
     hour12: false
   });
-
   return `${relative} (${dateStr})`;
+};
+
+const formatLastSeen = (timestamp: number) => {
+  const now = Date.now();
+  const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
+  const diff = now - time;
+  if (diff < 60000) return 'Just now';
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return '>1d ago';
 };
 
 const compareVersions = (v1: string, v2: string) => {
@@ -87,7 +81,6 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
-// Uses Consensus Version for fair scoring
 const getHealthScore = (node: Node, consensusVersion: string) => {
   let score = 100;
   if (node.uptime < 3600) score -= 40;
@@ -355,7 +348,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
   const filteredNodes = nodes
     .filter(node => {
       const q = searchQuery.toLowerCase();
-      // Safe navigation to prevent crashes on null values
       return (
         (node.address || '').toLowerCase().includes(q) ||
         (node.pubkey || '').toLowerCase().includes(q) ||
@@ -562,7 +554,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
       </div>
 
-      {/* WATCHLIST SECTION - WITH EMPTY STATE */}
+      {/* WATCHLIST SECTION */}
       {watchListNodes.length > 0 ? (
         <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
            <div className="flex items-center gap-2 mb-4">
@@ -628,7 +620,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             </div>
         </div>
 
-        {/* SEARCH BAR WITH TIP */}
+        {/* SEARCH BAR WITH TIP AND CLEAR */}
         <div className="relative">
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
@@ -641,9 +633,9 @@ Monitor at: https://xandeum-pulse.vercel.app`;
           {searchQuery && (
             <button 
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-3 text-zinc-500 hover:text-white"
+              className="absolute right-3 top-3 text-zinc-500 hover:text-white p-1"
             >
-              <X size={18} />
+              <X size={16} />
             </button>
           )}
         </div>
@@ -680,7 +672,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
                         <Server size={20} className="text-blue-500" /> Node Inspector
                     </h2>
-                    {/* MOVED VERSION TO TOP RIGHT */}
                     <span className="text-xs font-mono bg-zinc-800 px-2 py-1 rounded text-zinc-300 border border-zinc-700">{selectedNode.version}</span>
                  </div>
                 <div className="flex items-center gap-2 mt-1">
@@ -713,7 +704,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                   <div className="text-xs text-zinc-500 mb-1 font-bold flex justify-center items-center gap-1 cursor-help">
                     HEALTH SCORE <Info size={10} />
                   </div>
-                  {/* Tooltip */}
                   <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl">
                     Calculated from Uptime, Version Consensus, and Visibility.
                   </div>
@@ -727,35 +717,37 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                 </div>
               </div>
 
-              {/* NETWORK REWARDS SECTION */}
-              <div className="mb-6">
-                 <div className="flex items-center gap-2 mb-3 group relative w-fit">
-                    <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2 cursor-help">
-                        <Trophy size={12} /> Network Rewards <Info size={10} />
-                    </h3>
-                    <div className="hidden group-hover:block absolute bottom-full left-0 mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl">
-                        Accumulated reputation credits and current network rank.
-                    </div>
-                 </div>
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-zinc-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3">
-                        <Trophy size={20} className="text-yellow-500" />
-                        <div>
-                            <div className="text-[10px] text-zinc-500 font-bold uppercase">Global Rank</div>
-                            <div className="text-xl font-bold text-white">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</div>
+              {/* NETWORK REWARDS SECTION - LINKED TO LEADERBOARD */}
+              <Link href="/leaderboard">
+                <div className="mb-6 cursor-pointer hover:opacity-90 transition">
+                    <div className="flex items-center gap-2 mb-3 group relative w-fit">
+                        <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2 cursor-help">
+                            <Trophy size={12} /> Network Rewards <Info size={10} /> <ExternalLink size={10} className="ml-1 text-blue-500"/>
+                        </h3>
+                        <div className="hidden group-hover:block absolute bottom-full left-0 mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl">
+                            Accumulated reputation credits and current network rank. Click to view full Leaderboard.
                         </div>
                     </div>
-                    <div className="bg-zinc-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3">
-                        <Wallet size={20} className="text-yellow-500" />
-                        <div>
-                            <div className="text-[10px] text-zinc-500 font-bold uppercase">Credits</div>
-                            <div className="text-xl font-bold text-white">{selectedNode.credits?.toLocaleString() || 0}</div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-zinc-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3 hover:border-yellow-500/40 transition">
+                            <Trophy size={20} className="text-yellow-500" />
+                            <div>
+                                <div className="text-[10px] text-zinc-500 font-bold uppercase">Global Rank</div>
+                                <div className="text-xl font-bold text-white">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</div>
+                            </div>
+                        </div>
+                        <div className="bg-zinc-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3 hover:border-yellow-500/40 transition">
+                            <Wallet size={20} className="text-yellow-500" />
+                            <div>
+                                <div className="text-[10px] text-zinc-500 font-bold uppercase">Credits</div>
+                                <div className="text-xl font-bold text-white">{selectedNode.credits?.toLocaleString() || 0}</div>
+                            </div>
                         </div>
                     </div>
-                 </div>
-              </div>
+                </div>
+              </Link>
 
-              {/* RENAMED STORAGE SECTION */}
+              {/* STORAGE SECTION */}
               <div className="mb-6">
                 <div className="flex items-center gap-2 mb-3 group relative w-fit">
                     <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2 cursor-help">
@@ -819,7 +811,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                 
                 <div className="flex justify-between py-1">
                    <span className="text-zinc-500">Uptime</span>
-                   <span className="text-white font-mono">{formatUptime(selectedNode.uptime)}</span>
+                   <span className="text-zinc-300 font-mono">{formatUptime(selectedNode.uptime)}</span>
                 </div>
               </div>
               
