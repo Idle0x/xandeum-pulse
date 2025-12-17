@@ -1,10 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
-// 1. The "Hero" Node (Your proven fast node)
+// --- CONFIGURATION ---
 const PRIMARY_NODE = '173.212.203.145';
-
-// 2. The Backup Squad (From Discord)
 const BACKUP_NODES = [
   '161.97.97.41',
   '192.190.136.36',
@@ -14,6 +12,9 @@ const BACKUP_NODES = [
   '192.190.136.29'
 ];
 
+const TIMEOUT_PRIMARY = 4000; // 4s for Hero
+const TIMEOUT_BACKUP = 6000;  // 6s for Backup Race
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // --- ATTEMPT 1: THE HERO NODE ---
   try {
@@ -21,11 +22,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `http://${PRIMARY_NODE}:6000/rpc`,
       {
         jsonrpc: '2.0',
-        method: 'get-pods-with-stats', // ⚠️ KEEP THIS! It works.
+        method: 'get-pods-with-stats',
         params: [],
         id: 1,
       },
-      { timeout: 4000 } // Fast timeout
+      { timeout: TIMEOUT_PRIMARY } 
     );
 
     if (response.data && response.data.result) {
@@ -36,7 +37,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // --- ATTEMPT 2: THE BACKUP SQUAD (Race Mode) ---
-  // If the hero fails, we pick 3 random backups and race them.
   const shuffled = BACKUP_NODES.sort(() => 0.5 - Math.random()).slice(0, 3);
   
   const requests = shuffled.map(ip => 
@@ -44,11 +44,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `http://${ip}:6000/rpc`,
       {
         jsonrpc: '2.0',
-        method: 'get-pods-with-stats', // ⚠️ The working method
+        method: 'get-pods-with-stats',
         params: [],
         id: 1,
       },
-      { timeout: 6000 } // Slower timeout for backups
+      { timeout: TIMEOUT_BACKUP } 
     ).then(res => {
       if (res.data && res.data.result) return res.data;
       throw new Error('Invalid Data');
