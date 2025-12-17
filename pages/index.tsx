@@ -42,6 +42,7 @@ const formatUptime = (seconds: number) => {
 
 const formatLastSeen = (timestamp: number) => {
   const now = Date.now();
+  // Normalize to milliseconds if needed
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
   const diff = now - time;
   
@@ -54,17 +55,16 @@ const formatLastSeen = (timestamp: number) => {
   if (hours < 24) return `${hours}h ago`;
   
   const days = Math.floor(hours / 24);
-  return `${days}d ago`; // FIXED: Shows exact days instead of ">1d ago"
+  return `${days}d ago`;
 };
 
 const formatDetailedTimestamp = (timestamp: number) => {
   if (!timestamp) return 'N/A';
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
   
-  // 1. Get Relative Time (Now accurate for days)
-  const relative = formatLastSeen(timestamp / 1000); 
+  // FIXED: Pass raw timestamp, don't divide by 1000 here
+  const relative = formatLastSeen(timestamp); 
   
-  // 2. Get Absolute Date
   const date = new Date(time);
   const dateStr = date.toLocaleString('en-US', {
     month: 'long',
@@ -802,6 +802,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
               <div className="space-y-3 text-sm border-t border-white/5 pt-4">
                 <div className="flex justify-between py-1">
                   <span className="text-zinc-500">Last Seen</span>
+                  {/* FIXED: White color for vital sign */}
                   <span className="text-white font-mono text-xs text-right">{formatDetailedTimestamp(selectedNode.last_seen_timestamp)}</span>
                 </div>
 
@@ -827,6 +828,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                 
                 <div className="flex justify-between py-1">
                    <span className="text-zinc-500">Uptime</span>
+                   {/* FIXED: White color for vital sign */}
                    <span className="text-white font-mono">{formatUptime(selectedNode.uptime)}</span>
                 </div>
               </div>
