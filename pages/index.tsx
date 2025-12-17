@@ -798,8 +798,10 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* TECHNICAL DETAILS */}
+                {/* BOTTOM FULL WIDTH - TECHNICAL DETAILS */}
+                <div className="md:col-span-2">
                     <div className="space-y-3 text-sm border-t border-white/5 pt-4">
                         <div className="flex justify-between py-1">
                         <span className="text-zinc-500">Last Seen</span>
