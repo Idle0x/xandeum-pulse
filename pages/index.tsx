@@ -28,6 +28,10 @@ const formatBytes = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
+const formatRawBytes = (bytes: number) => {
+  return bytes ? bytes.toLocaleString() + ' B' : '0 B';
+};
+
 const formatUptime = (seconds: number) => {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
@@ -36,10 +40,31 @@ const formatUptime = (seconds: number) => {
   return `${h}h ${m}m`;
 };
 
+const formatLastSeen = (timestamp: number) => {
+  const now = Date.now();
+  const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
+  const diff = now - time;
+  
+  if (diff < 60000) return 'Just now';
+  
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`; // FIXED: Shows exact days instead of ">1d ago"
+};
+
 const formatDetailedTimestamp = (timestamp: number) => {
   if (!timestamp) return 'N/A';
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
+  
+  // 1. Get Relative Time (Now accurate for days)
   const relative = formatLastSeen(timestamp / 1000); 
+  
+  // 2. Get Absolute Date
   const date = new Date(time);
   const dateStr = date.toLocaleString('en-US', {
     month: 'long',
@@ -50,19 +75,8 @@ const formatDetailedTimestamp = (timestamp: number) => {
     second: '2-digit',
     hour12: false
   });
-  return `${relative} (${dateStr})`;
-};
 
-const formatLastSeen = (timestamp: number) => {
-  const now = Date.now();
-  const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
-  const diff = now - time;
-  if (diff < 60000) return 'Just now';
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return '>1d ago';
+  return `${relative} (${dateStr})`;
 };
 
 const compareVersions = (v1: string, v2: string) => {
