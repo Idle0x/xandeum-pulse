@@ -22,7 +22,7 @@ export default function Leaderboard() {
         
         let parsedList: RankedNode[] = [];
 
-        // 🛠️ CRITICAL FIX: Use 'pod_id'
+        // Parsing logic matching main dashboard
         if (Array.isArray(rawData)) {
           parsedList = rawData.map((item: any) => ({
             pubkey: item.pod_id || item.pubkey || 'Unknown',
@@ -40,11 +40,20 @@ export default function Leaderboard() {
           }).filter(Boolean) as RankedNode[];
         }
 
-        const sorted = parsedList
-            .sort((a, b) => b.credits - a.credits)
-            .map((node, index) => ({ ...node, rank: index + 1 }));
+        // --- OLYMPIC RANKING LOGIC ---
+        // 1. Sort Descending
+        parsedList.sort((a, b) => b.credits - a.credits);
 
-        setRanking(sorted);
+        // 2. Assign Ranks with Tie Handling
+        let currentRank = 1;
+        for (let i = 0; i < parsedList.length; i++) {
+            if (i > 0 && parsedList[i].credits < parsedList[i - 1].credits) {
+                currentRank = i + 1;
+            }
+            parsedList[i].rank = currentRank;
+        }
+
+        setRanking(parsedList);
       } catch (err) {
         console.error("Leaderboard Error:", err);
       } finally {
@@ -99,7 +108,10 @@ export default function Leaderboard() {
                 
                 {/* RANK BADGE */}
                 <div className="col-span-2 md:col-span-1 flex justify-center font-bold text-zinc-500">
-                  #{node.rank}
+                  {node.rank === 1 && <Medal className="text-yellow-400" size={24} />}
+                  {node.rank === 2 && <Medal className="text-gray-300" size={24} />}
+                  {node.rank === 3 && <Medal className="text-amber-700" size={24} />}
+                  {node.rank > 3 && <span>#{node.rank}</span>}
                 </div>
 
                 {/* ADDRESS */}
