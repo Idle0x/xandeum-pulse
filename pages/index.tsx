@@ -42,7 +42,7 @@ const formatUptime = (seconds: number) => {
 
 const formatLastSeen = (timestamp: number) => {
   const now = Date.now();
-  // Normalize to milliseconds if needed
+  // Normalize to milliseconds
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
   const diff = now - time;
   
@@ -62,7 +62,6 @@ const formatDetailedTimestamp = (timestamp: number) => {
   if (!timestamp) return 'N/A';
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
   
-  // FIXED: Logic now handles raw timestamp correctly
   const relative = formatLastSeen(timestamp); 
   
   const date = new Date(time);
@@ -668,27 +667,27 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </>
       )}
 
-      {/* --- ULTIMATE MODAL (RESPONSIVE & HIGH CONTRAST ZINC) --- */}
+      {/* --- ULTIMATE MODAL (TITANIUM EDITION) --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
-          <div className="bg-gradient-to-b from-zinc-800 to-zinc-950 border border-zinc-700 w-full max-w-lg md:max-w-4xl p-0 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.7)] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+          <div className="bg-gradient-to-b from-slate-900 to-black border border-t-white/10 border-slate-800 w-full max-w-lg md:max-w-4xl p-0 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.9)] shadow-blue-500/5 flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
             
-            <div className="bg-white/5 p-6 border-b border-zinc-800 flex justify-between items-start shrink-0">
+            <div className="bg-white/5 p-6 border-b border-white/5 flex justify-between items-start shrink-0">
               <div className="flex-1 overflow-hidden mr-4">
                  <div className="flex justify-between items-start">
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
                         <Server size={20} className="text-blue-500" /> Node Inspector
                     </h2>
-                    <span className="text-xs font-mono bg-zinc-800 px-2 py-1 rounded text-zinc-300 border border-zinc-700">{selectedNode.version}</span>
+                    <span className="text-xs font-mono bg-slate-800 px-2 py-1 rounded text-slate-300 border border-slate-700">{selectedNode.version}</span>
                  </div>
                 <div className="flex items-center gap-2 mt-1">
-                    <p className="text-zinc-500 font-mono text-xs truncate">{selectedNode.address}</p>
-                    <button onClick={() => copyToClipboard(selectedNode.address)} className="text-zinc-600 hover:text-white transition">
+                    <p className="text-slate-400 font-mono text-xs truncate">{selectedNode.address}</p>
+                    <button onClick={() => copyToClipboard(selectedNode.address)} className="text-slate-500 hover:text-white transition">
                         {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
                     </button>
                 </div>
               </div>
-              <button onClick={() => setSelectedNode(null)} className="text-zinc-500 hover:text-white transition">
+              <button onClick={() => setSelectedNode(null)} className="text-slate-500 hover:text-white transition">
                 <X size={24} />
               </button>
             </div>
@@ -699,7 +698,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                  className={`w-full mb-6 py-3 rounded-xl border flex items-center justify-center gap-2 font-bold transition ${
                    favorites.includes(selectedNode.address) 
                    ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500' 
-                   : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:bg-zinc-700'
+                   : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
                  }`}
               >
                 <Star size={18} fill={favorites.includes(selectedNode.address) ? "currentColor" : "none"} />
@@ -711,17 +710,17 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                 {/* LEFT COLUMN */}
                 <div>
                     <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl text-center group relative">
-                        <div className="text-xs text-zinc-500 mb-1 font-bold flex justify-center items-center gap-1 cursor-help">
+                        <div className="bg-slate-900/50 border border-slate-700/50 p-4 rounded-xl text-center group relative">
+                        <div className="text-xs text-slate-500 mb-1 font-bold flex justify-center items-center gap-1 cursor-help">
                             HEALTH SCORE <Info size={10} />
                         </div>
-                        <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl">
+                        <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-black border border-slate-700 rounded-lg text-[10px] text-slate-300 z-10 shadow-xl">
                             Calculated from Uptime, Version Consensus, and Visibility.
                         </div>
                         <div className="text-3xl font-bold text-white">{getHealthScore(selectedNode, mostCommonVersion)}</div>
                         </div>
-                        <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl text-center">
-                        <div className="text-xs text-zinc-500 mb-1 font-bold">VISIBILITY</div>
+                        <div className="bg-slate-900/50 border border-slate-700/50 p-4 rounded-xl text-center">
+                        <div className="text-xs text-slate-500 mb-1 font-bold">VISIBILITY</div>
                         <div className={`text-lg font-bold mt-1 flex justify-center items-center gap-2 ${selectedNode.is_public ? 'text-green-400' : 'text-orange-400'}`}>
                             {selectedNode.is_public ? <><Globe size={16} /> PUBLIC</> : <><Shield size={16} /> PRIVATE</>}
                         </div>
@@ -732,25 +731,25 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     <Link href="/leaderboard">
                         <div className="mb-6 cursor-pointer hover:opacity-90 transition">
                             <div className="flex items-center gap-2 mb-3 group relative w-fit">
-                                <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2 cursor-help">
+                                <h3 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 cursor-help">
                                     <Trophy size={12} /> Network Rewards <Info size={10} /> <ExternalLink size={10} className="ml-1 text-blue-500"/>
                                 </h3>
-                                <div className="hidden group-hover:block absolute bottom-full left-0 mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl">
+                                <div className="hidden group-hover:block absolute bottom-full left-0 mb-2 w-48 p-2 bg-black border border-slate-700 rounded-lg text-[10px] text-slate-300 z-10 shadow-xl">
                                     Accumulated reputation credits and current network rank. Click to view full Leaderboard.
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-zinc-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3 hover:border-yellow-500/40 transition">
+                                <div className="bg-slate-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3 hover:border-yellow-500/40 transition">
                                     <Trophy size={20} className="text-yellow-500" />
                                     <div>
-                                        <div className="text-[10px] text-zinc-500 font-bold uppercase">Global Rank</div>
+                                        <div className="text-[10px] text-slate-500 font-bold uppercase">Global Rank</div>
                                         <div className="text-xl font-bold text-white">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</div>
                                     </div>
                                 </div>
-                                <div className="bg-zinc-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3 hover:border-yellow-500/40 transition">
+                                <div className="bg-slate-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3 hover:border-yellow-500/40 transition">
                                     <Wallet size={20} className="text-yellow-500" />
                                     <div>
-                                        <div className="text-[10px] text-zinc-500 font-bold uppercase">Credits</div>
+                                        <div className="text-[10px] text-slate-500 font-bold uppercase">Credits</div>
                                         <div className="text-xl font-bold text-white">{selectedNode.credits?.toLocaleString() || 0}</div>
                                     </div>
                                 </div>
@@ -764,38 +763,38 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     {/* STORAGE SECTION */}
                     <div className="mb-6">
                         <div className="flex items-center gap-2 mb-3 group relative w-fit">
-                            <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2 cursor-help">
+                            <h3 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2 cursor-help">
                             <Database size={12} /> Storage Metrics <Info size={10} />
                             </h3>
-                            <div className="hidden group-hover:block absolute bottom-full left-0 mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl">
+                            <div className="hidden group-hover:block absolute bottom-full left-0 mb-2 w-48 p-2 bg-black border border-slate-700 rounded-lg text-[10px] text-slate-300 z-10 shadow-xl">
                                 Real-time storage allocation and commitment.
                             </div>
                         </div>
-                        <div className="bg-zinc-900/50 rounded-xl p-4 border border-zinc-800 space-y-3">
+                        <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700/50 space-y-3">
                         <div className="flex justify-between items-center">
-                            <span className="text-zinc-400 text-sm">Used</span>
+                            <span className="text-slate-400 text-sm">Used</span>
                             <div className="flex flex-col items-end">
                                 <span className="text-blue-400 font-mono font-bold">{formatBytes(selectedNode.storage_used)}</span>
                                 <div className="flex items-center gap-1 mt-0.5 opacity-60 hover:opacity-100 transition">
-                                    <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">RAW</span>
-                                    <span className="text-[10px] font-mono text-zinc-400 bg-zinc-900 px-1.5 rounded border border-zinc-800">
+                                    <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">RAW</span>
+                                    <span className="text-[10px] font-mono text-slate-400 bg-slate-900 px-1.5 rounded border border-slate-800">
                                         {selectedNode.storage_used?.toLocaleString()}
                                     </span>
                                 </div>
                             </div>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-zinc-400 text-sm">Committed</span>
+                            <span className="text-slate-400 text-sm">Committed</span>
                             <span className="text-purple-400 font-mono font-bold">{formatBytes(selectedNode.storage_committed || 0)}</span>
                         </div>
                         <div className="flex justify-between items-center group relative cursor-help">
-                            <span className="text-zinc-400 text-sm flex items-center gap-1">Utilization <Info size={10}/></span>
-                            <div className="hidden group-hover:block absolute right-0 bottom-full mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl">
+                            <span className="text-slate-400 text-sm flex items-center gap-1">Utilization <Info size={10}/></span>
+                            <div className="hidden group-hover:block absolute right-0 bottom-full mb-2 w-48 p-2 bg-black border border-slate-700 rounded-lg text-[10px] text-slate-300 z-10 shadow-xl">
                                 Percentage of Committed Storage currently in use.
                             </div>
                             <span className="text-white font-mono font-bold">{selectedNode.storage_usage_percentage}</span>
                         </div>
-                        <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-2">
+                        <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mt-2">
                             <div className="h-full bg-blue-500" style={{ width: selectedNode.storage_usage_percentage?.includes('<') ? '1%' : selectedNode.storage_usage_percentage }}></div>
                         </div>
                         </div>
@@ -806,32 +805,32 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                 <div className="md:col-span-2">
                     <div className="space-y-3 text-sm border-t border-white/5 pt-4">
                         <div className="flex justify-between py-1">
-                        <span className="text-zinc-500">Last Seen</span>
+                        <span className="text-slate-500">Last Seen</span>
                         <span className="text-white font-mono text-xs text-right">{formatDetailedTimestamp(selectedNode.last_seen_timestamp)}</span>
                         </div>
 
                         <div className="flex justify-between py-1">
-                        <span className="text-zinc-500">RPC Endpoint</span>
+                        <span className="text-slate-500">RPC Endpoint</span>
                         <div className="flex items-center gap-2">
-                            <span className="text-zinc-300 font-mono text-xs truncate max-w-[150px]">http://{selectedNode.address.split(':')[0]}:6000</span>
+                            <span className="text-slate-300 font-mono text-xs truncate max-w-[150px]">http://{selectedNode.address.split(':')[0]}:6000</span>
                             <button onClick={() => copyToClipboard(`http://${selectedNode.address.split(':')[0]}:6000`)}>
-                                <Copy size={12} className="text-zinc-600 hover:text-white" />
+                                <Copy size={12} className="text-slate-600 hover:text-white" />
                             </button>
                         </div>
                         </div>
 
                         <div className="flex justify-between py-1">
-                        <span className="text-zinc-500">Public Key</span>
+                        <span className="text-slate-500">Public Key</span>
                         <div className="flex items-center gap-2">
-                            <span className="text-zinc-300 font-mono truncate w-24 text-right">{selectedNode.pubkey}</span>
+                            <span className="text-slate-300 font-mono truncate w-24 text-right">{selectedNode.pubkey}</span>
                             <button onClick={() => copyToClipboard(selectedNode.pubkey)}>
-                                <Copy size={12} className="text-zinc-600 hover:text-white" />
+                                <Copy size={12} className="text-slate-600 hover:text-white" />
                             </button>
                         </div>
                         </div>
                         
                         <div className="flex justify-between py-1">
-                        <span className="text-zinc-500">Uptime</span>
+                        <span className="text-slate-500">Uptime</span>
                         <span className="text-white font-mono">{formatUptime(selectedNode.uptime)}</span>
                         </div>
                     </div>
@@ -842,7 +841,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
               <div className="mt-6 pt-4 border-t border-white/5 grid grid-cols-2 gap-3">
                  <button 
                    onClick={() => copyStatusReport(selectedNode)}
-                   className="flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold py-3 rounded-xl transition border border-zinc-700"
+                   className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold py-3 rounded-xl transition border border-slate-700"
                  >
                    {shared ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
                    {shared ? 'COPIED!' : 'REPORT'}
@@ -856,7 +855,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                  </button>
                  <button 
                    onClick={() => copyRawJson(selectedNode)}
-                   className="col-span-2 flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 text-[10px] font-mono py-2 rounded-lg transition border border-zinc-800"
+                   className="col-span-2 flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-slate-500 hover:text-slate-300 text-[10px] font-mono py-2 rounded-lg transition border border-slate-800"
                  >
                    {jsonCopied ? <Check size={12} className="text-green-500" /> : <Code size={12} />}
                    {jsonCopied ? 'JSON COPIED' : 'COPY RAW JSON (DEV)'}
