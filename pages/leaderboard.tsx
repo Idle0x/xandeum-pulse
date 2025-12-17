@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Trophy, Medal, ArrowLeft, Search, Wallet } from 'lucide-react';
+import { Trophy, Medal, ArrowLeft, Search, Wallet, X } from 'lucide-react';
 import Link from 'next/link';
 
 interface RankedNode {
@@ -22,7 +22,6 @@ export default function Leaderboard() {
         
         let parsedList: RankedNode[] = [];
 
-        // Parsing logic matching main dashboard
         if (Array.isArray(rawData)) {
           parsedList = rawData.map((item: any) => ({
             pubkey: item.pod_id || item.pubkey || 'Unknown',
@@ -41,10 +40,8 @@ export default function Leaderboard() {
         }
 
         // --- OLYMPIC RANKING LOGIC ---
-        // 1. Sort Descending
         parsedList.sort((a, b) => b.credits - a.credits);
 
-        // 2. Assign Ranks with Tie Handling
         let currentRank = 1;
         for (let i = 0; i < parsedList.length; i++) {
             if (i > 0 && parsedList[i].credits < parsedList[i - 1].credits) {
@@ -75,20 +72,28 @@ export default function Leaderboard() {
           <ArrowLeft size={16} /> Back to Monitor
         </Link>
         <h1 className="text-3xl font-extrabold flex items-center gap-3 text-yellow-500">
-          <Trophy size={32} /> LEADERBOARD
+          <Trophy size={32} /> LEADERBOARD <span className="text-zinc-700 text-lg">(TOP 100)</span>
         </h1>
       </div>
 
-      {/* SEARCH */}
+      {/* SEARCH WITH CLEAR BUTTON */}
       <div className="max-w-4xl mx-auto mb-6 relative">
         <Search className="absolute left-4 top-3.5 text-zinc-500" size={20} />
         <input 
             type="text" 
             placeholder="Find Public Key..." 
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-12 text-white focus:border-yellow-500 outline-none transition placeholder-zinc-600"
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-12 pr-10 text-white focus:border-yellow-500 outline-none transition placeholder-zinc-600"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery('')}
+              className="absolute right-4 top-3.5 text-zinc-500 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+          )}
       </div>
 
       {/* TABLE */}
