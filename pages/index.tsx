@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Wallet, Medal, Share2, Twitter, Code, Info, Lightbulb } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Wallet, Medal, Share2, Twitter, Code, Info } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -40,38 +40,6 @@ const formatUptime = (seconds: number) => {
   return `${h}h ${m}m`;
 };
 
-// NEW: "2 minutes ago (December 17, 2025 at 11:47:12)"
-const formatDetailedDate = (timestamp: number) => {
-  if (!timestamp) return 'N/A';
-  const now = Date.now();
-  const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
-  
-  // 1. Calculate Relative Time
-  const diff = now - time;
-  let relative = 'Just now';
-  const mins = Math.floor(diff / 60000);
-  if (mins > 0 && mins < 60) relative = `${mins}m ago`;
-  else if (mins >= 60) {
-      const hours = Math.floor(mins / 60);
-      if (hours < 24) relative = `${hours}h ago`;
-      else relative = `${Math.floor(hours / 24)}d ago`;
-  }
-
-  // 2. Calculate Absolute Date
-  const date = new Date(time);
-  const absolute = date.toLocaleString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  });
-
-  return `${relative} (${absolute})`;
-};
-
 const formatLastSeen = (timestamp: number) => {
   const now = Date.now();
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
@@ -82,6 +50,29 @@ const formatLastSeen = (timestamp: number) => {
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   return '>1d ago';
+};
+
+// NEW: Combined "Relative (Absolute)" format
+const formatDetailedTimestamp = (timestamp: number) => {
+  if (!timestamp) return 'N/A';
+  const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
+  
+  // 1. Get Relative Time
+  const relative = formatLastSeen(timestamp / 1000); // reuse existing logic
+  
+  // 2. Get Absolute Date (No milliseconds)
+  const date = new Date(time);
+  const dateStr = date.toLocaleString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+
+  return `${relative} (${dateStr})`;
 };
 
 const compareVersions = (v1: string, v2: string) => {
@@ -96,6 +87,7 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
+// Uses Consensus Version for fair scoring
 const getHealthScore = (node: Node, consensusVersion: string) => {
   let score = 100;
   if (node.uptime < 3600) score -= 40;
@@ -302,6 +294,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             credits: creditMap.get(node.pubkey) || 0
         }));
 
+        // --- OLYMPIC RANKING ---
         mergedList.sort((a, b) => (b.credits || 0) - (a.credits || 0));
         let currentRank = 1;
         for (let i = 0; i < mergedList.length; i++) {
@@ -311,6 +304,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             mergedList[i].rank = currentRank;
         }
 
+        // --- PRECISE STORAGE MATH ---
         mergedList = mergedList.map(node => {
             const used = node.storage_used || 0;
             const cap = node.storage_committed || 0;
@@ -361,6 +355,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
   const filteredNodes = nodes
     .filter(node => {
       const q = searchQuery.toLowerCase();
+      // Safe navigation to prevent crashes on null values
       return (
         (node.address || '').toLowerCase().includes(q) ||
         (node.pubkey || '').toLowerCase().includes(q) ||
@@ -435,26 +430,28 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                  <div className="text-[10px] text-zinc-500 uppercase font-bold">NODE IP</div>
                  {!node.is_public && <Shield size={10} className="text-zinc-600" />}
               </div>
-              <div className="font-mono text-sm text-zinc-300 truncate w-32 md:w-40 group-hover:text-white transition">
+              <div className="font-mono text-sm text-zinc-300 truncate w-40 md:w-56 group-hover:text-white transition">
                 {node.address}
               </div>
             </div>
             
-            <div className="flex items-start gap-2">
-                <div className="flex items-center gap-1.5 bg-zinc-900/80 px-2 py-1 rounded-md border border-zinc-700/50">
-                    <span className={`text-[10px] font-mono ${isLatest ? 'text-green-400' : 'text-yellow-500'}`}>v{node.version}</span>
-                    {isLatest ? <CheckCircle size={10} className="text-green-500" /> : <AlertTriangle size={10} className="text-yellow-600" />}
-                </div>
-                <button 
-                onClick={(e) => toggleFavorite(e, node.address)}
-                className={`p-1.5 rounded-full transition ${isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'}`}
-                >
-                <Star size={16} fill={isFav ? "currentColor" : "none"} />
-                </button>
-            </div>
+            <button 
+              onClick={(e) => toggleFavorite(e, node.address)}
+              className={`p-1.5 rounded-full transition ${isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'}`}
+            >
+              <Star size={16} fill={isFav ? "currentColor" : "none"} />
+            </button>
         </div>
 
         <div className="space-y-3">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-zinc-500">Version</span>
+            <div className="flex items-center gap-2">
+               <span className="text-zinc-300 bg-zinc-800 px-2 py-0.5 rounded">{node.version}</span>
+               {isLatest ? <CheckCircle size={12} className="text-green-500" /> : <AlertTriangle size={12} className="text-yellow-600" />}
+            </div>
+          </div>
+
           <div className="pt-2">
              <div className="text-[10px] text-zinc-600 uppercase font-bold mb-1 tracking-wider">Network Rewards</div>
              <div className="flex justify-between items-center text-xs bg-black/40 p-2 rounded-lg border border-zinc-800/50">
@@ -478,6 +475,14 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                 {cycleData.value}
               </span>
             </div>
+            
+            <span className={`text-[10px] px-2 py-1 rounded-md font-bold flex items-center gap-1.5 ${
+              node.uptime > 86400 
+              ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
+              : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+            }`}>
+              {node.uptime > 86400 ? 'STABLE' : 'BOOTING'}
+            </span>
           </div>
         </div>
       </div>
@@ -486,6 +491,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
 
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans relative selection:bg-blue-500/30 selection:text-blue-200 flex flex-col">
+      {/* GLOBAL HEAD */}
       <Head>
         <title>Xandeum Pulse - Live Network Monitor</title>
         <meta name="description" content="Real-time pNode health, storage capacity, and network consensus metrics for Xandeum." />
@@ -494,6 +500,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         <meta name="twitter:card" content="summary_large_image" />
       </Head>
 
+      {/* GLOBAL STYLES (Scrollbar) */}
       <style jsx global>{`
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #09090b; }
@@ -555,7 +562,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
       </div>
 
-      {/* WATCHLIST SECTION */}
+      {/* WATCHLIST SECTION - WITH EMPTY STATE */}
       {watchListNodes.length > 0 ? (
         <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
            <div className="flex items-center gap-2 mb-4">
@@ -621,11 +628,12 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             </div>
         </div>
 
+        {/* SEARCH BAR WITH TIP */}
         <div className="relative">
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
             type="text" 
-            placeholder="Search Node Address..." 
+            placeholder="Search Node IP..." 
             className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 pl-10 pr-10 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition placeholder-zinc-600"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -639,11 +647,9 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             </button>
           )}
         </div>
-        <div className="text-center md:text-left pl-1">
-            <span className="text-[10px] text-zinc-500 flex items-center justify-center md:justify-start gap-1">
-                <Lightbulb size={10} className="text-yellow-500"/> Pro Tip: Tap any node card to inspect full details.
-            </span>
-        </div>
+        <p className="text-[10px] text-zinc-600 text-center font-mono tracking-wide uppercase mt-2">
+            Click any node for deep inspection
+        </p>
       </div>
 
       {loading && nodes.length === 0 ? (
@@ -670,9 +676,13 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             
             <div className="bg-zinc-900/50 p-6 border-b border-zinc-800 flex justify-between items-start shrink-0">
               <div className="flex-1 overflow-hidden mr-4">
-                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Server size={20} className="text-blue-500" /> Node Inspector
-                </h2>
+                 <div className="flex justify-between items-start">
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                        <Server size={20} className="text-blue-500" /> Node Inspector
+                    </h2>
+                    {/* MOVED VERSION TO TOP RIGHT */}
+                    <span className="text-xs font-mono bg-zinc-800 px-2 py-1 rounded text-zinc-300 border border-zinc-700">{selectedNode.version}</span>
+                 </div>
                 <div className="flex items-center gap-2 mt-1">
                     <p className="text-zinc-500 font-mono text-xs truncate">{selectedNode.address}</p>
                     <button onClick={() => copyToClipboard(selectedNode.address)} className="text-zinc-600 hover:text-white transition">
@@ -703,7 +713,8 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                   <div className="text-xs text-zinc-500 mb-1 font-bold flex justify-center items-center gap-1 cursor-help">
                     HEALTH SCORE <Info size={10} />
                   </div>
-                  <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl pointer-events-none">
+                  {/* Tooltip */}
+                  <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl">
                     Calculated from Uptime, Version Consensus, and Visibility.
                   </div>
                   <div className="text-3xl font-bold text-white">{getHealthScore(selectedNode, mostCommonVersion)}</div>
@@ -718,15 +729,14 @@ Monitor at: https://xandeum-pulse.vercel.app`;
 
               {/* NETWORK REWARDS SECTION */}
               <div className="mb-6">
-                 <div className="group relative w-fit mb-3">
+                 <div className="flex items-center gap-2 mb-3 group relative w-fit">
                     <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2 cursor-help">
                         <Trophy size={12} /> Network Rewards <Info size={10} />
                     </h3>
-                    <div className="hidden group-hover:block absolute bottom-full left-0 mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl pointer-events-none">
-                        Rankings and Credits derived directly from the Xandeum Rewards API.
+                    <div className="hidden group-hover:block absolute bottom-full left-0 mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl">
+                        Accumulated reputation credits and current network rank.
                     </div>
                  </div>
-                 
                  <div className="grid grid-cols-2 gap-4">
                     <div className="bg-zinc-900/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3">
                         <Trophy size={20} className="text-yellow-500" />
@@ -745,17 +755,16 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                  </div>
               </div>
 
-              {/* STORAGE METRICS SECTION */}
+              {/* RENAMED STORAGE SECTION */}
               <div className="mb-6">
-                <div className="group relative w-fit mb-3">
+                <div className="flex items-center gap-2 mb-3 group relative w-fit">
                     <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2 cursor-help">
-                        <Database size={12} /> Storage Metrics <Info size={10} />
+                    <Database size={12} /> Storage Metrics <Info size={10} />
                     </h3>
-                    <div className="hidden group-hover:block absolute bottom-full left-0 mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl pointer-events-none">
-                        Real-time storage usage and capacity reported by the pNode via RPC.
+                    <div className="hidden group-hover:block absolute bottom-full left-0 mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl">
+                        Real-time storage allocation and commitment.
                     </div>
                 </div>
-
                 <div className="bg-zinc-900/50 rounded-xl p-4 border border-zinc-800 space-y-3">
                    <div className="flex justify-between items-center">
                       <span className="text-zinc-400 text-sm">Used</span>
@@ -770,7 +779,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                    </div>
                    <div className="flex justify-between items-center group relative cursor-help">
                       <span className="text-zinc-400 text-sm flex items-center gap-1">Utilization <Info size={10}/></span>
-                      <div className="hidden group-hover:block absolute right-0 bottom-full mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl pointer-events-none">
+                      <div className="hidden group-hover:block absolute right-0 bottom-full mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl">
                         Percentage of Committed Storage currently in use.
                       </div>
                       <span className="text-white font-mono font-bold">{selectedNode.storage_usage_percentage}</span>
@@ -785,15 +794,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
               <div className="space-y-3 text-sm border-t border-white/5 pt-4">
                 <div className="flex justify-between py-1">
                   <span className="text-zinc-500">Last Seen</span>
-                  <span className="text-zinc-300 font-mono text-xs text-right">{formatDetailedDate(selectedNode.last_seen_timestamp)}</span>
-                </div>
-
-                <div className="flex justify-between py-1">
-                  <span className="text-zinc-500">Version</span>
-                  <div className="flex items-center gap-2">
-                     <span className="text-white font-mono bg-zinc-800 px-2 py-0.5 rounded text-xs">{selectedNode.version}</span>
-                     {selectedNode.version === mostCommonVersion && <CheckCircle size={12} className="text-green-500" />}
-                  </div>
+                  <span className="text-zinc-300 font-mono text-xs text-right">{formatDetailedTimestamp(selectedNode.last_seen_timestamp)}</span>
                 </div>
 
                 <div className="flex justify-between py-1">
@@ -860,10 +861,10 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">
                 Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.
             </p>
-            <div className="flex flex-row items-center justify-center gap-2 text-xs font-mono text-zinc-600">
+            <div className="flex items-center justify-center gap-2 text-xs font-mono text-zinc-600">
                 <span className="opacity-50">pRPC Powered</span>
-                <span className="w-1 h-1 bg-zinc-700 rounded-full"></span>
-                <span>Built by <a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-blue-400 transition">riot'</a></span>
+                <span>•</span>
+                <span>Built by <a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-blue-400 transition font-bold">riot'</a></span>
             </div>
         </div>
       </footer>
