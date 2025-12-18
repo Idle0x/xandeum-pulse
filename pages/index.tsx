@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
@@ -172,7 +172,7 @@ export default function Home() {
   const router = useRouter();
   const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isFirstLoad, setIsFirstLoad] = useState(true); // NEW: Prevents white screen flash
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [error, setError] = useState('');
   const [lastUpdated, setLastUpdated] = useState('');
   
@@ -193,14 +193,11 @@ export default function Home() {
   ];
 
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [copied, setCopied] = useState(false);
-  const [shared, setShared] = useState(false);
-  const [jsonCopied, setJsonCopied] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null); // NEW: Track which specific field is copied
   const [cycleStep, setCycleStep] = useState(0);
 
   const [networkHealth, setNetworkHealth] = useState('0.00');
   const [mostCommonVersion, setMostCommonVersion] = useState('N/A');
-  const [latestVersion, setLatestVersion] = useState('N/A');
   const [totalStorageUsed, setTotalStorageUsed] = useState(0);
   const [totalStorageCommitted, setTotalStorageCommitted] = useState(0);
   const [totalNetworkCredits, setTotalNetworkCredits] = useState(0);
@@ -287,16 +284,17 @@ export default function Home() {
       }
   };
 
-  const copyToClipboard = (text: string) => {
+  // NEW: Updated copy function to handle specific fields
+  const copyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopiedField(fieldId);
+    setTimeout(() => setCopiedField(null), 2000);
   };
 
   const copyRawJson = (node: Node) => {
     navigator.clipboard.writeText(JSON.stringify(node, null, 2));
-    setJsonCopied(true);
-    setTimeout(() => setJsonCopied(false), 2000);
+    setCopiedField('json');
+    setTimeout(() => setCopiedField(null), 2000);
   };
 
   const copyStatusReport = (node: Node) => {
@@ -312,8 +310,8 @@ Version: ${node.version}
 -----------------------
 Monitor at: https://xandeum-pulse.vercel.app`;
     navigator.clipboard.writeText(report);
-    setShared(true);
-    setTimeout(() => setShared(false), 2000);
+    setCopiedField('report');
+    setTimeout(() => setCopiedField(null), 2000);
   };
 
   const shareToTwitter = (node: Node) => {
@@ -428,7 +426,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
     }
   };
 
-  // Helper Function for isLatest (Moved outside renderNodeCard but inside Component)
   const isLatest = (nodeVersion: string) => {
       return mostCommonVersion !== 'N/A' && compareVersions(nodeVersion, mostCommonVersion) >= 0;
   };
@@ -500,7 +497,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
   const renderNodeCard = (node: Node, i: number) => {
     const cycleData = getCycleContent(node, i);
     const isFav = favorites.includes(node.address);
-    const latest = isLatest(node.version); // FIX: Call function here
+    const latest = isLatest(node.version);
     
     return (
       <div 
@@ -575,12 +572,14 @@ Monitor at: https://xandeum-pulse.vercel.app`;
 
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans relative selection:bg-blue-500/30 selection:text-blue-200 flex flex-col" onClick={handleGlobalClick}>
+      {/* GLOBAL HEAD */}
       <Head>
         <title>Xandeum Pulse - Live Network Monitor</title>
         <meta name="description" content="Real-time pNode health, storage capacity, and network consensus metrics for Xandeum." />
         <meta property="og:title" content="Xandeum Pulse - Live Network Monitor" />
       </Head>
 
+      {/* GLOBAL STYLES (Scrollbar) */}
       <style jsx global>{`
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #09090b; }
@@ -723,7 +722,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             </div>
         </div>
 
-        {/* SEARCH BAR */}
+        {/* SEARCH BAR WITH ROTATING TIP */}
         <div className="relative">
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
@@ -766,7 +765,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </>
       )}
 
-      {/* --- MODAL --- */}
+      {/* --- ULTIMATE MODAL (ZERO-SECOND CONTEXT) --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => closeModal()}>
           <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/5 w-full max-w-lg lg:max-w-5xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => { e.stopPropagation(); handleGlobalClick(); }}>
@@ -780,8 +779,8 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                  </div>
                 <div className="flex items-center gap-2 mt-1">
                     <p className="text-zinc-500 font-mono text-xs truncate">{selectedNode.address}</p>
-                    <button onClick={() => copyToClipboard(selectedNode.address)} className="text-zinc-600 hover:text-white transition">
-                        {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                    <button onClick={() => copyToClipboard(selectedNode.address, 'ip')} className="text-zinc-600 hover:text-white transition">
+                        {copiedField === 'ip' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
                     </button>
                 </div>
               </div>
@@ -793,11 +792,20 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             <div className="p-6 overflow-y-auto custom-scrollbar">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
-                {/* COLUMN 1: IDENTITY */}
+                {/* COLUMN 1: IDENTITY & STATUS (SANITIZED TERMINOLOGY) */}
                 <div>
                     <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'identity')}>
                         <h3 className="text-xs font-bold text-zinc-500 uppercase">Identity & Status</h3>
                         <HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" />
+                        {/* WATCHLIST TOGGLE IN HEADER */}
+                        <div className="flex-grow flex justify-end">
+                            <button 
+                                onClick={(e) => toggleFavorite(e, selectedNode.address)}
+                                className={`p-1.5 rounded transition border ${favorites.includes(selectedNode.address) ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500' : 'bg-zinc-900 border-zinc-700 text-zinc-500 hover:text-white'}`}
+                            >
+                                <Star size={12} fill={favorites.includes(selectedNode.address) ? "currentColor" : "none"} />
+                            </button>
+                        </div>
                     </div>
                     {activeTooltip === 'identity' && (
                         <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 animate-in fade-in slide-in-from-top-1">
@@ -805,23 +813,27 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         </div>
                     )}
                     
+                    {/* Operator Details */}
                     <div className="bg-black/50 border border-white/5 rounded-xl p-4 space-y-3 mb-4 backdrop-blur-md">
                         <div>
                             <div className="text-[9px] text-zinc-500 uppercase mb-1">Public Key</div>
                             <div className="font-mono text-sm text-zinc-300 flex items-center justify-between">
                                 <span className="truncate w-full">{selectedNode.pubkey.slice(0, 12)}...</span>
-                                <Copy size={12} onClick={() => copyToClipboard(selectedNode.pubkey)} className="cursor-pointer hover:text-white shrink-0" />
+                                <Copy size={12} onClick={() => copyToClipboard(selectedNode.pubkey, 'pubkey')} className="cursor-pointer hover:text-white shrink-0" />
+                                {copiedField === 'pubkey' && <span className="absolute right-8 text-[9px] text-green-500 font-bold">COPIED</span>}
                             </div>
                         </div>
                         <div>
                             <div className="text-[9px] text-zinc-500 uppercase mb-1">RPC Endpoint</div>
                             <div className="font-mono text-sm text-zinc-300 flex items-center justify-between">
                                 <span className="truncate w-full">http://{selectedNode.address.split(':')[0]}:6000</span>
-                                <Copy size={12} onClick={() => copyToClipboard(`http://${selectedNode.address.split(':')[0]}:6000`)} className="cursor-pointer hover:text-white shrink-0" />
+                                <Copy size={12} onClick={() => copyToClipboard(`http://${selectedNode.address.split(':')[0]}:6000`, 'rpc')} className="cursor-pointer hover:text-white shrink-0" />
+                                {copiedField === 'rpc' && <span className="absolute right-8 text-[9px] text-green-500 font-bold">COPIED</span>}
                             </div>
                         </div>
                     </div>
 
+                    {/* Status Checks */}
                     <div className="bg-black/50 border border-white/5 rounded-xl p-4 backdrop-blur-md">
                         <div className="space-y-3 text-xs">
                            <div className="flex justify-between items-center">
@@ -851,7 +863,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     </div>
                 </div>
 
-                {/* COLUMN 2: STORAGE (NEW STYLING) */}
+                {/* COLUMN 2: STORAGE METRICS (UPDATED LAYOUT) */}
                 <div>
                     <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'infra')}>
                         <h3 className="text-xs font-bold text-zinc-500 uppercase">Storage Metrics</h3>
@@ -966,7 +978,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="text-lg font-bold text-white">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</span>
-                                    {/* PERMANENT VIEW ICON */}
                                     <ExternalLink size={12} className="text-zinc-500 group-hover:text-white transition" />
                                 </div>
                             </div>
@@ -990,8 +1001,8 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                    onClick={() => copyStatusReport(selectedNode)}
                    className="flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white text-[10px] font-bold py-3 rounded-xl transition border border-zinc-700"
                  >
-                   {shared ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
-                   {shared ? 'COPIED' : 'REPORT'}
+                   {copiedField === 'report' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                   {copiedField === 'report' ? 'COPIED' : 'REPORT'}
                  </button>
                  <button 
                    onClick={() => shareToTwitter(selectedNode)}
@@ -1004,8 +1015,8 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                    onClick={() => copyRawJson(selectedNode)}
                    className="flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 text-[10px] font-mono py-3 rounded-xl transition border border-zinc-800"
                  >
-                   {jsonCopied ? <Check size={12} className="text-green-500" /> : <Code size={12} />}
-                   {jsonCopied ? 'COPIED' : 'DIAGNOSTIC DATA'}
+                   {copiedField === 'json' ? <Check size={12} className="text-green-500" /> : <Code size={12} />}
+                   {copiedField === 'json' ? 'COPIED' : 'DIAGNOSTIC DATA'}
                  </button>
               </div>
               
