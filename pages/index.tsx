@@ -3,8 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Link from 'next/link';
-// FIX: Aliased 'Map' to 'MapIcon' to avoid conflict with JS Map constructor
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink, BarChart3, HelpCircle, ChevronRight, Maximize2, Map as MapIcon } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink, BarChart3, HelpCircle, ChevronRight, Maximize2, Map as MapIcon, Fingerprint } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -75,6 +74,12 @@ const formatDetailedTimestamp = (timestamp: number) => {
     second: '2-digit',
     hour12: false
   });
+};
+
+const truncateKey = (key: string) => {
+    if (!key) return 'Unknown';
+    if (key.length < 12) return key;
+    return `${key.slice(0, 6)}...${key.slice(-4)}`;
 };
 
 const compareVersions = (v1: string, v2: string) => {
@@ -179,7 +184,6 @@ export default function Home() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'rank'>('uptime');
-  // FIX: Updated type definition to allow both 'asc' and 'desc'
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   
@@ -190,7 +194,7 @@ export default function Home() {
   const [searchTipIndex, setSearchTipIndex] = useState(0);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchTips = [
-    "Search by IP, Public Key, or Version",
+    "Search by Public Key, IP, or Version",
     "Tip: Click any node card for deep inspection"
   ];
 
@@ -301,7 +305,7 @@ export default function Home() {
   const copyStatusReport = (node: Node) => {
     const report = `[XANDEUM PULSE REPORT]
 -----------------------
-Node: ${node.address}
+ID: ${node.pubkey}
 Status: ${node.uptime > 86400 ? 'STABLE' : 'BOOTING'}
 Rank: #${node.rank || '-'}
 Credits: ${node.credits?.toLocaleString() || 0}
@@ -321,8 +325,18 @@ Monitor at: https://xandeum-pulse.vercel.app`;
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
   };
 
+  // --- MANUAL REFRESH HANDLER ---
+  const handleRefresh = () => {
+    setLoading(true); // Force loading state immediately
+    // Small timeout to ensure the UI visual feedback is seen even if API is instant
+    setTimeout(() => {
+        fetchData();
+    }, 500);
+  };
+
   const fetchData = async () => {
-    if (isFirstLoad) setLoading(true);
+    // Note: We don't set loading=true here to allow "background updates" 
+    // unless it's the first load or manual refresh.
     
     try {
       const [statsRes, creditsRes] = await Promise.all([
@@ -404,14 +418,21 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             const topVersion = Object.entries(versionCounts).sort((a, b) => b[1] - a[1])[0][0];
             setMostCommonVersion(topVersion);
             
-            const totalComm = mergedList.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
-            const totalCred = mergedList.reduce((sum, n) => sum + (n.credits || 0), 0);
-            setAvgCommitted(totalComm / mergedList.length);
-            
             const totalBytesUsed = mergedList.reduce((sum, n) => sum + (n.storage_used || 0), 0);
             const totalBytesCommitted = mergedList.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
             setTotalStorageUsed(totalBytesUsed);
             setTotalStorageCommitted(totalBytesCommitted);
+
+            // --- MEDIAN CALCULATION (FIX FOR OUTLIERS) ---
+            const committedValues = mergedList.map(n => n.storage_committed || 0).sort((a, b) => a - b);
+            const mid = Math.floor(committedValues.length / 2);
+            let medianCommitted = 0;
+            if (committedValues.length > 0) {
+                 medianCommitted = committedValues.length % 2 !== 0
+                    ? committedValues[mid]
+                    : (committedValues[mid - 1] + committedValues[mid]) / 2;
+            }
+            setAvgCommitted(medianCommitted);
         }
         
         setError('');
@@ -420,10 +441,8 @@ Monitor at: https://xandeum-pulse.vercel.app`;
       console.error("Fetch error:", err);
       if (isFirstLoad) setError('Connection failed. Retrying...');
     } finally {
-      if (isFirstLoad) {
-          setLoading(false);
-          setIsFirstLoad(false);
-      }
+        setLoading(false); // Ensure loading is cleared
+        if (isFirstLoad) setIsFirstLoad(false);
     }
   };
 
@@ -442,8 +461,16 @@ Monitor at: https://xandeum-pulse.vercel.app`;
       );
     })
     .sort((a, b) => {
-      let valA = a[sortBy === 'storage' ? 'storage_used' : (sortBy === 'rank' ? 'rank' : sortBy)] as any;
-      let valB = b[sortBy === 'storage' ? 'storage_used' : (sortBy === 'rank' ? 'rank' : sortBy)] as any;
+      // FIX: Sort 'storage' by COMMITTED (capacity), not USED
+      let valA: any, valB: any;
+      
+      if (sortBy === 'storage') {
+          valA = a.storage_committed || 0;
+          valB = b.storage_committed || 0;
+      } else {
+          valA = a[sortBy === 'rank' ? 'rank' : sortBy];
+          valB = b[sortBy === 'rank' ? 'rank' : sortBy];
+      }
       
       if (sortBy === 'version') {
          return sortOrder === 'asc' ? compareVersions(a.version, b.version) : compareVersions(b.version, a.version);
@@ -517,11 +544,15 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         <div className="mb-4 flex justify-between items-start">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                 <div className="text-[10px] text-zinc-500 uppercase font-bold">NODE IP</div>
+                 {/* CHANGED: Label now says PUBLIC KEY IDENTITY */}
+                 <div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-1">
+                    <Fingerprint size={10} /> IDENTITY
+                 </div>
                  {!node.is_public && <Shield size={10} className="text-zinc-600" />}
               </div>
-              <div className="font-mono text-sm text-zinc-300 truncate w-40 md:w-56 group-hover:text-white transition">
-                {node.address}
+              {/* CHANGED: Shows PubKey by default (Truncated) */}
+              <div className="font-mono text-sm text-zinc-300 truncate w-40 md:w-56 group-hover:text-white transition" title={node.pubkey}>
+                {truncateKey(node.pubkey)}
               </div>
             </div>
             
@@ -607,7 +638,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
 
         <div className="flex items-center gap-2">
-             {/* CORRECTED: USING MAPICON */}
             <Link href="/map">
                 <button className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-blue-500 hover:text-blue-400 rounded-lg transition text-xs font-semibold tracking-wide flex items-center gap-2 text-zinc-300">
                     <MapIcon size={16} /> 
@@ -653,7 +683,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
       </div>
 
-      {/* NEW MAP CTA BANNER */}
       <Link href="/map" className="block mb-4 group animate-in fade-in slide-in-from-top-2">
         <div className="bg-blue-900/10 border border-blue-500/20 rounded-lg p-2.5 flex items-center justify-center gap-3 hover:bg-blue-500/10 transition cursor-pointer text-center">
             <Globe size={16} className="text-blue-500" />
@@ -664,7 +693,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
       </Link>
 
-      {/* LEADERBOARD LINK */}
       <Link href="/leaderboard" className="block mb-8 group">
         <div className="bg-zinc-900/50 border border-yellow-500/20 rounded-lg p-3 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-4 hover:bg-yellow-500/10 transition cursor-pointer text-center">
             <div className="flex items-center gap-2">
@@ -680,7 +708,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
       </Link>
 
-      {/* WATCHLIST SECTION */}
       {watchListNodes.length > 0 ? (
         <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
            <div className="flex items-center gap-2 mb-4">
@@ -706,7 +733,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex gap-2 w-full md:w-auto">
                 <button 
-                    onClick={fetchData} 
+                    onClick={handleRefresh} 
                     disabled={loading}
                     className="flex-1 md:flex-none justify-center px-4 py-2.5 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2 text-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -766,7 +793,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
           )}
         </div>
         <p className="text-[10px] text-zinc-600 text-center font-mono tracking-wide uppercase mt-2 h-4 transition-all duration-500">
-            {isSearchFocused ? "Search by IP, Public Key, or Version" : searchTips[searchTipIndex]}
+            {isSearchFocused ? "Search by Public Key, IP, or Version" : searchTips[searchTipIndex]}
         </p>
       </div>
 
@@ -787,7 +814,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </>
       )}
 
-      {/* --- ULTIMATE MODAL (UPDATED WITH HYBRID BAR) --- */}
+      {/* --- ULTIMATE MODAL (UPDATED WITH MEDIAN & GRID LAYOUT) --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => closeModal()}>
           <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/5 w-full max-w-lg lg:max-w-5xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => { e.stopPropagation(); handleGlobalClick(); }}>
@@ -882,7 +909,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     </div>
                 </div>
 
-                {/* COLUMN 2: STORAGE METRICS (UPDATED: HYBRID MARKER SYSTEM) */}
+                {/* COLUMN 2: STORAGE METRICS (UPDATED: SIDE BY SIDE LAYOUT) */}
                 <div>
                     <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'infra')}>
                         <h3 className="text-xs font-bold text-zinc-500 uppercase">Storage Metrics</h3>
@@ -890,7 +917,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     </div>
                     {activeTooltip === 'infra' && (
                         <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 animate-in fade-in slide-in-from-top-1">
-                            Real-time storage capacity and utilization compared to network averages.
+                            Real-time storage capacity compared to network median.
                         </div>
                     )}
 
@@ -923,54 +950,46 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         </div>
                     </div>
 
-                    <h4 className="text-[9px] text-zinc-500 uppercase mb-2 font-bold pl-1">VS Network Average</h4>
-                    {/* CUSTOM HYBRID BAR COMPONENT LOGIC INLINE */}
-                    {(() => {
-                        const nodeCap = selectedNode.storage_committed || 0;
-                        const avg = avgCommitted || 1; 
-                        const diff = nodeCap - avg;
-                        const isPos = diff >= 0;
-                        const percentDiff = (Math.abs(diff) / avg) * 100;
-                        
-                        // Dynamic Scale Logic: Ensure both node bar and average line fit
-                        const maxScale = Math.max(nodeCap, avg) * 1.1; // 10% headroom
-                        const nodeWidth = (nodeCap / maxScale) * 100;
-                        const avgPos = (avg / maxScale) * 100;
+                    {/* NEW SIDE-BY-SIDE LAYOUT FOR MEDIAN COMPARISON */}
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* LEFT: COMMITMENT VISUAL */}
+                        <div className="bg-black/50 rounded-xl p-4 border border-white/5 backdrop-blur-md">
+                             <h4 className="text-[9px] text-zinc-500 uppercase mb-2 font-bold">Committed</h4>
+                             <div className="text-lg font-mono font-bold text-purple-400 mb-1 truncate">
+                                {formatBytes(selectedNode.storage_committed || 0)}
+                             </div>
+                             <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-purple-500" style={{ width: '100%' }}></div>
+                             </div>
+                        </div>
 
-                        return (
-                            <div className="bg-black/50 rounded-xl p-4 border border-white/5 backdrop-blur-md">
-                                <div className="flex justify-between items-center mb-2">
-                                    <span className="text-[10px] text-zinc-400">Storage Capacity</span>
-                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                                        isPos 
-                                        ? 'bg-green-900/20 text-green-400 border-green-900/50' 
-                                        : 'bg-red-900/20 text-red-400 border-red-900/50'
-                                    }`}>
-                                        {isPos ? '▲' : '▼'} {percentDiff.toFixed(1)}% vs avg
-                                    </span>
+                        {/* RIGHT: VS MEDIAN (OUTLIER PROOF) */}
+                        {(() => {
+                            const nodeCap = selectedNode.storage_committed || 0;
+                            const median = avgCommitted || 1; // Uses Median now
+                            const diff = nodeCap - median;
+                            const isPos = diff >= 0;
+                            const percentDiff = (Math.abs(diff) / median) * 100;
+                            
+                            return (
+                                <div className="bg-black/50 rounded-xl p-4 border border-white/5 backdrop-blur-md">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <h4 className="text-[9px] text-zinc-500 uppercase font-bold">Vs Median</h4>
+                                        <span className={`text-[9px] font-bold px-1 py-0.5 rounded border ${
+                                            isPos 
+                                            ? 'bg-green-900/20 text-green-400 border-green-900/50' 
+                                            : 'bg-red-900/20 text-red-400 border-red-900/50'
+                                        }`}>
+                                            {isPos ? '▲' : '▼'} {percentDiff > 999 ? '>999' : percentDiff.toFixed(0)}%
+                                        </span>
+                                    </div>
+                                    <div className="text-[10px] text-zinc-400 font-mono mt-2 text-right">
+                                        Median: {formatBytes(median)}
+                                    </div>
                                 </div>
-                                
-                                <div className="relative h-3 bg-zinc-800 rounded-full overflow-hidden w-full">
-                                    {/* User Bar */}
-                                    <div 
-                                        className={`h-full transition-all duration-700 ${isPos ? 'bg-purple-500' : 'bg-orange-500'}`} 
-                                        style={{ width: `${nodeWidth}%` }}
-                                    ></div>
-                                    
-                                    {/* Average Needle */}
-                                    <div 
-                                        className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] z-10"
-                                        style={{ left: `${avgPos}%` }}
-                                        title={`Network Average: ${formatBytes(avg)}`}
-                                    ></div>
-                                </div>
-                                <div className="flex justify-between text-[9px] text-zinc-600 mt-1 font-mono">
-                                    <span>0 B</span>
-                                    <span className="text-zinc-400">Avg: {formatBytes(avg)}</span>
-                                </div>
-                            </div>
-                        );
-                    })()}
+                            );
+                        })()}
+                    </div>
                 </div>
 
                 {/* COLUMN 3: PERFORMANCE */}
