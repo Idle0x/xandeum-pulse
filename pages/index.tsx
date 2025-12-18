@@ -3,7 +3,6 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Link from 'next/link';
-// FIX: Aliased 'Map' to 'MapIcon' to avoid conflict with JS Map constructor
 import { Search, Download, Server, Activity, Database, X, Shield, Clock, Zap, Trophy, HardDrive, Star, Copy, Check, CheckCircle, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Twitter, Code, Info, ExternalLink, HelpCircle, ChevronRight, Maximize2, Map as MapIcon } from 'lucide-react';
 
 // --- TYPES ---
@@ -187,7 +186,6 @@ export default function Home() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'rank'>('uptime');
-  // FIX: Updated type definition to allow both 'asc' and 'desc'
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   
@@ -212,7 +210,6 @@ export default function Home() {
   const [totalStorageCommitted, setTotalStorageCommitted] = useState(0);
   const [totalNetworkCredits, setTotalNetworkCredits] = useState(0);
   
-  // CHANGED: Renamed from Avg to Median for clarity
   const [medianCommitted, setMedianCommitted] = useState(0);
 
   useEffect(() => {
@@ -331,21 +328,15 @@ Monitor at: https://xandeum-pulse.vercel.app`;
   };
 
   const handleRefresh = () => {
-      // FORCE LOADING STATE for UX feedback
       setLoading(true);
-      // Small timeout to ensure user sees the "flash" of interaction
       setTimeout(() => {
           fetchData();
       }, 300);
   };
 
   const fetchData = async () => {
-    // If it's first load, we might already have loading=true. 
-    // If manual refresh, handleRefresh sets it true.
-    
     try {
       const [statsRes, creditsRes] = await Promise.all([
-        // Added timestamp to prevent caching
         axios.get(`/api/stats?t=${Date.now()}`),
         axios.get(`/api/credits?t=${Date.now()}`)
       ]);
@@ -354,7 +345,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         let podList: Node[] = statsRes.data.result.pods;
         
         const creditsData = creditsRes.data.pods_credits || creditsRes.data;
-        // CORRECTED: Now this uses the native JS Map because we renamed the import
         const creditMap = new Map<string, number>();
         let totalCreds = 0;
         
@@ -430,7 +420,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             setTotalStorageUsed(totalBytesUsed);
             setTotalStorageCommitted(totalBytesCommitted);
 
-            // LOGIC CHANGE: Calculate Median instead of Mean to handle Outliers
             const committedValues = mergedList.map(n => n.storage_committed || 0);
             setMedianCommitted(calculateMedian(committedValues));
         }
@@ -461,7 +450,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
       );
     })
     .sort((a, b) => {
-      // LOGIC FIX: Sort storage by Committed (Capacity), not Used
       let valA: any, valB: any;
       
       if (sortBy === 'storage') {
@@ -544,18 +532,14 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         <div className="mb-4 flex justify-between items-start">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                 {/* UX FIX: PubKey is now the identity hero, IP is hidden/secondary */}
                  <div className="text-[10px] text-zinc-500 uppercase font-bold">NODE IDENTITY</div>
                  {!node.is_public && <Shield size={10} className="text-zinc-600" />}
               </div>
               
-              {/* IDENTITY SWAP ON HOVER */}
               <div className="relative h-6 w-56">
-                  {/* Default State: PubKey */}
                   <div className="absolute inset-0 font-mono text-sm text-zinc-300 truncate transition-opacity duration-300 group-hover:opacity-0">
                     {node.pubkey.slice(0, 12)}...{node.pubkey.slice(-4)}
                   </div>
-                  {/* Hover State: IP Address */}
                   <div className="absolute inset-0 font-mono text-sm text-blue-400 truncate opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-center gap-2">
                      <span className="text-[10px] text-zinc-500">IP:</span> {node.address}
                   </div>
@@ -645,7 +629,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
 
         <div className="flex items-center gap-2">
-             {/* CORRECTED: USING MAPICON */}
             <Link href="/map">
                 <button className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-blue-500 hover:text-blue-400 rounded-lg transition text-xs font-semibold tracking-wide flex items-center gap-2 text-zinc-300">
                     <MapIcon size={16} /> 
