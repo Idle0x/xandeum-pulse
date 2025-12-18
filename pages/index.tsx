@@ -3,8 +3,8 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Link from 'next/link';
-// FIX: Aliased 'Map' to 'MapIcon' to avoid conflict with JS Map constructor
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink, BarChart3, HelpCircle, ChevronRight, Maximize2, Map as MapIcon } from 'lucide-react';
+// Aliased 'Map' to 'MapIcon'
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink, BarChart3, HelpCircle, ChevronRight, Maximize2, Map as MapIcon, Hash } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -77,6 +77,12 @@ const formatDetailedTimestamp = (timestamp: number) => {
   });
 };
 
+// Truncate PubKey for display (e.g., "Abc1...xyz9")
+const formatPubKey = (key: string) => {
+    if (!key || key.length < 12) return key;
+    return `${key.slice(0, 6)}...${key.slice(-4)}`;
+};
+
 const compareVersions = (v1: string, v2: string) => {
   const parts1 = v1.split('.').map(Number);
   const parts2 = v2.split('.').map(Number);
@@ -87,14 +93,6 @@ const compareVersions = (v1: string, v2: string) => {
     if (num1 < num2) return -1;
   }
   return 0;
-};
-
-// NEW: Helper to calculate Median (fairer than Average)
-const calculateMedian = (values: number[]) => {
-    if (values.length === 0) return 0;
-    const sorted = [...values].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 };
 
 const getHealthScore = (node: Node, consensusVersion: string) => {
@@ -211,7 +209,7 @@ export default function Home() {
   const [totalStorageCommitted, setTotalStorageCommitted] = useState(0);
   const [totalNetworkCredits, setTotalNetworkCredits] = useState(0);
   
-  // Renamed from avgCommitted to medianCommitted for better logic
+  // CHANGED: Using Median instead of Mean to handle outliers
   const [medianCommitted, setMedianCommitted] = useState(0);
 
   useEffect(() => {
@@ -309,7 +307,7 @@ export default function Home() {
   const copyStatusReport = (node: Node) => {
     const report = `[XANDEUM PULSE REPORT]
 -----------------------
-Node: ${node.pubkey}
+Node ID: ${node.pubkey}
 Status: ${node.uptime > 86400 ? 'STABLE' : 'BOOTING'}
 Rank: #${node.rank || '-'}
 Credits: ${node.credits?.toLocaleString() || 0}
@@ -324,22 +322,21 @@ Monitor at: https://xandeum-pulse.vercel.app`;
   };
 
   const shareToTwitter = (node: Node) => {
-    const text = `Just checked pNode ${node.pubkey.slice(0,6)}... on Xandeum Pulse! ⚡\n\n🟢 Status: ${node.uptime > 86400 ? 'Stable' : 'Booting'}\n🏆 Rank: #${node.rank || '-'}\n💰 Credits: ${node.credits?.toLocaleString() || 0}\n💾 Storage: ${formatBytes(node.storage_used)}\n\nMonitor the network here:`;
+    const text = `Just checked my pNode status on Xandeum Pulse! ⚡\n\n🟢 Status: ${node.uptime > 86400 ? 'Stable' : 'Booting'}\n🏆 Rank: #${node.rank || '-'}\n💰 Credits: ${node.credits?.toLocaleString() || 0}\n💾 Storage: ${formatBytes(node.storage_used)}\n\nMonitor the network here:`;
     const url = "https://xandeum-pulse.vercel.app";
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
   };
 
-  // FIX: Added manualRefresh param to force cache busting
-  const fetchData = async (manualRefresh = false) => {
-    if (isFirstLoad) setLoading(true);
-    if (manualRefresh) setLoading(true);
+  const fetchData = async (isManual = false) => {
+    // FIX: Show loading on manual refresh
+    if (isFirstLoad || isManual) setLoading(true);
     
     try {
-      // FIX: Added timestamp to prevent browser caching on refresh
-      const timestamp = new Date().getTime();
+      // FIX: Add cache-buster to prevent stale data
+      const t = Date.now();
       const [statsRes, creditsRes] = await Promise.all([
-        axios.get(`/api/stats?t=${timestamp}`),
-        axios.get(`/api/credits?t=${timestamp}`)
+        axios.get(`/api/stats?t=${t}`),
+        axios.get(`/api/credits?t=${t}`)
       ]);
 
       if (statsRes.data.result && statsRes.data.result.pods) {
@@ -416,9 +413,13 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             const topVersion = Object.entries(versionCounts).sort((a, b) => b[1] - a[1])[0][0];
             setMostCommonVersion(topVersion);
             
-            // FIX: Use Median for cleaner benchmarking against outliers
-            const allCommitted = mergedList.map(n => n.storage_committed || 0);
-            const medianVal = calculateMedian(allCommitted);
+            // Calculate MEDIAN instead of Average for committed storage
+            const sortedCaps = mergedList.map(n => n.storage_committed || 0).sort((a, b) => a - b);
+            const mid = Math.floor(sortedCaps.length / 2);
+            const medianVal = sortedCaps.length % 2 !== 0 
+                ? sortedCaps[mid] 
+                : (sortedCaps[mid - 1] + sortedCaps[mid]) / 2;
+            
             setMedianCommitted(medianVal);
             
             const totalBytesUsed = mergedList.reduce((sum, n) => sum + (n.storage_used || 0), 0);
@@ -453,15 +454,15 @@ Monitor at: https://xandeum-pulse.vercel.app`;
       );
     })
     .sort((a, b) => {
-      // FIX: Sort storage by COMMITTED (Capacity), not Used
-      let valA: any, valB: any;
-      
+      // FIX: Sort by committed storage (capacity) not used storage
+      let valA, valB;
+
       if (sortBy === 'storage') {
           valA = a.storage_committed || 0;
           valB = b.storage_committed || 0;
       } else {
-          valA = a[sortBy === 'rank' ? 'rank' : sortBy];
-          valB = b[sortBy === 'rank' ? 'rank' : sortBy];
+          valA = a[sortBy === 'rank' ? 'rank' : sortBy] as any;
+          valB = b[sortBy === 'rank' ? 'rank' : sortBy] as any;
       }
       
       if (sortBy === 'version') {
@@ -534,25 +535,26 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
 
         <div className="mb-4 flex justify-between items-start">
-            <div>
+            <div className="flex-1 overflow-hidden">
               <div className="flex items-center gap-2 mb-1">
-                 {/* FIX: Now showing PUBKEY as primary identifier */}
-                 <div className="text-[10px] text-zinc-500 uppercase font-bold">PUBKEY</div>
+                 <div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-1">
+                    <Hash size={10} /> IDENTITY
+                 </div>
                  {!node.is_public && <Shield size={10} className="text-zinc-600" />}
               </div>
-              <div className="font-mono text-sm text-zinc-300 truncate w-40 md:w-56 group-hover:text-white transition" title={node.pubkey}>
-                {node.pubkey.slice(0, 16)}...
-              </div>
               
-              {/* FIX: Moved IP to secondary/hover line */}
-              <div className="text-[10px] text-zinc-600 font-mono mt-1 opacity-60 group-hover:opacity-100 transition">
-                {node.address}
+              {/* FIX: Swapped PubKey to Main Title, IP to Subtext */}
+              <div className="font-mono text-base font-bold text-zinc-200 truncate group-hover:text-white transition">
+                {formatPubKey(node.pubkey)}
+              </div>
+              <div className="text-[10px] font-mono text-zinc-600 truncate mt-0.5 group-hover:text-zinc-500">
+                IP: {node.address}
               </div>
             </div>
             
             <button 
               onClick={(e) => toggleFavorite(e, node.address)}
-              className={`p-1.5 rounded-full transition ${isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'}`}
+              className={`p-1.5 rounded-full transition shrink-0 ${isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'}`}
             >
               <Star size={16} fill={isFav ? "currentColor" : "none"} />
             </button>
@@ -598,14 +600,11 @@ Monitor at: https://xandeum-pulse.vercel.app`;
 
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans relative selection:bg-blue-500/30 selection:text-blue-200 flex flex-col" onClick={handleGlobalClick}>
-      {/* GLOBAL HEAD */}
       <Head>
         <title>Xandeum Pulse - Live Network Monitor</title>
         <meta name="description" content="Real-time pNode health, storage capacity, and network consensus metrics for Xandeum." />
-        <meta property="og:title" content="Xandeum Pulse - Live Network Monitor" />
       </Head>
 
-      {/* GLOBAL STYLES */}
       <style jsx global>{`
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #09090b; }
@@ -632,6 +631,13 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
 
         <div className="flex items-center gap-2">
+            <Link href="/map">
+                <button className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-blue-500 hover:text-blue-400 rounded-lg transition text-xs font-semibold tracking-wide flex items-center gap-2 text-zinc-300">
+                    <MapIcon size={16} /> 
+                    NETWORK MAP
+                </button>
+            </Link>
+            
             <button onClick={exportCSV} className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-semibold tracking-wide flex items-center gap-2 text-zinc-300">
                 <Download size={16} /> 
                 CSV EXPORT
@@ -670,47 +676,30 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
       </div>
 
-      {/* FIX: SIDE-BY-SIDE LAYOUT (Grid on MD+, Stacked on Mobile) */}
+      {/* FIX: Layout Update - Two columns for Call-to-Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        
-        {/* LEADERBOARD CARD */}
-        <Link href="/leaderboard" className="group h-full">
-            <div className="h-full bg-zinc-900/50 border border-yellow-500/20 rounded-lg p-4 flex flex-col justify-center items-center hover:bg-yellow-500/10 transition cursor-pointer text-center relative overflow-hidden">
-                 {/* Subtle Background Glow */}
-                <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/5 blur-2xl rounded-full -translate-y-1/2 translate-x-1/2"></div>
-                
-                <div className="flex items-center gap-2 mb-1">
-                    <Trophy size={18} className="text-yellow-500" />
-                    <span className="text-xs font-bold text-yellow-500 uppercase tracking-wider">Top Earners</span>
-                </div>
-                <div className="text-sm font-mono text-zinc-400">
-                    Total Network Credits: <span className="text-yellow-400 font-bold ml-1">{(totalNetworkCredits / 1000000).toFixed(2)}M</span>
-                </div>
-                <div className="mt-2 text-[10px] text-zinc-500 flex items-center gap-1 group-hover:text-yellow-400 transition">
-                    View Leaderboard <ChevronRight size={10} />
-                </div>
+        <Link href="/map" className="group">
+            <div className="bg-blue-900/10 border border-blue-500/20 rounded-lg p-3 flex items-center justify-center gap-3 hover:bg-blue-500/10 transition cursor-pointer text-center h-full">
+                <Globe size={16} className="text-blue-500" />
+                <span className="text-xs font-bold text-blue-300 group-hover:text-blue-200 uppercase tracking-wide">
+                    Global Distribution Map
+                </span>
+                <ChevronRight size={14} className="text-blue-500" />
             </div>
         </Link>
 
-        {/* MAP CARD */}
-        <Link href="/map" className="group h-full">
-            <div className="h-full bg-zinc-900/50 border border-blue-500/20 rounded-lg p-4 flex flex-col justify-center items-center hover:bg-blue-500/10 transition cursor-pointer text-center relative overflow-hidden">
-                 {/* Subtle Background Glow */}
-                 <div className="absolute top-0 left-0 w-24 h-24 bg-blue-500/5 blur-2xl rounded-full -translate-y-1/2 -translate-x-1/2"></div>
-
-                <div className="flex items-center gap-2 mb-1">
-                    <Globe size={18} className="text-blue-500" />
-                    <span className="text-xs font-bold text-blue-500 uppercase tracking-wider">Global Topology</span>
-                </div>
-                <div className="text-sm font-mono text-zinc-400">
-                    Active Nodes across <span className="text-blue-400 font-bold">Multiple Regions</span>
-                </div>
-                <div className="mt-2 text-[10px] text-zinc-500 flex items-center gap-1 group-hover:text-blue-400 transition">
-                    View Network Map <ChevronRight size={10} />
-                </div>
+        <Link href="/leaderboard" className="group">
+            <div className="bg-zinc-900/50 border border-yellow-500/20 rounded-lg p-3 flex items-center justify-center gap-3 hover:bg-yellow-500/10 transition cursor-pointer text-center h-full">
+                <Trophy size={16} className="text-yellow-500" />
+                <span className="text-xs font-bold text-zinc-300 group-hover:text-white uppercase tracking-wide">
+                    Reputation Leaderboard
+                </span>
+                <span className="hidden lg:inline text-[10px] font-mono text-zinc-500">
+                    ({(totalNetworkCredits / 1000000).toFixed(1)}M Credits)
+                </span>
+                <ChevronRight size={14} className="text-yellow-500" />
             </div>
         </Link>
-
       </div>
 
       {/* WATCHLIST SECTION */}
@@ -820,7 +809,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </>
       )}
 
-      {/* --- ULTIMATE MODAL (UPDATED WITH HYBRID BAR + MEDIAN LOGIC) --- */}
+      {/* --- ULTIMATE MODAL (UPDATED MEDIAN LOGIC) --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => closeModal()}>
           <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/5 w-full max-w-lg lg:max-w-5xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => { e.stopPropagation(); handleGlobalClick(); }}>
@@ -833,7 +822,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     </h2>
                  </div>
                 <div className="flex items-center gap-2 mt-1">
-                    <p className="text-zinc-500 font-mono text-xs truncate">{selectedNode.pubkey}</p>
+                    <p className="text-zinc-500 font-mono text-xs truncate">{formatPubKey(selectedNode.pubkey)}</p>
                     <button onClick={() => copyToClipboard(selectedNode.pubkey, 'pubkey')} className="text-zinc-600 hover:text-white transition">
                         {copiedField === 'pubkey' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
                     </button>
@@ -884,6 +873,14 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                                 {copiedField === 'rpc' && <span className="absolute right-8 text-[9px] text-green-500 font-bold">COPIED</span>}
                             </div>
                         </div>
+                         <div>
+                            <div className="text-[9px] text-zinc-500 uppercase mb-1">IP Address</div>
+                            <div className="font-mono text-sm text-zinc-300 flex items-center justify-between">
+                                <span className="truncate w-full">{selectedNode.address}</span>
+                                <Copy size={12} onClick={() => copyToClipboard(selectedNode.address, 'ip')} className="cursor-pointer hover:text-white shrink-0" />
+                                {copiedField === 'ip' && <span className="absolute right-8 text-[9px] text-green-500 font-bold">COPIED</span>}
+                            </div>
+                        </div>
                     </div>
 
                     <div className="bg-black/50 border border-white/5 rounded-xl p-4 backdrop-blur-md">
@@ -915,7 +912,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     </div>
                 </div>
 
-                {/* COLUMN 2: STORAGE METRICS (UPDATED: MEDIAN LOGIC) */}
+                {/* COLUMN 2: STORAGE METRICS (UPDATED: MEDIAN COMPARISON) */}
                 <div>
                     <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'infra')}>
                         <h3 className="text-xs font-bold text-zinc-500 uppercase">Storage Metrics</h3>
@@ -923,7 +920,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     </div>
                     {activeTooltip === 'infra' && (
                         <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 animate-in fade-in slide-in-from-top-1">
-                            Real-time storage capacity and utilization compared to network averages.
+                            Real-time storage capacity compared to network median.
                         </div>
                     )}
 
@@ -957,18 +954,18 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     </div>
 
                     <h4 className="text-[9px] text-zinc-500 uppercase mb-2 font-bold pl-1">VS Network Median</h4>
-                    {/* CUSTOM HYBRID BAR COMPONENT (MEDIAN) */}
+                    {/* CUSTOM MEDIAN BAR COMPONENT LOGIC INLINE */}
                     {(() => {
                         const nodeCap = selectedNode.storage_committed || 0;
-                        const refValue = medianCommitted || 1; // Used Median instead of Average
-                        const diff = nodeCap - refValue;
+                        const med = medianCommitted || 1; // Prevent div by zero
+                        const diff = nodeCap - med;
                         const isPos = diff >= 0;
-                        const percentDiff = (Math.abs(diff) / refValue) * 100;
+                        const percentDiff = (Math.abs(diff) / med) * 100;
                         
-                        // Dynamic Scale Logic
-                        const maxScale = Math.max(nodeCap, refValue) * 1.1; 
+                        // Dynamic Scale Logic: Ensure both node bar and median line fit
+                        const maxScale = Math.max(nodeCap, med) * 1.1; // 10% headroom
                         const nodeWidth = (nodeCap / maxScale) * 100;
-                        const refPos = (refValue / maxScale) * 100;
+                        const medPos = (med / maxScale) * 100;
 
                         return (
                             <div className="bg-black/50 rounded-xl p-4 border border-white/5 backdrop-blur-md">
@@ -993,13 +990,13 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                                     {/* Median Needle */}
                                     <div 
                                         className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] z-10"
-                                        style={{ left: `${refPos}%` }}
-                                        title={`Network Median: ${formatBytes(refValue)}`}
+                                        style={{ left: `${medPos}%` }}
+                                        title={`Network Median: ${formatBytes(med)}`}
                                     ></div>
                                 </div>
                                 <div className="flex justify-between text-[9px] text-zinc-600 mt-1 font-mono">
                                     <span>0 B</span>
-                                    <span className="text-zinc-400">Median: {formatBytes(refValue)}</span>
+                                    <span className="text-zinc-400">Median: {formatBytes(med)}</span>
                                 </div>
                             </div>
                         );
