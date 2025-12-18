@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import axios from 'axios';
 import Link from 'next/link';
-import { Trophy, Medal, ArrowLeft, Search, Wallet, X, Users, Activity, BarChart3, HelpCircle, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/router';
+import { Trophy, Medal, ArrowLeft, Search, Wallet, X, Users, Activity, BarChart3, HelpCircle, ChevronRight, Star } from 'lucide-react';
 
 // --- TYPES ---
 interface RankedNode {
@@ -13,16 +13,19 @@ interface RankedNode {
 }
 
 export default function Leaderboard() {
+  const router = useRouter();
   const [ranking, setRanking] = useState<RankedNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const router = useRouter();
+  const [favorites, setFavorites] = useState<string[]>([]);
+  
+  // No nodeMap needed anymore - we rely on the main dashboard for details
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await axios.get('/api/credits');
-        const rawData = res.data.pods_credits || res.data;
+        const creditsRes = await axios.get('/api/credits');
+        const rawData = creditsRes.data.pods_credits || creditsRes.data;
         let parsedList: RankedNode[] = [];
 
         if (Array.isArray(rawData)) {
@@ -53,6 +56,10 @@ export default function Leaderboard() {
         }
 
         setRanking(parsedList);
+
+        const saved = localStorage.getItem('xandeum_favorites');
+        if (saved) setFavorites(JSON.parse(saved));
+
       } catch (err) {
         console.error("Leaderboard Error:", err);
       } finally {
@@ -67,8 +74,8 @@ export default function Leaderboard() {
     n.pubkey.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Navigate to home and auto-open modal
-  const handleNodeClick = (pubkey: string) => {
+  // Simple Click Handler -> Go to Home and Open Modal
+  const handleRowClick = (pubkey: string) => {
     router.push(`/?open=${pubkey}`);
   };
 
@@ -99,18 +106,21 @@ export default function Leaderboard() {
             <div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Users size={12}/> Nodes with Credits</div>
             <div className="text-2xl font-bold text-white mt-1">{ranking.length}</div>
           </div>
+          
           <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm">
-            <div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Wallet size={12}/> Total Credits</div>
+            <div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Wallet size={12}/> Total Credits Issued</div>
             <div className="text-2xl font-bold text-yellow-400 mt-1">
               {(ranking.reduce((sum, n) => sum + n.credits, 0) / 1000000).toFixed(1)}M
             </div>
           </div>
+          
           <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm">
             <div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Activity size={12}/> Avg Credits</div>
             <div className="text-2xl font-bold text-white mt-1">
               {Math.round(ranking.reduce((sum, n) => sum + n.credits, 0) / ranking.length).toLocaleString()}
             </div>
           </div>
+          
           <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm">
             <div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><BarChart3 size={12}/> Top 10 Dominance</div>
             <div className="text-2xl font-bold text-blue-400 mt-1">
@@ -153,8 +163,11 @@ export default function Leaderboard() {
         </div>
 
         {loading ? (
-          <div className="p-20 text-center animate-pulse text-zinc-500 font-mono">
-            CALCULATING FORTUNES...
+          <div className="absolute inset-0 flex items-center justify-center">
+             <div className="text-center animate-pulse text-zinc-500 font-mono flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-4 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin"></div>
+                CALCULATING FORTUNES...
+             </div>
           </div>
         ) : filtered.length === 0 ? (
           <div className="p-20 text-center text-zinc-600">
@@ -163,43 +176,53 @@ export default function Leaderboard() {
           </div>
         ) : (
           <div className="divide-y divide-zinc-800/50">
-            {filtered.slice(0, 100).map((node) => (
-              <div 
-                key={node.pubkey} 
-                className="grid grid-cols-12 gap-4 p-4 hover:bg-white/5 transition items-center group cursor-pointer"
-                onClick={() => handleNodeClick(node.pubkey)}
-              >
-                {/* RANK */}
-                <div className="col-span-2 md:col-span-1 flex justify-center items-center gap-1">
-                  {node.rank === 1 && <Trophy size={20} className="text-yellow-400" />}
-                  {node.rank === 2 && <Medal size={20} className="text-zinc-300" />}
-                  {node.rank === 3 && <Medal size={20} className="text-amber-600" />}
-                  {node.rank > 3 && <span className="text-sm font-bold text-zinc-500">#{node.rank}</span>}
-                </div>
+            {filtered.slice(0, 100).map((node) => {
+              // Check if node is in favorites (using only pubkey since we don't have address here easily without map)
+              // Note: Favorites stores Addresses, but we only have Pubkey here. 
+              // Without the nodeMap, highlighting favorites is harder. 
+              // We'll skip highlighting here for simplicity/performance unless you really want it back.
+              
+              return (
+                <div 
+                  key={node.pubkey} 
+                  className="grid grid-cols-12 gap-4 p-4 hover:bg-white/5 transition items-center group relative cursor-pointer"
+                  onClick={() => handleRowClick(node.pubkey)}
+                >
+                  
+                  {/* RANK BADGE */}
+                  <div className="col-span-2 md:col-span-1 flex justify-center items-center gap-1">
+                    {node.rank === 1 && <Trophy size={20} className="text-yellow-400" />}
+                    {node.rank === 2 && <Medal size={20} className="text-zinc-300" />}
+                    {node.rank === 3 && <Medal size={20} className="text-amber-600" />}
+                    {node.rank > 3 && <span className="text-sm font-bold text-zinc-500">#{node.rank}</span>}
+                  </div>
 
-                {/* PUBLIC KEY */}
-                <div className="col-span-7 md:col-span-8 font-mono text-sm text-zinc-300 truncate group-hover:text-white transition flex items-center gap-2">
-                  {node.pubkey}
-                  <ExternalLink size={10} className="opacity-0 group-hover:opacity-50" />
-                </div>
+                  {/* PUBLIC KEY */}
+                  <div className="col-span-7 md:col-span-8 font-mono text-sm text-zinc-300 truncate group-hover:text-white transition flex items-center justify-between">
+                    {node.pubkey}
+                    <div className="opacity-0 group-hover:opacity-100 transition text-[10px] text-blue-400 font-bold flex items-center gap-1">
+                        VIEW <ChevronRight size={10} />
+                    </div>
+                  </div>
 
-                {/* CREDITS */}
-                <div className="col-span-3 text-right font-bold font-mono text-yellow-500 flex items-center justify-end gap-2">
-                  {node.credits.toLocaleString()}
-                  <Wallet size={14} className="text-zinc-600 group-hover:text-yellow-500 transition hidden md:block" />
+                  {/* CREDITS */}
+                  <div className="col-span-3 text-right font-bold font-mono text-yellow-500 flex items-center justify-end gap-2">
+                    {node.credits.toLocaleString()}
+                    <Wallet size={14} className="text-zinc-600 group-hover:text-yellow-500 transition hidden md:block" />
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* FOOTER */}
+      {/* FOOTER NOTE - FIXED */}
       {!loading && (
         <div className="max-w-5xl mx-auto mt-6 text-center text-xs text-zinc-600 flex items-center justify-center gap-2">
           <HelpCircle size={12} />
           <span>
-            Only nodes earning credits are displayed. <span className="text-zinc-400 font-bold">{ranking.length} nodes displayed</span>.
+            Only nodes earning credits are displayed. <span className="text-zinc-400 font-bold">{ranking.length}</span> nodes displayed.
           </span>
         </div>
       )}
