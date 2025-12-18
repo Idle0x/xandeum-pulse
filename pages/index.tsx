@@ -219,12 +219,10 @@ export default function Home() {
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
-    // Metrics Cycle Interval
     const cycleInterval = setInterval(() => {
       setCycleStep(prev => prev + 1); 
     }, 4000);
 
-    // Search Tip Rotation Interval
     const tipInterval = setInterval(() => {
         if (!isSearchFocused) {
             setSearchTipIndex(prev => (prev + 1) % searchTips.length);
@@ -680,6 +678,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     >
                     <opt.icon size={12} />
                     {opt.label}
+                    {/* NEW: Distinct Sort Icons */}
                     {sortBy === opt.id && (
                         sortOrder === 'asc' ? <ArrowUp size={10} className="ml-1" /> : <ArrowDown size={10} className="ml-1" />
                     )}
@@ -734,7 +733,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
       {/* --- ULTIMATE MODAL (ZERO-SECOND CONTEXT) --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
-          <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/5 w-full max-w-lg lg:max-w-5xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => { e.stopPropagation(); handleModalClick(); }}>
+          <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/5 w-full max-w-lg lg:max-w-5xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => { e.stopPropagation(); handleGlobalClick(); }}>
             
             <div className="bg-white/5 p-6 border-b border-white/5 flex justify-between items-start shrink-0">
               <div className="flex-1 overflow-hidden mr-4">
@@ -758,14 +757,14 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             <div className="p-6 overflow-y-auto custom-scrollbar">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
-                {/* COLUMN 1: IDENTITY & STATUS (SANITIZED TERMINOLOGY) */}
+                {/* COLUMN 1: IDENTITY & STATUS */}
                 <div>
                     <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'identity')}>
                         <h3 className="text-xs font-bold text-zinc-500 uppercase">Identity & Status</h3>
                         <HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" />
                     </div>
                     {activeTooltip === 'identity' && (
-                        <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400">
+                        <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 animate-in fade-in slide-in-from-top-1">
                             Core identifiers and current network synchronization status.
                         </div>
                     )}
@@ -825,7 +824,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         <HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" />
                     </div>
                     {activeTooltip === 'infra' && (
-                        <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400">
+                        <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 animate-in fade-in slide-in-from-top-1">
                             Real-time storage capacity and utilization compared to network averages.
                         </div>
                     )}
@@ -879,7 +878,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         <HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" />
                     </div>
                     {activeTooltip === 'perf' && (
-                        <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400">
+                        <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 animate-in fade-in slide-in-from-top-1">
                             Health score and reputation credits earned from network participation.
                         </div>
                     )}
@@ -894,7 +893,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         </div>
                         
                         {(showHealthInfo) && (
-                            <div className="absolute top-10 left-4 right-4 bg-zinc-900 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-10 shadow-xl">
+                            <div className="absolute top-10 left-4 right-4 bg-zinc-900 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-10 shadow-xl animate-in fade-in slide-in-from-top-1">
                                 Score based on Uptime, Version Consensus, and Network Visibility.
                             </div>
                         )}
@@ -913,7 +912,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         </div>
 
                         {(showReputationInfo) && (
-                            <div className="absolute top-8 right-4 w-48 bg-zinc-900 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-10 shadow-xl">
+                            <div className="absolute top-8 right-4 w-48 bg-zinc-900 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-10 shadow-xl animate-in fade-in slide-in-from-top-1">
                                 Reputation is earned by proving storage capacity and maintaining high uptime.
                             </div>
                         )}
