@@ -1,15 +1,14 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  reactCompiler: true,
+const nextConfig = {
     reactStrictMode: true,
-      // This is the line that stops the build from failing
-        typescript: {
-            ignoreBuildErrors: true,
-              },
-                eslint: {
-                    ignoreDuringBuilds: true,
-                      },
-                      };
+      typescript: {
+          // !! WARN !!
+              // This allows the build to finish even if "react-simple-maps" has no types
+                  ignoreBuildErrors: true,
+                    },
+                      eslint: {
+                          ignoreDuringBuilds: true,
+                            },
+                            };
 
-                      export default nextConfig;
+                            export default nextConfig;
+}
