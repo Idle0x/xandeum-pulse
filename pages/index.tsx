@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink, BarChart3 } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink, BarChart3, HelpCircle } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -45,7 +45,8 @@ const formatLastSeen = (timestamp: number) => {
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
   const diff = now - time;
   
-  if (diff < 60000) return 'Just now';
+  if (diff < 1000) return 'Just now';
+  if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`; // Precise seconds
   
   const mins = Math.floor(diff / 60000);
   if (mins < 60) return `${mins}m ago`;
@@ -61,11 +62,9 @@ const formatDetailedTimestamp = (timestamp: number) => {
   if (!timestamp) return 'N/A';
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
   
-  const relative = formatLastSeen(timestamp); 
-  
   const date = new Date(time);
-  const dateStr = date.toLocaleString('en-US', {
-    month: 'long',
+  return date.toLocaleString('en-US', {
+    month: 'short',
     day: 'numeric',
     year: 'numeric',
     hour: '2-digit',
@@ -73,8 +72,6 @@ const formatDetailedTimestamp = (timestamp: number) => {
     second: '2-digit',
     hour12: false
   });
-
-  return `${relative} (${dateStr})`;
 };
 
 const compareVersions = (v1: string, v2: string) => {
@@ -177,9 +174,10 @@ export default function Home() {
   const [lastUpdated, setLastUpdated] = useState('');
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'rank'>('uptime');
+  const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'rank' | 'latency'>('uptime');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [showHealthInfo, setShowHealthInfo] = useState(false); // Mobile Tooltip Toggle
 
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
@@ -193,7 +191,7 @@ export default function Home() {
   const [totalStorageUsed, setTotalStorageUsed] = useState(0);
   const [totalStorageCommitted, setTotalStorageCommitted] = useState(0);
   
-  // NEW: Averages for benchmarking
+  // Benchmarking Averages
   const [avgCommitted, setAvgCommitted] = useState(0);
   const [avgCredits, setAvgCredits] = useState(0);
 
@@ -213,9 +211,16 @@ export default function Home() {
       setCycleStep(prev => prev + 1); 
     }, 4000);
     
+    // ESC to close modal
+    const handleEscape = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setSelectedNode(null);
+    };
+    document.addEventListener('keydown', handleEscape);
+
     return () => {
         clearInterval(interval);
         document.removeEventListener('visibilitychange', handleVisibility);
+        document.removeEventListener('keydown', handleEscape);
     };
   }, []);
 
@@ -373,7 +378,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
       return (
         (node.address || '').toLowerCase().includes(q) ||
         (node.pubkey || '').toLowerCase().includes(q) ||
-        (node.version || '').toLowerCase().includes(q) || // SEARCH BY VERSION ADDED
+        (node.version || '').toLowerCase().includes(q) || 
         (node.rank && node.rank.toString() === q)
       );
     })
@@ -393,15 +398,23 @@ Monitor at: https://xandeum-pulse.vercel.app`;
   const watchListNodes = nodes.filter(node => favorites.includes(node.address));
 
   const exportCSV = () => {
-    const headers = 'Address,Rank,Credits,Version,Uptime(s),Storage Used,Is Public,Is Favorite,RPC Endpoint\n';
-    const rows = filteredNodes.map(n => 
-      `${n.address},${n.rank},${n.credits},${n.version},${n.uptime},${n.storage_used},${n.is_public},${favorites.includes(n.address)},http://${n.address.split(':')[0]}:6000`
-    );
+    // NEW: Human-readable headers and ALL data columns
+    const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Utilization_Percent,Health_Score,Network_Mode,Last_Seen_ISO,RPC_URL,Is_Favorite\n';
+    
+    const rows = filteredNodes.map(n => {
+        const health = getHealthScore(n, mostCommonVersion);
+        const utilization = n.storage_usage_percentage?.replace('%', '') || '0';
+        const mode = n.is_public ? 'Public' : 'Private';
+        const isoTime = new Date(n.last_seen_timestamp < 10000000000 ? n.last_seen_timestamp * 1000 : n.last_seen_timestamp).toISOString();
+        
+        return `${n.address},${n.pubkey},${n.rank},${n.credits},${n.version},${n.uptime},${n.storage_committed},${n.storage_used},${utilization},${health},${mode},${isoTime},http://${n.address.split(':')[0]}:6000,${favorites.includes(n.address)}`;
+    });
+    
     const blob = new Blob([headers + rows.join('\n')], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `xandeum_pulse_export.csv`;
+    a.download = `xandeum_pulse_export_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   };
 
@@ -630,7 +643,10 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     >
                     <opt.icon size={12} />
                     {opt.label}
-                    {sortBy === opt.id && <ArrowUpDown size={10} className="ml-1" />}
+                    {/* NEW: Distinct Sort Icons */}
+                    {sortBy === opt.id && (
+                        sortOrder === 'asc' ? <ArrowUp size={10} className="ml-1" /> : <ArrowDown size={10} className="ml-1" />
+                    )}
                     </button>
                 ))}
             </div>
@@ -641,7 +657,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
             type="text" 
-            placeholder="Search by IP, Public Key, or Version..." 
+            placeholder="Search nodes..." 
             className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 pl-10 pr-10 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition placeholder-zinc-600"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -656,7 +672,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
           )}
         </div>
         <p className="text-[10px] text-zinc-600 text-center font-mono tracking-wide uppercase mt-2">
-            Click any node for deep inspection
+            Filter by IP, Public Key, or Version
         </p>
       </div>
 
@@ -677,10 +693,10 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </>
       )}
 
-      {/* --- ULTIMATE MODAL (RESPONSIVE & TITANIUM & BENCHMARKS) --- */}
+      {/* --- ULTIMATE MODAL (HUMAN-FIRST LAYOUT) --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
-          <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/5 w-full max-w-lg md:max-w-4xl 2xl:max-w-6xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+          <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/5 w-full max-w-lg lg:max-w-5xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
             
             <div className="bg-white/5 p-6 border-b border-white/5 flex justify-between items-start shrink-0">
               <div className="flex-1 overflow-hidden mr-4">
@@ -703,135 +719,131 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             </div>
 
             <div className="p-6 overflow-y-auto custom-scrollbar">
-              <button 
-                 onClick={(e) => toggleFavorite(e, selectedNode.address)}
-                 className={`w-full mb-6 py-3 rounded-xl border flex items-center justify-center gap-2 font-bold transition ${
-                   favorites.includes(selectedNode.address) 
-                   ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500' 
-                   : 'bg-black/50 border-white/5 text-zinc-400 hover:bg-black/70'
-                 }`}
-              >
-                <Star size={18} fill={favorites.includes(selectedNode.address) ? "currentColor" : "none"} />
-                {favorites.includes(selectedNode.address) ? 'REMOVE FROM WATCHLIST' : 'ADD TO WATCHLIST'}
-              </button>
-
-              <div className="md:grid md:grid-cols-2 2xl:grid-cols-3 md:gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
-                {/* COLUMN 1: HEALTH & SYSTEM ANALYSIS */}
+                {/* COLUMN 1: IDENTITY & STATUS (SANITIZED TERMINOLOGY) */}
                 <div>
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="bg-black/50 border border-white/5 p-4 rounded-xl text-center group relative backdrop-blur-md">
-                        <div className="text-xs text-zinc-500 mb-1 font-bold flex justify-center items-center gap-1 cursor-help">
-                            HEALTH SCORE <Info size={10} />
+                    <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3">Identity & Status</h3>
+                    
+                    {/* Operator Details */}
+                    <div className="bg-black/50 border border-white/5 rounded-xl p-4 space-y-3 mb-4 backdrop-blur-md">
+                        <div>
+                            <div className="text-[9px] text-zinc-500 uppercase mb-1">Public Key</div>
+                            <div className="font-mono text-sm text-zinc-300 flex items-center justify-between">
+                                <span className="truncate w-full">{selectedNode.pubkey.slice(0, 12)}...</span>
+                                <Copy size={12} onClick={() => copyToClipboard(selectedNode.pubkey)} className="cursor-pointer hover:text-white shrink-0" />
+                            </div>
                         </div>
-                        <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl">
-                            Calculated from Uptime, Version Consensus, and Visibility.
-                        </div>
-                        <div className="text-3xl font-bold text-white">{getHealthScore(selectedNode, mostCommonVersion)}</div>
-                        </div>
-                        <div className="bg-black/50 border border-white/5 p-4 rounded-xl text-center backdrop-blur-md">
-                        <div className="text-xs text-zinc-500 mb-1 font-bold">VISIBILITY</div>
-                        <div className={`text-lg font-bold mt-1 flex justify-center items-center gap-2 ${selectedNode.is_public ? 'text-green-400' : 'text-orange-400'}`}>
-                            {selectedNode.is_public ? <><Globe size={16} /> PUBLIC</> : <><Shield size={16} /> PRIVATE</>}
-                        </div>
+                        <div>
+                            <div className="text-[9px] text-zinc-500 uppercase mb-1">RPC Endpoint</div>
+                            <div className="font-mono text-sm text-zinc-300 flex items-center justify-between">
+                                <span className="truncate w-full">http://{selectedNode.address.split(':')[0]}:6000</span>
+                                <Copy size={12} onClick={() => copyToClipboard(`http://${selectedNode.address.split(':')[0]}:6000`)} className="cursor-pointer hover:text-white shrink-0" />
+                            </div>
                         </div>
                     </div>
 
-                    <div className="bg-black/30 border border-white/5 rounded-xl p-4 mb-6 backdrop-blur-md">
-                        <h3 className="text-[10px] text-zinc-500 font-bold uppercase mb-3 tracking-widest">System Analysis</h3>
-                        <div className="space-y-2 text-xs">
+                    {/* Status Checks */}
+                    <div className="bg-black/50 border border-white/5 rounded-xl p-4 backdrop-blur-md">
+                        <div className="space-y-3 text-xs">
                            <div className="flex justify-between items-center">
                               <span className="text-zinc-400">Uptime Stability</span>
                               <span className={selectedNode.uptime > 86400 ? "text-green-500" : "text-yellow-500"}>
-                                {selectedNode.uptime > 86400 ? "EXCELLENT" : "BOOTING"}
+                                {selectedNode.uptime > 86400 ? "STABLE" : "BOOTING"}
                               </span>
                            </div>
                            <div className="flex justify-between items-center">
-                              <span className="text-zinc-400">Consensus Match</span>
+                              <span className="text-zinc-400">Version Sync</span>
                               <span className={selectedNode.version === mostCommonVersion ? "text-green-500" : "text-blue-500"}>
-                                {selectedNode.version === mostCommonVersion ? "SYNCED" : "DIVERGED"}
+                                {selectedNode.version === mostCommonVersion ? "MATCHED" : "DIFFERENT"}
                               </span>
                            </div>
                            <div className="flex justify-between items-center">
-                              <span className="text-zinc-400">Gossip Connectivity</span>
+                              <span className="text-zinc-400">Network Mode</span>
                               <span className={selectedNode.is_public ? "text-green-500" : "text-orange-500"}>
-                                {selectedNode.is_public ? "STABLE" : "RESTRICTED"}
+                                {selectedNode.is_public ? "PUBLIC" : "PRIVATE"}
                               </span>
                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* COLUMN 2: STORAGE METRICS */}
+                {/* COLUMN 2: INFRASTRUCTURE (STORAGE) */}
                 <div>
-                    <div className="mb-6">
-                        <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">
-                        <Database size={12} /> Storage Metrics
-                        </h3>
-                        <div className="bg-black/50 rounded-xl p-4 border border-white/5 space-y-3 backdrop-blur-md">
-                        <div className="flex justify-between items-center">
-                            <span className="text-zinc-400 text-sm">Committed</span>
-                            <span className="text-purple-400 font-mono font-bold">{formatBytes(selectedNode.storage_committed || 0)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                            <span className="text-zinc-400 text-sm">Used</span>
-                            <div className="flex flex-col items-end">
-                                <span className="text-blue-400 font-mono font-bold">{formatBytes(selectedNode.storage_used)}</span>
-                                <div className="flex items-center gap-1 mt-0.5 opacity-60 hover:opacity-100 transition">
-                                    <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">RAW</span>
-                                    <span className="text-[10px] font-mono text-zinc-400 bg-zinc-900 px-1.5 rounded border border-zinc-800">
-                                        {selectedNode.storage_used?.toLocaleString()}
-                                    </span>
-                                </div>
+                    <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3">Infrastructure</h3>
+                    <div className="bg-black/50 rounded-xl p-4 border border-white/5 space-y-4 backdrop-blur-md mb-4">
+                        <div>
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="text-zinc-400 text-xs">Capacity</span>
+                                <span className="text-purple-400 font-mono font-bold text-sm">{formatBytes(selectedNode.storage_committed || 0)}</span>
                             </div>
+                            <div className="h-1.5 bg-zinc-800 rounded-full w-full"></div>
                         </div>
-                        <div className="flex justify-between items-center group relative cursor-help">
-                            <span className="text-zinc-400 text-sm flex items-center gap-1">Utilization <Info size={10}/></span>
-                            <div className="hidden group-hover:block absolute right-0 bottom-full mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl">
-                                Percentage of Committed Storage currently in use.
+                        <div>
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="text-zinc-400 text-xs">Used</span>
+                                <span className="text-blue-400 font-mono font-bold text-sm">{formatBytes(selectedNode.storage_used)}</span>
                             </div>
-                            <span className="text-white font-mono font-bold">{selectedNode.storage_usage_percentage}</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-2">
-                            <div className="h-full bg-blue-500" style={{ width: selectedNode.storage_usage_percentage?.includes('<') ? '1%' : selectedNode.storage_usage_percentage }}></div>
-                        </div>
+                            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden w-full">
+                                <div className="h-full bg-blue-500" style={{ width: selectedNode.storage_usage_percentage }}></div>
+                            </div>
+                            <div className="text-right text-[9px] text-zinc-600 mt-1 font-mono">
+                                {selectedNode.storage_used?.toLocaleString()} raw bytes
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                {/* COLUMN 3: NETWORK BENCHMARKS (Full width on Laptop, 1/3 on Wide) */}
-                <div className="md:col-span-2 2xl:col-span-1">
-                    <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">
-                        <BarChart3 size={12} /> Network Benchmarks
-                    </h3>
-                    <div className="bg-black/50 rounded-xl p-4 border border-white/5 space-y-4 backdrop-blur-md">
-                        {/* Comparison 1: Committed Storage */}
-                        <div>
+                    {/* Network Comparison (Storage) */}
+                    <div className="bg-black/50 rounded-xl p-4 border border-white/5 backdrop-blur-md">
+                        <h4 className="text-[9px] text-zinc-500 uppercase mb-3 font-bold">VS Network Average</h4>
+                        <div className="mb-2">
                             <div className="flex justify-between text-[10px] text-zinc-400 mb-1">
                                 <span>Storage Capacity</span>
-                                <span>vs Network Avg ({formatBytes(avgCommitted)})</span>
+                                <span>{formatBytes(avgCommitted)} (Avg)</span>
                             </div>
-                            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden flex">
+                            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden relative">
                                 <div className="h-full bg-purple-500" style={{ width: `${Math.min(((selectedNode.storage_committed || 0) / (avgCommitted || 1)) * 50, 100)}%` }}></div>
-                                <div className="w-0.5 h-full bg-white opacity-50"></div>
+                                <div className="w-0.5 h-full bg-white opacity-50 absolute left-1/2"></div>
                             </div>
                         </div>
+                    </div>
+                </div>
 
-                        {/* Comparison 2: Reputation */}
-                        <div>
-                            <div className="flex justify-between text-[10px] text-zinc-400 mb-1">
-                                <span>Reputation Credits</span>
-                                <span>vs Network Avg ({avgCredits.toFixed(0)})</span>
-                            </div>
-                            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden flex">
-                                <div className="h-full bg-yellow-500" style={{ width: `${Math.min(((selectedNode.credits || 0) / (avgCredits || 1)) * 50, 100)}%` }}></div>
-                                <div className="w-0.5 h-full bg-white opacity-50"></div>
-                            </div>
+                {/* COLUMN 3: PERFORMANCE & SOCIAL */}
+                <div>
+                    <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3">Performance</h3>
+                    
+                    {/* Health Score */}
+                    <div className="bg-black/50 border border-white/5 rounded-xl p-4 text-center mb-4 backdrop-blur-md relative group">
+                        <div className="text-xs text-zinc-500 mb-2 flex items-center justify-center gap-1 font-bold uppercase">
+                            Health Score 
+                            {/* Clickable Tooltip for Mobile */}
+                            <button onClick={(e) => { e.stopPropagation(); setShowHealthInfo(!showHealthInfo); }}>
+                                <Info size={12} className="cursor-pointer hover:text-white" />
+                            </button>
                         </div>
+                        
+                        {/* Tooltip Popup */}
+                        {(showHealthInfo) && (
+                            <div className="absolute top-10 left-4 right-4 bg-zinc-900 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-10 shadow-xl">
+                                Score based on Uptime, Version Consensus, and Network Visibility.
+                            </div>
+                        )}
 
-                        {/* Comparison 3: Rank */}
+                        <div className="text-5xl font-bold text-white mb-1">{getHealthScore(selectedNode, mostCommonVersion)}</div>
+                        <div className="text-[9px] text-zinc-600">out of 100</div>
+                    </div>
+
+                    {/* Reputation & Rank */}
+                    <div className="bg-black/50 border border-yellow-500/20 rounded-xl p-4 backdrop-blur-md">
+                        <h4 className="text-[9px] text-zinc-500 uppercase mb-3 font-bold">Reputation</h4>
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-zinc-400 text-xs">Credits</span>
+                            <span className="text-yellow-400 font-mono font-bold">{selectedNode.credits?.toLocaleString() || 0}</span>
+                        </div>
+                        
                         <Link href="/leaderboard">
-                            <div className="bg-zinc-900/50 border border-yellow-500/20 p-2 rounded-lg flex items-center justify-between cursor-pointer hover:border-yellow-500/40 transition mt-2">
+                            <div className="bg-zinc-900/50 border border-yellow-500/20 p-2 rounded-lg flex items-center justify-between cursor-pointer hover:border-yellow-500/40 transition mt-3">
                                 <div className="flex items-center gap-2">
                                     <Trophy size={14} className="text-yellow-500" />
                                     <span className="text-xs font-bold text-zinc-400">Global Rank</span>
@@ -840,66 +852,41 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                             </div>
                         </Link>
                     </div>
-                </div>
 
-                {/* BOTTOM FULL WIDTH - TECHNICAL DETAILS */}
-                <div className="md:col-span-2 2xl:col-span-3">
-                    <div className="space-y-3 text-sm border-t border-white/5 pt-4">
-                        <div className="flex justify-between py-1">
-                        <span className="text-zinc-500">Last Seen</span>
-                        <span className="text-white font-mono text-xs text-right">{formatDetailedTimestamp(selectedNode.last_seen_timestamp)}</span>
-                        </div>
-
-                        <div className="flex justify-between py-1">
-                        <span className="text-zinc-500">RPC Endpoint</span>
-                        <div className="flex items-center gap-2">
-                            <span className="text-zinc-300 font-mono text-xs truncate max-w-[150px]">http://{selectedNode.address.split(':')[0]}:6000</span>
-                            <button onClick={() => copyToClipboard(`http://${selectedNode.address.split(':')[0]}:6000`)}>
-                                <Copy size={12} className="text-zinc-600 hover:text-white" />
-                            </button>
-                        </div>
-                        </div>
-
-                        <div className="flex justify-between py-1">
-                        <span className="text-zinc-500">Public Key</span>
-                        <div className="flex items-center gap-2">
-                            <span className="text-zinc-300 font-mono truncate w-24 text-right">{selectedNode.pubkey}</span>
-                            <button onClick={() => copyToClipboard(selectedNode.pubkey)}>
-                                <Copy size={12} className="text-zinc-600 hover:text-white" />
-                            </button>
-                        </div>
-                        </div>
-                        
-                        <div className="flex justify-between py-1">
-                        <span className="text-zinc-500">Uptime</span>
-                        <span className="text-white font-mono">{formatUptime(selectedNode.uptime)}</span>
+                    {/* Precise Timestamp */}
+                    <div className="mt-4 text-xs text-center text-zinc-500 group relative cursor-help">
+                        <Clock size={12} className="inline mr-1" />
+                        Last seen {formatLastSeen(selectedNode.last_seen_timestamp)}
+                        <div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black border border-zinc-700 rounded px-2 py-1 text-[10px] whitespace-nowrap z-10">
+                            {formatDetailedTimestamp(selectedNode.last_seen_timestamp)}
                         </div>
                     </div>
                 </div>
+
               </div>
               
               {/* SHARE BUTTONS (FULL WIDTH) */}
-              <div className="mt-6 pt-4 border-t border-white/5 grid grid-cols-2 gap-3">
+              <div className="mt-6 pt-4 border-t border-white/5 grid grid-cols-3 gap-2">
                  <button 
                    onClick={() => copyStatusReport(selectedNode)}
-                   className="flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold py-3 rounded-xl transition border border-zinc-700"
+                   className="flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white text-[10px] font-bold py-3 rounded-xl transition border border-zinc-700"
                  >
-                   {shared ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-                   {shared ? 'COPIED!' : 'REPORT'}
+                   {shared ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                   {shared ? 'COPIED' : 'REPORT'}
                  </button>
                  <button 
                    onClick={() => shareToTwitter(selectedNode)}
-                   className="flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold py-3 rounded-xl transition"
+                   className="flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-400 text-white text-[10px] font-bold py-3 rounded-xl transition"
                  >
-                   <Twitter size={14} fill="currentColor" />
+                   <Twitter size={12} fill="currentColor" />
                    SHARE ON X
                  </button>
                  <button 
                    onClick={() => copyRawJson(selectedNode)}
-                   className="col-span-2 flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 text-[10px] font-mono py-2 rounded-lg transition border border-zinc-800"
+                   className="flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 text-[10px] font-mono py-3 rounded-xl transition border border-zinc-800"
                  >
                    {jsonCopied ? <Check size={12} className="text-green-500" /> : <Code size={12} />}
-                   {jsonCopied ? 'JSON COPIED' : 'COPY RAW JSON (DEV)'}
+                   {jsonCopied ? 'COPIED' : 'DIAGNOSTIC DATA'}
                  </button>
               </div>
               
@@ -910,17 +897,24 @@ Monitor at: https://xandeum-pulse.vercel.app`;
       </div>
       
       {/* FOOTER */}
-      <footer className="border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto">
-        <div className="max-w-4xl mx-auto text-center">
-            <h3 className="text-white font-bold mb-2">XANDEUM PULSE MONITOR</h3>
-            <p className="text-zinc-500 text-sm mb-2 max-w-lg mx-auto">
-                Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.
-            </p>
-            <div className="flex items-center justify-center gap-1.5 text-xs font-mono text-zinc-600">
-                <span className="opacity-50">pRPC Powered</span>
-                <span>•</span>
-                <span>Built by <a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-blue-400 transition font-bold">riot'</a></span>
+      <footer className="border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto text-center">
+        <h3 className="text-white font-bold mb-2">XANDEUM PULSE MONITOR</h3>
+        <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">
+            Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.
+        </p>
+        <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-600">
+            <span className="opacity-50">pRPC Powered</span>
+            <span className="text-zinc-800">|</span>
+            <div className="flex items-center gap-1">
+                <span>Built by</span>
+                <a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-blue-400 transition font-bold flex items-center gap-1">
+                    riot' <Twitter size={10} />
+                </a>
             </div>
+            <span className="text-zinc-800">|</span>
+            <a href="https://github.com/Idle0x/xandeum-pulse" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition flex items-center gap-1">
+                Open Source <ExternalLink size={10} />
+            </a>
         </div>
       </footer>
     </div>
