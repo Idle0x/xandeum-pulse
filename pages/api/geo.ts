@@ -26,7 +26,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // 1. Fetch Live Nodes from your existing source
     // (Simulating the fetch you do in index.tsx - usually you'd extract this to a shared helper)
-    const statsRes = await axios.get('https://xandeum-pulse.vercel.app/api/stats'); 
+    const protocol = req.headers['x-forwarded-proto'] || 'http';
+    const host = req.headers.host;
+    const statsRes = await axios.get(`${protocol}://${host}/api/stats`);
+
     // ^ IMPORTANT: In local dev, use http://localhost:3000/api/stats. 
     // For now, I'll assume we can fetch from your live URL or you can replace this with your direct logic.
     
