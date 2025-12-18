@@ -213,10 +213,11 @@ export default function Leaderboard() {
           <div className="flex md:hidden flex-col gap-4">
             {ranking.slice(0, 3).map((node, idx) => {
               const tier = getTierBadge(node.rank);
+              const TierIcon = tier.icon; // FIX: Assign to uppercase variable for JSX
               return (
                 <div key={node.pubkey} className={`rounded-xl p-4 flex items-center justify-between border ${tier.bg}`}>
                   <div className="flex items-center gap-3">
-                    <tier.icon className={tier.color} size={32} />
+                    {TierIcon && <TierIcon className={tier.color} size={32} />}
                     <div>
                       <div className="text-xs text-zinc-400 uppercase font-bold">{tier.label}</div>
                       <div className="font-mono text-sm text-white truncate max-w-[150px]">{node.pubkey}</div>
@@ -335,6 +336,7 @@ export default function Leaderboard() {
           <div className="divide-y divide-zinc-800/50">
             {filtered.slice(0, 100).map((node) => {
               const tier = getTierBadge(node.rank);
+              const TierIcon = tier.icon; // FIX: UpperCase for JSX
               const details = nodeMap.get(node.pubkey);
               const isMyNode = isFavorite(node.pubkey);
 
@@ -352,7 +354,7 @@ export default function Leaderboard() {
                   {/* RANK BADGE */}
                   <div className="col-span-2 md:col-span-1 flex justify-center items-center gap-1">
                     {isMyNode && <Star size={12} className="text-yellow-500 absolute left-2" fill="currentColor" />}
-                    {tier.icon ? (
+                    {TierIcon ? (
                       <div className="flex flex-col items-center">
                          <span className={`text-xs font-bold ${node.rank <= 3 ? 'text-white' : 'text-zinc-500'}`}>#{node.rank}</span>
                       </div>
