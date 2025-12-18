@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
-import { useRouter } from 'next/router'; // NEW IMPORT
+import { useRouter } from 'next/router';
 import axios from 'axios';
 import Link from 'next/link';
 import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink, BarChart3, HelpCircle, ChevronRight, Maximize2 } from 'lucide-react';
@@ -108,7 +108,6 @@ const LiveWireLoader = () => (
   </div>
 );
 
-// --- COMPONENT: CENTER PULSE GRAPH ---
 const PulseGraphLoader = () => {
   const [text, setText] = useState("Initializing Uplink...");
   
@@ -170,9 +169,10 @@ const PulseGraphLoader = () => {
 };
 
 export default function Home() {
-  const router = useRouter(); // NEW
+  const router = useRouter();
   const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isFirstLoad, setIsFirstLoad] = useState(true); // NEW: Prevents white screen flash
   const [error, setError] = useState('');
   const [lastUpdated, setLastUpdated] = useState('');
   
@@ -200,12 +200,11 @@ export default function Home() {
 
   const [networkHealth, setNetworkHealth] = useState('0.00');
   const [mostCommonVersion, setMostCommonVersion] = useState('N/A');
-  const [latestVersion, setLatestVersion] = useState('N/A');
   const [totalStorageUsed, setTotalStorageUsed] = useState(0);
   const [totalStorageCommitted, setTotalStorageCommitted] = useState(0);
+  const [totalNetworkCredits, setTotalNetworkCredits] = useState(0);
   
   const [avgCommitted, setAvgCommitted] = useState(0);
-  const [avgCredits, setAvgCredits] = useState(0);
 
   useEffect(() => {
     fetchData();
@@ -232,7 +231,6 @@ export default function Home() {
     const handleEscape = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
             setSelectedNode(null);
-            // Clear URL param on close to clean up
             if (router.query.open) {
                 router.replace('/', undefined, { shallow: true });
             }
@@ -248,7 +246,6 @@ export default function Home() {
     };
   }, [isSearchFocused]);
 
-  // DEEP LINKING LOGIC: Check URL for ?open=PUBKEY
   useEffect(() => {
     if (!loading && nodes.length > 0 && router.query.open) {
         const pubkeyToOpen = router.query.open as string;
@@ -284,7 +281,6 @@ export default function Home() {
 
   const closeModal = () => {
       setSelectedNode(null);
-      // Clean URL if it has params
       if (router.query.open) {
           router.replace('/', undefined, { shallow: true });
       }
@@ -326,7 +322,9 @@ Monitor at: https://xandeum-pulse.vercel.app`;
   };
 
   const fetchData = async () => {
-    setLoading(true);
+    // Only show loading spinner on the very first load
+    if (isFirstLoad) setLoading(true);
+    
     try {
       const [statsRes, creditsRes] = await Promise.all([
         axios.get('/api/stats'),
@@ -338,12 +336,14 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         
         const creditsData = creditsRes.data.pods_credits || creditsRes.data;
         const creditMap = new Map<string, number>();
+        let totalCreds = 0;
         
         if (Array.isArray(creditsData)) {
             creditsData.forEach((item: any) => {
                 const key = item.pod_id || item.pubkey || item.node || item.address;
                 const val = Number(item.credits || item.amount || 0);
                 if (key) creditMap.set(key, val);
+                totalCreds += val;
             });
         } else if (typeof creditsData === 'object' && creditsData !== null) {
             Object.entries(creditsData).forEach(([key, val]: [string, any]) => {
@@ -351,8 +351,10 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                 const keyToUse = val?.pod_id || val?.pubkey || key;
                 const numVal = typeof val === 'number' ? val : Number(val?.credits || 0);
                 creditMap.set(keyToUse, numVal);
+                totalCreds += numVal;
             });
         }
+        setTotalNetworkCredits(totalCreds);
 
         let mergedList = podList.map(node => ({
             ...node,
@@ -403,27 +405,26 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             const topVersion = Object.entries(versionCounts).sort((a, b) => b[1] - a[1])[0][0];
             setMostCommonVersion(topVersion);
             
-            const allVersions = mergedList.map(n => n.version);
-            const sortedVersions = allVersions.sort((a, b) => compareVersions(b, a));
-            setLatestVersion(sortedVersions[0] || 'N/A');
-            
             const totalComm = mergedList.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
             const totalCred = mergedList.reduce((sum, n) => sum + (n.credits || 0), 0);
             setAvgCommitted(totalComm / mergedList.length);
-            setAvgCredits(totalCred / mergedList.length);
+            
+            const totalBytesUsed = mergedList.reduce((sum, n) => sum + (n.storage_used || 0), 0);
+            const totalBytesCommitted = mergedList.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
+            setTotalStorageUsed(totalBytesUsed);
+            setTotalStorageCommitted(totalBytesCommitted);
         }
-
-        const totalBytesUsed = mergedList.reduce((sum, n) => sum + (n.storage_used || 0), 0);
-        const totalBytesCommitted = mergedList.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
-        setTotalStorageUsed(totalBytesUsed);
-        setTotalStorageCommitted(totalBytesCommitted);
+        
         setError('');
       }
     } catch (err: any) {
       console.error("Fetch error:", err);
-      setError('Connection failed. Retrying...');
+      if (isFirstLoad) setError('Connection failed. Retrying...');
     } finally {
-      setLoading(false);
+      if (isFirstLoad) {
+          setLoading(false);
+          setIsFirstLoad(false);
+      }
     }
   };
 
@@ -494,7 +495,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
   const renderNodeCard = (node: Node, i: number) => {
     const cycleData = getCycleContent(node, i);
     const isFav = favorites.includes(node.address);
-    const isLatest = latestVersion !== 'N/A' && node.version === latestVersion;
     
     return (
       <div 
@@ -534,7 +534,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             <span className="text-zinc-500">Version</span>
             <div className="flex items-center gap-2">
                <span className="text-zinc-300 bg-zinc-800 px-2 py-0.5 rounded">{node.version}</span>
-               {isLatest ? <CheckCircle size={12} className="text-green-500" /> : <AlertTriangle size={12} className="text-yellow-600" />}
+               {isLatest && <CheckCircle size={12} className="text-green-500" />}
             </div>
           </div>
 
@@ -567,18 +567,19 @@ Monitor at: https://xandeum-pulse.vercel.app`;
     );
   };
 
+  const isLatest = (nodeVersion: string) => {
+      // Just a helper for the card
+      return mostCommonVersion !== 'N/A' && compareVersions(nodeVersion, mostCommonVersion) >= 0;
+  };
+
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans relative selection:bg-blue-500/30 selection:text-blue-200 flex flex-col" onClick={handleGlobalClick}>
-      {/* GLOBAL HEAD */}
       <Head>
         <title>Xandeum Pulse - Live Network Monitor</title>
         <meta name="description" content="Real-time pNode health, storage capacity, and network consensus metrics for Xandeum." />
         <meta property="og:title" content="Xandeum Pulse - Live Network Monitor" />
-        <meta property="og:description" content="Monitor Xandeum pNodes, track network rewards, and check storage consensus in real-time." />
-        <meta name="twitter:card" content="summary_large_image" />
       </Head>
 
-      {/* GLOBAL STYLES (Scrollbar) */}
       <style jsx global>{`
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #09090b; }
@@ -621,7 +622,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
       )}
 
       {/* STATS OVERVIEW */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
           <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Network Capacity</div>
           <div className="text-3xl font-bold text-white mt-1">{formatBytes(totalStorageCommitted)}</div>
@@ -641,7 +642,21 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
       </div>
 
-      {/* WATCHLIST SECTION - WITH EMPTY STATE */}
+      {/* LEADERBOARD LINK BAR */}
+      <Link href="/leaderboard" className="block mb-8 group">
+        <div className="bg-zinc-900/50 border border-yellow-500/20 rounded-lg p-2.5 flex items-center justify-center gap-3 hover:bg-yellow-500/10 transition cursor-pointer">
+            <Trophy size={14} className="text-yellow-500" />
+            <span className="text-xs font-mono text-zinc-400">
+                Total Network Credits Issued: <span className="text-yellow-400 font-bold ml-1">{(totalNetworkCredits / 1000000).toFixed(2)}M</span>
+            </span>
+            <span className="text-zinc-600">|</span>
+            <span className="text-xs font-bold text-zinc-300 group-hover:text-white flex items-center gap-1">
+                View Reputation Leaderboard <ChevronRight size={12} />
+            </span>
+        </div>
+      </Link>
+
+      {/* WATCHLIST SECTION */}
       {watchListNodes.length > 0 ? (
         <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
            <div className="flex items-center gap-2 mb-4">
@@ -666,10 +681,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
       <div className="mb-8 space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex gap-2 w-full md:w-auto">
-                <Link href="/leaderboard" className="flex-1 md:flex-none justify-center px-5 py-2.5 bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 text-yellow-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2">
-                    <Trophy size={16} /> LEADERBOARD
-                </Link>
-
                 <button 
                     onClick={fetchData} 
                     disabled={loading}
@@ -701,7 +712,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     >
                     <opt.icon size={12} />
                     {opt.label}
-                    {/* NEW: Distinct Sort Icons */}
                     {sortBy === opt.id && (
                         sortOrder === 'asc' ? <ArrowUp size={10} className="ml-1" /> : <ArrowDown size={10} className="ml-1" />
                     )}
@@ -710,7 +720,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             </div>
         </div>
 
-        {/* SEARCH BAR WITH ROTATING TIP */}
+        {/* SEARCH BAR */}
         <div className="relative">
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
@@ -753,7 +763,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </>
       )}
 
-      {/* --- ULTIMATE MODAL (ZERO-SECOND CONTEXT) --- */}
+      {/* --- MODAL --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => closeModal()}>
           <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/5 w-full max-w-lg lg:max-w-5xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => { e.stopPropagation(); handleGlobalClick(); }}>
@@ -780,7 +790,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             <div className="p-6 overflow-y-auto custom-scrollbar">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
-                {/* COLUMN 1: IDENTITY & STATUS (SANITIZED TERMINOLOGY) */}
+                {/* COLUMN 1: IDENTITY */}
                 <div>
                     <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'identity')}>
                         <h3 className="text-xs font-bold text-zinc-500 uppercase">Identity & Status</h3>
@@ -792,7 +802,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         </div>
                     )}
                     
-                    {/* Operator Details */}
                     <div className="bg-black/50 border border-white/5 rounded-xl p-4 space-y-3 mb-4 backdrop-blur-md">
                         <div>
                             <div className="text-[9px] text-zinc-500 uppercase mb-1">Public Key</div>
@@ -810,7 +819,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         </div>
                     </div>
 
-                    {/* Status Checks */}
                     <div className="bg-black/50 border border-white/5 rounded-xl p-4 backdrop-blur-md">
                         <div className="space-y-3 text-xs">
                            <div className="flex justify-between items-center">
@@ -840,7 +848,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     </div>
                 </div>
 
-                {/* COLUMN 2: STORAGE METRICS (UPDATED LAYOUT) */}
+                {/* COLUMN 2: STORAGE (NEW STYLING) */}
                 <div>
                     <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'infra')}>
                         <h3 className="text-xs font-bold text-zinc-500 uppercase">Storage Metrics</h3>
@@ -854,29 +862,26 @@ Monitor at: https://xandeum-pulse.vercel.app`;
 
                     <div className="bg-black/50 rounded-xl p-4 border border-white/5 space-y-4 backdrop-blur-md mb-4">
                         <div>
-                            {/* SPLIT LAYOUT FOR STORAGE */}
+                            {/* NEW GLASS CHIP FOR RAW BYTES */}
                             <div className="flex justify-between items-end mb-2">
-                                {/* USED (Left) */}
                                 <div className="flex flex-col items-start">
-                                    <span className="text-[9px] text-zinc-500 font-mono mb-0.5">{formatRawBytes(selectedNode.storage_used)} raw bytes</span>
+                                    <span className="mb-1 inline-block bg-zinc-900 border border-zinc-800/50 rounded px-1.5 py-0.5 text-[9px] text-zinc-500 font-mono">
+                                        {formatRawBytes(selectedNode.storage_used)} raw bytes
+                                    </span>
                                     <span className="text-xl font-mono font-bold text-blue-400">{formatBytes(selectedNode.storage_used)}</span>
                                     <span className="text-[10px] text-zinc-600 uppercase tracking-wider mt-0.5">USED</span>
                                 </div>
-                                {/* SEPARATOR */}
                                 <div className="text-zinc-700 text-xl font-light pb-4">/</div>
-                                {/* CAPACITY (Right) */}
                                 <div className="flex flex-col items-end">
                                     <span className="text-xl font-mono font-bold text-purple-400">{formatBytes(selectedNode.storage_committed || 0)}</span>
                                     <span className="text-[10px] text-zinc-600 uppercase tracking-wider mt-0.5">CAPACITY</span>
                                 </div>
                             </div>
 
-                            {/* BAR */}
                             <div className="h-2 bg-zinc-800 rounded-full overflow-hidden w-full mb-2">
                                 <div className="h-full bg-blue-500" style={{ width: `${Math.min(selectedNode.storage_usage_raw || 0, 100)}%` }}></div>
                             </div>
                             
-                            {/* UTILIZATION PILL */}
                             <div className="flex justify-center">
                                 <span className="text-[10px] text-zinc-400 font-mono bg-zinc-900/80 px-2 py-1 rounded-full border border-zinc-800">
                                     {selectedNode.storage_usage_percentage} Utilization
@@ -885,7 +890,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         </div>
                     </div>
 
-                    {/* Network Comparison (Storage) */}
                     <h4 className="text-[9px] text-zinc-500 uppercase mb-2 font-bold pl-1">VS Network Average</h4>
                     <div className="bg-black/50 rounded-xl p-4 border border-white/5 backdrop-blur-md">
                         <div className="mb-2">
@@ -901,7 +905,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     </div>
                 </div>
 
-                {/* COLUMN 3: PERFORMANCE & SOCIAL */}
+                {/* COLUMN 3: PERFORMANCE */}
                 <div>
                     <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'perf')}>
                         <h3 className="text-xs font-bold text-zinc-500 uppercase">Performance</h3>
@@ -913,7 +917,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         </div>
                     )}
                     
-                    {/* Health Score */}
                     <div className="bg-black/50 border border-white/5 rounded-xl p-4 text-center mb-4 backdrop-blur-md relative group">
                         <div className="text-xs text-zinc-500 mb-2 flex items-center justify-center gap-1 font-bold uppercase">
                             Health Score 
@@ -932,7 +935,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         <div className="text-[9px] text-zinc-600">out of 100</div>
                     </div>
 
-                    {/* Reputation & Rank */}
+                    {/* REPUTATION WITH EXPLICIT VIEW LINK */}
                     <div className="bg-black/50 border border-yellow-500/20 rounded-xl p-4 backdrop-blur-md relative">
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="text-[9px] text-zinc-500 uppercase font-bold">Reputation</h4>
@@ -953,17 +956,20 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         </div>
                         
                         <Link href="/leaderboard">
-                            <div className="bg-zinc-900/50 border border-yellow-500/20 p-2 rounded-lg flex items-center justify-between cursor-pointer hover:border-yellow-500/40 transition mt-3">
+                            <div className="bg-zinc-900/50 border border-yellow-500/20 p-2 rounded-lg flex items-center justify-between cursor-pointer hover:border-yellow-500/40 transition mt-3 group">
                                 <div className="flex items-center gap-2">
                                     <Trophy size={14} className="text-yellow-500" />
                                     <span className="text-xs font-bold text-zinc-400">Global Rank</span>
                                 </div>
-                                <span className="text-lg font-bold text-white">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-lg font-bold text-white">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</span>
+                                    {/* PERMANENT VIEW ICON */}
+                                    <ExternalLink size={12} className="text-zinc-500 group-hover:text-white transition" />
+                                </div>
                             </div>
                         </Link>
                     </div>
 
-                    {/* Precise Timestamp */}
                     <div className="mt-4 text-xs text-center text-zinc-500 group relative cursor-help">
                         <Clock size={12} className="inline mr-1" />
                         Last seen {formatLastSeen(selectedNode.last_seen_timestamp)}
@@ -975,7 +981,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
 
               </div>
               
-              {/* SHARE BUTTONS (FULL WIDTH) */}
+              {/* SHARE BUTTONS */}
               <div className="mt-6 pt-4 border-t border-white/5 grid grid-cols-3 gap-2">
                  <button 
                    onClick={() => copyStatusReport(selectedNode)}
