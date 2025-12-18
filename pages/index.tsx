@@ -15,6 +15,7 @@ interface Node {
   storage_used: number;
   storage_committed?: number; 
   storage_usage_percentage?: string;
+  storage_usage_raw?: number; 
   rank?: number;
   credits?: number;
 }
@@ -26,10 +27,6 @@ const formatBytes = (bytes: number) => {
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
-
-const formatRawBytes = (bytes: number) => {
-  return bytes ? bytes.toLocaleString() + ' B' : '0 B';
 };
 
 const formatUptime = (seconds: number) => {
@@ -174,11 +171,13 @@ export default function Home() {
   const [lastUpdated, setLastUpdated] = useState('');
   
   const [searchQuery, setSearchQuery] = useState('');
-  // REMOVED 'latency' from sort types to fix build error
   const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'rank'>('uptime');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  const [showHealthInfo, setShowHealthInfo] = useState(false); 
+  
+  // Tooltip States
+  const [showHealthInfo, setShowHealthInfo] = useState(false);
+  const [showReputationInfo, setShowReputationInfo] = useState(false); 
 
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
@@ -211,6 +210,7 @@ export default function Home() {
       setCycleStep(prev => prev + 1); 
     }, 4000);
     
+    // ESC to close modal
     const handleEscape = (e: KeyboardEvent) => {
         if (e.key === 'Escape') setSelectedNode(null);
     };
@@ -222,6 +222,12 @@ export default function Home() {
         document.removeEventListener('keydown', handleEscape);
     };
   }, []);
+
+  // Close tooltips when clicking anywhere in the modal overlay
+  const handleModalClick = () => {
+    if (showHealthInfo) setShowHealthInfo(false);
+    if (showReputationInfo) setShowReputationInfo(false);
+  };
 
   const toggleFavorite = (e: React.MouseEvent, address: string) => {
     e.stopPropagation();
@@ -317,16 +323,21 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             const used = node.storage_used || 0;
             const cap = node.storage_committed || 0;
             let percentStr = "0%";
+            let rawPercent = 0;
             
             if (cap > 0 && used > 0) {
-                const p = (used / cap) * 100;
-                if (p < 0.01) percentStr = "< 0.01%";
-                else percentStr = `${p.toFixed(2)}%`;
+                rawPercent = (used / cap) * 100;
+                if (rawPercent < 0.01) percentStr = "< 0.01%";
+                else percentStr = `${rawPercent.toFixed(2)}%`;
             } else if (used === 0) {
                 percentStr = "0%";
             }
             
-            return { ...node, storage_usage_percentage: percentStr };
+            return { 
+                ...node, 
+                storage_usage_percentage: percentStr,
+                storage_usage_raw: rawPercent 
+            };
         });
 
         setNodes(mergedList);
@@ -637,7 +648,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     >
                     <opt.icon size={12} />
                     {opt.label}
-                    {/* NEW: Distinct Sort Icons */}
                     {sortBy === opt.id && (
                         sortOrder === 'asc' ? <ArrowUp size={10} className="ml-1" /> : <ArrowDown size={10} className="ml-1" />
                     )}
@@ -690,7 +700,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
       {/* --- ULTIMATE MODAL (HUMAN-FIRST LAYOUT) --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
-          <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/5 w-full max-w-lg lg:max-w-5xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+          <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/5 w-full max-w-lg lg:max-w-5xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => { e.stopPropagation(); handleModalClick(); }}>
             
             <div className="bg-white/5 p-6 border-b border-white/5 flex justify-between items-start shrink-0">
               <div className="flex-1 overflow-hidden mr-4">
@@ -698,7 +708,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
                         <Server size={20} className="text-blue-500" /> Node Inspector
                     </h2>
-                    <span className="text-xs font-mono bg-zinc-800 px-2 py-1 rounded text-zinc-300 border border-zinc-700">{selectedNode.version}</span>
+                    {/* VERSION PILL REMOVED FROM HERE */}
                  </div>
                 <div className="flex items-center gap-2 mt-1">
                     <p className="text-zinc-500 font-mono text-xs truncate">{selectedNode.address}</p>
@@ -747,10 +757,12 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                               </span>
                            </div>
                            <div className="flex justify-between items-center">
-                              <span className="text-zinc-400">Version Sync</span>
-                              <span className={selectedNode.version === mostCommonVersion ? "text-green-500" : "text-blue-500"}>
-                                {selectedNode.version === mostCommonVersion ? "MATCHED" : "DIFFERENT"}
-                              </span>
+                              <span className="text-zinc-400">Software Version</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-zinc-300 bg-zinc-800 px-1.5 rounded">{selectedNode.version}</span>
+                                {selectedNode.version === mostCommonVersion && <span className="text-[9px] text-green-500 bg-green-500/10 px-1 rounded uppercase font-bold">Majority</span>}
+                                {compareVersions(selectedNode.version, mostCommonVersion) < 0 && <span className="text-[9px] text-orange-500 bg-orange-500/10 px-1 rounded uppercase font-bold">Behind</span>}
+                              </div>
                            </div>
                            <div className="flex justify-between items-center">
                               <span className="text-zinc-400">Network Mode</span>
@@ -771,7 +783,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                                 <span className="text-zinc-400 text-xs">Capacity</span>
                                 <span className="text-purple-400 font-mono font-bold text-sm">{formatBytes(selectedNode.storage_committed || 0)}</span>
                             </div>
-                            <div className="h-1.5 bg-zinc-800 rounded-full w-full"></div>
+                            {/* CAPACITY BAR REMOVED */}
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
@@ -779,10 +791,11 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                                 <span className="text-blue-400 font-mono font-bold text-sm">{formatBytes(selectedNode.storage_used)}</span>
                             </div>
                             <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden w-full">
-                                <div className="h-full bg-blue-500" style={{ width: selectedNode.storage_usage_percentage }}></div>
+                                {/* RAW PERCENTAGE USED FOR BAR WIDTH */}
+                                <div className="h-full bg-blue-500" style={{ width: `${Math.min(selectedNode.storage_usage_raw || 0, 100)}%` }}></div>
                             </div>
                             <div className="text-right text-[9px] text-zinc-600 mt-1 font-mono">
-                                {selectedNode.storage_used?.toLocaleString()} raw bytes
+                                {selectedNode.storage_usage_percentage}
                             </div>
                         </div>
                     </div>
@@ -811,13 +824,11 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     <div className="bg-black/50 border border-white/5 rounded-xl p-4 text-center mb-4 backdrop-blur-md relative group">
                         <div className="text-xs text-zinc-500 mb-2 flex items-center justify-center gap-1 font-bold uppercase">
                             Health Score 
-                            {/* Clickable Tooltip for Mobile */}
                             <button onClick={(e) => { e.stopPropagation(); setShowHealthInfo(!showHealthInfo); }}>
                                 <Info size={12} className="cursor-pointer hover:text-white" />
                             </button>
                         </div>
                         
-                        {/* Tooltip Popup */}
                         {(showHealthInfo) && (
                             <div className="absolute top-10 left-4 right-4 bg-zinc-900 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-10 shadow-xl">
                                 Score based on Uptime, Version Consensus, and Network Visibility.
@@ -829,8 +840,20 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     </div>
 
                     {/* Reputation & Rank */}
-                    <div className="bg-black/50 border border-yellow-500/20 rounded-xl p-4 backdrop-blur-md">
-                        <h4 className="text-[9px] text-zinc-500 uppercase mb-3 font-bold">Reputation</h4>
+                    <div className="bg-black/50 border border-yellow-500/20 rounded-xl p-4 backdrop-blur-md relative">
+                        <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-[9px] text-zinc-500 uppercase font-bold">Reputation</h4>
+                            <button onClick={(e) => { e.stopPropagation(); setShowReputationInfo(!showReputationInfo); }}>
+                                <HelpCircle size={10} className="text-zinc-600 hover:text-zinc-400" />
+                            </button>
+                        </div>
+
+                        {(showReputationInfo) && (
+                            <div className="absolute top-8 right-4 w-48 bg-zinc-900 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-10 shadow-xl">
+                                Reputation is earned by proving storage capacity and maintaining high uptime.
+                            </div>
+                        )}
+
                         <div className="flex justify-between items-center mb-2">
                             <span className="text-zinc-400 text-xs">Credits</span>
                             <span className="text-yellow-400 font-mono font-bold">{selectedNode.credits?.toLocaleString() || 0}</span>
