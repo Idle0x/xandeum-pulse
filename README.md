@@ -1,54 +1,77 @@
 # Xandeum Pulse
 
-> Real-time pNode Monitor & Network Dashboard for the Xandeum Gossip Protocol.
-> 
-Live Demo: https://xandeum-pulse.vercel.app
+Real-time network monitor and analytics dashboard for the Xandeum gossip protocol.
+
+**Live Demo:** https://xandeum-pulse.vercel.app
 
 ## Overview
 
-Xandeum Pulse is a serverless analytics dashboard designed to monitor the health, storage consensus, and stability of the Xandeum network. It connects directly to pNodes via pRPC to fetch live stats without relying on centralized indexers or databases.
+Xandeum Pulse is a serverless analytics platform for monitoring pNode health, storage consensus, and network reputation. It connects directly to the Xandeum mesh network via pRPC to provide real-time metrics without relying on centralized indexers.
 
-The platform focuses on operator utility, providing real-time storage metrics, uptime tracking, and network reputation rankings.
+Built for node operators and network validators who need accurate, up-to-date visibility into network status.
 
-## Key Features
+## Core Architecture
 
- * Direct pRPC Integration: Fetches live data using the get-pods-with-stats method via a resilient proxy.
- * Failover Architecture: Implements a "Hero Node" priority system with a backup race condition to ensure high availability.
- * Network Analytics: Real-time calculation of Total Storage Committed, Network Stability, and Consensus Version.
- * Operator Tools:
-   * Smart Watchlist: Local persistence for tracking specific nodes.
-   * Deep Inspection: View raw JSON data, precise timestamps, and RPC endpoints.
-   * Status Reporting: One-click generation of formatted status reports for community sharing.
- * Reputation Leaderboard: Global ranking based on network credits with Olympic-style tie handling.
- * Responsive Interface: Adaptive grid layout optimized for mobile and desktop viewing.
+### Failover System
 
-## Architecture & Data Logic
+The dashboard implements a resilient failover strategy to maintain uptime even when individual nodes are unreachable:
 
-### Failover API System
+1. **Primary Request:** Attempts connection to a known high-performance seed node
+2. **Backup Race:** If primary fails or times out (>4s), simultaneously queries 3 random seed nodes
+3. **First Response Wins:** Returns the first valid payload using Promise.any
 
-To ensure reliability during network instability, the backend (/api/stats) utilizes a hybrid failover strategy:
+This ensures the dashboard remains functional even during network instability.
 
- * Primary Attempt: Requests data from a known high-performance "Hero Node" (173.212.203.145).
- * Backup Race: If the primary fails or times out (4s), the system simultaneously queries 3 random seed nodes.
- * Resolution: The first successful response is returned to the client (Promise.any).
+*Implementation: `pages/api/stats.ts`*
 
-### Derived Metrics
+### Client-Side Metrics
 
-The following metrics are computed client-side to provide actionable insights:
+Several key metrics are computed client-side from raw pRPC data:
 
- * Health Score: A heuristic based on uptime, version consensus (vs. majority), visibility, and storage utilization.
- * Network Stability: The percentage of nodes with >24h uptime.
- * Consensus Version: The software version currently running on the majority of the network.
+- **Health Score:** Algorithmic score (0-100) based on uptime, version consensus, storage utilization, and network visibility
+- **Network Stability:** Percentage of nodes with >24h uptime
+- **Consensus Version:** Most common software version across active nodes
+- **Storage Utilization:** Ratio of used vs. committed storage with byte-level precision
 
-## API Documentation
+*Implementation: `pages/index.tsx` (see `getHealthScore` function)*
 
-### 1. Network Stats
+### Reputation Ranking
 
-Endpoint: GET /api/stats
+The leaderboard uses a dual-fetch architecture to correlate reputation credits with live node status:
 
-Source: Direct pRPC (get-pods-with-stats)
+1. Fetches credit balances from the Xandeum rewards oracle
+2. Simultaneously fetches live node stats via pRPC
+3. Maps public keys to IP addresses, allowing operators to trace top earners to their physical nodes
 
-Returns a list of all active pNodes in the gossip protocol.
+Olympic-style tie handling ensures accurate ranking when nodes have equal credits.
+
+*Implementation: `pages/leaderboard.tsx`*
+
+## Features
+
+**Network Monitoring**
+- Real-time node grid with search and filtering (IP, public key, version)
+- Deep inspection modal with raw JSON export
+- Automatic background refresh on tab focus
+
+**Operator Tools**
+- Watchlist: Star and pin specific nodes for monitoring
+- Deep linking: Share node states via URL parameters
+- Export formats: CSV (full network dump), JSON (raw data), formatted text (social sharing)
+
+**Analytics**
+- Total network storage committed
+- Version distribution and consensus tracking
+- Uptime stability metrics
+- Global reputation leaderboard
+
+## API Endpoints
+
+### GET /api/stats
+
+Proxies pRPC `get-pods-with-stats` method with failover logic.
+
+Returns array of active pNodes:
 
 ```json
 {
@@ -57,9 +80,9 @@ Returns a list of all active pNodes in the gossip protocol.
       {
         "address": "173.212.203.145:9001",
         "pubkey": "8x...",
-        "version": "0.8.0",
+        "version": "1.0.4",
         "uptime": 86400,
-        "storage_used": 1048576,
+        "storage_used": 52428800,
         "storage_committed": 1099511627776,
         "is_public": true
       }
@@ -68,66 +91,62 @@ Returns a list of all active pNodes in the gossip protocol.
 }
 ```
 
-### 2. Reputation Credits
+### GET /api/credits
 
-Endpoint: GET /api/credits
+Proxies the Xandeum rewards oracle.
 
-Source: https://podcredits.xandeum.network/api/pods-credits
-
-Returns the accumulated credit balance for reward distribution.
+Returns credit balances for all registered public keys.
 
 ## Running Locally
 
-If you'd like to run Xandeum Pulse on your local machine for development or testing:
-
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/Idle0x/xandeum-pulse.git
 cd xandeum-pulse
 
 # Install dependencies
 npm install
 
-# Start the development server
+# Start development server
 npm run dev
 ```
 
-The dashboard will be available at http://localhost:3000
+Open http://localhost:3000
 
-Note: The application connects directly to the Xandeum network via pRPC, so no additional configuration or API keys are required.
+No environment variables required - the pRPC proxy configuration is self-contained.
 
 ## Project Structure
 
 ```
 xandeum-pulse/
 ├── pages/
-│   ├── index.tsx           # Main dashboard (Grid, Search, Modal)
-│   ├── leaderboard.tsx     # Credits ranking table
+│   ├── index.tsx           # Main dashboard (grid, search, modals)
+│   ├── leaderboard.tsx     # Reputation ranking
 │   └── api/
-│       ├── stats.ts        # RPC proxy with failover logic
+│       ├── stats.ts        # pRPC proxy with failover
 │       └── credits.ts      # Credits API proxy
 ├── styles/
-│   └── globals.css         # Tailwind directives & custom scrollbar
+│   └── globals.css         # Tailwind configuration
 └── package.json
 ```
 
 ## Tech Stack
 
- * Framework: Next.js 16 (React)
- * Styling: Tailwind CSS
- * Networking: Axios
- * Icons: Lucide React
- * Deployment: Vercel (Serverless Functions)
+- **Framework:** Next.js 16 (React)
+- **Styling:** Tailwind CSS
+- **Networking:** Axios with Promise.any for failover
+- **Icons:** Lucide React
+- **Deployment:** Vercel (Serverless Functions)
 
 ## License
 
 MIT
 
-## Credits
+## Author
 
 Developed by riot'
 
- * X (Twitter): @33xp_
- * Discord: @idle0x
+- Twitter: [@33xp_](https://twitter.com/33xp_)
+- Discord: @idle0x
 
-Built for the Xandeum Ecosystem.
+Built for the Xandeum ecosystem.
