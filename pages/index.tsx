@@ -179,7 +179,8 @@ export default function Home() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'rank'>('uptime');
-  const [sortOrder, setSortOrder] = useState<'desc'>('desc');
+  // FIX: Updated type definition to allow both 'asc' and 'desc'
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   
   const [showHealthInfo, setShowHealthInfo] = useState(false);
@@ -333,7 +334,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         let podList: Node[] = statsRes.data.result.pods;
         
         const creditsData = creditsRes.data.pods_credits || creditsRes.data;
-        // CORRECTED: Now this uses the native JS Map because we renamed the import
         const creditMap = new Map<string, number>();
         let totalCreds = 0;
         
