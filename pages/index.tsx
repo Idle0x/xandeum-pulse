@@ -3,7 +3,8 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink, BarChart3, HelpCircle, ChevronRight, Maximize2, Map } from 'lucide-react';
+// FIX: Aliased 'Map' to 'MapIcon' to avoid conflict with JS Map constructor
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink, BarChart3, HelpCircle, ChevronRight, Maximize2, Map as MapIcon } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -332,6 +333,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         let podList: Node[] = statsRes.data.result.pods;
         
         const creditsData = creditsRes.data.pods_credits || creditsRes.data;
+        // CORRECTED: Now this uses the native JS Map because we renamed the import
         const creditMap = new Map<string, number>();
         let totalCreds = 0;
         
@@ -605,10 +607,10 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
 
         <div className="flex items-center gap-2">
-             {/* NEW MAP BUTTON */}
+             {/* CORRECTED: USING MAPICON */}
             <Link href="/map">
                 <button className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-blue-500 hover:text-blue-400 rounded-lg transition text-xs font-semibold tracking-wide flex items-center gap-2 text-zinc-300">
-                    <Globe size={16} /> 
+                    <MapIcon size={16} /> 
                     NETWORK MAP
                 </button>
             </Link>
