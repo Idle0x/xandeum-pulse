@@ -30,7 +30,7 @@ const formatBytes = (bytes: number) => {
 };
 
 const formatRawBytes = (bytes: number) => {
-  return bytes ? bytes.toLocaleString() + ' B' : '0 B';
+  return bytes ? bytes.toLocaleString() : '0';
 };
 
 const formatUptime = (seconds: number) => {
@@ -757,7 +757,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             <div className="p-6 overflow-y-auto custom-scrollbar">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
-                {/* COLUMN 1: IDENTITY & STATUS */}
+                {/* COLUMN 1: IDENTITY & STATUS (SANITIZED TERMINOLOGY) */}
                 <div>
                     <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'identity')}>
                         <h3 className="text-xs font-bold text-zinc-500 uppercase">Identity & Status</h3>
@@ -817,10 +817,10 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     </div>
                 </div>
 
-                {/* COLUMN 2: INFRASTRUCTURE (STORAGE) */}
+                {/* COLUMN 2: STORAGE METRICS (UPDATED LAYOUT) */}
                 <div>
                     <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'infra')}>
-                        <h3 className="text-xs font-bold text-zinc-500 uppercase">Infrastructure</h3>
+                        <h3 className="text-xs font-bold text-zinc-500 uppercase">Storage Metrics</h3>
                         <HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" />
                     </div>
                     {activeTooltip === 'infra' && (
@@ -831,25 +831,32 @@ Monitor at: https://xandeum-pulse.vercel.app`;
 
                     <div className="bg-black/50 rounded-xl p-4 border border-white/5 space-y-4 backdrop-blur-md mb-4">
                         <div>
-                            {/* HYBRID LAYOUT: RATIO + RAW BYTES */}
-                            <div className="flex justify-between items-end mb-1">
-                                <span className="text-zinc-400 text-xs mb-0.5">Used / Capacity</span>
-                                <div className="text-right">
-                                    <span className="text-blue-400 font-mono font-bold text-sm">{formatBytes(selectedNode.storage_used)}</span>
-                                    <span className="text-zinc-500 text-xs mx-1">/</span>
-                                    <span className="text-purple-400 font-mono font-bold text-sm">{formatBytes(selectedNode.storage_committed || 0)}</span>
+                            {/* SPLIT LAYOUT FOR STORAGE */}
+                            <div className="flex justify-between items-end mb-2">
+                                {/* USED (Left) */}
+                                <div className="flex flex-col items-start">
+                                    <span className="text-[9px] text-zinc-500 font-mono mb-0.5">{formatRawBytes(selectedNode.storage_used)} raw bytes</span>
+                                    <span className="text-xl font-mono font-bold text-blue-400">{formatBytes(selectedNode.storage_used)}</span>
+                                    <span className="text-[10px] text-zinc-600 uppercase tracking-wider mt-0.5">USED</span>
+                                </div>
+                                {/* SEPARATOR */}
+                                <div className="text-zinc-700 text-xl font-light pb-4">/</div>
+                                {/* CAPACITY (Right) */}
+                                <div className="flex flex-col items-end">
+                                    <span className="text-xl font-mono font-bold text-purple-400">{formatBytes(selectedNode.storage_committed || 0)}</span>
+                                    <span className="text-[10px] text-zinc-600 uppercase tracking-wider mt-0.5">CAPACITY</span>
                                 </div>
                             </div>
-                            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden w-full mb-1">
-                                {/* RAW PERCENTAGE USED FOR BAR WIDTH */}
+
+                            {/* BAR */}
+                            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden w-full mb-2">
                                 <div className="h-full bg-blue-500" style={{ width: `${Math.min(selectedNode.storage_usage_raw || 0, 100)}%` }}></div>
                             </div>
-                            <div className="flex justify-between items-center mt-2">
-                                <span className="text-[10px] text-zinc-500 font-mono">
+                            
+                            {/* UTILIZATION PILL */}
+                            <div className="flex justify-center">
+                                <span className="text-[10px] text-zinc-400 font-mono bg-zinc-900/80 px-2 py-1 rounded-full border border-zinc-800">
                                     {selectedNode.storage_usage_percentage} Utilization
-                                </span>
-                                <span className="text-[9px] text-zinc-600 font-mono bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-800">
-                                    {selectedNode.storage_used?.toLocaleString()} raw bytes
                                 </span>
                             </div>
                         </div>
