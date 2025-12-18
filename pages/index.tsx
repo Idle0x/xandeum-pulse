@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink, BarChart3, HelpCircle, ChevronRight, Maximize2 } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink, BarChart3, HelpCircle, ChevronRight, Maximize2, Map } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -178,7 +178,7 @@ export default function Home() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'rank'>('uptime');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [sortOrder, setSortOrder] = useState<'desc'>('desc');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   
   const [showHealthInfo, setShowHealthInfo] = useState(false);
@@ -193,7 +193,7 @@ export default function Home() {
   ];
 
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [copiedField, setCopiedField] = useState<string | null>(null); // NEW: Track which specific field is copied
+  const [copiedField, setCopiedField] = useState<string | null>(null); 
   const [cycleStep, setCycleStep] = useState(0);
 
   const [networkHealth, setNetworkHealth] = useState('0.00');
@@ -284,7 +284,6 @@ export default function Home() {
       }
   };
 
-  // NEW: Updated copy function to handle specific fields
   const copyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldId);
@@ -579,7 +578,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         <meta property="og:title" content="Xandeum Pulse - Live Network Monitor" />
       </Head>
 
-      {/* GLOBAL STYLES (Scrollbar) */}
+      {/* GLOBAL STYLES */}
       <style jsx global>{`
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #09090b; }
@@ -605,10 +604,20 @@ Monitor at: https://xandeum-pulse.vercel.app`;
           </div>
         </div>
 
-        <button onClick={exportCSV} className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-semibold tracking-wide flex items-center gap-2 text-zinc-300">
-            <Download size={16} /> 
-            CSV EXPORT
-        </button>
+        <div className="flex items-center gap-2">
+             {/* NEW MAP BUTTON */}
+            <Link href="/map">
+                <button className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-blue-500 hover:text-blue-400 rounded-lg transition text-xs font-semibold tracking-wide flex items-center gap-2 text-zinc-300">
+                    <Globe size={16} /> 
+                    NETWORK MAP
+                </button>
+            </Link>
+            
+            <button onClick={exportCSV} className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-semibold tracking-wide flex items-center gap-2 text-zinc-300">
+                <Download size={16} /> 
+                CSV EXPORT
+            </button>
+        </div>
       </header>
 
       {error && (
@@ -642,7 +651,18 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
       </div>
 
-      {/* LEADERBOARD LINK BAR (UPDATED: BIGGER TEXT, NO SHRINKING) */}
+      {/* NEW MAP CTA BANNER */}
+      <Link href="/map" className="block mb-4 group animate-in fade-in slide-in-from-top-2">
+        <div className="bg-blue-900/10 border border-blue-500/20 rounded-lg p-2.5 flex items-center justify-center gap-3 hover:bg-blue-500/10 transition cursor-pointer text-center">
+            <Globe size={16} className="text-blue-500" />
+            <span className="text-xs font-bold text-blue-300 group-hover:text-blue-200 uppercase tracking-wide">
+                View Global Node Distribution
+            </span>
+            <ChevronRight size={14} className="text-blue-500" />
+        </div>
+      </Link>
+
+      {/* LEADERBOARD LINK */}
       <Link href="/leaderboard" className="block mb-8 group">
         <div className="bg-zinc-900/50 border border-yellow-500/20 rounded-lg p-3 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-4 hover:bg-yellow-500/10 transition cursor-pointer text-center">
             <div className="flex items-center gap-2">
@@ -722,7 +742,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             </div>
         </div>
 
-        {/* SEARCH BAR WITH ROTATING TIP */}
+        {/* SEARCH BAR */}
         <div className="relative">
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
@@ -765,7 +785,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </>
       )}
 
-      {/* --- ULTIMATE MODAL (ZERO-SECOND CONTEXT) --- */}
+      {/* --- ULTIMATE MODAL (UPDATED WITH HYBRID BAR) --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => closeModal()}>
           <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/5 w-full max-w-lg lg:max-w-5xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => { e.stopPropagation(); handleGlobalClick(); }}>
@@ -792,12 +812,11 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             <div className="p-6 overflow-y-auto custom-scrollbar">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
-                {/* COLUMN 1: IDENTITY & STATUS (SANITIZED TERMINOLOGY) */}
+                {/* COLUMN 1: IDENTITY */}
                 <div>
                     <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'identity')}>
                         <h3 className="text-xs font-bold text-zinc-500 uppercase">Identity & Status</h3>
                         <HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" />
-                        {/* WATCHLIST TOGGLE IN HEADER */}
                         <div className="flex-grow flex justify-end">
                             <button 
                                 onClick={(e) => toggleFavorite(e, selectedNode.address)}
@@ -813,7 +832,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         </div>
                     )}
                     
-                    {/* Operator Details */}
                     <div className="bg-black/50 border border-white/5 rounded-xl p-4 space-y-3 mb-4 backdrop-blur-md">
                         <div>
                             <div className="text-[9px] text-zinc-500 uppercase mb-1">Public Key</div>
@@ -833,7 +851,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         </div>
                     </div>
 
-                    {/* Status Checks */}
                     <div className="bg-black/50 border border-white/5 rounded-xl p-4 backdrop-blur-md">
                         <div className="space-y-3 text-xs">
                            <div className="flex justify-between items-center">
@@ -863,7 +880,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     </div>
                 </div>
 
-                {/* COLUMN 2: STORAGE METRICS (UPDATED LAYOUT) */}
+                {/* COLUMN 2: STORAGE METRICS (UPDATED: HYBRID MARKER SYSTEM) */}
                 <div>
                     <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'infra')}>
                         <h3 className="text-xs font-bold text-zinc-500 uppercase">Storage Metrics</h3>
@@ -877,7 +894,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
 
                     <div className="bg-black/50 rounded-xl p-4 border border-white/5 space-y-4 backdrop-blur-md mb-4">
                         <div>
-                            {/* NEW GLASS CHIP FOR RAW BYTES */}
                             <div className="flex justify-between items-end mb-2">
                                 <div className="flex flex-col items-start">
                                     <span className="mb-1 inline-block bg-zinc-900 border border-zinc-800/50 rounded px-1.5 py-0.5 text-[9px] text-zinc-500 font-mono">
@@ -906,18 +922,53 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     </div>
 
                     <h4 className="text-[9px] text-zinc-500 uppercase mb-2 font-bold pl-1">VS Network Average</h4>
-                    <div className="bg-black/50 rounded-xl p-4 border border-white/5 backdrop-blur-md">
-                        <div className="mb-2">
-                            <div className="flex justify-between text-[10px] text-zinc-400 mb-1">
-                                <span>Storage Capacity</span>
-                                <span>{formatBytes(avgCommitted)} (Avg)</span>
+                    {/* CUSTOM HYBRID BAR COMPONENT LOGIC INLINE */}
+                    {(() => {
+                        const nodeCap = selectedNode.storage_committed || 0;
+                        const avg = avgCommitted || 1; 
+                        const diff = nodeCap - avg;
+                        const isPos = diff >= 0;
+                        const percentDiff = (Math.abs(diff) / avg) * 100;
+                        
+                        // Dynamic Scale Logic: Ensure both node bar and average line fit
+                        const maxScale = Math.max(nodeCap, avg) * 1.1; // 10% headroom
+                        const nodeWidth = (nodeCap / maxScale) * 100;
+                        const avgPos = (avg / maxScale) * 100;
+
+                        return (
+                            <div className="bg-black/50 rounded-xl p-4 border border-white/5 backdrop-blur-md">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-[10px] text-zinc-400">Storage Capacity</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                                        isPos 
+                                        ? 'bg-green-900/20 text-green-400 border-green-900/50' 
+                                        : 'bg-red-900/20 text-red-400 border-red-900/50'
+                                    }`}>
+                                        {isPos ? '▲' : '▼'} {percentDiff.toFixed(1)}% vs avg
+                                    </span>
+                                </div>
+                                
+                                <div className="relative h-3 bg-zinc-800 rounded-full overflow-hidden w-full">
+                                    {/* User Bar */}
+                                    <div 
+                                        className={`h-full transition-all duration-700 ${isPos ? 'bg-purple-500' : 'bg-orange-500'}`} 
+                                        style={{ width: `${nodeWidth}%` }}
+                                    ></div>
+                                    
+                                    {/* Average Needle */}
+                                    <div 
+                                        className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] z-10"
+                                        style={{ left: `${avgPos}%` }}
+                                        title={`Network Average: ${formatBytes(avg)}`}
+                                    ></div>
+                                </div>
+                                <div className="flex justify-between text-[9px] text-zinc-600 mt-1 font-mono">
+                                    <span>0 B</span>
+                                    <span className="text-zinc-400">Avg: {formatBytes(avg)}</span>
+                                </div>
                             </div>
-                            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden relative">
-                                <div className="h-full bg-purple-500" style={{ width: `${Math.min(((selectedNode.storage_committed || 0) / (avgCommitted || 1)) * 50, 100)}%` }}></div>
-                                <div className="w-0.5 h-full bg-white opacity-50 absolute left-1/2"></div>
-                            </div>
-                        </div>
-                    </div>
+                        );
+                    })()}
                 </div>
 
                 {/* COLUMN 3: PERFORMANCE */}
@@ -950,7 +1001,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         <div className="text-[9px] text-zinc-600">out of 100</div>
                     </div>
 
-                    {/* REPUTATION WITH EXPLICIT VIEW LINK */}
                     <div className="bg-black/50 border border-yellow-500/20 rounded-xl p-4 backdrop-blur-md relative">
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="text-[9px] text-zinc-500 uppercase font-bold">Reputation</h4>
@@ -992,7 +1042,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         </div>
                     </div>
                 </div>
-
               </div>
               
               {/* SHARE BUTTONS */}
@@ -1019,7 +1068,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                    {copiedField === 'json' ? 'COPIED' : 'DIAGNOSTIC DATA'}
                  </button>
               </div>
-              
             </div>
           </div>
         </div>
