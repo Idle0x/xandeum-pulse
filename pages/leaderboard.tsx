@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import axios from 'axios';
 import Link from 'next/link';
@@ -23,7 +23,6 @@ export default function Leaderboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch both endpoints to map PubKey -> Address (needed for favorites)
         const [creditsRes, statsRes] = await Promise.all([
           axios.get('/api/credits'),
           axios.get('/api/stats')
@@ -91,6 +90,14 @@ export default function Leaderboard() {
 
   const handleRowClick = (pubkey: string) => {
     router.push(`/?open=${pubkey}`);
+  };
+
+  const formatBytes = (bytes: number) => {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   return (
@@ -191,7 +198,6 @@ export default function Leaderboard() {
         ) : (
           <div className="divide-y divide-zinc-800/50">
             {filtered.slice(0, 100).map((node) => {
-              // Check if node is in favorites using the address we mapped
               const isMyNode = node.address && favorites.includes(node.address);
 
               return (
@@ -215,7 +221,14 @@ export default function Leaderboard() {
                   {/* PUBLIC KEY */}
                   <div className="col-span-7 md:col-span-8 font-mono text-sm text-zinc-300 truncate group-hover:text-white transition flex items-center justify-between">
                     {node.pubkey}
-                    <div className="opacity-0 group-hover:opacity-100 transition text-[10px] text-blue-400 font-bold flex items-center gap-1">
+                    
+                    {/* MOBILE CHEVRON (Always Visible) */}
+                    <div className="md:hidden text-zinc-600">
+                        <ChevronRight size={14} />
+                    </div>
+
+                    {/* DESKTOP HOVER VIEW */}
+                    <div className="hidden md:flex opacity-0 group-hover:opacity-100 transition text-[10px] text-blue-400 font-bold items-center gap-1">
                         VIEW <ChevronRight size={10} />
                     </div>
                   </div>
@@ -234,11 +247,13 @@ export default function Leaderboard() {
 
       {/* FOOTER NOTE - FIXED */}
       {!loading && (
-        <div className="max-w-5xl mx-auto mt-6 text-center text-xs text-zinc-600 flex items-center justify-center gap-2">
-          <HelpCircle size={12} />
-          <span>
-            Only nodes earning credits are displayed. <span className="text-zinc-400 font-bold">{ranking.length}</span> nodes displayed.
-          </span>
+        <div className="max-w-5xl mx-auto mt-6 text-center text-xs text-zinc-600 flex flex-col md:flex-row items-center justify-center gap-2">
+          <div className="flex items-center gap-2">
+            <HelpCircle size={12} />
+            <span>Tracking <span className="text-zinc-400 font-bold">{ranking.length}</span> earning nodes. Top 100 displayed.</span>
+          </div>
+          <span className="hidden md:inline text-zinc-700">•</span>
+          <span className="text-zinc-500">(Search to find others)</span>
         </div>
       )}
     </div>
