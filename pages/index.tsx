@@ -759,9 +759,12 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                            <div className="flex justify-between items-center">
                               <span className="text-zinc-400">Software Version</span>
                               <div className="flex items-center gap-1.5">
-                                <span className="text-zinc-300 bg-zinc-800 px-1.5 rounded">{selectedNode.version}</span>
+                                <span className={`${
+                                    selectedNode.version === mostCommonVersion ? 'text-zinc-300 bg-zinc-800' : 
+                                    compareVersions(selectedNode.version, mostCommonVersion) < 0 ? 'text-red-400 bg-zinc-800' : 
+                                    'text-white bg-zinc-800'
+                                } px-1.5 rounded transition-colors`}>{selectedNode.version}</span>
                                 {selectedNode.version === mostCommonVersion && <span className="text-[9px] text-green-500 bg-green-500/10 px-1 rounded uppercase font-bold">Majority</span>}
-                                {compareVersions(selectedNode.version, mostCommonVersion) < 0 && <span className="text-[9px] text-orange-500 bg-orange-500/10 px-1 rounded uppercase font-bold">Behind</span>}
                               </div>
                            </div>
                            <div className="flex justify-between items-center">
