@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
@@ -172,7 +172,7 @@ export default function Home() {
   const router = useRouter();
   const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [isFirstLoad, setIsFirstLoad] = useState(true); // NEW: Prevents white screen flash
   const [error, setError] = useState('');
   const [lastUpdated, setLastUpdated] = useState('');
   
@@ -200,6 +200,7 @@ export default function Home() {
 
   const [networkHealth, setNetworkHealth] = useState('0.00');
   const [mostCommonVersion, setMostCommonVersion] = useState('N/A');
+  const [latestVersion, setLatestVersion] = useState('N/A');
   const [totalStorageUsed, setTotalStorageUsed] = useState(0);
   const [totalStorageCommitted, setTotalStorageCommitted] = useState(0);
   const [totalNetworkCredits, setTotalNetworkCredits] = useState(0);
@@ -642,16 +643,18 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
       </div>
 
-      {/* LEADERBOARD LINK BAR */}
+      {/* LEADERBOARD LINK BAR (UPDATED: BIGGER TEXT, NO SHRINKING) */}
       <Link href="/leaderboard" className="block mb-8 group">
-        <div className="bg-zinc-900/50 border border-yellow-500/20 rounded-lg p-2.5 flex items-center justify-center gap-3 hover:bg-yellow-500/10 transition cursor-pointer">
-            <Trophy size={14} className="text-yellow-500" />
-            <span className="text-xs font-mono text-zinc-400">
-                Total Network Credits Issued: <span className="text-yellow-400 font-bold ml-1">{(totalNetworkCredits / 1000000).toFixed(2)}M</span>
-            </span>
-            <span className="text-zinc-600">|</span>
-            <span className="text-xs font-bold text-zinc-300 group-hover:text-white flex items-center gap-1">
-                View Reputation Leaderboard <ChevronRight size={12} />
+        <div className="bg-zinc-900/50 border border-yellow-500/20 rounded-lg p-3 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-4 hover:bg-yellow-500/10 transition cursor-pointer text-center">
+            <div className="flex items-center gap-2">
+                <Trophy size={16} className="text-yellow-500 shrink-0" />
+                <span className="text-sm font-mono text-zinc-400 whitespace-nowrap">
+                    Total Network Credits: <span className="text-yellow-400 font-bold ml-1">{(totalNetworkCredits / 1000000).toFixed(2)}M</span>
+                </span>
+            </div>
+            <span className="hidden md:inline text-zinc-600">|</span>
+            <span className="text-sm font-bold text-zinc-300 group-hover:text-white flex items-center gap-1 whitespace-nowrap">
+                View Reputation Leaderboard <ChevronRight size={14} />
             </span>
         </div>
       </Link>
@@ -963,6 +966,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="text-lg font-bold text-white">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</span>
+                                    {/* PERMANENT VIEW ICON */}
                                     <ExternalLink size={12} className="text-zinc-500 group-hover:text-white transition" />
                                 </div>
                             </div>
