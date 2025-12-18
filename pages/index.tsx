@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink, BarChart3, HelpCircle } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink, BarChart3, HelpCircle, ChevronRight, Maximize2 } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -27,6 +27,10 @@ const formatBytes = (bytes: number) => {
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+const formatRawBytes = (bytes: number) => {
+  return bytes ? bytes.toLocaleString() + ' B' : '0 B';
 };
 
 const formatUptime = (seconds: number) => {
@@ -175,9 +179,18 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   
-  // Tooltip States
+  // Tooltip & UX States
   const [showHealthInfo, setShowHealthInfo] = useState(false);
   const [showReputationInfo, setShowReputationInfo] = useState(false); 
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+  
+  // Rotating Search Tip State
+  const [searchTipIndex, setSearchTipIndex] = useState(0);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchTips = [
+    "Search by IP, Public Key, or Version",
+    "Tip: Click any node card for deep inspection"
+  ];
 
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
@@ -206,9 +219,17 @@ export default function Home() {
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
-    const interval = setInterval(() => {
+    // Metrics Cycle Interval
+    const cycleInterval = setInterval(() => {
       setCycleStep(prev => prev + 1); 
     }, 4000);
+
+    // Search Tip Rotation Interval
+    const tipInterval = setInterval(() => {
+        if (!isSearchFocused) {
+            setSearchTipIndex(prev => (prev + 1) % searchTips.length);
+        }
+    }, 5000);
     
     // ESC to close modal
     const handleEscape = (e: KeyboardEvent) => {
@@ -217,16 +238,23 @@ export default function Home() {
     document.addEventListener('keydown', handleEscape);
 
     return () => {
-        clearInterval(interval);
+        clearInterval(cycleInterval);
+        clearInterval(tipInterval);
         document.removeEventListener('visibilitychange', handleVisibility);
         document.removeEventListener('keydown', handleEscape);
     };
-  }, []);
+  }, [isSearchFocused]);
 
-  // Close tooltips when clicking anywhere in the modal overlay
-  const handleModalClick = () => {
+  // Global click handler to close tooltips
+  const handleGlobalClick = () => {
+    if (activeTooltip) setActiveTooltip(null);
     if (showHealthInfo) setShowHealthInfo(false);
     if (showReputationInfo) setShowReputationInfo(false);
+  };
+
+  const toggleTooltip = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setActiveTooltip(activeTooltip === id ? null : id);
   };
 
   const toggleFavorite = (e: React.MouseEvent, address: string) => {
@@ -451,12 +479,16 @@ Monitor at: https://xandeum-pulse.vercel.app`;
       <div 
         key={node.address} 
         onClick={() => setSelectedNode(node)}
-        className={`group relative border rounded-xl p-5 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${
+        className={`group relative border rounded-xl p-5 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:border-blue-500/50 ${
             isFav 
             ? 'bg-gradient-to-b from-zinc-900 to-black border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.1)]' 
-            : 'bg-gradient-to-b from-zinc-900 to-black border-zinc-800 hover:border-blue-500/50'
+            : 'bg-gradient-to-b from-zinc-900 to-black border-zinc-800'
         }`}
       >
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition duration-300 text-[9px] text-blue-400 font-bold uppercase tracking-widest flex items-center gap-1 bg-black/50 px-2 py-1 rounded-full border border-blue-500/20">
+            View Details <Maximize2 size={8} />
+        </div>
+
         <div className="mb-4 flex justify-between items-start">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -515,7 +547,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
   };
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans relative selection:bg-blue-500/30 selection:text-blue-200 flex flex-col">
+    <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans relative selection:bg-blue-500/30 selection:text-blue-200 flex flex-col" onClick={handleGlobalClick}>
       {/* GLOBAL HEAD */}
       <Head>
         <title>Xandeum Pulse - Live Network Monitor</title>
@@ -656,7 +688,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             </div>
         </div>
 
-        {/* SEARCH BAR WITH TIP AND CLEAR */}
+        {/* SEARCH BAR WITH ROTATING TIP */}
         <div className="relative">
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
@@ -665,6 +697,8 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 pl-10 pr-10 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition placeholder-zinc-600"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => setIsSearchFocused(false)}
           />
           {searchQuery && (
             <button 
@@ -675,8 +709,8 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             </button>
           )}
         </div>
-        <p className="text-[10px] text-zinc-600 text-center font-mono tracking-wide uppercase mt-2">
-            Filter by IP, Public Key, or Version
+        <p className="text-[10px] text-zinc-600 text-center font-mono tracking-wide uppercase mt-2 h-4 transition-all duration-500">
+            {isSearchFocused ? "Search by IP, Public Key, or Version" : searchTips[searchTipIndex]}
         </p>
       </div>
 
@@ -697,7 +731,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </>
       )}
 
-      {/* --- ULTIMATE MODAL (HUMAN-FIRST LAYOUT) --- */}
+      {/* --- ULTIMATE MODAL (ZERO-SECOND CONTEXT) --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
           <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/5 w-full max-w-lg lg:max-w-5xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => { e.stopPropagation(); handleModalClick(); }}>
@@ -708,7 +742,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
                         <Server size={20} className="text-blue-500" /> Node Inspector
                     </h2>
-                    {/* VERSION PILL REMOVED FROM HERE */}
                  </div>
                 <div className="flex items-center gap-2 mt-1">
                     <p className="text-zinc-500 font-mono text-xs truncate">{selectedNode.address}</p>
@@ -727,7 +760,15 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                 
                 {/* COLUMN 1: IDENTITY & STATUS (SANITIZED TERMINOLOGY) */}
                 <div>
-                    <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3">Identity & Status</h3>
+                    <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'identity')}>
+                        <h3 className="text-xs font-bold text-zinc-500 uppercase">Identity & Status</h3>
+                        <HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" />
+                    </div>
+                    {activeTooltip === 'identity' && (
+                        <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400">
+                            Core identifiers and current network synchronization status.
+                        </div>
+                    )}
                     
                     {/* Operator Details */}
                     <div className="bg-black/50 border border-white/5 rounded-xl p-4 space-y-3 mb-4 backdrop-blur-md">
@@ -779,33 +820,45 @@ Monitor at: https://xandeum-pulse.vercel.app`;
 
                 {/* COLUMN 2: INFRASTRUCTURE (STORAGE) */}
                 <div>
-                    <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3">Infrastructure</h3>
+                    <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'infra')}>
+                        <h3 className="text-xs font-bold text-zinc-500 uppercase">Infrastructure</h3>
+                        <HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" />
+                    </div>
+                    {activeTooltip === 'infra' && (
+                        <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400">
+                            Real-time storage capacity and utilization compared to network averages.
+                        </div>
+                    )}
+
                     <div className="bg-black/50 rounded-xl p-4 border border-white/5 space-y-4 backdrop-blur-md mb-4">
                         <div>
-                            <div className="flex justify-between items-center mb-1">
-                                <span className="text-zinc-400 text-xs">Capacity</span>
-                                <span className="text-purple-400 font-mono font-bold text-sm">{formatBytes(selectedNode.storage_committed || 0)}</span>
+                            {/* HYBRID LAYOUT: RATIO + RAW BYTES */}
+                            <div className="flex justify-between items-end mb-1">
+                                <span className="text-zinc-400 text-xs mb-0.5">Used / Capacity</span>
+                                <div className="text-right">
+                                    <span className="text-blue-400 font-mono font-bold text-sm">{formatBytes(selectedNode.storage_used)}</span>
+                                    <span className="text-zinc-500 text-xs mx-1">/</span>
+                                    <span className="text-purple-400 font-mono font-bold text-sm">{formatBytes(selectedNode.storage_committed || 0)}</span>
+                                </div>
                             </div>
-                            {/* CAPACITY BAR REMOVED */}
-                        </div>
-                        <div>
-                            <div className="flex justify-between items-center mb-1">
-                                <span className="text-zinc-400 text-xs">Used</span>
-                                <span className="text-blue-400 font-mono font-bold text-sm">{formatBytes(selectedNode.storage_used)}</span>
-                            </div>
-                            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden w-full">
+                            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden w-full mb-1">
                                 {/* RAW PERCENTAGE USED FOR BAR WIDTH */}
                                 <div className="h-full bg-blue-500" style={{ width: `${Math.min(selectedNode.storage_usage_raw || 0, 100)}%` }}></div>
                             </div>
-                            <div className="text-right text-[9px] text-zinc-600 mt-1 font-mono">
-                                {selectedNode.storage_usage_percentage}
+                            <div className="flex justify-between items-center mt-2">
+                                <span className="text-[10px] text-zinc-500 font-mono">
+                                    {selectedNode.storage_usage_percentage} Utilization
+                                </span>
+                                <span className="text-[9px] text-zinc-600 font-mono bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-800">
+                                    {selectedNode.storage_used?.toLocaleString()} raw bytes
+                                </span>
                             </div>
                         </div>
                     </div>
 
                     {/* Network Comparison (Storage) */}
+                    <h4 className="text-[9px] text-zinc-500 uppercase mb-2 font-bold pl-1">VS Network Average</h4>
                     <div className="bg-black/50 rounded-xl p-4 border border-white/5 backdrop-blur-md">
-                        <h4 className="text-[9px] text-zinc-500 uppercase mb-3 font-bold">VS Network Average</h4>
                         <div className="mb-2">
                             <div className="flex justify-between text-[10px] text-zinc-400 mb-1">
                                 <span>Storage Capacity</span>
@@ -821,7 +874,15 @@ Monitor at: https://xandeum-pulse.vercel.app`;
 
                 {/* COLUMN 3: PERFORMANCE & SOCIAL */}
                 <div>
-                    <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3">Performance</h3>
+                    <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'perf')}>
+                        <h3 className="text-xs font-bold text-zinc-500 uppercase">Performance</h3>
+                        <HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" />
+                    </div>
+                    {activeTooltip === 'perf' && (
+                        <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400">
+                            Health score and reputation credits earned from network participation.
+                        </div>
+                    )}
                     
                     {/* Health Score */}
                     <div className="bg-black/50 border border-white/5 rounded-xl p-4 text-center mb-4 backdrop-blur-md relative group">
