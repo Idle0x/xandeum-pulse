@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router'; // NEW IMPORT
 import axios from 'axios';
 import Link from 'next/link';
 import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink, BarChart3, HelpCircle, ChevronRight, Maximize2 } from 'lucide-react';
@@ -169,6 +170,7 @@ const PulseGraphLoader = () => {
 };
 
 export default function Home() {
+  const router = useRouter(); // NEW
   const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -179,12 +181,10 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   
-  // Tooltip & UX States
   const [showHealthInfo, setShowHealthInfo] = useState(false);
   const [showReputationInfo, setShowReputationInfo] = useState(false); 
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   
-  // Rotating Search Tip State
   const [searchTipIndex, setSearchTipIndex] = useState(0);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchTips = [
@@ -229,9 +229,14 @@ export default function Home() {
         }
     }, 5000);
     
-    // ESC to close modal
     const handleEscape = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') setSelectedNode(null);
+        if (e.key === 'Escape') {
+            setSelectedNode(null);
+            // Clear URL param on close to clean up
+            if (router.query.open) {
+                router.replace('/', undefined, { shallow: true });
+            }
+        }
     };
     document.addEventListener('keydown', handleEscape);
 
@@ -243,7 +248,17 @@ export default function Home() {
     };
   }, [isSearchFocused]);
 
-  // Global click handler to close tooltips
+  // DEEP LINKING LOGIC: Check URL for ?open=PUBKEY
+  useEffect(() => {
+    if (!loading && nodes.length > 0 && router.query.open) {
+        const pubkeyToOpen = router.query.open as string;
+        const targetNode = nodes.find(n => n.pubkey === pubkeyToOpen);
+        if (targetNode) {
+            setSelectedNode(targetNode);
+        }
+    }
+  }, [loading, nodes, router.query.open]);
+
   const handleGlobalClick = () => {
     if (activeTooltip) setActiveTooltip(null);
     if (showHealthInfo) setShowHealthInfo(false);
@@ -265,6 +280,14 @@ export default function Home() {
     }
     setFavorites(newFavs);
     localStorage.setItem('xandeum_favorites', JSON.stringify(newFavs));
+  };
+
+  const closeModal = () => {
+      setSelectedNode(null);
+      // Clean URL if it has params
+      if (router.query.open) {
+          router.replace('/', undefined, { shallow: true });
+      }
   };
 
   const copyToClipboard = (text: string) => {
@@ -732,7 +755,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
 
       {/* --- ULTIMATE MODAL (ZERO-SECOND CONTEXT) --- */}
       {selectedNode && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => closeModal()}>
           <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/5 w-full max-w-lg lg:max-w-5xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => { e.stopPropagation(); handleGlobalClick(); }}>
             
             <div className="bg-white/5 p-6 border-b border-white/5 flex justify-between items-start shrink-0">
@@ -749,7 +772,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     </button>
                 </div>
               </div>
-              <button onClick={() => setSelectedNode(null)} className="text-zinc-500 hover:text-white transition">
+              <button onClick={() => closeModal()} className="text-zinc-500 hover:text-white transition">
                 <X size={24} />
               </button>
             </div>
