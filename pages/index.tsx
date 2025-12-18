@@ -46,7 +46,7 @@ const formatLastSeen = (timestamp: number) => {
   const diff = now - time;
   
   if (diff < 1000) return 'Just now';
-  if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`; // Precise seconds
+  if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`; 
   
   const mins = Math.floor(diff / 60000);
   if (mins < 60) return `${mins}m ago`;
@@ -174,10 +174,11 @@ export default function Home() {
   const [lastUpdated, setLastUpdated] = useState('');
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'rank' | 'latency'>('uptime');
+  // REMOVED 'latency' from sort types to fix build error
+  const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'rank'>('uptime');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  const [showHealthInfo, setShowHealthInfo] = useState(false); // Mobile Tooltip Toggle
+  const [showHealthInfo, setShowHealthInfo] = useState(false); 
 
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
@@ -191,7 +192,6 @@ export default function Home() {
   const [totalStorageUsed, setTotalStorageUsed] = useState(0);
   const [totalStorageCommitted, setTotalStorageCommitted] = useState(0);
   
-  // Benchmarking Averages
   const [avgCommitted, setAvgCommitted] = useState(0);
   const [avgCredits, setAvgCredits] = useState(0);
 
@@ -211,7 +211,6 @@ export default function Home() {
       setCycleStep(prev => prev + 1); 
     }, 4000);
     
-    // ESC to close modal
     const handleEscape = (e: KeyboardEvent) => {
         if (e.key === 'Escape') setSelectedNode(null);
     };
@@ -305,7 +304,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             credits: creditMap.get(node.pubkey) || 0
         }));
 
-        // --- OLYMPIC RANKING ---
         mergedList.sort((a, b) => (b.credits || 0) - (a.credits || 0));
         let currentRank = 1;
         for (let i = 0; i < mergedList.length; i++) {
@@ -315,7 +313,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             mergedList[i].rank = currentRank;
         }
 
-        // --- PRECISE STORAGE MATH ---
         mergedList = mergedList.map(node => {
             const used = node.storage_used || 0;
             const cap = node.storage_committed || 0;
@@ -350,7 +347,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             const sortedVersions = allVersions.sort((a, b) => compareVersions(b, a));
             setLatestVersion(sortedVersions[0] || 'N/A');
             
-            // --- NEW: Calculate Averages for Benchmarks ---
             const totalComm = mergedList.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
             const totalCred = mergedList.reduce((sum, n) => sum + (n.credits || 0), 0);
             setAvgCommitted(totalComm / mergedList.length);
@@ -374,7 +370,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
   const filteredNodes = nodes
     .filter(node => {
       const q = searchQuery.toLowerCase();
-      // Safe navigation to prevent crashes on null values
       return (
         (node.address || '').toLowerCase().includes(q) ||
         (node.pubkey || '').toLowerCase().includes(q) ||
@@ -398,7 +393,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
   const watchListNodes = nodes.filter(node => favorites.includes(node.address));
 
   const exportCSV = () => {
-    // NEW: Human-readable headers and ALL data columns
     const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Utilization_Percent,Health_Score,Network_Mode,Last_Seen_ISO,RPC_URL,Is_Favorite\n';
     
     const rows = filteredNodes.map(n => {
