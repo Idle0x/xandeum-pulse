@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Eye, CheckCircle, Zap, Trophy, HardDrive, Star, Copy, Check, Globe, AlertTriangle, ArrowUpDown, Wallet, Medal, Share2, Twitter, Code, Info, ExternalLink, BarChart3 } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -21,7 +21,7 @@ interface Node {
 
 // --- HELPER FUNCTIONS ---
 const formatBytes = (bytes: number) => {
-  if (!bytes || bytes === 0) return '0.00 B';
+  if (!bytes || bytes === 0 || isNaN(bytes)) return '0.00 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -192,6 +192,10 @@ export default function Home() {
   const [latestVersion, setLatestVersion] = useState('N/A');
   const [totalStorageUsed, setTotalStorageUsed] = useState(0);
   const [totalStorageCommitted, setTotalStorageCommitted] = useState(0);
+  
+  // NEW: Averages for benchmarking
+  const [avgCommitted, setAvgCommitted] = useState(0);
+  const [avgCredits, setAvgCredits] = useState(0);
 
   useEffect(() => {
     fetchData();
@@ -340,6 +344,12 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             const allVersions = mergedList.map(n => n.version);
             const sortedVersions = allVersions.sort((a, b) => compareVersions(b, a));
             setLatestVersion(sortedVersions[0] || 'N/A');
+            
+            // --- NEW: Calculate Averages for Benchmarks ---
+            const totalComm = mergedList.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
+            const totalCred = mergedList.reduce((sum, n) => sum + (n.credits || 0), 0);
+            setAvgCommitted(totalComm / mergedList.length);
+            setAvgCredits(totalCred / mergedList.length);
         }
 
         const totalBytesUsed = mergedList.reduce((sum, n) => sum + (n.storage_used || 0), 0);
@@ -363,6 +373,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
       return (
         (node.address || '').toLowerCase().includes(q) ||
         (node.pubkey || '').toLowerCase().includes(q) ||
+        (node.version || '').toLowerCase().includes(q) || // SEARCH BY VERSION ADDED
         (node.rank && node.rank.toString() === q)
       );
     })
@@ -630,7 +641,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
           <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
           <input 
             type="text" 
-            placeholder="Search Node IP..." 
+            placeholder="Search by IP, Public Key, or Version..." 
             className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl p-3 pl-10 pr-10 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition placeholder-zinc-600"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -666,10 +677,10 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </>
       )}
 
-      {/* --- ULTIMATE MODAL (OLED CALIBRATED) --- */}
+      {/* --- ULTIMATE MODAL (RESPONSIVE & TITANIUM & BENCHMARKS) --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedNode(null)}>
-          <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/5 w-full max-w-lg md:max-w-4xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+          <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/5 w-full max-w-lg md:max-w-4xl 2xl:max-w-6xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
             
             <div className="bg-white/5 p-6 border-b border-white/5 flex justify-between items-start shrink-0">
               <div className="flex-1 overflow-hidden mr-4">
@@ -704,9 +715,9 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                 {favorites.includes(selectedNode.address) ? 'REMOVE FROM WATCHLIST' : 'ADD TO WATCHLIST'}
               </button>
 
-              <div className="md:grid md:grid-cols-2 md:gap-6">
+              <div className="md:grid md:grid-cols-2 2xl:grid-cols-3 md:gap-6">
                 
-                {/* LEFT COLUMN */}
+                {/* COLUMN 1: HEALTH & SYSTEM ANALYSIS */}
                 <div>
                     <div className="grid grid-cols-2 gap-4 mb-4">
                         <div className="bg-black/50 border border-white/5 p-4 rounded-xl text-center group relative backdrop-blur-md">
@@ -726,50 +737,42 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         </div>
                     </div>
 
-                    {/* NETWORK REWARDS SECTION - LINKED */}
-                    <Link href="/leaderboard">
-                        <div className="mb-6 cursor-pointer hover:opacity-90 transition">
-                            <div className="flex items-center gap-2 mb-3 group relative w-fit">
-                                <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2 cursor-help">
-                                    <Trophy size={12} /> Network Rewards <Info size={10} /> <ExternalLink size={10} className="ml-1 text-blue-500"/>
-                                </h3>
-                                <div className="hidden group-hover:block absolute bottom-full left-0 mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl">
-                                    Accumulated reputation credits and current network rank. Click to view full Leaderboard.
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-black/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3 hover:border-yellow-500/40 transition backdrop-blur-md">
-                                    <Trophy size={20} className="text-yellow-500" />
-                                    <div>
-                                        <div className="text-[10px] text-zinc-500 font-bold uppercase">Global Rank</div>
-                                        <div className="text-xl font-bold text-white">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</div>
-                                    </div>
-                                </div>
-                                <div className="bg-black/50 border border-yellow-500/20 p-3 rounded-xl flex items-center gap-3 hover:border-yellow-500/40 transition backdrop-blur-md">
-                                    <Wallet size={20} className="text-yellow-500" />
-                                    <div>
-                                        <div className="text-[10px] text-zinc-500 font-bold uppercase">Credits</div>
-                                        <div className="text-xl font-bold text-white">{selectedNode.credits?.toLocaleString() || 0}</div>
-                                    </div>
-                                </div>
-                            </div>
+                    <div className="bg-black/30 border border-white/5 rounded-xl p-4 mb-6 backdrop-blur-md">
+                        <h3 className="text-[10px] text-zinc-500 font-bold uppercase mb-3 tracking-widest">System Analysis</h3>
+                        <div className="space-y-2 text-xs">
+                           <div className="flex justify-between items-center">
+                              <span className="text-zinc-400">Uptime Stability</span>
+                              <span className={selectedNode.uptime > 86400 ? "text-green-500" : "text-yellow-500"}>
+                                {selectedNode.uptime > 86400 ? "EXCELLENT" : "BOOTING"}
+                              </span>
+                           </div>
+                           <div className="flex justify-between items-center">
+                              <span className="text-zinc-400">Consensus Match</span>
+                              <span className={selectedNode.version === mostCommonVersion ? "text-green-500" : "text-blue-500"}>
+                                {selectedNode.version === mostCommonVersion ? "SYNCED" : "DIVERGED"}
+                              </span>
+                           </div>
+                           <div className="flex justify-between items-center">
+                              <span className="text-zinc-400">Gossip Connectivity</span>
+                              <span className={selectedNode.is_public ? "text-green-500" : "text-orange-500"}>
+                                {selectedNode.is_public ? "STABLE" : "RESTRICTED"}
+                              </span>
+                           </div>
                         </div>
-                    </Link>
+                    </div>
                 </div>
 
-                {/* RIGHT COLUMN */}
+                {/* COLUMN 2: STORAGE METRICS */}
                 <div>
-                    {/* STORAGE SECTION */}
                     <div className="mb-6">
-                        <div className="flex items-center gap-2 mb-3 group relative w-fit">
-                            <h3 className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2 cursor-help">
-                            <Database size={12} /> Storage Metrics <Info size={10} />
-                            </h3>
-                            <div className="hidden group-hover:block absolute bottom-full left-0 mb-2 w-48 p-2 bg-black border border-zinc-700 rounded-lg text-[10px] text-zinc-300 z-10 shadow-xl">
-                                Real-time storage allocation and commitment.
-                            </div>
-                        </div>
+                        <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">
+                        <Database size={12} /> Storage Metrics
+                        </h3>
                         <div className="bg-black/50 rounded-xl p-4 border border-white/5 space-y-3 backdrop-blur-md">
+                        <div className="flex justify-between items-center">
+                            <span className="text-zinc-400 text-sm">Committed</span>
+                            <span className="text-purple-400 font-mono font-bold">{formatBytes(selectedNode.storage_committed || 0)}</span>
+                        </div>
                         <div className="flex justify-between items-center">
                             <span className="text-zinc-400 text-sm">Used</span>
                             <div className="flex flex-col items-end">
@@ -781,10 +784,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                                     </span>
                                 </div>
                             </div>
-                        </div>
-                        <div className="flex justify-between items-center">
-                            <span className="text-zinc-400 text-sm">Committed</span>
-                            <span className="text-purple-400 font-mono font-bold">{formatBytes(selectedNode.storage_committed || 0)}</span>
                         </div>
                         <div className="flex justify-between items-center group relative cursor-help">
                             <span className="text-zinc-400 text-sm flex items-center gap-1">Utilization <Info size={10}/></span>
@@ -800,8 +799,51 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                     </div>
                 </div>
 
+                {/* COLUMN 3: NETWORK BENCHMARKS (Full width on Laptop, 1/3 on Wide) */}
+                <div className="md:col-span-2 2xl:col-span-1">
+                    <h3 className="text-xs font-bold text-zinc-500 uppercase mb-3 flex items-center gap-2">
+                        <BarChart3 size={12} /> Network Benchmarks
+                    </h3>
+                    <div className="bg-black/50 rounded-xl p-4 border border-white/5 space-y-4 backdrop-blur-md">
+                        {/* Comparison 1: Committed Storage */}
+                        <div>
+                            <div className="flex justify-between text-[10px] text-zinc-400 mb-1">
+                                <span>Storage Capacity</span>
+                                <span>vs Network Avg ({formatBytes(avgCommitted)})</span>
+                            </div>
+                            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden flex">
+                                <div className="h-full bg-purple-500" style={{ width: `${Math.min(((selectedNode.storage_committed || 0) / (avgCommitted || 1)) * 50, 100)}%` }}></div>
+                                <div className="w-0.5 h-full bg-white opacity-50"></div>
+                            </div>
+                        </div>
+
+                        {/* Comparison 2: Reputation */}
+                        <div>
+                            <div className="flex justify-between text-[10px] text-zinc-400 mb-1">
+                                <span>Reputation Credits</span>
+                                <span>vs Network Avg ({avgCredits.toFixed(0)})</span>
+                            </div>
+                            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden flex">
+                                <div className="h-full bg-yellow-500" style={{ width: `${Math.min(((selectedNode.credits || 0) / (avgCredits || 1)) * 50, 100)}%` }}></div>
+                                <div className="w-0.5 h-full bg-white opacity-50"></div>
+                            </div>
+                        </div>
+
+                        {/* Comparison 3: Rank */}
+                        <Link href="/leaderboard">
+                            <div className="bg-zinc-900/50 border border-yellow-500/20 p-2 rounded-lg flex items-center justify-between cursor-pointer hover:border-yellow-500/40 transition mt-2">
+                                <div className="flex items-center gap-2">
+                                    <Trophy size={14} className="text-yellow-500" />
+                                    <span className="text-xs font-bold text-zinc-400">Global Rank</span>
+                                </div>
+                                <span className="text-lg font-bold text-white">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</span>
+                            </div>
+                        </Link>
+                    </div>
+                </div>
+
                 {/* BOTTOM FULL WIDTH - TECHNICAL DETAILS */}
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 2xl:col-span-3">
                     <div className="space-y-3 text-sm border-t border-white/5 pt-4">
                         <div className="flex justify-between py-1">
                         <span className="text-zinc-500">Last Seen</span>
