@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
@@ -172,7 +172,7 @@ export default function Home() {
   const router = useRouter();
   const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isFirstLoad, setIsFirstLoad] = useState(true); // NEW: Prevents white screen flash
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [error, setError] = useState('');
   const [lastUpdated, setLastUpdated] = useState('');
   
@@ -322,7 +322,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
   };
 
   const fetchData = async () => {
-    // Only show loading spinner on the very first load
     if (isFirstLoad) setLoading(true);
     
     try {
@@ -428,6 +427,11 @@ Monitor at: https://xandeum-pulse.vercel.app`;
     }
   };
 
+  // Helper Function for isLatest (Moved outside renderNodeCard but inside Component)
+  const isLatest = (nodeVersion: string) => {
+      return mostCommonVersion !== 'N/A' && compareVersions(nodeVersion, mostCommonVersion) >= 0;
+  };
+
   const filteredNodes = nodes
     .filter(node => {
       const q = searchQuery.toLowerCase();
@@ -495,6 +499,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
   const renderNodeCard = (node: Node, i: number) => {
     const cycleData = getCycleContent(node, i);
     const isFav = favorites.includes(node.address);
+    const latest = isLatest(node.version); // FIX: Call function here
     
     return (
       <div 
@@ -534,7 +539,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
             <span className="text-zinc-500">Version</span>
             <div className="flex items-center gap-2">
                <span className="text-zinc-300 bg-zinc-800 px-2 py-0.5 rounded">{node.version}</span>
-               {isLatest && <CheckCircle size={12} className="text-green-500" />}
+               {latest && <CheckCircle size={12} className="text-green-500" />}
             </div>
           </div>
 
@@ -565,11 +570,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         </div>
       </div>
     );
-  };
-
-  const isLatest = (nodeVersion: string) => {
-      // Just a helper for the card
-      return mostCommonVersion !== 'N/A' && compareVersions(nodeVersion, mostCommonVersion) >= 0;
   };
 
   return (
@@ -963,7 +963,6 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="text-lg font-bold text-white">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</span>
-                                    {/* PERMANENT VIEW ICON */}
                                     <ExternalLink size={12} className="text-zinc-500 group-hover:text-white transition" />
                                 </div>
                             </div>
