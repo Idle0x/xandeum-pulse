@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import axios from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Trophy, Medal, ArrowLeft, Search, Wallet, X, Users, Activity, BarChart3, HelpCircle, ChevronRight, Star } from 'lucide-react';
+import { Trophy, Medal, ArrowLeft, Search, Wallet, X, ChevronRight, Activity, Users, BarChart3, HelpCircle, Star } from 'lucide-react';
 
 // --- TYPES ---
 interface RankedNode {
   rank: number;
   pubkey: string;
   credits: number;
+  address?: string; // Added for favorite matching
 }
 
 export default function Leaderboard() {
@@ -19,12 +20,23 @@ export default function Leaderboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState<string[]>([]);
   
-  // No nodeMap needed anymore - we rely on the main dashboard for details
-
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const creditsRes = await axios.get('/api/credits');
+        // Fetch both endpoints to map PubKey -> Address (needed for favorites)
+        const [creditsRes, statsRes] = await Promise.all([
+          axios.get('/api/credits'),
+          axios.get('/api/stats')
+        ]);
+
+        // Build Map: PubKey -> Address
+        const addressMap = new Map<string, string>();
+        if (statsRes.data.result?.pods) {
+            statsRes.data.result.pods.forEach((node: any) => {
+                addressMap.set(node.pubkey, node.address);
+            });
+        }
+
         const rawData = creditsRes.data.pods_credits || creditsRes.data;
         let parsedList: RankedNode[] = [];
 
@@ -32,15 +44,18 @@ export default function Leaderboard() {
           parsedList = rawData.map((item: any) => ({
             pubkey: item.pod_id || item.pubkey || 'Unknown',
             credits: Number(item.credits || 0),
-            rank: 0
+            rank: 0,
+            address: addressMap.get(item.pod_id || item.pubkey)
           }));
         } else if (typeof rawData === 'object') {
           parsedList = Object.entries(rawData).map(([key, val]: [string, any]) => {
             if (key === 'status' || key === 'success') return null;
+            const pKey = val?.pod_id || val?.pubkey || key;
             return {
-              pubkey: val?.pod_id || val?.pubkey || key,
+              pubkey: pKey,
               credits: typeof val === 'number' ? val : Number(val?.credits || 0),
-              rank: 0
+              rank: 0,
+              address: addressMap.get(pKey)
             };
           }).filter(Boolean) as RankedNode[];
         }
@@ -74,7 +89,6 @@ export default function Leaderboard() {
     n.pubkey.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Simple Click Handler -> Go to Home and Open Modal
   const handleRowClick = (pubkey: string) => {
     router.push(`/?open=${pubkey}`);
   };
@@ -177,20 +191,21 @@ export default function Leaderboard() {
         ) : (
           <div className="divide-y divide-zinc-800/50">
             {filtered.slice(0, 100).map((node) => {
-              // Check if node is in favorites (using only pubkey since we don't have address here easily without map)
-              // Note: Favorites stores Addresses, but we only have Pubkey here. 
-              // Without the nodeMap, highlighting favorites is harder. 
-              // We'll skip highlighting here for simplicity/performance unless you really want it back.
-              
+              // Check if node is in favorites using the address we mapped
+              const isMyNode = node.address && favorites.includes(node.address);
+
               return (
                 <div 
                   key={node.pubkey} 
-                  className="grid grid-cols-12 gap-4 p-4 hover:bg-white/5 transition items-center group relative cursor-pointer"
+                  className={`grid grid-cols-12 gap-4 p-4 hover:bg-white/5 transition items-center group relative cursor-pointer ${
+                    isMyNode ? 'bg-yellow-500/5 border-l-4 border-yellow-500' : 'border-l-4 border-transparent'
+                  }`}
                   onClick={() => handleRowClick(node.pubkey)}
                 >
                   
                   {/* RANK BADGE */}
-                  <div className="col-span-2 md:col-span-1 flex justify-center items-center gap-1">
+                  <div className="col-span-2 md:col-span-1 flex justify-center items-center gap-1 relative">
+                    {isMyNode && <Star size={12} className="text-yellow-500 absolute left-0 md:left-4" fill="currentColor" />}
                     {node.rank === 1 && <Trophy size={20} className="text-yellow-400" />}
                     {node.rank === 2 && <Medal size={20} className="text-zinc-300" />}
                     {node.rank === 3 && <Medal size={20} className="text-amber-600" />}
