@@ -537,11 +537,15 @@ Monitor at: https://xandeum-pulse.vercel.app`;
               </div>
               
               <div className="relative h-6 w-56">
+                  {/* Default State: PubKey (Safeguarded) */}
                   <div className="absolute inset-0 font-mono text-sm text-zinc-300 truncate transition-opacity duration-300 group-hover:opacity-0">
-                    {node.pubkey.slice(0, 12)}...{node.pubkey.slice(-4)}
+                    {(node.pubkey || '').length > 12 
+                        ? `${(node.pubkey || '').slice(0, 12)}...${(node.pubkey || '').slice(-4)}`
+                        : (node.pubkey || 'Unknown Identity')}
                   </div>
+                  {/* Hover State: IP Address (Safeguarded) */}
                   <div className="absolute inset-0 font-mono text-sm text-blue-400 truncate opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-center gap-2">
-                     <span className="text-[10px] text-zinc-500">IP:</span> {node.address}
+                     <span className="text-[10px] text-zinc-500">IP:</span> {node.address || 'N/A'}
                   </div>
               </div>
 
