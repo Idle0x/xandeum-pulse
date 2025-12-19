@@ -47,7 +47,6 @@ const compareVersions = (v1: string, v2: string) => {
 };
 
 // --- HELPER: THE "VITALITY SCORE" ALGORITHM ---
-// Calculates a 0-100 score based on 4 weighted components
 const calculateVitalityScore = (
   storageGB: number, 
   uptimeSeconds: number, 
@@ -59,49 +58,47 @@ const calculateVitalityScore = (
   // GATE: 0 Storage = 0 Health (Useless Node)
   if (storageGB <= 0) return 0;
 
-  // 1. UPTIME SCORE (30% Weight) - Rewards stability
+  // 1. UPTIME SCORE (30% Weight)
   let uptimeScore = 0;
   const days = uptimeSeconds / 86400;
-  if (days >= 30) uptimeScore = 100; // Perfect stability (>30 days)
-  else if (days >= 7) uptimeScore = 70 + (days - 7) * (30 / 23); // Good (1 week+)
-  else if (days >= 1) uptimeScore = 40 + (days - 1) * (30 / 6);   // Fair (1 day+)
-  else uptimeScore = days * 40; // Poor (<24h)
+  if (days >= 30) uptimeScore = 100;
+  else if (days >= 7) uptimeScore = 70 + (days - 7) * (30 / 23);
+  else if (days >= 1) uptimeScore = 40 + (days - 1) * (30 / 6);
+  else uptimeScore = days * 40;
 
-  // 2. VERSION SCORE (20% Weight) - Rewards security
+  // 2. VERSION SCORE (20% Weight)
   let versionScore = 100;
   const comparison = compareVersions(version, consensusVersion);
   if (comparison < 0) {
     const parts1 = version.split('.').map(Number);
     const parts2 = consensusVersion.split('.').map(Number);
-    // Check how far behind
-    if ((parts2[0] || 0) > (parts1[0] || 0)) versionScore = 30; // Major version behind
-    else if (((parts2[1] || 0) - (parts1[1] || 0)) > 2) versionScore = 60; // >2 Minor versions behind
-    else versionScore = 80; // slightly behind
+    if ((parts2[0] || 0) > (parts1[0] || 0)) versionScore = 30;
+    else if (((parts2[1] || 0) - (parts1[1] || 0)) > 2) versionScore = 60;
+    else versionScore = 80;
   }
 
-  // 3. REPUTATION SCORE (25% Weight) - Rewards network contribution relative to peers
-  let reputationScore = 50; // Neutral baseline
+  // 3. REPUTATION SCORE (25% Weight)
+  let reputationScore = 50; 
   if (medianCredits > 0 && credits > 0) {
     const ratio = credits / medianCredits;
-    if (ratio >= 2) reputationScore = 100;       // Exceptional (>2x median)
-    else if (ratio >= 1) reputationScore = 75 + (ratio - 1) * 25; // Above average
-    else if (ratio >= 0.5) reputationScore = 50 + (ratio - 0.5) * 50; // Below average
-    else if (ratio >= 0.1) reputationScore = 25 + (ratio - 0.1) * 62.5; // Low
-    else reputationScore = ratio * 250; // Very Low
+    if (ratio >= 2) reputationScore = 100;
+    else if (ratio >= 1) reputationScore = 75 + (ratio - 1) * 25;
+    else if (ratio >= 0.5) reputationScore = 50 + (ratio - 0.5) * 50;
+    else if (ratio >= 0.1) reputationScore = 25 + (ratio - 0.1) * 62.5;
+    else reputationScore = ratio * 250;
   } else if (credits === 0) {
-    reputationScore = 0; // No history
+    reputationScore = 0;
   } else if (medianCredits === 0 && credits > 0) {
-    reputationScore = 100; // Early adopter (only one with credits)
+    reputationScore = 100;
   }
 
-  // 4. CAPACITY SCORE (25% Weight) - Rewards utility
+  // 4. CAPACITY SCORE (25% Weight)
   let capacityScore = 0;
-  if (storageGB >= 1000) capacityScore = 100;     // >1TB
+  if (storageGB >= 1000) capacityScore = 100;
   else if (storageGB >= 100) capacityScore = 70 + (storageGB - 100) * (30 / 900);
   else if (storageGB >= 10) capacityScore = 40 + (storageGB - 10) * (30 / 90);
   else capacityScore = storageGB * 4;
 
-  // Final Weighted Calculation
   const finalScore = 
     (uptimeScore * 0.30) +
     (versionScore * 0.20) +
@@ -131,23 +128,20 @@ async function getPodsFromRPC() {
 
 // --- HELPER: BATCH GEO (With De-duping) ---
 async function getGeoDataForIps(ips: string[]) {
-  // 1. Check cache first
   const missing = ips.filter(ip => !geoCache.has(ip));
   const toFetch: string[] = [];
 
-  // 2. Check in-flight requests
   const promises: Promise<any>[] = [];
   missing.forEach(ip => {
     if (pendingGeoRequests.has(ip)) {
-      promises.push(pendingGeoRequests.get(ip));
+      // FIX: Added '!' non-null assertion because we verified it exists with .has()
+      promises.push(pendingGeoRequests.get(ip)!);
     } else {
       toFetch.push(ip);
     }
   });
 
-  // 3. Fetch what's truly missing
   if (toFetch.length > 0) {
-    // Process in chunks of 100
     for (let i = 0; i < toFetch.length; i += 100) {
       const chunk = toFetch.slice(i, i + 100);
       const promise = axios.post('http://ip-api.com/batch', 
@@ -163,11 +157,9 @@ async function getGeoDataForIps(ips: string[]) {
         console.error("Geo Batch Error:", err);
         return [];
       }).finally(() => {
-        // Cleanup pending flags
         chunk.forEach(ip => pendingGeoRequests.delete(ip));
       });
 
-      // Mark as pending
       chunk.forEach(ip => pendingGeoRequests.set(ip, promise));
       promises.push(promise);
     }
@@ -185,7 +177,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ]);
 
     // 2. CALCULATE NETWORK METRICS
-    // Version Consensus
     const versionCounts: Record<string, number> = {};
     pods.forEach((p: any) => {
         const v = p.version || '0.0.0';
@@ -193,7 +184,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     const consensusVersion = Object.keys(versionCounts).sort((a, b) => versionCounts[b] - versionCounts[a])[0] || '0.0.0';
 
-    // Median Credits
     const allCredits: number[] = [];
     const creditsMap = new Map<string, number>();
     const creditsArray = creditsRes.data?.pods_credits || [];
@@ -212,7 +202,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // 3. GEOCODING
     const uniqueIps = [...new Set(pods.map((p: any) => p.address.split(':')[0]))] as string[];
-    await getGeoDataForIps(uniqueIps); // Uses new robust fetcher
+    await getGeoDataForIps(uniqueIps);
 
     // 4. DATA MERGE
     const cityMap = new Map<string, any>();
@@ -224,14 +214,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (geo) {
         const key = `${geo.city}-${geo.country}`;
         
-        // Metrics
         const rawStorage = parseFloat(node.storage_committed || '0');
         const storageGB = rawStorage / (1024 * 1024 * 1024);
         const credits = creditsMap.get(node.pubkey) || 0;
         const uptime = node.uptime || 0;
         const version = node.version || '0.0.0';
 
-        // THE NEW HEALTH ALGORITHM
         const health = calculateVitalityScore(storageGB, uptime, version, consensusVersion, credits, medianCredits);
 
         if (cityMap.has(key)) {
