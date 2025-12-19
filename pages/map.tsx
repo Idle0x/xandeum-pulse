@@ -163,7 +163,7 @@ export default function MapPage() {
   }, [locations, activeLocation]);
 
   const ViewToggles = ({ className = "" }: { className?: string }) => (
-    <div className={`flex items-center gap-1 p-1 bg-zinc-900/90 border border-zinc-800 rounded-xl shadow-lg ${className}`}>
+    <div className={`flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-700/50 rounded-xl ${className}`}>
         {(['STORAGE', 'HEALTH', 'CREDITS'] as ViewMode[]).map((mode) => {
             let Icon = Database;
             if (mode === 'HEALTH') Icon = Activity;
@@ -177,8 +177,8 @@ export default function MapPage() {
                         active ? 'bg-blue-600 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
                     }`}
                 >
-                    <Icon size={12} />
-                    <span className="text-[10px] font-bold tracking-wide">{mode}</span>
+                    <Icon size={14} className={active ? "text-white" : "text-zinc-500"} />
+                    <span className="text-[10px] md:text-xs font-bold tracking-wide">{mode}</span>
                 </button>
             )
         })}
@@ -197,10 +197,7 @@ export default function MapPage() {
       </Head>
 
       {/* --- HORIZONTAL HEADER BAR --- */}
-      {/* Changed from absolute to relative to prevent overlap */}
-      <div className="w-full z-50 flex flex-col gap-4 px-6 py-4 bg-[#09090b]/80 backdrop-blur-md border-b border-zinc-800/50 shadow-lg">
-        
-        {/* Top Row: Back Button */}
+      <div className="w-full shrink-0 z-50 flex flex-col gap-4 px-6 py-4 bg-[#09090b]/80 backdrop-blur-md border-b border-zinc-800/50 shadow-lg">
         <div className="flex items-center justify-between w-full">
             <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all cursor-pointer">
                 <ArrowLeft size={12} className="text-zinc-400 group-hover:text-white" />
@@ -219,7 +216,6 @@ export default function MapPage() {
             </div>
         </div>
         
-        {/* Bottom Row: Dynamic Content */}
         <div>
             <h1 className="text-xl md:text-3xl font-extrabold tracking-tight text-white leading-tight">
                 {getDynamicTitle()}
@@ -230,240 +226,182 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* --- LAYER 1: MAP FRAME --- */}
-      {/* Reduced mt-32 to mt-6 because header now takes space */}
-      <div className="relative z-10 mx-6 mt-6 flex-grow border border-zinc-800/50 rounded-3xl overflow-hidden shadow-2xl bg-[#080808] transition-all duration-500 h-full max-h-[50vh]">
-        <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_#1a202c_0%,_#000000_80%)] opacity-50"></div>
-            <div className="absolute inset-0 opacity-10" 
-                style={{ backgroundImage: 'linear-gradient(#3b82f6 1px, transparent 1px), linear-gradient(90deg, #3b82f6 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
-            </div>
-        </div>
+      {/* --- MAIN CONTENT AREA (Scrollable if screen is tiny, but generally fixed) --- */}
+      <div className="flex-grow flex flex-col relative overflow-hidden">
+        
+        {/* --- MAP CONTAINER --- */}
+        {/* Adjusted Height: Not full screen, leaves room for control dock */}
+        <div className="relative w-full h-[50vh] md:h-[55vh] border-b border-zinc-800/50 bg-[#080808] transition-all duration-500">
+            {loading ? (
+                <div className="absolute inset-0 flex items-center justify-center z-20"><Globe className="animate-pulse text-blue-500" /></div>
+            ) : (
+                <ComposableMap projectionConfig={{ scale: 170 }} className="w-full h-full" style={{ width: "100%", height: "100%" }}>
+                <ZoomableGroup zoom={position.zoom} center={position.coordinates as [number, number]} onMoveEnd={handleMoveEnd} maxZoom={5}>
+                    <Geographies geography={GEO_URL}>
+                    {({ geographies }: { geographies: any }) => geographies.map((geo: any) => (
+                        <Geography key={geo.rsmKey} geography={geo} fill="#1f1f1f" stroke="#333" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { fill: "#333", outline: "none" }, pressed: { outline: "none" }}} />
+                    ))}
+                    </Geographies>
+                    {locationsForMap.map((loc) => {
+                    const size = sizeScale(loc.count);
+                    const isActive = activeLocation === loc.name;
+                    const tier = getTier(loc);
+                    const baseColor = TIER_COLORS[tier];
 
-        {loading ? (
-           <div className="absolute inset-0 flex items-center justify-center z-20"><Globe className="animate-pulse text-blue-500" /></div>
-        ) : (
-          <ComposableMap projectionConfig={{ scale: 170 }} className="w-full h-full" style={{ width: "100%", height: "100%" }}>
-            <ZoomableGroup zoom={position.zoom} center={position.coordinates as [number, number]} onMoveEnd={handleMoveEnd} maxZoom={5}>
-              <Geographies geography={GEO_URL}>
-                {({ geographies }: { geographies: any }) => geographies.map((geo: any) => (
-                    <Geography key={geo.rsmKey} geography={geo} fill="#1f1f1f" stroke="#333" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { fill: "#333", outline: "none" }, pressed: { outline: "none" }}} />
-                ))}
-              </Geographies>
-              {locationsForMap.map((loc) => {
-                const size = sizeScale(loc.count);
-                const isActive = activeLocation === loc.name;
-                const tier = getTier(loc);
-                const baseColor = TIER_COLORS[tier];
-
-                return (
-                    <Marker key={loc.name} coordinates={[loc.lon, loc.lat]} onClick={() => lockTarget(loc.name, loc.lat, loc.lon)}>
-                    <g className="group cursor-pointer transition-all duration-500">
-                        <circle 
-                            r={size * 2.5} 
-                            fill={isActive ? '#22c55e' : baseColor} 
-                            className="animate-ping opacity-20" 
-                            style={{ animationDuration: isActive ? '1s' : '3s' }} 
-                        />
-                        {isActive ? (
-                            <polygon 
-                                points="0,-12 3,-4 11,-4 5,1 7,9 0,5 -7,9 -5,1 -11,-4 -3,-4" 
-                                transform={`scale(${size/6})`}
-                                fill="#52525b" stroke="#22c55e" strokeWidth={1.5}
-                                className="drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]"
+                    return (
+                        <Marker key={loc.name} coordinates={[loc.lon, loc.lat]} onClick={() => lockTarget(loc.name, loc.lat, loc.lon)}>
+                        <g className="group cursor-pointer transition-all duration-500">
+                            <circle 
+                                r={size * 2.5} 
+                                fill={isActive ? '#22c55e' : baseColor} 
+                                className="animate-ping opacity-20" 
+                                style={{ animationDuration: isActive ? '1s' : '3s' }} 
                             />
-                        ) : (
-                            <>
-                                {viewMode === 'STORAGE' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} />}
-                                {viewMode === 'CREDITS' && <circle r={size} fill={baseColor} stroke="#fff" strokeWidth={1} />}
-                                {viewMode === 'HEALTH' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} className="rotate-45" />}
-                            </>
-                        )}
-                        {isActive && (
-                            <text y={-size - 15} textAnchor="middle" className="font-mono text-[8px] fill-white font-bold uppercase tracking-widest pointer-events-none drop-shadow-md z-50">
-                                {loc.name}
-                            </text>
-                        )}
-                        {isActive && (
-                            <text y={size + 15} textAnchor="middle" className="font-sans text-[6px] fill-green-400 font-bold pointer-events-none z-50">
-                                {getMetricText(loc)}
-                            </text>
-                        )}
-                    </g>
-                    </Marker>
-                );
-              })}
-            </ZoomableGroup>
-          </ComposableMap>
-        )}
-
-        <div className="absolute bottom-6 right-4 flex flex-col gap-2 z-30">
-            <button onClick={handleZoomIn} title="Zoom In" className="p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Plus size={18} /></button>
-            <button onClick={handleZoomOut} title="Zoom Out" className="p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Minus size={18} /></button>
-            
-            {(position.zoom > 1.2 || activeLocation) && (
-                <button 
-                    onClick={resetView}
-                    className="p-3 bg-red-900/80 border border-red-500/50 text-red-200 rounded-xl hover:text-white hover:bg-red-800 transition-all animate-in fade-in zoom-in"
-                    title="Reset Map View"
-                >
-                    <RotateCcw size={18} />
-                </button>
+                            {isActive ? (
+                                <polygon 
+                                    points="0,-12 3,-4 11,-4 5,1 7,9 0,5 -7,9 -5,1 -11,-4 -3,-4" 
+                                    transform={`scale(${size/6})`}
+                                    fill="#52525b" stroke="#22c55e" strokeWidth={1.5}
+                                    className="drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]"
+                                />
+                            ) : (
+                                <>
+                                    {viewMode === 'STORAGE' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} />}
+                                    {viewMode === 'CREDITS' && <circle r={size} fill={baseColor} stroke="#fff" strokeWidth={1} />}
+                                    {viewMode === 'HEALTH' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} className="rotate-45" />}
+                                </>
+                            )}
+                            {isActive && (
+                                <text y={-size - 15} textAnchor="middle" className="font-mono text-[8px] fill-white font-bold uppercase tracking-widest pointer-events-none drop-shadow-md z-50">
+                                    {loc.name}
+                                </text>
+                            )}
+                        </g>
+                        </Marker>
+                    );
+                    })}
+                </ZoomableGroup>
+                </ComposableMap>
             )}
-        </div>
-      </div>
 
-      {/* --- LAYER 2: THE DOCK & LEGEND --- */}
-      {!drawerOpen && (
-        <div className="absolute top-[58vh] md:top-[60vh] left-0 right-0 z-40 flex flex-col items-center pointer-events-none transition-opacity duration-300">
-            <div className="pointer-events-auto mb-4">
-                <ViewToggles />
+            {/* Floating Zoom Controls (Still fine on map) */}
+            <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-30">
+                <button onClick={handleZoomIn} title="Zoom In" className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Plus size={16} /></button>
+                <button onClick={handleZoomOut} title="Zoom Out" className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Minus size={16} /></button>
+                {(position.zoom > 1.2 || activeLocation) && (
+                    <button onClick={resetView} className="p-2 md:p-3 bg-red-900/80 border border-red-500/50 text-red-200 rounded-xl hover:text-white"><RotateCcw size={16} /></button>
+                )}
             </div>
-            <div className="flex flex-col items-center text-[9px] text-zinc-400 font-mono bg-black/40 px-4 py-3 rounded-2xl border border-zinc-800/50 backdrop-blur-sm shadow-xl">
-                {/* Visual Legend for Shapes */}
-                <div className="flex items-center gap-4 mb-2 opacity-80">
+        </div>
+
+        {/* --- CONTROL DOCK (Dedicated Space Below Map) --- */}
+        <div className="flex-grow bg-[#09090b] flex flex-col md:flex-row items-center justify-between p-4 md:px-8 gap-4 overflow-y-auto">
+            
+            {/* Left: View Toggles */}
+            <div className="w-full md:w-auto flex justify-center md:justify-start">
+                 <ViewToggles />
+            </div>
+
+            {/* Center/Right: The Legend (Now in a block, not floating) */}
+            <div className="w-full md:w-auto bg-zinc-900/30 border border-zinc-800 rounded-2xl p-3 md:p-4 flex flex-col md:flex-row items-center gap-4">
+                <div className="flex items-center gap-4 opacity-80 text-[10px] md:text-xs text-zinc-400">
                     <div className="flex items-center gap-1"><div className="w-2 h-2 bg-zinc-500"></div><span>Storage</span></div>
                     <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-zinc-500"></div><span>Credits</span></div>
                     <div className="flex items-center gap-1"><div className="w-2 h-2 bg-zinc-500 rotate-45"></div><span>Health</span></div>
                 </div>
 
-                <div className="mb-2 font-bold text-zinc-300">Color Intensity = Higher Value</div>
-                <div className="flex items-stretch gap-3">
-                    <div className="w-1.5 rounded-full bg-gradient-to-b from-[#22d3ee] via-[#a855f7] to-[#f59e0b] shadow-[0_0_10px_rgba(59,130,246,0.3)]"></div>
-                    
-                    {/* COLORED TEXT LABELS */}
-                    <div className="flex flex-col justify-between h-24 text-[8px] font-bold uppercase tracking-wider py-1">
-                        {viewMode === 'STORAGE' && (
-                            <>
-                                <span style={{ color: TIER_COLORS[0] }}>&lt; 1 GB</span>
-                                <span style={{ color: TIER_COLORS[1] }}>1-10 GB</span>
-                                <span style={{ color: TIER_COLORS[2] }}>10-100 GB</span>
-                                <span style={{ color: TIER_COLORS[3] }}>100-1T</span>
-                                <span style={{ color: TIER_COLORS[4] }}>&gt; 1 TB</span>
-                            </>
-                        )}
-                        {viewMode === 'CREDITS' && (
-                            <>
-                                <span style={{ color: TIER_COLORS[0] }}>&lt; 100</span>
-                                <span style={{ color: TIER_COLORS[1] }}>100-1k</span>
-                                <span style={{ color: TIER_COLORS[2] }}>1k-10k</span>
-                                <span style={{ color: TIER_COLORS[3] }}>10k-100k</span>
-                                <span style={{ color: TIER_COLORS[4] }}>&gt; 100k</span>
-                            </>
-                        )}
-                        {viewMode === 'HEALTH' && (
-                            <>
-                                <span style={{ color: TIER_COLORS[0] }}>&lt; 40%</span>
-                                <span style={{ color: TIER_COLORS[1] }}>40-60%</span>
-                                <span style={{ color: TIER_COLORS[2] }}>60-75%</span>
-                                <span style={{ color: TIER_COLORS[3] }}>75-90%</span>
-                                <span style={{ color: TIER_COLORS[4] }}>&gt; 90%</span>
-                            </>
-                        )}
+                <div className="hidden md:block w-px h-8 bg-zinc-800"></div>
+
+                <div className="flex flex-col w-full md:w-auto">
+                    <div className="text-[10px] md:text-xs font-bold text-zinc-500 mb-1 text-center md:text-left">Metric Intensity</div>
+                    <div className="flex items-center gap-2">
+                         <div className="w-full md:w-32 h-2 rounded-full bg-gradient-to-r from-[#22d3ee] via-[#a855f7] to-[#f59e0b]"></div>
+                    </div>
+                    <div className="flex justify-between w-full md:w-32 text-[8px] md:text-[10px] font-mono text-zinc-500 mt-1">
+                        <span>Low</span>
+                        <span>High</span>
                     </div>
                 </div>
             </div>
         </div>
-      )}
+      </div>
 
-      {/* --- LAYER 3: TRIGGER BUTTONS --- */}
-      {!drawerOpen && (
-          <>
-            <div className="hidden md:flex absolute top-[85vh] left-0 right-0 justify-center z-50 pointer-events-none">
-                <button 
-                    onClick={() => setDrawerOpen(true)}
-                    className="pointer-events-auto flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-700 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.8)] text-zinc-200 hover:text-white hover:border-blue-500/50 hover:bg-zinc-800 transition-all active:scale-95 transform -translate-y-1/2"
-                >
-                    <Activity size={16} className="text-blue-400" />
-                    <span className="text-xs font-bold uppercase tracking-widest">Live Statistics</span>
-                    <ChevronUp size={16} className="text-zinc-500" />
-                </button>
+      {/* --- FOOTER: ACTION BUTTON --- */}
+      {/* Fixed at bottom, always accessible, clearly actionable */}
+      <div className="shrink-0 p-4 md:p-6 bg-[#09090b] border-t border-zinc-800 z-50">
+        {!drawerOpen ? (
+            <button 
+                onClick={() => setDrawerOpen(true)}
+                className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 px-6 py-4 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-blue-500/50 rounded-xl shadow-lg transition-all group"
+            >
+                <Activity size={18} className="text-blue-400 group-hover:scale-110 transition-transform" />
+                <span className="text-xs md:text-sm font-bold uppercase tracking-widest text-zinc-200 group-hover:text-white">
+                    Click to Open Live Stats
+                </span>
+                <ChevronUp size={18} className="text-zinc-500 group-hover:-translate-y-1 transition-transform" />
+            </button>
+        ) : (
+            <div className="w-full text-center">
+                 <span className="text-xs text-zinc-500">Panel Open</span>
             </div>
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#09090b] border-t border-zinc-800 pb-safe shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
-                <button 
-                    onClick={() => setDrawerOpen(true)}
-                    className="w-full flex items-center justify-between px-6 py-4 text-zinc-300 hover:text-white transition-colors"
-                >
-                    <div className="flex items-center gap-3">
-                        <Activity size={18} className="text-blue-400" />
-                        <span className="text-xs font-bold uppercase tracking-widest">Open Live Stats</span>
-                    </div>
-                    <ChevronUp size={18} />
-                </button>
-            </div>
-          </>
-      )}
+        )}
+      </div>
 
-      {/* --- LAYER 4: THE PANEL --- */}
+      {/* --- DRAWER PANEL (Same as before) --- */}
       <div 
-        className={`absolute inset-x-0 bottom-0 z-50 flex flex-col justify-end pointer-events-none transition-transform duration-300 ease-out ${drawerOpen ? 'translate-y-0' : 'translate-y-full'}`}
+        className={`absolute inset-x-0 bottom-0 z-[60] flex flex-col justify-end pointer-events-none transition-transform duration-300 ease-out ${drawerOpen ? 'translate-y-0' : 'translate-y-full'}`}
       >
-        <div className="pointer-events-auto w-full md:max-w-xl mx-auto md:mb-8 h-[45vh] md:h-[40vh] bg-[#09090b] md:bg-[#09090b]/95 border-t md:border border-zinc-700 md:rounded-[2rem] rounded-t-3xl shadow-[0_-10px_50px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden">
+        <div className="pointer-events-auto w-full md:max-w-xl mx-auto h-[60vh] bg-[#09090b] border-t border-zinc-700 rounded-t-[2rem] shadow-[0_-20px_60px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden">
             
-            <div className="flex flex-col gap-3 px-6 py-4 border-b border-zinc-800/50 bg-black/20 shrink-0 cursor-pointer" onClick={() => setDrawerOpen(false)}>
-                <div className="flex items-center justify-between">
-                        <span className="text-sm font-bold text-white flex items-center gap-2">
-                        <Activity size={14} className="text-green-500" /> Network Data
-                    </span>
-                    <button className="p-2 bg-zinc-800/50 rounded-full text-zinc-400 hover:bg-zinc-700">
-                        <ChevronDown size={16} />
-                    </button>
-                </div>
-                <div className="w-full" onClick={(e) => e.stopPropagation()}>
-                    <ViewToggles className="w-full justify-between bg-black/50" />
-                </div>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/50 bg-black/40 cursor-pointer hover:bg-black/60 transition-colors" onClick={() => setDrawerOpen(false)}>
+                <span className="text-sm font-bold text-white flex items-center gap-2">
+                    <Activity size={14} className="text-green-500" /> Live Network Data
+                </span>
+                <ChevronDown size={20} className="text-zinc-400" />
             </div>
 
-            <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar">
-                {sortedLocations.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-50">
-                        <Globe size={48} className="text-zinc-700 mb-4 animate-pulse" />
-                        <p className="text-zinc-500 text-sm font-bold">No Signal Detected</p>
-                        <p className="text-zinc-600 text-xs mt-2">Waiting for network telemetry...</p>
-                    </div>
-                ) : (
-                    sortedLocations.map((loc, i) => (
-                        <div 
-                            id={`list-item-${loc.name}`}
-                            key={loc.name} 
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                lockTarget(loc.name, loc.lat, loc.lon);
-                            }}
-                            className={`group flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
-                                activeLocation === loc.name 
-                                ? 'bg-zinc-800 border-green-500/50' 
-                                : 'bg-zinc-900/50 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800'
-                            }`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className={`flex items-center justify-center w-8 h-8 rounded-full font-mono text-xs font-bold ${
-                                    activeLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'
-                                }`}>
-                                    {i + 1}
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-bold text-zinc-200 group-hover:text-white">{loc.name}, {loc.country}</span>
-                                    <span 
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleCopyCoords(loc.lat, loc.lon, loc.name);
-                                        }}
-                                        className="text-[10px] text-zinc-500 flex items-center gap-1 hover:text-blue-400 cursor-copy transition-colors"
-                                        title="Click to copy GPS"
-                                    >
-                                        <MapPin size={10} /> 
-                                        {copiedCoords === loc.name ? <span className="text-green-500 font-bold">Copied!</span> : `${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}`}
-                                    </span>
-                                </div>
+            <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar bg-[#09090b]">
+                {sortedLocations.map((loc, i) => (
+                    <div 
+                        id={`list-item-${loc.name}`}
+                        key={loc.name} 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            lockTarget(loc.name, loc.lat, loc.lon);
+                        }}
+                        className={`group flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
+                            activeLocation === loc.name 
+                            ? 'bg-zinc-800 border-green-500/50' 
+                            : 'bg-zinc-900/50 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800'
+                        }`}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className={`flex items-center justify-center w-8 h-8 rounded-full font-mono text-xs font-bold ${
+                                activeLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'
+                            }`}>
+                                {i + 1}
                             </div>
-                            <div className="text-right">
-                                <div className={`text-sm font-mono font-bold ${activeLocation === loc.name ? 'text-green-400' : 'text-blue-400'}`}>{getMetricText(loc)}</div>
-                                <div className="text-[10px] text-zinc-500">{loc.count} Nodes</div>
+                            <div className="flex flex-col">
+                                <span className="text-sm font-bold text-zinc-200 group-hover:text-white">{loc.name}, {loc.country}</span>
+                                <span 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCopyCoords(loc.lat, loc.lon, loc.name);
+                                    }}
+                                    className="text-[10px] text-zinc-500 flex items-center gap-1 hover:text-blue-400 cursor-copy transition-colors"
+                                    title="Click to copy GPS"
+                                >
+                                    <MapPin size={10} /> 
+                                    {copiedCoords === loc.name ? <span className="text-green-500 font-bold">Copied!</span> : `${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}`}
+                                </span>
                             </div>
                         </div>
-                    ))
-                )}
+                        <div className="text-right">
+                            <div className={`text-sm font-mono font-bold ${activeLocation === loc.name ? 'text-green-400' : 'text-blue-400'}`}>{getMetricText(loc)}</div>
+                            <div className="text-[10px] text-zinc-500">{loc.count} Nodes</div>
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
       </div>
