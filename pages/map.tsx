@@ -121,8 +121,9 @@ export default function MapPage() {
             >
               {/* LANDMASS */}
               <Geographies geography={GEO_URL}>
-                {({ geographies }) =>
-                  geographies.map((geo) => (
+                {/* FIX APPLIED BELOW: Explicitly typing 'geographies' as any */}
+                {({ geographies }: { geographies: any }) =>
+                  geographies.map((geo: any) => (
                     <Geography
                       key={geo.rsmKey}
                       geography={geo}
@@ -174,7 +175,7 @@ export default function MapPage() {
           </ComposableMap>
         )}
         
-        {/* CUSTOM TOOLTIP (Follows no specific position, just fixed top-center when active for clean look) */}
+        {/* CUSTOM TOOLTIP */}
         {tooltip && (
             <div className="absolute top-32 left-1/2 -translate-x-1/2 md:top-auto md:bottom-32 pointer-events-none animate-in fade-in slide-in-from-bottom-2">
                 <div className="bg-black/80 backdrop-blur-md border border-zinc-700 px-4 py-2 rounded-full shadow-2xl flex items-center gap-3">
