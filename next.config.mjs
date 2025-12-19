@@ -1,10 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // We keep the experimental compiler enabled as you had it
-  experimental: {
-    reactCompiler: true,
-  },
+  // We are removing 'reactCompiler' because it requires specific dependencies you don't have.
 };
 
 export default nextConfig;
