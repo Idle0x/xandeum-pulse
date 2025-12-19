@@ -27,14 +27,19 @@ const LEGEND_LABELS = {
     HEALTH:  ['< 40%', '40-60%', '60-75%', '75-90%', '> 90%']
 };
 
+const CONTEXT_DESCRIPTIONS = {
+    STORAGE: "Visualizing committed disk space.",
+    CREDITS: "Tracking accumulated node rewards.",
+    HEALTH: "Monitoring uptime and stability."
+};
+
 export default function MapPage() {
   const [locations, setLocations] = useState<LocationData[]>([]);
   const [stats, setStats] = useState<MapStats>({ totalNodes: 0, countries: 0, topRegion: 'Scanning...', topRegionMetric: 0 });
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('STORAGE');
   
-  // Interaction State
-  const [panelMode, setPanelMode] = useState<'LEGEND' | 'LIST'>('LEGEND');
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeLocation, setActiveLocation] = useState<string | null>(null);
   const [position, setPosition] = useState({ coordinates: [10, 20], zoom: 1.2 });
   const [copiedCoords, setCopiedCoords] = useState<string | null>(null);
@@ -59,21 +64,24 @@ export default function MapPage() {
   // --- INTERACTION LOGIC ---
 
   const lockTarget = (name: string, lat: number, lon: number) => {
-    // If we click the same target, we reset
+    // If the drawer is NOT open, open it so they can see the details "side by side"
+    if (!drawerOpen) setDrawerOpen(true);
+
     if (activeLocation === name) {
-        resetView();
+        // If clicking the same one, just recenter map, don't close drawer
+        setPosition({ coordinates: [lon, lat], zoom: 3 });
         return;
     }
     setActiveLocation(name);
     setPosition({ coordinates: [lon, lat], zoom: 3 });
     
-    // Auto-scroll list if it's open
-    if (panelMode === 'LIST' && listRef.current) {
-         setTimeout(() => {
-             const item = document.getElementById(`list-item-${name}`);
-             if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-         }, 100);
-    }
+    // Scroll to item in list
+    setTimeout(() => {
+        if (listRef.current) {
+            const item = document.getElementById(`list-item-${name}`);
+            if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+       }
+    }, 100);
   };
 
   const resetView = () => {
@@ -123,7 +131,7 @@ export default function MapPage() {
     }
   };
 
-  // --- TEXT GENERATORS ---
+  // --- DYNAMIC TITLES & SORTING ---
 
   const sortedLocations = useMemo(() => {
     return [...locations].sort((a, b) => {
@@ -138,24 +146,32 @@ export default function MapPage() {
   const getDynamicTitle = () => {
     if (loading) return "Calibrating Global Sensors...";
     if (!leadingRegion) return "Waiting for Node Telemetry...";
+
     const { country } = leadingRegion;
+
     switch (viewMode) {
-        case 'STORAGE': return <><span className="text-blue-400">{country}</span> Leads Storage Capacity</>;
-        case 'CREDITS': return <><span className="text-yellow-400">{country}</span> Tops Network Earnings</>;
-        case 'HEALTH': return <><span className="text-green-400">{country}</span> Sets Vitality Standard</>;
+        case 'STORAGE':
+            return <><span className="text-blue-400">{country}</span> Leads Storage Capacity</>;
+        case 'CREDITS':
+            return <><span className="text-yellow-400">{country}</span> Tops Network Earnings</>;
+        case 'HEALTH':
+            return <><span className="text-green-400">{country}</span> Sets Vitality Standard</>;
     }
   };
 
-  // New Context Logic for Legend Area
-  const getContextDescription = () => {
-      switch (viewMode) {
-          case 'STORAGE':
-              return "Aggregating committed disk space. Regions are color-coded based on the total storage volume tiers defined below.";
-          case 'CREDITS':
-              return "Tracking network rewards. Regions are color-coded based on the accumulated credit tiers defined below.";
-          case 'HEALTH':
-              return "Monitoring system stability. Regions are color-coded based on the aggregate vitality score tiers defined below.";
-      }
+  // CLEANED UP HEADER SUBTITLE (Data only)
+  const getDynamicSubtitle = () => {
+     if (!leadingRegion) return "Analyzing network topology...";
+     const { name, totalStorage, totalCredits, avgHealth, count } = leadingRegion;
+
+     switch (viewMode) {
+        case 'STORAGE':
+             return `The largest hub, ${name}, is currently providing ${formatStorage(totalStorage)}.`;
+        case 'CREDITS':
+             return `Operators in ${name} have generated a total of ${totalCredits.toLocaleString()} Cr.`;
+        case 'HEALTH':
+             return `${name} is performing optimally with an average health score of ${avgHealth}% across ${count} nodes.`;
+     }
   };
 
   const locationsForMap = useMemo(() => {
@@ -165,8 +181,8 @@ export default function MapPage() {
     return active ? [...others, active] : others;
   }, [locations, activeLocation]);
 
-  const ViewToggles = () => (
-    <div className="flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-700/50 rounded-xl">
+  const ViewToggles = ({ className = "" }: { className?: string }) => (
+    <div className={`flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-700/50 rounded-xl ${className}`}>
         {(['STORAGE', 'HEALTH', 'CREDITS'] as ViewMode[]).map((mode) => {
             let Icon = Database;
             if (mode === 'HEALTH') Icon = Activity;
@@ -200,7 +216,7 @@ export default function MapPage() {
       </Head>
 
       {/* --- 1. HEADER (Fixed Top) --- */}
-      <div className="shrink-0 w-full z-50 flex flex-col gap-2 px-6 py-4 bg-[#09090b] border-b border-zinc-800/50 shadow-lg">
+      <div className="shrink-0 w-full z-50 flex flex-col gap-4 px-6 py-4 bg-[#09090b] border-b border-zinc-800/50 shadow-lg">
         <div className="flex items-center justify-between w-full">
             <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all cursor-pointer">
                 <ArrowLeft size={12} className="text-zinc-400 group-hover:text-white" />
@@ -223,191 +239,177 @@ export default function MapPage() {
             <h1 className="text-xl md:text-3xl font-extrabold tracking-tight text-white leading-tight">
                 {getDynamicTitle()}
             </h1>
+            <p className="text-xs md:text-sm text-zinc-400 font-medium leading-relaxed mt-2 max-w-2xl">
+                {getDynamicSubtitle()}
+            </p>
         </div>
       </div>
 
-      {/* --- 2. MAP AREA (Top Half) --- */}
-      {/* Takes 45-50% of height. Never gets covered. */}
-      <div className="h-[45vh] md:h-[50vh] w-full bg-[#080808] border-b border-zinc-800/50 relative z-0">
-            {loading ? (
-                <div className="absolute inset-0 flex items-center justify-center z-20"><Globe className="animate-pulse text-blue-500" /></div>
-            ) : (
-                <ComposableMap projectionConfig={{ scale: 170 }} className="w-full h-full" style={{ width: "100%", height: "100%" }}>
-                <ZoomableGroup zoom={position.zoom} center={position.coordinates as [number, number]} onMoveEnd={handleMoveEnd} maxZoom={5}>
-                    <Geographies geography={GEO_URL}>
-                    {({ geographies }: { geographies: any }) => geographies.map((geo: any) => (
-                        <Geography key={geo.rsmKey} geography={geo} fill="#1f1f1f" stroke="#333" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { fill: "#333", outline: "none" }, pressed: { outline: "none" }}} />
-                    ))}
-                    </Geographies>
-                    {locationsForMap.map((loc) => {
-                    const size = sizeScale(loc.count);
-                    const isActive = activeLocation === loc.name;
-                    const tier = getTier(loc);
-                    const baseColor = TIER_COLORS[tier];
+      {/* --- 2. MAIN FLEX AREA (Contains Map & Drawer in vertical split) --- */}
+      <div className="flex-1 flex flex-col min-h-0 relative">
+        
+        {/* MAP CONTAINER - Shrinks when drawer opens */}
+        <div className={`relative w-full transition-all duration-300 ease-in-out bg-[#080808] border-b border-zinc-800/50 ${drawerOpen ? 'flex-[0.8] md:flex-[1.5]' : 'flex-1'}`}>
+                {loading ? (
+                    <div className="absolute inset-0 flex items-center justify-center z-20"><Globe className="animate-pulse text-blue-500" /></div>
+                ) : (
+                    <ComposableMap projectionConfig={{ scale: 170 }} className="w-full h-full" style={{ width: "100%", height: "100%" }}>
+                    <ZoomableGroup zoom={position.zoom} center={position.coordinates as [number, number]} onMoveEnd={handleMoveEnd} maxZoom={5}>
+                        <Geographies geography={GEO_URL}>
+                        {({ geographies }: { geographies: any }) => geographies.map((geo: any) => (
+                            <Geography key={geo.rsmKey} geography={geo} fill="#1f1f1f" stroke="#333" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { fill: "#333", outline: "none" }, pressed: { outline: "none" }}} />
+                        ))}
+                        </Geographies>
+                        {locationsForMap.map((loc) => {
+                        const size = sizeScale(loc.count);
+                        const isActive = activeLocation === loc.name;
+                        const tier = getTier(loc);
+                        const baseColor = TIER_COLORS[tier];
 
-                    return (
-                        <Marker key={loc.name} coordinates={[loc.lon, loc.lat]} onClick={() => lockTarget(loc.name, loc.lat, loc.lon)}>
-                        <g className="group cursor-pointer transition-all duration-500">
-                            <circle 
-                                r={size * 2.5} 
-                                fill={isActive ? '#22c55e' : baseColor} 
-                                className="animate-ping opacity-20" 
-                                style={{ animationDuration: isActive ? '1s' : '3s' }} 
-                            />
-                            {isActive ? (
-                                <polygon 
-                                    points="0,-12 3,-4 11,-4 5,1 7,9 0,5 -7,9 -5,1 -11,-4 -3,-4" 
-                                    transform={`scale(${size/6})`}
-                                    fill="#52525b" stroke="#22c55e" strokeWidth={1.5}
-                                    className="drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]"
+                        return (
+                            <Marker key={loc.name} coordinates={[loc.lon, loc.lat]} onClick={() => lockTarget(loc.name, loc.lat, loc.lon)}>
+                            <g className="group cursor-pointer transition-all duration-500">
+                                <circle 
+                                    r={size * 2.5} 
+                                    fill={isActive ? '#22c55e' : baseColor} 
+                                    className="animate-ping opacity-20" 
+                                    style={{ animationDuration: isActive ? '1s' : '3s' }} 
                                 />
-                            ) : (
-                                <>
-                                    {viewMode === 'STORAGE' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} />}
-                                    {viewMode === 'CREDITS' && <circle r={size} fill={baseColor} stroke="#fff" strokeWidth={1} />}
-                                    {viewMode === 'HEALTH' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} className="rotate-45" />}
-                                </>
-                            )}
-                        </g>
-                        </Marker>
-                    );
-                    })}
-                </ZoomableGroup>
-                </ComposableMap>
-            )}
-
-            {/* Map Controls */}
-            <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-30">
-                <button onClick={handleZoomIn} title="Zoom In" className="p-2 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Plus size={16} /></button>
-                <button onClick={handleZoomOut} title="Zoom Out" className="p-2 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Minus size={16} /></button>
-                {(position.zoom > 1.2 || activeLocation) && (
-                    <button onClick={resetView} className="p-2 bg-red-900/80 border border-red-500/50 text-red-200 rounded-xl hover:text-white"><RotateCcw size={16} /></button>
+                                {isActive ? (
+                                    <polygon 
+                                        points="0,-12 3,-4 11,-4 5,1 7,9 0,5 -7,9 -5,1 -11,-4 -3,-4" 
+                                        transform={`scale(${size/6})`}
+                                        fill="#52525b" stroke="#22c55e" strokeWidth={1.5}
+                                        className="drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]"
+                                    />
+                                ) : (
+                                    <>
+                                        {viewMode === 'STORAGE' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} />}
+                                        {viewMode === 'CREDITS' && <circle r={size} fill={baseColor} stroke="#fff" strokeWidth={1} />}
+                                        {viewMode === 'HEALTH' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} className="rotate-45" />}
+                                    </>
+                                )}
+                                {isActive && (
+                                    <text y={-size - 15} textAnchor="middle" className="font-mono text-[8px] fill-white font-bold uppercase tracking-widest pointer-events-none drop-shadow-md z-50">
+                                        {loc.name}
+                                    </text>
+                                )}
+                            </g>
+                            </Marker>
+                        );
+                        })}
+                    </ZoomableGroup>
+                    </ComposableMap>
                 )}
+
+                {/* Zoom Controls */}
+                <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-30">
+                    <button onClick={handleZoomIn} title="Zoom In" className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Plus size={16} /></button>
+                    <button onClick={handleZoomOut} title="Zoom Out" className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Minus size={16} /></button>
+                    {(position.zoom > 1.2 || activeLocation) && (
+                        <button onClick={resetView} className="p-2 md:p-3 bg-red-900/80 border border-red-500/50 text-red-200 rounded-xl hover:text-white"><RotateCcw size={16} /></button>
+                    )}
+                </div>
+        </div>
+
+        {/* --- 3. LEGEND / INFO BAR (Always Visible) --- */}
+        <div className="shrink-0 bg-[#09090b] z-40 flex flex-col border-b border-zinc-800">
+             {/* Text Context - Moved Here */}
+            <div className="px-6 py-3 border-b border-zinc-800/50 bg-zinc-900/20">
+                <div className="flex items-start gap-2 max-w-3xl">
+                    <Info size={14} className="text-blue-400 mt-0.5 shrink-0" />
+                    <p className="text-[11px] md:text-xs text-zinc-400 leading-tight">
+                        <strong className="text-zinc-200 block md:inline mb-1 md:mb-0 mr-1">{CONTEXT_DESCRIPTIONS[viewMode]}</strong> 
+                        Nodes are distributed according to the score range shown below. Regions are color-coded based on the tier they fall into.
+                    </p>
+                </div>
             </div>
-      </div>
 
-      {/* --- 3. BOTTOM PANEL (Bottom Half) --- */}
-      {/* This area toggles content but stays fixed in place below map */}
-      <div className="flex-1 bg-[#09090b] relative overflow-hidden flex flex-col">
-          
-          {/* PANEL A: LEGEND & OVERVIEW (Default) */}
-          <div 
-            className={`absolute inset-0 flex flex-col transition-all duration-300 ease-in-out ${
-                panelMode === 'LEGEND' ? 'opacity-100 translate-x-0 z-20' : 'opacity-0 -translate-x-10 z-0 pointer-events-none'
-            }`}
-          >
-                <div className="flex-grow overflow-y-auto p-6 pb-24">
-                    {/* Toggles */}
-                    <div className="mb-6">
-                        <ViewToggles />
-                    </div>
-
-                    {/* Context 1: Logic Explanation */}
-                    <div className="mb-6">
-                        <h3 className="text-zinc-200 text-sm font-bold mb-2 flex items-center gap-2">
-                            <Activity size={14} className="text-blue-500" />
-                            Performance Segmentation
-                        </h3>
-                        <p className="text-xs text-zinc-400 leading-relaxed max-w-2xl">
-                            {getContextDescription()}
-                        </p>
-                    </div>
-
-                    {/* The Legend */}
-                    <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-4 mb-6">
-                        <div className="grid grid-cols-3 md:grid-cols-5 gap-y-4 gap-x-2 w-full">
-                            {LEGEND_LABELS[viewMode].map((label, idx) => (
-                                <div key={idx} className="flex flex-col items-center gap-1.5">
-                                    <div className="w-8 h-1.5 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.5)]" style={{ backgroundColor: TIER_COLORS[idx] }}></div>
-                                    <span className="text-[10px] font-mono text-zinc-400 font-bold whitespace-nowrap">{label}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Context 2: Pulse Intensity */}
-                    <div className="flex items-start gap-3 p-3 bg-blue-500/5 border border-blue-500/10 rounded-xl">
-                        <Info size={14} className="text-blue-400 mt-0.5 shrink-0" />
-                        <p className="text-[10px] text-zinc-400 leading-relaxed">
-                            <strong className="text-zinc-300">Pulse Intensity:</strong> Brighter, thicker pulses on the map indicate a higher concentration of active nodes in that specific cluster.
-                        </p>
-                    </div>
-                </div>
-
-                {/* Footer Action */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#09090b] via-[#09090b] to-transparent z-30">
-                    <button 
-                        onClick={() => setPanelMode('LIST')}
-                        className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-blue-500/50 rounded-xl shadow-lg transition-all group"
-                    >
-                        <Activity size={16} className="text-blue-400 group-hover:scale-110 transition-transform" />
-                        <span className="text-xs font-bold uppercase tracking-widest text-zinc-200 group-hover:text-white">
-                            Open Live Stats
-                        </span>
-                        <ChevronUp size={16} className="text-zinc-500" />
-                    </button>
-                </div>
-          </div>
-
-          {/* PANEL B: LIVE NODE LIST (Active) */}
-          <div 
-            className={`absolute inset-0 flex flex-col bg-[#09090b] transition-all duration-300 ease-in-out ${
-                panelMode === 'LIST' ? 'opacity-100 translate-y-0 z-30' : 'opacity-0 translate-y-10 z-0 pointer-events-none'
-            }`}
-          >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/50 bg-[#09090b] shrink-0">
-                    <span className="text-sm font-bold text-white flex items-center gap-2">
-                        <Activity size={14} className="text-green-500 animate-pulse" /> Live Network Data
-                    </span>
-                    <button 
-                        onClick={() => setPanelMode('LEGEND')}
-                        className="p-2 -mr-2 text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 rounded-lg transition-colors"
-                    >
-                        <X size={16} />
-                    </button>
-                </div>
-
-                <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar">
-                    {sortedLocations.map((loc, i) => (
-                        <div 
-                            id={`list-item-${loc.name}`}
-                            key={loc.name} 
-                            onClick={() => lockTarget(loc.name, loc.lat, loc.lon)}
-                            className={`group flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
-                                activeLocation === loc.name 
-                                ? 'bg-zinc-800 border-green-500/50 shadow-[inset_0_0_20px_rgba(34,197,94,0.1)]' 
-                                : 'bg-zinc-900/50 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800'
-                            }`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className={`flex items-center justify-center w-8 h-8 rounded-full font-mono text-xs font-bold ${
-                                    activeLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'
-                                }`}>
-                                    {i + 1}
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-bold text-zinc-200 group-hover:text-white">{loc.name}, {loc.country}</span>
-                                    <span 
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleCopyCoords(loc.lat, loc.lon, loc.name);
-                                        }}
-                                        className="text-[10px] text-zinc-500 flex items-center gap-1 hover:text-blue-400 cursor-copy transition-colors"
-                                        title="Click to copy GPS"
-                                    >
-                                        <MapPin size={10} /> 
-                                        {copiedCoords === loc.name ? <span className="text-green-500 font-bold">Copied!</span> : `${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}`}
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <div className={`text-sm font-mono font-bold ${activeLocation === loc.name ? 'text-green-400' : 'text-blue-400'}`}>{getMetricText(loc)}</div>
-                                <div className="text-[10px] text-zinc-500">{loc.count} Nodes</div>
-                            </div>
+            {/* Legend Tiers */}
+            <div className="px-6 py-4 flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-8 overflow-x-auto">
+                <div className="flex items-center gap-2 md:gap-4 w-full">
+                    {LEGEND_LABELS[viewMode].map((label, idx) => (
+                        <div key={idx} className="flex flex-col items-center gap-1.5 flex-1">
+                            <div className="w-full h-1.5 rounded-full" style={{ backgroundColor: TIER_COLORS[idx] }}></div>
+                            <span className="text-[9px] font-mono text-zinc-500 font-bold whitespace-nowrap">{label}</span>
                         </div>
                     ))}
                 </div>
-          </div>
+            </div>
+        </div>
+
+        {/* --- 4. THE SPLIT-VIEW DRAWER (The "Dock") --- */}
+        <div 
+            className={`bg-[#09090b] flex flex-col transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] overflow-hidden ${
+                drawerOpen ? 'flex-1 border-t border-zinc-700 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]' : 'h-0 opacity-0'
+            }`}
+        >
+            {/* Dock Header with ENGAGING TOGGLES */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900/50">
+                <div className="flex items-center gap-4">
+                     <span className="text-sm font-bold text-white uppercase tracking-widest hidden md:block">Active Nodes</span>
+                     {/* Toggles inside dock for engagement */}
+                     <ViewToggles />
+                </div>
+                <button 
+                    onClick={() => setDrawerOpen(false)} 
+                    className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-colors"
+                >
+                    <X size={18} />
+                </button>
+            </div>
+
+            {/* Scrollable List */}
+            <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar bg-[#09090b]">
+                {sortedLocations.map((loc, i) => (
+                    <div 
+                        id={`list-item-${loc.name}`}
+                        key={loc.name} 
+                        onClick={() => lockTarget(loc.name, loc.lat, loc.lon)}
+                        className={`group flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                            activeLocation === loc.name 
+                            ? 'bg-zinc-800 border-green-500/50' 
+                            : 'bg-zinc-900/30 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800'
+                        }`}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className={`flex items-center justify-center w-6 h-6 rounded-full font-mono text-[10px] font-bold ${
+                                activeLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'
+                            }`}>
+                                {i + 1}
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-sm font-bold text-zinc-300 group-hover:text-white">{loc.name}, {loc.country}</span>
+                                <span className="text-[10px] text-zinc-500 font-mono">
+                                    {loc.lat.toFixed(2)}, {loc.lon.toFixed(2)}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className={`text-xs font-mono font-bold ${activeLocation === loc.name ? 'text-green-400' : 'text-blue-400'}`}>{getMetricText(loc)}</div>
+                            <div className="text-[10px] text-zinc-600">{loc.count} Nodes</div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+
+        {/* --- 5. ACTION BAR (Only visible when Drawer is CLOSED) --- */}
+        {!drawerOpen && (
+            <div className="shrink-0 p-4 bg-[#09090b] border-t border-zinc-800 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <button 
+                    onClick={() => setDrawerOpen(true)}
+                    className="w-full max-w-xl mx-auto flex items-center justify-center gap-3 px-6 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-blue-500/50 rounded-xl shadow-lg transition-all group"
+                >
+                    <Activity size={16} className="text-blue-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-bold uppercase tracking-widest text-zinc-200 group-hover:text-white">
+                        Click to Open Live Stats
+                    </span>
+                    <ChevronUp size={16} className="text-zinc-500 group-hover:-translate-y-1 transition-transform" />
+                </button>
+            </div>
+        )}
+
       </div>
     </div>
   );
