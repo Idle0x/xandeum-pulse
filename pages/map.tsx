@@ -27,19 +27,15 @@ const LEGEND_LABELS = {
     HEALTH:  ['< 40%', '40-60%', '60-75%', '75-90%', '> 90%']
 };
 
-const CONTEXT_DESCRIPTIONS = {
-    STORAGE: "Visualizing committed disk space.",
-    CREDITS: "Tracking accumulated node rewards.",
-    HEALTH: "Monitoring uptime and stability."
-};
-
 export default function MapPage() {
   const [locations, setLocations] = useState<LocationData[]>([]);
   const [stats, setStats] = useState<MapStats>({ totalNodes: 0, countries: 0, topRegion: 'Scanning...', topRegionMetric: 0 });
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('STORAGE');
   
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  // Renamed for clarity: isSplitView controls the dashboard split state
+  const [isSplitView, setIsSplitView] = useState(false);
+  
   const [activeLocation, setActiveLocation] = useState<string | null>(null);
   const [position, setPosition] = useState({ coordinates: [10, 20], zoom: 1.2 });
   const [copiedCoords, setCopiedCoords] = useState<string | null>(null);
@@ -64,24 +60,20 @@ export default function MapPage() {
   // --- INTERACTION LOGIC ---
 
   const lockTarget = (name: string, lat: number, lon: number) => {
-    // If the drawer is NOT open, open it so they can see the details "side by side"
-    if (!drawerOpen) setDrawerOpen(true);
-
     if (activeLocation === name) {
-        // If clicking the same one, just recenter map, don't close drawer
-        setPosition({ coordinates: [lon, lat], zoom: 3 });
+        resetView();
         return;
     }
     setActiveLocation(name);
     setPosition({ coordinates: [lon, lat], zoom: 3 });
     
-    // Scroll to item in list
-    setTimeout(() => {
-        if (listRef.current) {
-            const item = document.getElementById(`list-item-${name}`);
-            if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-       }
-    }, 100);
+    // Auto-scroll to item if in split view
+    if (isSplitView && listRef.current) {
+         setTimeout(() => {
+             const item = document.getElementById(`list-item-${name}`);
+             if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+         }, 300);
+    }
   };
 
   const resetView = () => {
@@ -159,11 +151,12 @@ export default function MapPage() {
     }
   };
 
-  // CLEANED UP HEADER SUBTITLE (Data only)
   const getDynamicSubtitle = () => {
      if (!leadingRegion) return "Analyzing network topology...";
      const { name, totalStorage, totalCredits, avgHealth, count } = leadingRegion;
 
+     // REMOVED: Generic context (moved to legend).
+     // KEPT: Specific data story.
      switch (viewMode) {
         case 'STORAGE':
              return `The largest hub, ${name}, is currently providing ${formatStorage(totalStorage)}.`;
@@ -173,6 +166,14 @@ export default function MapPage() {
              return `${name} is performing optimally with an average health score of ${avgHealth}% across ${count} nodes.`;
      }
   };
+
+  const getLegendContext = () => {
+      switch(viewMode) {
+          case 'STORAGE': return "Visualizing global committed disk space.";
+          case 'HEALTH': return "Monitoring uptime, version consensus, and stability.";
+          case 'CREDITS': return "Tracking accumulated node rewards and reputation.";
+      }
+  }
 
   const locationsForMap = useMemo(() => {
     if (!activeLocation) return locations;
@@ -245,171 +246,197 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* --- 2. MAIN FLEX AREA (Contains Map & Drawer in vertical split) --- */}
-      <div className="flex-1 flex flex-col min-h-0 relative">
-        
-        {/* MAP CONTAINER - Shrinks when drawer opens */}
-        <div className={`relative w-full transition-all duration-300 ease-in-out bg-[#080808] border-b border-zinc-800/50 ${drawerOpen ? 'flex-[0.8] md:flex-[1.5]' : 'flex-1'}`}>
-                {loading ? (
-                    <div className="absolute inset-0 flex items-center justify-center z-20"><Globe className="animate-pulse text-blue-500" /></div>
-                ) : (
-                    <ComposableMap projectionConfig={{ scale: 170 }} className="w-full h-full" style={{ width: "100%", height: "100%" }}>
-                    <ZoomableGroup zoom={position.zoom} center={position.coordinates as [number, number]} onMoveEnd={handleMoveEnd} maxZoom={5}>
-                        <Geographies geography={GEO_URL}>
-                        {({ geographies }: { geographies: any }) => geographies.map((geo: any) => (
-                            <Geography key={geo.rsmKey} geography={geo} fill="#1f1f1f" stroke="#333" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { fill: "#333", outline: "none" }, pressed: { outline: "none" }}} />
-                        ))}
-                        </Geographies>
-                        {locationsForMap.map((loc) => {
-                        const size = sizeScale(loc.count);
-                        const isActive = activeLocation === loc.name;
-                        const tier = getTier(loc);
-                        const baseColor = TIER_COLORS[tier];
+      {/* --- 2. MAP AREA (Flexible - Shrinks when Split View is Active) --- */}
+      <div 
+        className={`relative w-full bg-[#080808] border-b border-zinc-800/50 transition-all duration-500 ease-in-out ${
+            isSplitView ? 'h-[50vh]' : 'flex-1 min-h-0' 
+        }`}
+      >
+            {loading ? (
+                <div className="absolute inset-0 flex items-center justify-center z-20"><Globe className="animate-pulse text-blue-500" /></div>
+            ) : (
+                <ComposableMap projectionConfig={{ scale: 170 }} className="w-full h-full" style={{ width: "100%", height: "100%" }}>
+                <ZoomableGroup zoom={position.zoom} center={position.coordinates as [number, number]} onMoveEnd={handleMoveEnd} maxZoom={5}>
+                    <Geographies geography={GEO_URL}>
+                    {({ geographies }: { geographies: any }) => geographies.map((geo: any) => (
+                        <Geography key={geo.rsmKey} geography={geo} fill="#1f1f1f" stroke="#333" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { fill: "#333", outline: "none" }, pressed: { outline: "none" }}} />
+                    ))}
+                    </Geographies>
+                    {locationsForMap.map((loc) => {
+                    const size = sizeScale(loc.count);
+                    const isActive = activeLocation === loc.name;
+                    const tier = getTier(loc);
+                    const baseColor = TIER_COLORS[tier];
 
-                        return (
-                            <Marker key={loc.name} coordinates={[loc.lon, loc.lat]} onClick={() => lockTarget(loc.name, loc.lat, loc.lon)}>
-                            <g className="group cursor-pointer transition-all duration-500">
-                                <circle 
-                                    r={size * 2.5} 
-                                    fill={isActive ? '#22c55e' : baseColor} 
-                                    className="animate-ping opacity-20" 
-                                    style={{ animationDuration: isActive ? '1s' : '3s' }} 
+                    return (
+                        <Marker key={loc.name} coordinates={[loc.lon, loc.lat]} onClick={() => lockTarget(loc.name, loc.lat, loc.lon)}>
+                        <g className="group cursor-pointer transition-all duration-500">
+                            <circle 
+                                r={size * 2.5} 
+                                fill={isActive ? '#22c55e' : baseColor} 
+                                className="animate-ping opacity-20" 
+                                style={{ animationDuration: isActive ? '1s' : '3s' }} 
+                            />
+                            {isActive ? (
+                                <polygon 
+                                    points="0,-12 3,-4 11,-4 5,1 7,9 0,5 -7,9 -5,1 -11,-4 -3,-4" 
+                                    transform={`scale(${size/6})`}
+                                    fill="#52525b" stroke="#22c55e" strokeWidth={1.5}
+                                    className="drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]"
                                 />
-                                {isActive ? (
-                                    <polygon 
-                                        points="0,-12 3,-4 11,-4 5,1 7,9 0,5 -7,9 -5,1 -11,-4 -3,-4" 
-                                        transform={`scale(${size/6})`}
-                                        fill="#52525b" stroke="#22c55e" strokeWidth={1.5}
-                                        className="drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]"
-                                    />
-                                ) : (
-                                    <>
-                                        {viewMode === 'STORAGE' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} />}
-                                        {viewMode === 'CREDITS' && <circle r={size} fill={baseColor} stroke="#fff" strokeWidth={1} />}
-                                        {viewMode === 'HEALTH' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} className="rotate-45" />}
-                                    </>
-                                )}
-                                {isActive && (
-                                    <text y={-size - 15} textAnchor="middle" className="font-mono text-[8px] fill-white font-bold uppercase tracking-widest pointer-events-none drop-shadow-md z-50">
-                                        {loc.name}
-                                    </text>
-                                )}
-                            </g>
-                            </Marker>
-                        );
-                        })}
-                    </ZoomableGroup>
-                    </ComposableMap>
+                            ) : (
+                                <>
+                                    {viewMode === 'STORAGE' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} />}
+                                    {viewMode === 'CREDITS' && <circle r={size} fill={baseColor} stroke="#fff" strokeWidth={1} />}
+                                    {viewMode === 'HEALTH' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} className="rotate-45" />}
+                                </>
+                            )}
+                            {isActive && (
+                                <text y={-size - 15} textAnchor="middle" className="font-mono text-[8px] fill-white font-bold uppercase tracking-widest pointer-events-none drop-shadow-md z-50">
+                                    {loc.name}
+                                </text>
+                            )}
+                        </g>
+                        </Marker>
+                    );
+                    })}
+                </ZoomableGroup>
+                </ComposableMap>
+            )}
+
+            {/* Zoom Controls */}
+            <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-30">
+                <button onClick={handleZoomIn} title="Zoom In" className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Plus size={16} /></button>
+                <button onClick={handleZoomOut} title="Zoom Out" className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Minus size={16} /></button>
+                {(position.zoom > 1.2 || activeLocation) && (
+                    <button onClick={resetView} className="p-2 md:p-3 bg-red-900/80 border border-red-500/50 text-red-200 rounded-xl hover:text-white"><RotateCcw size={16} /></button>
                 )}
+            </div>
+      </div>
 
-                {/* Zoom Controls */}
-                <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-30">
-                    <button onClick={handleZoomIn} title="Zoom In" className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Plus size={16} /></button>
-                    <button onClick={handleZoomOut} title="Zoom Out" className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Minus size={16} /></button>
-                    {(position.zoom > 1.2 || activeLocation) && (
-                        <button onClick={resetView} className="p-2 md:p-3 bg-red-900/80 border border-red-500/50 text-red-200 rounded-xl hover:text-white"><RotateCcw size={16} /></button>
-                    )}
+      {/* --- 3. THE DOCK (State-Dependent Layout) --- */}
+      {/* If Split View (OPEN): Takes remaining height (approx 50vh).
+         If Legend View (CLOSED): Auto height to fit Legend content.
+      */}
+      <div className={`shrink-0 bg-[#09090b] z-40 flex flex-col transition-all duration-500 ease-in-out ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
+            
+            {/* CONTENT A: The Legend (Visible when !isSplitView) */}
+            <div className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4 transition-opacity duration-300 ${isSplitView ? 'hidden opacity-0' : 'flex opacity-100'}`}>
+                {/* View Toggles (Closed State) */}
+                <div className="w-full md:w-auto flex justify-center md:justify-start">
+                    <ViewToggles />
                 </div>
-        </div>
 
-        {/* --- 3. LEGEND / INFO BAR (Always Visible) --- */}
-        <div className="shrink-0 bg-[#09090b] z-40 flex flex-col border-b border-zinc-800">
-             {/* Text Context - Moved Here */}
-            <div className="px-6 py-3 border-b border-zinc-800/50 bg-zinc-900/20">
-                <div className="flex items-start gap-2 max-w-3xl">
-                    <Info size={14} className="text-blue-400 mt-0.5 shrink-0" />
-                    <p className="text-[11px] md:text-xs text-zinc-400 leading-tight">
-                        <strong className="text-zinc-200 block md:inline mb-1 md:mb-0 mr-1">{CONTEXT_DESCRIPTIONS[viewMode]}</strong> 
-                        Nodes are distributed according to the score range shown below. Regions are color-coded based on the tier they fall into.
-                    </p>
+                {/* The Legend & New Context Text */}
+                <div className="w-full md:w-auto bg-zinc-900/30 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3">
+                    
+                    {/* The new "Professional" Context Text above Legend */}
+                    <div className="flex items-start gap-2 max-w-xl">
+                        <Info size={12} className="text-blue-400 mt-0.5 shrink-0" />
+                        <p className="text-[10px] text-zinc-400 leading-tight">
+                            <strong className="text-zinc-200">{getLegendContext()}</strong> Nodes are distributed according to the score range shown below. Regions with higher scores are visualized by increased color intensity.
+                        </p>
+                    </div>
+
+                    <div className="w-full h-px bg-zinc-800/50"></div>
+
+                    {/* The Legend Bar */}
+                    <div className="grid grid-cols-3 md:grid-cols-5 gap-3 w-full">
+                        {LEGEND_LABELS[viewMode].map((label, idx) => (
+                            <div key={idx} className="flex flex-col items-center gap-1.5">
+                                <div className="w-8 h-1.5 rounded-full" style={{ backgroundColor: TIER_COLORS[idx] }}></div>
+                                <span className="text-[9px] font-mono text-zinc-500 font-bold whitespace-nowrap">{label}</span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
 
-            {/* Legend Tiers */}
-            <div className="px-6 py-4 flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-8 overflow-x-auto">
-                <div className="flex items-center gap-2 md:gap-4 w-full">
-                    {LEGEND_LABELS[viewMode].map((label, idx) => (
-                        <div key={idx} className="flex flex-col items-center gap-1.5 flex-1">
-                            <div className="w-full h-1.5 rounded-full" style={{ backgroundColor: TIER_COLORS[idx] }}></div>
-                            <span className="text-[9px] font-mono text-zinc-500 font-bold whitespace-nowrap">{label}</span>
+            {/* CONTENT B: The Live List (Visible when isSplitView) */}
+            <div className={`flex flex-col h-full overflow-hidden transition-opacity duration-500 ${isSplitView ? 'flex opacity-100' : 'hidden opacity-0'}`}>
+                 
+                 {/* Internal Dock Header */}
+                 <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-[#09090b]">
+                    <div className="flex items-center gap-4">
+                        <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                             <Activity size={16} className="text-green-500" /> Live Data Stream
+                        </h2>
+                        {/* Internal Toggles so user can switch while dock is open */}
+                        <div className="hidden md:block scale-90 origin-left"><ViewToggles /></div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                        <div className="md:hidden scale-75 origin-right"><ViewToggles /></div>
+                        <button 
+                            onClick={() => setIsSplitView(false)}
+                            className="p-2 bg-zinc-800 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
+                        >
+                            <X size={16} />
+                        </button>
+                    </div>
+                 </div>
+
+                 {/* The Scrollable List */}
+                 <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar bg-[#09090b]">
+                    {sortedLocations.map((loc, i) => (
+                        <div 
+                            id={`list-item-${loc.name}`}
+                            key={loc.name} 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                lockTarget(loc.name, loc.lat, loc.lon);
+                            }}
+                            className={`group flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
+                                activeLocation === loc.name 
+                                ? 'bg-zinc-800 border-green-500/50' 
+                                : 'bg-zinc-900/50 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800'
+                            }`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className={`flex items-center justify-center w-8 h-8 rounded-full font-mono text-xs font-bold ${
+                                    activeLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'
+                                }`}>
+                                    {i + 1}
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-bold text-zinc-200 group-hover:text-white">{loc.name}, {loc.country}</span>
+                                    <span 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleCopyCoords(loc.lat, loc.lon, loc.name);
+                                        }}
+                                        className="text-[10px] text-zinc-500 flex items-center gap-1 hover:text-blue-400 cursor-copy transition-colors"
+                                        title="Click to copy GPS"
+                                    >
+                                        <MapPin size={10} /> 
+                                        {copiedCoords === loc.name ? <span className="text-green-500 font-bold">Copied!</span> : `${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}`}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <div className={`text-sm font-mono font-bold ${activeLocation === loc.name ? 'text-green-400' : 'text-blue-400'}`}>{getMetricText(loc)}</div>
+                                <div className="text-[10px] text-zinc-500">{loc.count} Nodes</div>
+                            </div>
                         </div>
                     ))}
                 </div>
             </div>
-        </div>
 
-        {/* --- 4. THE SPLIT-VIEW DRAWER (The "Dock") --- */}
-        <div 
-            className={`bg-[#09090b] flex flex-col transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] overflow-hidden ${
-                drawerOpen ? 'flex-1 border-t border-zinc-700 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]' : 'h-0 opacity-0'
-            }`}
-        >
-            {/* Dock Header with ENGAGING TOGGLES */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900/50">
-                <div className="flex items-center gap-4">
-                     <span className="text-sm font-bold text-white uppercase tracking-widest hidden md:block">Active Nodes</span>
-                     {/* Toggles inside dock for engagement */}
-                     <ViewToggles />
-                </div>
-                <button 
-                    onClick={() => setDrawerOpen(false)} 
-                    className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-colors"
-                >
-                    <X size={18} />
-                </button>
-            </div>
-
-            {/* Scrollable List */}
-            <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar bg-[#09090b]">
-                {sortedLocations.map((loc, i) => (
-                    <div 
-                        id={`list-item-${loc.name}`}
-                        key={loc.name} 
-                        onClick={() => lockTarget(loc.name, loc.lat, loc.lon)}
-                        className={`group flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
-                            activeLocation === loc.name 
-                            ? 'bg-zinc-800 border-green-500/50' 
-                            : 'bg-zinc-900/30 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800'
-                        }`}
+            {/* ACTION BAR (Only visible when CLOSED / !isSplitView) */}
+            {!isSplitView && (
+                <div className="shrink-0 p-4 md:px-6 md:py-4 bg-[#09090b] border-t border-zinc-800 z-50 animate-in slide-in-from-bottom-5">
+                    <button 
+                        onClick={() => setIsSplitView(true)}
+                        className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 px-6 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-blue-500/50 rounded-xl shadow-lg transition-all group"
                     >
-                        <div className="flex items-center gap-3">
-                            <div className={`flex items-center justify-center w-6 h-6 rounded-full font-mono text-[10px] font-bold ${
-                                activeLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'
-                            }`}>
-                                {i + 1}
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-sm font-bold text-zinc-300 group-hover:text-white">{loc.name}, {loc.country}</span>
-                                <span className="text-[10px] text-zinc-500 font-mono">
-                                    {loc.lat.toFixed(2)}, {loc.lon.toFixed(2)}
-                                </span>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <div className={`text-xs font-mono font-bold ${activeLocation === loc.name ? 'text-green-400' : 'text-blue-400'}`}>{getMetricText(loc)}</div>
-                            <div className="text-[10px] text-zinc-600">{loc.count} Nodes</div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-
-        {/* --- 5. ACTION BAR (Only visible when Drawer is CLOSED) --- */}
-        {!drawerOpen && (
-            <div className="shrink-0 p-4 bg-[#09090b] border-t border-zinc-800 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <button 
-                    onClick={() => setDrawerOpen(true)}
-                    className="w-full max-w-xl mx-auto flex items-center justify-center gap-3 px-6 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-blue-500/50 rounded-xl shadow-lg transition-all group"
-                >
-                    <Activity size={16} className="text-blue-400 group-hover:scale-110 transition-transform" />
-                    <span className="text-xs font-bold uppercase tracking-widest text-zinc-200 group-hover:text-white">
-                        Click to Open Live Stats
-                    </span>
-                    <ChevronUp size={16} className="text-zinc-500 group-hover:-translate-y-1 transition-transform" />
-                </button>
-            </div>
-        )}
-
+                        <Activity size={18} className="text-blue-400 group-hover:scale-110 transition-transform" />
+                        <span className="text-xs md:text-sm font-bold uppercase tracking-widest text-zinc-200 group-hover:text-white">
+                            Click to Open Live Stats
+                        </span>
+                        <ChevronUp size={18} className="text-zinc-500 group-hover:-translate-y-1 transition-transform" />
+                    </button>
+                </div>
+            )}
       </div>
     </div>
   );
