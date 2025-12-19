@@ -204,8 +204,6 @@ export default function MapPage() {
   );
 
   return (
-    // FIX 1: Use 'fixed inset-0' to strictly constrain the app window. 
-    // This prevents overflow and scrollbar issues on all devices.
     <div className="fixed inset-0 bg-black text-white font-sans overflow-hidden flex flex-col">
       <Head>
         <title>Xandeum Command Center</title>
@@ -216,7 +214,7 @@ export default function MapPage() {
         `}</style>
       </Head>
 
-      {/* --- 1. HEADER (Fixed Top, Non-Shrinking) --- */}
+      {/* --- 1. HEADER (Fixed Top) --- */}
       <div className="shrink-0 w-full z-50 flex flex-col gap-4 px-6 py-4 bg-[#09090b] border-b border-zinc-800/50 shadow-lg">
         <div className="flex items-center justify-between w-full">
             <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all cursor-pointer">
@@ -246,10 +244,10 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* --- 2. MAP AREA (Flexible - Shrinks when Split View is Active) --- */}
-      {/* FIX 2: 'flex-1 basis-0 min-h-0' ensures the map never pushes the Dock off-screen, even on Desktop */}
+      {/* --- 2. MAP AREA --- */}
+      {/* ACTION: Removed 'transition-all duration-500 ease-in-out' from below */}
       <div 
-        className={`relative w-full bg-[#080808] border-b border-zinc-800/50 transition-all duration-500 ease-in-out ${
+        className={`relative w-full bg-[#080808] border-b border-zinc-800/50 ${
             isSplitView ? 'h-[50vh] shrink-0' : 'flex-1 basis-0 min-h-0' 
         }`}
       >
@@ -315,32 +313,26 @@ export default function MapPage() {
             </div>
       </div>
 
-      {/* --- 3. THE DOCK (State-Dependent Layout) --- */}
-      {/* FIX 3: Increased Z-Index to 50 and 'shrink-0' ensures it sits above map if needed, 
-          but flex layout should now prevent overlap. */}
-      <div className={`shrink-0 bg-[#09090b] relative z-50 flex flex-col transition-all duration-500 ease-in-out ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
+      {/* --- 3. THE DOCK --- */}
+      {/* ACTION: Removed 'transition-all duration-500 ease-in-out' from below */}
+      <div className={`shrink-0 bg-[#09090b] relative z-50 flex flex-col ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
             
             {/* CONTENT A: The Legend (Visible when !isSplitView) */}
-            <div className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4 transition-opacity duration-300 ${isSplitView ? 'hidden opacity-0' : 'flex opacity-100'}`}>
+            <div className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4 ${isSplitView ? 'hidden' : 'flex'}`}>
                 {/* View Toggles (Closed State) */}
                 <div className="w-full md:w-auto flex justify-center md:justify-start">
                     <ViewToggles />
                 </div>
 
-                {/* The Legend & New Context Text */}
+                {/* The Legend & Context */}
                 <div className="w-full md:w-auto bg-zinc-900/30 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3">
-                    
-                    {/* The new "Professional" Context Text above Legend */}
                     <div className="flex flex-col gap-2 max-w-xl">
-                        {/* 1. Data Context */}
                         <div className="flex items-start gap-2">
                             <Info size={12} className="text-blue-400 mt-0.5 shrink-0" />
                             <p className="text-[10px] text-zinc-400 leading-tight">
                                 <strong className="text-zinc-200">{getLegendContext()}</strong> Nodes are distributed according to the score range shown below.
                             </p>
                         </div>
-                        
-                        {/* 2. Pulse Context (Confirmed Added) */}
                         <p className="text-[10px] text-zinc-500 leading-tight pl-5">
                             <strong className="text-zinc-400">Pulse Intensity</strong> represents node density in a region. The thicker/brighter the intensity, the higher the nodes in that region.
                         </p>
@@ -361,7 +353,7 @@ export default function MapPage() {
             </div>
 
             {/* CONTENT B: The Live List (Visible when isSplitView) */}
-            <div className={`flex flex-col h-full overflow-hidden transition-opacity duration-500 ${isSplitView ? 'flex opacity-100' : 'hidden opacity-0'}`}>
+            <div className={`flex flex-col h-full overflow-hidden ${isSplitView ? 'flex' : 'hidden'}`}>
                  
                  {/* Internal Dock Header */}
                  <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-[#09090b]">
