@@ -13,7 +13,6 @@ const TIMEOUT_BACKUP = 6000;
 let geoCache = new Map<string, { lat: number; lon: number; country: string; city: string }>();
 
 // --- HELPER: VERSION COMPARISON ---
-// Returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal
 const compareVersions = (v1: string, v2: string) => {
   const p1 = v1.replace(/[^0-9.]/g, '').split('.').map(Number);
   const p2 = v2.replace(/[^0-9.]/g, '').split('.').map(Number);
@@ -57,32 +56,33 @@ async function fetchGeoBatch(ips: string[]) {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    // 1. FETCH DATA
+    // 1. FETCH DATA (RPC + CREDITS API)
     const [pods, creditsRes] = await Promise.all([
       getPodsFromRPC(),
-      axios.get('https://podcredits.xandeum.network/api/pods-credits').catch(() => ({ data: [] }))
+      axios.get('https://podcredits.xandeum.network/api/pods-credits').catch(() => ({ data: {} }))
     ]);
 
-    // 2. CALCULATE NETWORK HEALTH (Consensus Logic)
-    // Find the "Most Common" version (Consensus), not necessarily the "Highest"
+    // 2. CALCULATE CONSENSUS VERSION
     const versionCounts: Record<string, number> = {};
     pods.forEach((p: any) => {
         const v = p.version || '0.0.0';
         versionCounts[v] = (versionCounts[v] || 0) + 1;
     });
-    
-    // Sort versions by frequency (count) descending
     const consensusVersion = Object.keys(versionCounts).sort((a, b) => versionCounts[b] - versionCounts[a])[0] || '0.0.0';
 
-    // 3. BUILD CREDITS MAP
+    // 3. BUILD CREDITS MAP (FIXED LOGIC)
     const creditsMap = new Map<string, number>();
-    const creditsData = Array.isArray(creditsRes.data) ? creditsRes.data : [];
-    creditsData.forEach((c: any) => {
-      const key = c.pubkey || c.account || c.node_id;
-      // Credits API returns raw numbers, assume standard unit
-      const amount = parseFloat(c.amount || c.balance || 0);
-      if (key) creditsMap.set(key, amount);
-    });
+    // Credits API returns { "pods_credits": [ ... ] }
+    const creditsArray = creditsRes.data?.pods_credits || [];
+    
+    if (Array.isArray(creditsArray)) {
+        creditsArray.forEach((c: any) => {
+            // Map 'pod_id' -> 'credits'
+            if (c.pod_id && c.credits !== undefined) {
+                creditsMap.set(c.pod_id, parseFloat(c.credits));
+            }
+        });
+    }
 
     // 4. GEOCODING
     const uniqueIps = [...new Set(pods.map((p: any) => p.address.split(':')[0]))] as string[];
@@ -113,25 +113,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (geo) {
         const key = `${geo.city}-${geo.country}`;
         
-        // --- STORAGE FIX ---
-        // Raw data is in Bytes (e.g., 340000000000). Divide by 1024^3 to get GB.
+        // --- STORAGE FIX (Bytes -> GB) ---
         const rawStorage = parseFloat(node.storage_committed || '0');
         const storageGB = rawStorage / (1024 * 1024 * 1024);
 
-        // --- HEALTH CALCULATION ---
+        // --- HEALTH CALCULATION (Hybrid) ---
         let health = 100;
         const nodeVersion = node.version || '0.0.0';
-        
-        // Penalize if older than consensus
+        const uptimeSeconds = node.uptime || 0;
+
+        // Penalty 1: Version Mismatch (-15)
         if (compareVersions(nodeVersion, consensusVersion) < 0) {
             health -= 15;
         }
-        // Penalize if uptime is suspiciously low (< 1 hour)
-        if ((node.uptime || 0) < 3600) {
-            health -= 5;
+
+        // Penalty 2: Low Uptime (-20)
+        // If uptime is less than 24 hours (86400 seconds), it's not fully stable yet
+        if (uptimeSeconds < 86400) {
+            health -= 20;
         }
 
-        // --- CREDITS ---
+        // --- CREDITS FIX (Match by Pubkey) ---
         const credits = creditsMap.get(node.pubkey) || 0;
 
         if (cityMap.has(key)) {
