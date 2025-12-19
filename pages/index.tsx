@@ -654,8 +654,9 @@ export default function Home() {
                         {networkStability}%
                         <span className="text-[10px] text-green-500 mb-1.5">●</span>
                     </div>
-                    <div className="text-[9px] text-zinc-600 font-mono mt-1">Uptime > 24h</div>
-                </div>
+                    <div className="text-[9px] text-zinc-600 font-mono mt-1">
+                      Uptime {'>'} 24h
+                    </div>
 
                 {/* 2. Health Score (The Star of the Show) */}
                 <div className="border-r border-white/5 px-2">
