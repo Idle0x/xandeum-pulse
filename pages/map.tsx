@@ -4,7 +4,7 @@ import Link from 'next/link';
 import axios from 'axios';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleSqrt } from 'd3-scale';
-import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, Target } from 'lucide-react';
+import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -20,7 +20,6 @@ interface MapStats {
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
 // --- COLOR BUCKETS (5 Tiers) ---
-// Used for the map markers. The Legend will visually blend these.
 const TIER_COLORS = ["#22d3ee", "#3b82f6", "#a855f7", "#ec4899", "#f59e0b"]; 
 
 export default function MapPage() {
@@ -95,6 +94,8 @@ export default function MapPage() {
     }
   };
 
+  // --- SORTING LOGIC ---
+  // 1. Sort for List (Drawer)
   const sortedLocations = useMemo(() => {
     return [...locations].sort((a, b) => {
         if (viewMode === 'STORAGE') return b.totalStorage - a.totalStorage;
@@ -103,20 +104,70 @@ export default function MapPage() {
     });
   }, [locations, viewMode]);
 
+  // 2. Sort for Map Rendering (Z-INDEX FIX)
+  // We move the 'activeLocation' to the VERY END of the array.
+  // In SVG, the last element drawn sits "on top" of previous elements.
+  const locationsForMap = useMemo(() => {
+    if (!activeLocation) return locations;
+    const others = locations.filter(l => l.name !== activeLocation);
+    const active = locations.find(l => l.name === activeLocation);
+    return active ? [...others, active] : others;
+  }, [locations, activeLocation]);
+
+
+  // --- COMPONENT: TOGGLE BUTTONS (Reusable) ---
+  const ViewToggles = ({ className = "" }: { className?: string }) => (
+    <div className={`flex items-center gap-1 p-1 bg-zinc-900/90 border border-zinc-800 rounded-xl shadow-lg ${className}`}>
+        {(['STORAGE', 'HEALTH', 'CREDITS'] as ViewMode[]).map((mode) => {
+            let Icon = Database;
+            if (mode === 'HEALTH') Icon = Activity;
+            if (mode === 'CREDITS') Icon = Zap;
+            const active = viewMode === mode;
+            return (
+                <button
+                    key={mode}
+                    onClick={(e) => { e.stopPropagation(); setViewMode(mode); }}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                        active ? 'bg-blue-600 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
+                    }`}
+                >
+                    <Icon size={12} />
+                    <span className="text-[10px] font-bold tracking-wide">{mode}</span>
+                </button>
+            )
+        })}
+    </div>
+  );
+
   return (
     <div className="h-screen w-screen bg-black text-white font-sans overflow-hidden flex flex-col relative">
       <Head><title>Xandeum Command Center</title></Head>
 
-      {/* --- HEADER --- */}
-      <div className="absolute top-6 left-6 z-50">
-        <Link href="/" className="group flex items-center gap-3 px-4 py-2 rounded-full bg-zinc-900/90 border border-zinc-800 hover:border-blue-500/50 backdrop-blur-md transition-all">
-            <ArrowLeft size={16} className="text-zinc-400 group-hover:text-blue-400" />
-            <span className="text-xs font-bold tracking-widest uppercase text-zinc-300">Dashboard</span>
+      {/* --- NEW HEADER STRUCTURE --- */}
+      <div className="absolute top-6 left-6 z-50 flex flex-col items-start gap-4 max-w-[80%]">
+        {/* Minimal Back Button */}
+        <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all">
+            <ArrowLeft size={14} className="text-zinc-400 group-hover:text-white" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-300">Operations</span>
         </Link>
+        
+        {/* Big Title & Subtitle */}
+        <div>
+            <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-white to-zinc-400">
+                Global Distribution of {viewMode.charAt(0) + viewMode.slice(1).toLowerCase()}
+            </h1>
+            <div className="flex items-center gap-2 mt-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                <p className="text-xs md:text-sm text-zinc-400 font-mono">
+                    Tracking <span className="text-white font-bold">{stats.totalNodes}</span> nodes across <span className="text-white font-bold">{stats.countries}</span> regions
+                </p>
+            </div>
+        </div>
       </div>
 
-      {/* --- LAYER 1: MAP FRAME (50% Height) --- */}
-      <div className="relative z-10 mx-6 mt-20 h-[50vh] border border-zinc-800/50 rounded-3xl overflow-hidden shadow-2xl bg-[#080808] transition-all duration-500">
+      {/* --- MAP FRAME (50% Height) --- */}
+      {/* Added mt-32 to push map down below the new larger header */}
+      <div className="relative z-10 mx-6 mt-32 h-[45vh] border border-zinc-800/50 rounded-3xl overflow-hidden shadow-2xl bg-[#080808] transition-all duration-500">
         <div className="absolute inset-0 pointer-events-none">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_#1a202c_0%,_#000000_80%)] opacity-50"></div>
             <div className="absolute inset-0 opacity-10" 
@@ -134,7 +185,9 @@ export default function MapPage() {
                     <Geography key={geo.rsmKey} geography={geo} fill="#1f1f1f" stroke="#333" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { fill: "#333", outline: "none" }, pressed: { outline: "none" }}} />
                 ))}
               </Geographies>
-              {locations.map((loc) => {
+              
+              {/* RENDER LOOP: Uses 'locationsForMap' where active node is LAST (Top Z-Index) */}
+              {locationsForMap.map((loc) => {
                 const size = sizeScale(loc.count);
                 const isActive = activeLocation === loc.name;
                 const tier = getTier(loc);
@@ -164,12 +217,12 @@ export default function MapPage() {
                             </>
                         )}
                         {isActive && (
-                            <text y={-size - 15} textAnchor="middle" className="font-mono text-[8px] fill-white font-bold uppercase tracking-widest pointer-events-none drop-shadow-md">
+                            <text y={-size - 15} textAnchor="middle" className="font-mono text-[8px] fill-white font-bold uppercase tracking-widest pointer-events-none drop-shadow-md z-50">
                                 {loc.name}
                             </text>
                         )}
                         {isActive && (
-                            <text y={size + 15} textAnchor="middle" className="font-sans text-[6px] fill-green-400 font-bold pointer-events-none">
+                            <text y={size + 15} textAnchor="middle" className="font-sans text-[6px] fill-green-400 font-bold pointer-events-none z-50">
                                 {getMetricText(loc)}
                             </text>
                         )}
@@ -187,115 +240,94 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* --- LAYER 2: THE DOCK & LEGEND --- */}
-      <div className="absolute top-[55vh] mt-4 left-0 right-0 z-40 flex flex-col items-center pointer-events-none">
+      {/* --- LAYER 2: THE DOCK & LEGEND (Desktop & Mobile) --- */}
+      <div className="absolute top-[55vh] mt-6 left-0 right-0 z-40 flex flex-col items-center pointer-events-none">
         
-        {/* Toggle Buttons */}
-        <div className="pointer-events-auto flex items-center gap-1 p-1.5 bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 rounded-2xl shadow-2xl mb-4">
-            {(['STORAGE', 'HEALTH', 'CREDITS'] as ViewMode[]).map((mode) => {
-                let Icon = Database;
-                if (mode === 'HEALTH') Icon = Activity;
-                if (mode === 'CREDITS') Icon = Zap;
-                const active = viewMode === mode;
-                return (
-                    <button
-                        key={mode}
-                        onClick={() => setViewMode(mode)}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all ${
-                            active ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
-                        }`}
-                    >
-                        <Icon size={14} />
-                        <span className="text-xs font-bold tracking-wide">{mode}</span>
-                    </button>
-                )
-            })}
+        {/* Toggle Buttons (Visible outside modal only on Desktop) */}
+        <div className="hidden md:block pointer-events-auto mb-4">
+            <ViewToggles />
         </div>
         
-        {/* NEW LEGEND: Vertical Gradient Line */}
+        {/* LEGEND: Vertical Gradient Line */}
         <div className="flex flex-col items-center text-[9px] text-zinc-400 font-mono bg-black/40 px-4 py-3 rounded-2xl border border-zinc-800/50 backdrop-blur-sm shadow-xl">
             <div className="mb-2 font-bold text-zinc-300">Pulse shows node density</div>
-            
             <div className="flex items-stretch gap-3">
-                {/* THE VERTICAL GRADIENT LINE (Cyan -> Gold) */}
                 <div className="w-1.5 rounded-full bg-gradient-to-b from-[#22d3ee] via-[#a855f7] to-[#f59e0b] shadow-[0_0_10px_rgba(59,130,246,0.3)]"></div>
-                
-                {/* The Labels (Aligned to the gradient) */}
                 <div className="flex flex-col justify-between h-24 text-[8px] text-zinc-500 font-bold uppercase tracking-wider py-1">
                     {viewMode === 'STORAGE' && (
-                        <>
-                            <span>&lt; 1 GB</span>
-                            <span>1 - 10 GB</span>
-                            <span>10 - 100 GB</span>
-                            <span>100 GB - 1 TB</span>
-                            <span className="text-[#f59e0b]">&gt; 1 TB</span>
-                        </>
+                        <><span>&lt; 1 GB</span><span>1 - 10 GB</span><span>10 - 100 GB</span><span>100 GB - 1 TB</span><span className="text-[#f59e0b]">&gt; 1 TB</span></>
                     )}
                     {viewMode === 'CREDITS' && (
-                        <>
-                            <span>&lt; 100</span>
-                            <span>100 - 1k</span>
-                            <span>1k - 10k</span>
-                            <span>10k - 100k</span>
-                            <span className="text-[#f59e0b]">&gt; 100k</span>
-                        </>
+                        <><span>&lt; 100</span><span>100 - 1k</span><span>1k - 10k</span><span>10k - 100k</span><span className="text-[#f59e0b]">&gt; 100k</span></>
                     )}
                     {viewMode === 'HEALTH' && (
-                        <>
-                            <span>&lt; 50%</span>
-                            <span>50% - 80%</span>
-                            <span>80% - 90%</span>
-                            <span>90% - 98%</span>
-                            <span className="text-[#f59e0b]">&gt; 98%</span>
-                        </>
+                        <><span>&lt; 50%</span><span>50% - 80%</span><span>80% - 90%</span><span>90% - 98%</span><span className="text-[#f59e0b]">&gt; 98%</span></>
                     )}
                 </div>
             </div>
         </div>
       </div>
 
-      {/* --- LAYER 3: FLOATING PILL BUTTON --- */}
+      {/* --- LAYER 3: TRIGGER BUTTONS (Responsive) --- */}
       
-      {/* RESPONSIVE POSITIONING: 
-          - Mobile (default): bottom-8 (Dock Style)
-          - Desktop (md:): top-[80vh] (Floating Middle Style) 
-      */}
       {!drawerOpen && (
-          <div className="absolute bottom-8 md:bottom-auto md:top-[80vh] left-0 right-0 flex justify-center z-50 pointer-events-none transition-all duration-500">
-              <button 
-                onClick={() => setDrawerOpen(true)}
-                className="pointer-events-auto flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-700 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.8)] text-zinc-200 hover:text-white hover:border-blue-500/50 hover:bg-zinc-800 transition-all active:scale-95 transform md:-translate-y-1/2"
-              >
-                <Activity size={16} className="text-blue-400" />
-                <span className="text-xs font-bold uppercase tracking-widest">Live Statistics</span>
-                <ChevronUp size={16} className="text-zinc-500" />
-              </button>
-          </div>
+          <>
+            {/* DESKTOP TRIGGER: Floating Pill in Middle */}
+            <div className="hidden md:flex absolute top-[80vh] left-0 right-0 justify-center z-50 pointer-events-none transition-all duration-500">
+                <button 
+                    onClick={() => setDrawerOpen(true)}
+                    className="pointer-events-auto flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-700 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.8)] text-zinc-200 hover:text-white hover:border-blue-500/50 hover:bg-zinc-800 transition-all active:scale-95 transform -translate-y-1/2"
+                >
+                    <Activity size={16} className="text-blue-400" />
+                    <span className="text-xs font-bold uppercase tracking-widest">Live Statistics</span>
+                    <ChevronUp size={16} className="text-zinc-500" />
+                </button>
+            </div>
+
+            {/* MOBILE TRIGGER: Fixed Bottom Dock (Horizontal Bar) */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#09090b] border-t border-zinc-800 pb-safe">
+                <button 
+                    onClick={() => setDrawerOpen(true)}
+                    className="w-full flex items-center justify-between px-6 py-4 text-zinc-300 hover:text-white transition-colors"
+                >
+                    <div className="flex items-center gap-2">
+                        <Activity size={16} className="text-blue-400" />
+                        <span className="text-xs font-bold uppercase tracking-widest">Live Statistics</span>
+                    </div>
+                    <ChevronUp size={16} />
+                </button>
+            </div>
+          </>
       )}
 
-      {/* 2. EXPANDED STATE: Floating Card */}
+      {/* --- LAYER 4: EXPANDED MODAL --- */}
       {drawerOpen && (
-          <div className="absolute inset-x-0 z-50 px-4 pointer-events-none flex flex-col items-center justify-center h-full">
-            <div className="absolute inset-0 pointer-events-auto bg-black/20" onClick={() => setDrawerOpen(false)}></div>
+          <div className="absolute inset-x-0 z-50 px-0 md:px-4 pointer-events-none flex flex-col items-center justify-center h-full">
+            <div className="absolute inset-0 pointer-events-auto bg-black/40 backdrop-blur-sm" onClick={() => setDrawerOpen(false)}></div>
             
-            {/* Expanded Card: Starts below dock, ends near bottom */}
-            <div className="absolute top-[62vh] bottom-8 w-full max-w-lg mx-auto bg-[#09090b]/95 border border-zinc-700 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden animate-in zoom-in-95 fade-in duration-300 pointer-events-auto">
+            {/* Modal Card */}
+            {/* Desktop: Centered Floating Card. Mobile: Full Width Bottom Sheet */}
+            <div className="absolute bottom-0 md:bottom-8 md:top-[62vh] w-full md:w-[500px] h-[60vh] md:h-auto md:max-h-[35vh] bg-[#09090b] md:bg-[#09090b]/95 border-t md:border border-zinc-700 md:rounded-[2rem] rounded-t-3xl shadow-[0_-10px_50px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300 pointer-events-auto">
                 
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/50 bg-black/20 shrink-0" onClick={() => setDrawerOpen(false)}>
-                    <div className="flex flex-col">
-                        <span className="text-sm font-bold text-white flex items-center gap-2">
-                            <Activity size={14} className="text-green-500" /> Live Network Breakdown
+                {/* Header with Toggles inside */}
+                <div className="flex flex-col gap-3 px-6 py-4 border-b border-zinc-800/50 bg-black/20 shrink-0">
+                    <div className="flex items-center justify-between" onClick={() => setDrawerOpen(false)}>
+                         <span className="text-sm font-bold text-white flex items-center gap-2">
+                            <Activity size={14} className="text-green-500" /> Network Data
                         </span>
-                        <span className="text-[10px] text-zinc-500">Sorted by {viewMode.toLowerCase()} • {locations.length} Regions</span>
+                        <button className="p-2 bg-zinc-800/50 rounded-full text-zinc-400 hover:bg-zinc-700">
+                            <ChevronDown size={16} />
+                        </button>
                     </div>
-                    <button className="p-2 bg-zinc-800/50 rounded-full text-zinc-400 hover:bg-zinc-700">
-                        <ChevronDown size={16} />
-                    </button>
+                    
+                    {/* TOGGLES INSIDE MODAL */}
+                    <div className="w-full">
+                        <ViewToggles className="w-full justify-between bg-black/50" />
+                    </div>
                 </div>
 
                 {/* List - Scrollable */}
-                <div className="flex-grow overflow-y-auto p-4 space-y-2">
+                <div className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe">
                     {sortedLocations.map((loc, i) => (
                         <div 
                             key={loc.name} 
