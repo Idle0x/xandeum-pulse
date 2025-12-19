@@ -186,7 +186,8 @@ export default function Home() {
   const [lastUpdated, setLastUpdated] = useState('');
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'rank'>('uptime');
+  // CHANGED: 'rank' -> 'health'
+  const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'health'>('uptime');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   
@@ -194,6 +195,15 @@ export default function Home() {
   const [showReputationInfo, setShowReputationInfo] = useState(false); 
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   
+  // RESTORED: Search Tips State
+  const [searchTipIndex, setSearchTipIndex] = useState(0);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchTips = [
+    "Search by IP, Public Key, or Version",
+    "Tip: Click any node card for deep inspection",
+    "Use the map to visualize network topology"
+  ];
+
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null); 
   const [cycleStep, setCycleStep] = useState(0);
@@ -216,15 +226,22 @@ export default function Home() {
     document.addEventListener('visibilitychange', handleVisibility);
 
     const cycleInterval = setInterval(() => { setCycleStep(prev => prev + 1); }, 4000);
+    
+    // RESTORED: Search Tip Interval
+    const tipInterval = setInterval(() => {
+        if (!isSearchFocused) setSearchTipIndex(prev => (prev + 1) % searchTips.length);
+    }, 5000);
+
     const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') { setSelectedNode(null); if(router.query.open) router.replace('/', undefined, { shallow: true }); } };
     document.addEventListener('keydown', handleEscape);
 
     return () => {
         clearInterval(cycleInterval);
+        clearInterval(tipInterval);
         document.removeEventListener('visibilitychange', handleVisibility);
         document.removeEventListener('keydown', handleEscape);
     };
-  }, []);
+  }, [isSearchFocused]);
 
   useEffect(() => {
     if (!loading && nodes.length > 0 && router.query.open) {
@@ -384,16 +401,19 @@ export default function Home() {
     .sort((a, b) => {
       let valA: any, valB: any;
       if (sortBy === 'storage') { valA = a.storage_committed || 0; valB = b.storage_committed || 0; } 
-      else { valA = a[sortBy === 'rank' ? 'rank' : sortBy] as any; valB = b[sortBy === 'rank' ? 'rank' : sortBy] as any; }
+      // NEW: Health Sorting
+      else if (sortBy === 'health') {
+          valA = getHealthScore(a, mostCommonVersion, medianCredits);
+          valB = getHealthScore(b, mostCommonVersion, medianCredits);
+      }
+      else { valA = a[sortBy] as any; valB = b[sortBy] as any; }
       
       if (sortBy === 'version') return sortOrder === 'asc' ? compareVersions(a.version, b.version) : compareVersions(b.version, a.version);
-      if (sortBy === 'rank') return sortOrder === 'asc' ? valA - valB : valB - valA;
       return sortOrder === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
     });
 
   const watchListNodes = nodes.filter(node => favorites.includes(node.address));
 
-  // --- FIXED: exportCSV DEFINED HERE (Scope Accessible) ---
   const exportCSV = () => {
     const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Utilization_Percent,Health_Score,Network_Mode,Last_Seen_ISO,RPC_URL,Is_Favorite\n';
     
@@ -508,7 +528,7 @@ export default function Home() {
       {isMenuOpen && <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>}
 
       <div className="p-4 md:p-8 flex-grow">
-      {/* HEADER (REFACTORED) */}
+      {/* HEADER (STICKY) */}
       <header className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-zinc-800 pb-6 sticky top-0 z-30 bg-[#09090b]/90 backdrop-blur-md pt-4 -mt-4 -mx-4 px-4 md:-mx-8 md:px-8">
         <div className="flex items-center gap-4 w-full md:w-auto mb-4 md:mb-0">
             <button onClick={() => setIsMenuOpen(true)} className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-400 hover:text-white hover:border-zinc-500 transition"><Menu size={20}/></button>
@@ -521,7 +541,7 @@ export default function Home() {
             </div>
         </div>
 
-        {/* SEARCH (MOVED TO HEADER) */}
+        {/* SEARCH (WITH ROTATING TIP) */}
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-2.5 text-zinc-500" size={16} />
           <input 
@@ -530,8 +550,18 @@ export default function Home() {
             className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 pl-9 pr-8 text-sm text-white focus:border-blue-500 outline-none transition placeholder-zinc-600"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => setIsSearchFocused(false)}
           />
           {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-3 top-2.5 text-zinc-500 hover:text-white"><X size={14} /></button>}
+          
+          {/* RESTORED: ROTATING SEARCH TIPS */}
+          <div className="absolute top-full left-0 right-0 mt-1.5 flex justify-center">
+             <p className="text-[9px] text-zinc-500 font-mono tracking-wide uppercase flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 key={searchTipIndex}">
+                <Info size={10} className="text-blue-500" />
+                {isSearchFocused ? "Search by IP, Public Key, or Version" : searchTips[searchTipIndex]}
+             </p>
+          </div>
         </div>
       </header>
 
@@ -543,7 +573,7 @@ export default function Home() {
       )}
 
       {/* STATS OVERVIEW */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 mt-2">
         <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
           <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Network Capacity</div>
           <div className="text-2xl md:text-3xl font-bold text-white mt-1">{formatBytes(totalStorageCommitted)}</div>
@@ -563,21 +593,32 @@ export default function Home() {
         </div>
       </div>
 
-      {/* WATCHLIST SECTION */}
-      {watchListNodes.length > 0 && (
+      {/* RESTORED: WATCHLIST EMPTY STATE */}
+      {favorites.length > 0 ? (
         <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
            <div className="flex items-center gap-2 mb-4"><Star className="text-yellow-500" fill="currentColor" size={20} /><h3 className="text-lg font-bold text-white tracking-widest uppercase">Your Watchlist</h3></div>
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 border-b border-zinc-800 pb-10">{watchListNodes.map((node, i) => renderNodeCard(node, i))}</div>
         </div>
+      ) : (
+        <div className="mb-10 p-6 bg-zinc-900/30 border border-zinc-800/50 border-dashed rounded-xl text-center animate-in fade-in">
+            <Star size={24} className="mx-auto mb-2 text-zinc-600" />
+            <h3 className="text-zinc-500 font-bold text-sm mb-1">No Favorites Yet</h3>
+            <p className="text-zinc-600 text-xs">Click the star icon <Star size={10} className="inline text-zinc-500" /> on any node to pin it here for quick monitoring.</p>
+        </div>
       )}
 
-      {/* CONTROLS */}
+      {/* CONTROLS (UPDATED SORT: RANK -> HEALTH) */}
       <div className="mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex gap-2 w-full md:w-auto">
             <button onClick={handleRefresh} disabled={loading} className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2 text-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed"><Zap size={14} className={loading ? "text-yellow-500 animate-spin" : "text-blue-500"} /> {loading ? 'SYNCING...' : 'REFRESH'}</button>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 w-full md:w-auto justify-end">
-            {[{ id: 'uptime', label: 'UPTIME', icon: Clock }, { id: 'version', label: 'VERSION', icon: Server }, { id: 'storage', label: 'STORAGE', icon: Database }, { id: 'rank', label: 'RANK', icon: Trophy }].map((opt) => (
+            {[
+                { id: 'uptime', label: 'UPTIME', icon: Clock },
+                { id: 'version', label: 'VERSION', icon: Server },
+                { id: 'storage', label: 'STORAGE', icon: Database },
+                { id: 'health', label: 'HEALTH', icon: Activity } 
+            ].map((opt) => (
                 <button key={opt.id} onClick={() => { if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); else setSortBy(opt.id as any); }} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${sortBy === opt.id ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}><opt.icon size={12} />{opt.label}{sortBy === opt.id && (sortOrder === 'asc' ? <ArrowUp size={10} className="ml-1" /> : <ArrowDown size={10} className="ml-1" />)}</button>
             ))}
         </div>
@@ -678,7 +719,20 @@ export default function Home() {
                         <div className="flex items-center justify-between mb-3"><h4 className="text-[9px] text-zinc-500 uppercase font-bold">Reputation</h4><button onClick={(e) => { e.stopPropagation(); setShowReputationInfo(!showReputationInfo); }}><HelpCircle size={10} className="text-zinc-600 hover:text-zinc-400" /></button></div>
                         {(showReputationInfo) && <div className="absolute top-8 right-4 w-48 bg-zinc-900 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-10 shadow-xl animate-in fade-in slide-in-from-top-1">Reputation is earned by proving storage capacity and maintaining high uptime.</div>}
                         <div className="flex justify-between items-center mb-2"><span className="text-zinc-400 text-xs">Credits</span><span className="text-yellow-400 font-mono font-bold">{selectedNode.credits?.toLocaleString() || 0}</span></div>
-                        <Link href="/leaderboard"><div className="bg-zinc-900/50 border border-yellow-500/20 p-2 rounded-lg flex items-center justify-between cursor-pointer hover:border-yellow-500/40 transition mt-3 group"><div className="flex items-center gap-2"><Trophy size={14} className="text-yellow-500" /><span className="text-xs font-bold text-zinc-400">Global Rank</span></div><div className="flex items-center gap-2"><span className="text-lg font-bold text-white">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</span><ExternalLink size={12} className="text-zinc-500 group-hover:text-white transition" /></div></div></Link>
+                        
+                        {/* REFACTORED VIEW BUTTON IN MODAL */}
+                        <Link href="/leaderboard">
+                            <div className="bg-zinc-900/50 border border-yellow-500/20 p-2 rounded-lg flex items-center justify-between cursor-pointer hover:border-yellow-500/40 transition mt-3 group">
+                                <div className="flex items-center gap-2">
+                                    <Trophy size={14} className="text-yellow-500" />
+                                    <span className="text-xs font-bold text-zinc-400">Global Rank</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-lg font-bold text-white">#{selectedNode.rank && selectedNode.rank < 9999 ? selectedNode.rank : '-'}</span>
+                                    <div className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[9px] font-bold flex items-center gap-1 border border-blue-500/20 group-hover:bg-blue-500/20 transition">VIEW <ChevronRight size={8} /></div>
+                                </div>
+                            </div>
+                        </Link>
                     </div>
                     <div className="mt-4 text-xs text-center text-zinc-500 group relative cursor-help"><Clock size={12} className="inline mr-1" />Last seen {formatLastSeen(selectedNode.last_seen_timestamp)}<div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black border border-zinc-700 rounded px-2 py-1 text-[10px] whitespace-nowrap z-10">{formatDetailedTimestamp(selectedNode.last_seen_timestamp)}</div></div>
                 </div>
@@ -698,7 +752,7 @@ export default function Home() {
       <footer className="border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto text-center">
         <h3 className="text-white font-bold mb-2">XANDEUM PULSE MONITOR</h3>
         <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.</p>
-        <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-600">
+        <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-600 mb-4">
             <span className="opacity-50">pRPC Powered</span><span className="text-zinc-800">|</span>
             <div className="flex items-center gap-1"><span>Built by</span><a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-blue-400 transition font-bold flex items-center gap-1">riot' <Twitter size={10} /></a></div>
             <span className="text-zinc-800">|</span>
