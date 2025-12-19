@@ -1,77 +1,93 @@
 # Xandeum Pulse
 
-Real-time network monitor and analytics dashboard for the Xandeum gossip protocol.
+Real-time network monitor, geographic visualizer, and analytics dashboard for the Xandeum gossip protocol.
 
 **Live Demo:** https://xandeum-pulse.vercel.app
 
 ## Overview
 
-Xandeum Pulse is a serverless analytics platform for monitoring pNode health, storage consensus, and network reputation. It connects directly to the Xandeum mesh network via pRPC to provide real-time metrics without relying on centralized indexers.
+Xandeum Pulse is a serverless analytics platform designed to provide transparency into the Xandeum mesh network. Unlike traditional explorers that rely on centralized databases, Pulse connects directly to pNodes via pRPC to visualize health, consensus, and physical decentralization in real-time.
 
-Built for node operators and network validators who need accurate, up-to-date visibility into network status.
+Built for node operators and validators who need accurate, unfiltered visibility into the network's physical and logical topology.
 
 ## Core Architecture
 
-### Failover System
+### 1. Resilient Failover System
 
-The dashboard implements a resilient failover strategy to maintain uptime even when individual nodes are unreachable:
+The platform implements a "Hero & Race" strategy to maintain uptime even if specific seed nodes go offline.
 
-1. **Primary Request:** Attempts connection to a known high-performance seed node
-2. **Backup Race:** If primary fails or times out (>4s), simultaneously queries 3 random seed nodes
-3. **First Response Wins:** Returns the first valid payload using Promise.any
-
-This ensures the dashboard remains functional even during network instability.
+- **Primary Request:** Attempts connection to a known high-performance seed node.
+- **Backup Race:** If the primary times out (>4s), the system simultaneously queries 3 random backup nodes.
+- **First Response Wins:** The first valid payload is returned using Promise.any, ensuring the fastest possible data path.
 
 *Implementation: `pages/api/stats.ts`*
 
-### Client-Side Metrics
+### 2. The "Vitality Score" Algorithm
 
-Several key metrics are computed client-side from raw pRPC data:
+We moved beyond simple uptime tracking to a comprehensive Vitality Score (0-100) that evaluates a node's true value to the network. This logic is computed server-side to ensure consistency across the dashboard and map.
 
-- **Health Score:** Algorithmic score (0-100) based on uptime, version consensus, storage utilization, and network visibility
-- **Network Stability:** Percentage of nodes with >24h uptime
-- **Consensus Version:** Most common software version across active nodes
-- **Storage Utilization:** Ratio of used vs. committed storage with byte-level precision
+- **Uptime (30%):** Heavily penalizes stability issues (<24h uptime).
+- **Consensus (20%):** Penalizes nodes running outdated software versions relative to the network majority.
+- **Reputation (25%):** Compares a node's accumulated credits against the network median to identify underperforming peers.
+- **Capacity (25%):** Rewards storage commitment, with zero-storage nodes receiving a score of 0 regardless of other metrics.
 
-*Implementation: `pages/index.tsx` (see `getHealthScore` function)*
+*Implementation: `pages/api/geo.ts` (see `calculateVitalityScore`)*
 
-### Reputation Ranking
+### 3. Intelligent Geocoding & Caching
 
-The leaderboard uses a dual-fetch architecture to correlate reputation credits with live node status:
+To visualize physical decentralization without hitting API rate limits, we built a smart caching layer:
 
-1. Fetches credit balances from the Xandeum rewards oracle
-2. Simultaneously fetches live node stats via pRPC
-3. Maps public keys to IP addresses, allowing operators to trace top earners to their physical nodes
+- **In-Flight Deduping:** Simultaneous requests for the same IP are merged into a single promise, preventing race conditions.
+- **LRU Caching:** Frequently accessed locations are kept in memory, while older data is evicted to prevent memory leaks during long sessions.
+- **Batch Processing:** IPs are resolved in chunks to minimize external API calls.
 
-Olympic-style tie handling ensures accurate ranking when nodes have equal credits.
+*Implementation: `pages/api/geo.ts`*
 
-*Implementation: `pages/leaderboard.tsx`*
+## Key Features
 
-## Features
+### Global Topology Map
 
-**Network Monitoring**
-- Real-time node grid with search and filtering (IP, public key, version)
-- Deep inspection modal with raw JSON export
-- Automatic background refresh on tab focus
+A cinematic, interactive visualization of the network's physical infrastructure.
 
-**Operator Tools**
-- Watchlist: Star and pin specific nodes for monitoring
-- Deep linking: Share node states via URL parameters
-- Export formats: CSV (full network dump), JSON (raw data), formatted text (social sharing)
+- **Smart Aggregation:** Nodes are grouped by city to reduce visual clutter while preserving density data.
+- **Multi-Dimensional Views:** Users can toggle between Storage (Capacity), Health (Stability), and Credits (Reputation) modes.
+- **Non-Blocking UI:** The "Live Stats" panel coexists with the map, allowing users to filter data without losing context.
+- **Visual Logic:** Markers change shape (Square/Circle/Diamond) and color intensity (Cyan → Gold) based on the active metric, providing instant visual comprehension.
 
-**Analytics**
-- Total network storage committed
-- Version distribution and consensus tracking
-- Uptime stability metrics
-- Global reputation leaderboard
+*View Code: `pages/map.tsx`*
+
+### Network Dashboard
+
+The command center for operational monitoring.
+
+- **Real-time Grid:** Filter nodes by IP, Public Key, or Version.
+- **Deep Inspection:** Click any node to view raw JSON data directly from the pRPC stream.
+- **Operator Tools:** Watchlist (Star/Pin nodes) and deep linking for sharing specific node states.
+- **Export Ready:** Download full network snapshots as CSV or JSON.
+
+*View Code: `pages/index.tsx`*
+
+### Reputation Leaderboard
+
+A dual-fetch system that correlates on-chain reputation with live node status.
+
+- Fetches credit balances from the Xandeum rewards oracle.
+- Merges data with live pRPC stats to map anonymous Public Keys to physical IP addresses.
+- Uses Olympic-style tie breaking for accurate ranking.
+
+*View Code: `pages/leaderboard.tsx`*
 
 ## API Endpoints
 
+### GET /api/geo
+
+The intelligence layer for the map. Returns aggregated city-level data with pre-calculated Vitality Scores and credit mapping.
+
+- Logic: Merges RPC data + Credits API + Geocoding Cache
+
 ### GET /api/stats
 
-Proxies pRPC `get-pods-with-stats` method with failover logic.
-
-Returns array of active pNodes:
+Proxies the raw pRPC `get-pods-with-stats` method with failover protection.
 
 ```json
 {
@@ -79,10 +95,7 @@ Returns array of active pNodes:
     "pods": [
       {
         "address": "173.212.203.145:9001",
-        "pubkey": "8x...",
         "version": "1.0.4",
-        "uptime": 86400,
-        "storage_used": 52428800,
         "storage_committed": 1099511627776,
         "is_public": true
       }
@@ -93,9 +106,7 @@ Returns array of active pNodes:
 
 ### GET /api/credits
 
-Proxies the Xandeum rewards oracle.
-
-Returns credit balances for all registered public keys.
+Proxies the Xandeum rewards oracle to retrieve the global credit ledger.
 
 ## Running Locally
 
@@ -111,32 +122,32 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000
-
-No environment variables required - the pRPC proxy configuration is self-contained.
+Open http://localhost:3000. No environment variables are required—the pRPC proxy configuration is self-contained.
 
 ## Project Structure
 
 ```
 xandeum-pulse/
 ├── pages/
-│   ├── index.tsx           # Main dashboard (grid, search, modals)
-│   ├── leaderboard.tsx     # Reputation ranking
+│   ├── index.tsx           # Main Dashboard (Grid, Search)
+│   ├── map.tsx             # Global Topology (Visualizations, Drawer)
+│   ├── leaderboard.tsx     # Reputation Ranking
 │   └── api/
-│       ├── stats.ts        # pRPC proxy with failover
-│       └── credits.ts      # Credits API proxy
+│       ├── geo.ts          # Aggregation, Caching & Health Logic
+│       ├── stats.ts        # pRPC Proxy & Failover
+│       └── credits.ts      # Oracle Proxy
 ├── styles/
-│   └── globals.css         # Tailwind configuration
+│   └── globals.css         # Tailwind & Safe Area configs
 └── package.json
 ```
 
 ## Tech Stack
 
 - **Framework:** Next.js 16 (React)
-- **Styling:** Tailwind CSS
-- **Networking:** Axios with Promise.any for failover
+- **Styling:** Tailwind CSS (Mobile-first, Dark Mode)
+- **Visualization:** React Simple Maps + D3 Scale
+- **Networking:** Axios (Promise.any failover)
 - **Icons:** Lucide React
-- **Deployment:** Vercel (Serverless Functions)
 
 ## License
 
