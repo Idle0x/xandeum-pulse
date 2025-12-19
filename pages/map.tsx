@@ -4,7 +4,7 @@ import Link from 'next/link';
 import axios from 'axios';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleSqrt } from 'd3-scale';
-import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin } from 'lucide-react';
+import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -19,7 +19,6 @@ interface MapStats {
 
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
-// --- COLOR BUCKETS (5 Tiers) ---
 const TIER_COLORS = ["#22d3ee", "#3b82f6", "#a855f7", "#ec4899", "#f59e0b"]; 
 
 export default function MapPage() {
@@ -28,13 +27,9 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('STORAGE');
   
-  // Interaction State
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeLocation, setActiveLocation] = useState<string | null>(null);
   const [position, setPosition] = useState({ coordinates: [10, 20], zoom: 1.2 });
-  const highlightTimeout = useRef<NodeJS.Timeout | null>(null);
-
-  // List Ref for Auto-scroll
   const listRef = useRef<HTMLDivElement>(null);
 
   // Fetch Data
@@ -53,20 +48,27 @@ export default function MapPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // --- LOGIC ---
+  // --- INTERACTION LOGIC (Fixed: No Auto-Unlock) ---
 
   const lockTarget = (name: string, lat: number, lon: number) => {
+    // If clicking the same node, toggle off
+    if (activeLocation === name) {
+        resetView();
+        return;
+    }
+
     setActiveLocation(name);
     setPosition({ coordinates: [lon, lat], zoom: 3 });
     
-    // Auto-scroll list if open
     if (drawerOpen && listRef.current) {
          const item = document.getElementById(`list-item-${name}`);
          if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+  };
 
-    if (highlightTimeout.current) clearTimeout(highlightTimeout.current);
-    highlightTimeout.current = setTimeout(() => setActiveLocation(null), 15000); 
+  const resetView = () => {
+    setActiveLocation(null);
+    setPosition({ coordinates: [10, 20], zoom: 1.2 });
   };
 
   const handleZoomIn = () => { if (position.zoom < 5) setPosition(pos => ({ ...pos, zoom: pos.zoom * 1.5 })); };
@@ -87,8 +89,13 @@ export default function MapPage() {
         const cr = loc.totalCredits;
         if (cr < 100) return 0; if (cr < 1000) return 1; if (cr < 10000) return 2; if (cr < 100000) return 3; return 4;
     }
+    // New Rebalanced Health Tiers
     const h = loc.avgHealth;
-    if (h < 50) return 0; if (h < 80) return 1; if (h < 90) return 2; if (h < 98) return 3; return 4;
+    if (h < 40) return 0;  // Critical
+    if (h < 60) return 1;  // Poor
+    if (h < 75) return 2;  // Fair
+    if (h < 90) return 3;  // Good
+    return 4;              // Excellent (>90)
   };
 
   const formatStorage = (gb: number) => {
@@ -104,7 +111,6 @@ export default function MapPage() {
     }
   };
 
-  // --- SORTING ---
   const sortedLocations = useMemo(() => {
     return [...locations].sort((a, b) => {
         if (viewMode === 'STORAGE') return b.totalStorage - a.totalStorage;
@@ -120,7 +126,6 @@ export default function MapPage() {
     return active ? [...others, active] : others;
   }, [locations, activeLocation]);
 
-  // --- COMPONENT: TOGGLES ---
   const ViewToggles = ({ className = "" }: { className?: string }) => (
     <div className={`flex items-center gap-1 p-1 bg-zinc-900/90 border border-zinc-800 rounded-xl shadow-lg ${className}`}>
         {(['STORAGE', 'HEALTH', 'CREDITS'] as ViewMode[]).map((mode) => {
@@ -146,7 +151,15 @@ export default function MapPage() {
 
   return (
     <div className="h-screen w-screen bg-black text-white font-sans overflow-hidden flex flex-col relative">
-      <Head><title>Xandeum Command Center</title></Head>
+      <Head>
+        <title>Xandeum Command Center</title>
+        {/* CSS for Safe Area Padding */}
+        <style>{`
+          @supports (padding: max(0px)) {
+            .pb-safe { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
+          }
+        `}</style>
+      </Head>
 
       {/* --- HEADER --- */}
       <div className="absolute top-6 left-6 z-50 flex flex-col items-start gap-4 max-w-[80%] pointer-events-none">
@@ -171,7 +184,7 @@ export default function MapPage() {
       </div>
 
       {/* --- LAYER 1: MAP FRAME --- */}
-      <div className="relative z-10 mx-6 mt-32 h-[45vh] border border-zinc-800/50 rounded-3xl overflow-hidden shadow-2xl bg-[#080808] transition-all duration-500">
+      <div className="relative z-10 mx-6 mt-32 h-[45vh] md:h-[50vh] border border-zinc-800/50 rounded-3xl overflow-hidden shadow-2xl bg-[#080808] transition-all duration-500">
         <div className="absolute inset-0 pointer-events-none">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_#1a202c_0%,_#000000_80%)] opacity-50"></div>
             <div className="absolute inset-0 opacity-10" 
@@ -239,19 +252,26 @@ export default function MapPage() {
         <div className="absolute bottom-6 right-4 flex flex-col gap-2 z-30">
             <button onClick={handleZoomIn} className="p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Plus size={18} /></button>
             <button onClick={handleZoomOut} className="p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Minus size={18} /></button>
+            
+            {/* NEW RESET BUTTON: Only shows when map is interacted with */}
+            {(position.zoom > 1.2 || activeLocation) && (
+                <button 
+                    onClick={resetView}
+                    className="p-3 bg-red-900/80 border border-red-500/50 text-red-200 rounded-xl hover:text-white hover:bg-red-800 transition-all animate-in fade-in zoom-in"
+                    title="Reset Map View"
+                >
+                    <RotateCcw size={18} />
+                </button>
+            )}
         </div>
       </div>
 
-      {/* --- LAYER 2: THE DOCK & LEGEND (Visible on Mobile too) --- */}
+      {/* --- LAYER 2: THE DOCK & LEGEND --- */}
       {!drawerOpen && (
         <div className="absolute top-[58vh] md:top-[60vh] left-0 right-0 z-40 flex flex-col items-center pointer-events-none transition-opacity duration-300">
-            
-            {/* Toggles - Visible on Mobile now */}
             <div className="pointer-events-auto mb-4">
                 <ViewToggles />
             </div>
-            
-            {/* Legend - Visible on Mobile now */}
             <div className="flex flex-col items-center text-[9px] text-zinc-400 font-mono bg-black/40 px-4 py-3 rounded-2xl border border-zinc-800/50 backdrop-blur-sm shadow-xl">
                 <div className="mb-2 font-bold text-zinc-300">Pulse shows node density</div>
                 <div className="flex items-stretch gap-3">
@@ -259,7 +279,7 @@ export default function MapPage() {
                     <div className="flex flex-col justify-between h-24 text-[8px] text-zinc-500 font-bold uppercase tracking-wider py-1">
                         {viewMode === 'STORAGE' && <><span className="text-zinc-500">&lt; 1 GB</span><span>1-10 GB</span><span>10-100 GB</span><span>100-1T</span><span className="text-[#f59e0b]">&gt; 1 TB</span></>}
                         {viewMode === 'CREDITS' && <><span className="text-zinc-500">&lt; 100</span><span>100-1k</span><span>1k-10k</span><span>10k-100k</span><span className="text-[#f59e0b]">&gt; 100k</span></>}
-                        {viewMode === 'HEALTH' && <><span className="text-zinc-500">&lt; 50%</span><span>50-80%</span><span>80-90%</span><span>90-98%</span><span className="text-[#f59e0b]">&gt; 98%</span></>}
+                        {viewMode === 'HEALTH' && <><span className="text-zinc-500">&lt; 40%</span><span>40-60%</span><span>60-75%</span><span>75-90%</span><span className="text-[#f59e0b]">&gt; 90%</span></>}
                     </div>
                 </div>
             </div>
@@ -269,7 +289,7 @@ export default function MapPage() {
       {/* --- LAYER 3: TRIGGER BUTTONS --- */}
       {!drawerOpen && (
           <>
-            {/* DESKTOP TRIGGER */}
+            {/* DESKTOP */}
             <div className="hidden md:flex absolute top-[85vh] left-0 right-0 justify-center z-50 pointer-events-none">
                 <button 
                     onClick={() => setDrawerOpen(true)}
@@ -281,7 +301,7 @@ export default function MapPage() {
                 </button>
             </div>
 
-            {/* MOBILE TRIGGER */}
+            {/* MOBILE: Safe Area Supported */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#09090b] border-t border-zinc-800 pb-safe shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
                 <button 
                     onClick={() => setDrawerOpen(true)}
@@ -297,9 +317,9 @@ export default function MapPage() {
           </>
       )}
 
-      {/* --- LAYER 4: THE NON-BLOCKING PANEL --- */}
+      {/* --- LAYER 4: THE PANEL (Faster Animation) --- */}
       <div 
-        className={`absolute inset-x-0 bottom-0 z-50 flex flex-col justify-end pointer-events-none transition-transform duration-500 ease-in-out ${drawerOpen ? 'translate-y-0' : 'translate-y-full'}`}
+        className={`absolute inset-x-0 bottom-0 z-50 flex flex-col justify-end pointer-events-none transition-transform duration-300 ease-out ${drawerOpen ? 'translate-y-0' : 'translate-y-full'}`}
       >
         <div className="pointer-events-auto w-full md:max-w-xl mx-auto md:mb-8 h-[45vh] md:h-[40vh] bg-[#09090b] md:bg-[#09090b]/95 border-t md:border border-zinc-700 md:rounded-[2rem] rounded-t-3xl shadow-[0_-10px_50px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden">
             
@@ -314,47 +334,54 @@ export default function MapPage() {
                     </button>
                 </div>
                 
-                {/* Internal Toggles */}
                 <div className="w-full" onClick={(e) => e.stopPropagation()}>
                     <ViewToggles className="w-full justify-between bg-black/50" />
                 </div>
             </div>
 
-            {/* Scrollable List */}
+            {/* List with Empty State */}
             <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar">
-                {sortedLocations.map((loc, i) => (
-                    <div 
-                        id={`list-item-${loc.name}`}
-                        key={loc.name} 
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            lockTarget(loc.name, loc.lat, loc.lon);
-                        }}
-                        className={`group flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
-                            activeLocation === loc.name 
-                            ? 'bg-zinc-800 border-green-500/50' 
-                            : 'bg-zinc-900/50 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800'
-                        }`}
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className={`flex items-center justify-center w-8 h-8 rounded-full font-mono text-xs font-bold ${
-                                activeLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'
-                            }`}>
-                                {i + 1}
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-sm font-bold text-zinc-200 group-hover:text-white">{loc.name}, {loc.country}</span>
-                                <span className="text-[10px] text-zinc-500 flex items-center gap-1">
-                                    <MapPin size={10} /> {loc.lat.toFixed(2)}, {loc.lon.toFixed(2)}
-                                </span>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <div className={`text-sm font-mono font-bold ${activeLocation === loc.name ? 'text-green-400' : 'text-blue-400'}`}>{getMetricText(loc)}</div>
-                            <div className="text-[10px] text-zinc-500">{loc.count} Nodes</div>
-                        </div>
+                {sortedLocations.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-50">
+                        <Globe size={48} className="text-zinc-700 mb-4 animate-pulse" />
+                        <p className="text-zinc-500 text-sm font-bold">No Signal Detected</p>
+                        <p className="text-zinc-600 text-xs mt-2">Waiting for network telemetry...</p>
                     </div>
-                ))}
+                ) : (
+                    sortedLocations.map((loc, i) => (
+                        <div 
+                            id={`list-item-${loc.name}`}
+                            key={loc.name} 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                lockTarget(loc.name, loc.lat, loc.lon);
+                            }}
+                            className={`group flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
+                                activeLocation === loc.name 
+                                ? 'bg-zinc-800 border-green-500/50' 
+                                : 'bg-zinc-900/50 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800'
+                            }`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className={`flex items-center justify-center w-8 h-8 rounded-full font-mono text-xs font-bold ${
+                                    activeLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'
+                                }`}>
+                                    {i + 1}
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-bold text-zinc-200 group-hover:text-white">{loc.name}, {loc.country}</span>
+                                    <span className="text-[10px] text-zinc-500 flex items-center gap-1">
+                                        <MapPin size={10} /> {loc.lat.toFixed(2)}, {loc.lon.toFixed(2)}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <div className={`text-sm font-mono font-bold ${activeLocation === loc.name ? 'text-green-400' : 'text-blue-400'}`}>{getMetricText(loc)}</div>
+                                <div className="text-[10px] text-zinc-500">{loc.count} Nodes</div>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
         </div>
       </div>
