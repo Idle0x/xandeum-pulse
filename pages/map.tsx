@@ -19,7 +19,7 @@ interface MapStats {
 
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
-// --- COLOR BUCKETS ---
+// --- COLOR BUCKETS (5 Tiers) ---
 const TIER_COLORS = ["#22d3ee", "#3b82f6", "#a855f7", "#ec4899", "#f59e0b"]; 
 
 export default function MapPage() {
@@ -33,8 +33,8 @@ export default function MapPage() {
   const [activeLocation, setActiveLocation] = useState<string | null>(null);
   const [position, setPosition] = useState({ coordinates: [10, 20], zoom: 1.2 });
   const highlightTimeout = useRef<NodeJS.Timeout | null>(null);
-  
-  // Ref for the list container to enable auto-scrolling
+
+  // List Ref for Auto-scroll
   const listRef = useRef<HTMLDivElement>(null);
 
   // Fetch Data
@@ -59,10 +59,10 @@ export default function MapPage() {
     setActiveLocation(name);
     setPosition({ coordinates: [lon, lat], zoom: 3 });
     
-    // Auto-scroll the list to this item if drawer is open
+    // Auto-scroll list if open
     if (drawerOpen && listRef.current) {
-        const item = document.getElementById(`list-item-${name}`);
-        if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+         const item = document.getElementById(`list-item-${name}`);
+         if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     if (highlightTimeout.current) clearTimeout(highlightTimeout.current);
@@ -170,12 +170,8 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* --- LAYER 1: MAP FRAME (Top Half) --- */}
-      {/* Desktop: 45vh height, pushed down. 
-          Mobile: 50vh height, pushed down.
-          Crucially: z-10 so it sits BEHIND the panel but stays clickable because panel won't cover it.
-      */}
-      <div className="relative z-10 mx-6 mt-32 h-[45vh] md:h-[50vh] border border-zinc-800/50 rounded-3xl overflow-hidden shadow-2xl bg-[#080808] transition-all duration-500">
+      {/* --- LAYER 1: MAP FRAME --- */}
+      <div className="relative z-10 mx-6 mt-32 h-[45vh] border border-zinc-800/50 rounded-3xl overflow-hidden shadow-2xl bg-[#080808] transition-all duration-500">
         <div className="absolute inset-0 pointer-events-none">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_#1a202c_0%,_#000000_80%)] opacity-50"></div>
             <div className="absolute inset-0 opacity-10" 
@@ -246,20 +242,17 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* --- LAYER 2: THE DOCK (Visible when Panel is CLOSED) --- */}
-      {/* Desktop: Floating under map.
-          Mobile: Fixed bottom bar (disappears when panel opens).
-      */}
+      {/* --- LAYER 2: THE DOCK & LEGEND (Visible on Mobile too) --- */}
       {!drawerOpen && (
         <div className="absolute top-[58vh] md:top-[60vh] left-0 right-0 z-40 flex flex-col items-center pointer-events-none transition-opacity duration-300">
             
-            {/* Desktop Toggles */}
-            <div className="hidden md:block pointer-events-auto mb-4">
+            {/* Toggles - Visible on Mobile now */}
+            <div className="pointer-events-auto mb-4">
                 <ViewToggles />
             </div>
             
-            {/* Legend */}
-            <div className="hidden md:flex flex-col items-center text-[9px] text-zinc-400 font-mono bg-black/40 px-4 py-3 rounded-2xl border border-zinc-800/50 backdrop-blur-sm shadow-xl">
+            {/* Legend - Visible on Mobile now */}
+            <div className="flex flex-col items-center text-[9px] text-zinc-400 font-mono bg-black/40 px-4 py-3 rounded-2xl border border-zinc-800/50 backdrop-blur-sm shadow-xl">
                 <div className="mb-2 font-bold text-zinc-300">Pulse shows node density</div>
                 <div className="flex items-stretch gap-3">
                     <div className="w-1.5 rounded-full bg-gradient-to-b from-[#22d3ee] via-[#a855f7] to-[#f59e0b] shadow-[0_0_10px_rgba(59,130,246,0.3)]"></div>
@@ -276,7 +269,7 @@ export default function MapPage() {
       {/* --- LAYER 3: TRIGGER BUTTONS --- */}
       {!drawerOpen && (
           <>
-            {/* DESKTOP TRIGGER: Floating Pill */}
+            {/* DESKTOP TRIGGER */}
             <div className="hidden md:flex absolute top-[85vh] left-0 right-0 justify-center z-50 pointer-events-none">
                 <button 
                     onClick={() => setDrawerOpen(true)}
@@ -288,7 +281,7 @@ export default function MapPage() {
                 </button>
             </div>
 
-            {/* MOBILE TRIGGER: Fixed Bottom Dock (Full Width) */}
+            {/* MOBILE TRIGGER */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#09090b] border-t border-zinc-800 pb-safe shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
                 <button 
                     onClick={() => setDrawerOpen(true)}
@@ -305,19 +298,12 @@ export default function MapPage() {
       )}
 
       {/* --- LAYER 4: THE NON-BLOCKING PANEL --- */}
-      {/* This is the key change. We use 'pointer-events-none' on the wrapper so clicks pass through to the map.
-         The panel itself has 'pointer-events-auto'.
-         NO BACKDROP BLUR/COLOR.
-      */}
       <div 
         className={`absolute inset-x-0 bottom-0 z-50 flex flex-col justify-end pointer-events-none transition-transform duration-500 ease-in-out ${drawerOpen ? 'translate-y-0' : 'translate-y-full'}`}
       >
-        {/* Desktop: Sits in the bottom 40% of screen.
-            Mobile: Sits at bottom, height 45vh.
-        */}
         <div className="pointer-events-auto w-full md:max-w-xl mx-auto md:mb-8 h-[45vh] md:h-[40vh] bg-[#09090b] md:bg-[#09090b]/95 border-t md:border border-zinc-700 md:rounded-[2rem] rounded-t-3xl shadow-[0_-10px_50px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden">
             
-            {/* Header (Acts as Close Button + Toggles) */}
+            {/* Header */}
             <div className="flex flex-col gap-3 px-6 py-4 border-b border-zinc-800/50 bg-black/20 shrink-0 cursor-pointer" onClick={() => setDrawerOpen(false)}>
                 <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-white flex items-center gap-2">
@@ -328,13 +314,13 @@ export default function MapPage() {
                     </button>
                 </div>
                 
-                {/* Internal Toggles (Usable without closing) */}
+                {/* Internal Toggles */}
                 <div className="w-full" onClick={(e) => e.stopPropagation()}>
                     <ViewToggles className="w-full justify-between bg-black/50" />
                 </div>
             </div>
 
-            {/* Scrollable List with Ref */}
+            {/* Scrollable List */}
             <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar">
                 {sortedLocations.map((loc, i) => (
                     <div 
