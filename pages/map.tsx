@@ -204,8 +204,6 @@ export default function MapPage() {
   );
 
   return (
-    // FIX 1: Use 'fixed inset-0' to strictly constrain the app window. 
-    // This prevents overflow and scrollbar issues on all devices.
     <div className="fixed inset-0 bg-black text-white font-sans overflow-hidden flex flex-col">
       <Head>
         <title>Xandeum Command Center</title>
@@ -217,9 +215,9 @@ export default function MapPage() {
       </Head>
 
       {/* --- 1. HEADER (Fixed Top, Non-Shrinking) --- */}
-      <div className="shrink-0 w-full z-50 flex flex-col gap-4 px-6 py-4 bg-[#09090b] border-b border-zinc-800/50 shadow-lg">
+      <div className="shrink-0 w-full z-50 flex flex-col gap-3 px-4 md:px-6 py-3 bg-[#09090b] border-b border-zinc-800/30">
         <div className="flex items-center justify-between w-full">
-            <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all cursor-pointer">
+            <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all cursor-pointer">
                 <ArrowLeft size={12} className="text-zinc-400 group-hover:text-white" />
                 <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-300">
                     Dashboard
@@ -237,20 +235,20 @@ export default function MapPage() {
         </div>
         
         <div>
-            <h1 className="text-xl md:text-3xl font-extrabold tracking-tight text-white leading-tight">
+            <h1 className="text-lg md:text-2xl font-bold tracking-tight text-white leading-tight">
                 {getDynamicTitle()}
             </h1>
-            <p className="text-xs md:text-sm text-zinc-400 font-medium leading-relaxed mt-2 max-w-2xl">
+            <p className="text-xs text-zinc-400 leading-relaxed mt-1 max-w-2xl">
                 {getDynamicSubtitle()}
             </p>
         </div>
       </div>
 
       {/* --- 2. MAP AREA (Flexible - Shrinks when Split View is Active) --- */}
-      {/* FIX 2: 'flex-1 basis-0 min-h-0' ensures the map never pushes the Dock off-screen, even on Desktop */}
+      {/* Better proportions: ~40% when split, full when closed */}
       <div 
-        className={`relative w-full bg-[#080808] border-b border-zinc-800/50 transition-all duration-500 ease-in-out ${
-            isSplitView ? 'h-[50vh] shrink-0' : 'flex-1 basis-0 min-h-0' 
+        className={`relative w-full bg-[#080808] transition-all duration-300 ease-out ${
+            isSplitView ? 'h-[40vh] shrink-0' : 'flex-1 basis-0 min-h-0' 
         }`}
       >
             {loading ? (
@@ -316,12 +314,11 @@ export default function MapPage() {
       </div>
 
       {/* --- 3. THE DOCK (State-Dependent Layout) --- */}
-      {/* FIX 3: Increased Z-Index to 50 and 'shrink-0' ensures it sits above map if needed, 
-          but flex layout should now prevent overlap. */}
-      <div className={`shrink-0 bg-[#09090b] relative z-50 flex flex-col transition-all duration-500 ease-in-out ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
+      {/* Better proportions: ~50% when split */}
+      <div className={`shrink-0 bg-[#09090b] relative z-50 flex flex-col transition-all duration-300 ease-out ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
             
             {/* CONTENT A: The Legend (Visible when !isSplitView) */}
-            <div className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4 transition-opacity duration-300 ${isSplitView ? 'hidden opacity-0' : 'flex opacity-100'}`}>
+            <div className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4 transition-all duration-200 ${isSplitView ? 'hidden' : 'flex'}`}>
                 {/* View Toggles (Closed State) */}
                 <div className="w-full md:w-auto flex justify-center md:justify-start">
                     <ViewToggles />
@@ -361,13 +358,13 @@ export default function MapPage() {
             </div>
 
             {/* CONTENT B: The Live List (Visible when isSplitView) */}
-            <div className={`flex flex-col h-full overflow-hidden transition-opacity duration-500 ${isSplitView ? 'flex opacity-100' : 'hidden opacity-0'}`}>
+            <div className={`flex flex-col h-full overflow-hidden transition-all duration-200 ${isSplitView ? 'flex' : 'hidden'}`}>
                  
                  {/* Internal Dock Header */}
-                 <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-[#09090b]">
-                    <div className="flex items-center gap-4">
+                 <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-zinc-800/30 bg-[#09090b]">
+                    <div className="flex items-center gap-3">
                         <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                             <Activity size={16} className="text-green-500" /> Live Data Stream
+                             <Activity size={14} className="text-green-500" /> Live Data
                         </h2>
                         {/* Internal Toggles so user can switch while dock is open */}
                         <div className="hidden md:block scale-90 origin-left"><ViewToggles /></div>
@@ -377,9 +374,9 @@ export default function MapPage() {
                         <div className="md:hidden scale-75 origin-right"><ViewToggles /></div>
                         <button 
                             onClick={() => setIsSplitView(false)}
-                            className="p-2 bg-zinc-800 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
+                            className="p-1.5 bg-zinc-800/50 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
                         >
-                            <X size={16} />
+                            <X size={14} />
                         </button>
                     </div>
                  </div>
@@ -432,16 +429,16 @@ export default function MapPage() {
 
             {/* ACTION BAR (Only visible when CLOSED / !isSplitView) */}
             {!isSplitView && (
-                <div className="shrink-0 p-4 md:px-6 md:py-4 bg-[#09090b] border-t border-zinc-800 z-50 animate-in slide-in-from-bottom-5">
+                <div className="shrink-0 p-3 md:px-6 md:py-4 bg-[#09090b] border-t border-zinc-800/30 z-50">
                     <button 
                         onClick={() => setIsSplitView(true)}
-                        className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 px-6 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-blue-500/50 rounded-xl shadow-lg transition-all group"
+                        className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 px-6 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-blue-500/50 rounded-xl transition-all group"
                     >
-                        <Activity size={18} className="text-blue-400 group-hover:scale-110 transition-transform" />
+                        <Activity size={16} className="text-blue-400 group-hover:scale-110 transition-transform" />
                         <span className="text-xs md:text-sm font-bold uppercase tracking-widest text-zinc-200 group-hover:text-white">
-                            Click to Open Live Stats
+                            Open Live Stats
                         </span>
-                        <ChevronUp size={18} className="text-zinc-500 group-hover:-translate-y-1 transition-transform" />
+                        <ChevronUp size={16} className="text-zinc-500 group-hover:-translate-y-1 transition-transform" />
                     </button>
                 </div>
             )}
