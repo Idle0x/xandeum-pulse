@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Zap, Trophy, HardDrive, Star, Copy, Check, CheckCircle, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Twitter, Code, Info, ExternalLink, HelpCircle, ChevronRight, Maximize2, Map as MapIcon } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Zap, Trophy, HardDrive, Star, Copy, Check, CheckCircle, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Twitter, Code, Info, ExternalLink, HelpCircle, ChevronRight, Maximize2, Map as MapIcon, BookOpen } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -101,7 +101,6 @@ const getHealthScore = (node: Node, consensusVersion: string) => {
   return Math.max(0, Math.min(100, score));
 };
 
-// --- CALCULATE MEDIAN (ROBUST AGAINST OUTLIERS) ---
 const calculateMedian = (values: number[]) => {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -617,8 +616,8 @@ Monitor at: https://xandeum-pulse.vercel.app`;
       {loading && <div className="fixed top-0 left-0 right-0 z-50"><LiveWireLoader /></div>}
 
       <div className="p-4 md:p-8 flex-grow">
-      {/* HEADER */}
-      <header className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-zinc-800 pb-6">
+      {/* HEADER (NOW STICKY) */}
+      <header className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-zinc-800 pb-6 sticky top-0 z-40 bg-[#09090b]/80 backdrop-blur-md pt-4 -mt-4 -mx-4 px-4 md:-mx-8 md:px-8">
         <div className="text-center md:text-left mb-4 md:mb-0">
           <h1 className="text-4xl font-extrabold tracking-tight text-white flex items-center gap-3 justify-center md:justify-start">
             <Activity className="text-blue-500" />
@@ -888,7 +887,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                         </div>
                     </div>
 
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-4 backdrop-blur-md">
+                    <div className="bg-black/50 border border-white/5 rounded-xl p-4 backdrop-blur-md mb-4">
                         <div className="space-y-3 text-xs">
                            <div className="flex justify-between items-center">
                               <span className="text-zinc-400">Uptime Stability</span>
@@ -915,6 +914,25 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                            </div>
                         </div>
                     </div>
+
+                    {/* NEW: PHYSICAL LAYER PORTAL */}
+                    <Link href="/map">
+                        <div className="bg-gradient-to-r from-blue-900/20 to-indigo-900/20 border border-blue-500/20 rounded-xl p-4 cursor-pointer hover:border-blue-500/50 transition-all group relative overflow-hidden">
+                             <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors"></div>
+                             <div className="relative flex items-center justify-between">
+                                 <div className="flex items-center gap-3">
+                                     <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400">
+                                         <Globe size={18} />
+                                     </div>
+                                     <div>
+                                         <div className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Physical Layer</div>
+                                         <div className="text-xs text-zinc-300">Visualize Physical Footprint</div>
+                                     </div>
+                                 </div>
+                                 <ChevronRight size={16} className="text-blue-500 group-hover:translate-x-1 transition-transform" />
+                             </div>
+                        </div>
+                    </Link>
                 </div>
 
                 {/* COLUMN 2: STORAGE METRICS (UPDATED: MEDIAN LOGIC) */}
@@ -1117,7 +1135,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
         <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">
             Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.
         </p>
-        <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-600">
+        <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-600 mb-4">
             <span className="opacity-50">pRPC Powered</span>
             <span className="text-zinc-800">|</span>
             <div className="flex items-center gap-1">
@@ -1131,6 +1149,11 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                 Open Source <ExternalLink size={10} />
             </a>
         </div>
+        
+        {/* NEW DOCS LINK */}
+        <Link href="/docs" className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-4 decoration-zinc-700 flex items-center justify-center gap-1">
+           <BookOpen size={10} /> System Architecture & Docs
+        </Link>
       </footer>
     </div>
   );
