@@ -204,6 +204,8 @@ export default function MapPage() {
   );
 
   return (
+    // FIX 1: Use 'fixed inset-0' to strictly constrain the app window. 
+    // This prevents overflow and scrollbar issues on all devices.
     <div className="fixed inset-0 bg-black text-white font-sans overflow-hidden flex flex-col">
       <Head>
         <title>Xandeum Command Center</title>
@@ -245,8 +247,9 @@ export default function MapPage() {
       </div>
 
       {/* --- 2. MAP AREA (Flexible - Shrinks when Split View is Active) --- */}
+      {/* FIX 2: 'flex-1 basis-0 min-h-0' ensures the map never pushes the Dock off-screen, even on Desktop */}
       <div 
-        className={`relative w-full bg-[#080808] border-b border-zinc-800/50 transition-all duration-300 ease-out ${
+        className={`relative w-full bg-[#080808] border-b border-zinc-800/50 transition-all duration-500 ease-in-out ${
             isSplitView ? 'h-[50vh] shrink-0' : 'flex-1 basis-0 min-h-0' 
         }`}
       >
@@ -313,10 +316,12 @@ export default function MapPage() {
       </div>
 
       {/* --- 3. THE DOCK (State-Dependent Layout) --- */}
-      <div className={`shrink-0 bg-[#09090b] relative z-50 flex flex-col transition-all duration-300 ease-out ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
+      {/* FIX 3: Increased Z-Index to 50 and 'shrink-0' ensures it sits above map if needed, 
+          but flex layout should now prevent overlap. */}
+      <div className={`shrink-0 bg-[#09090b] relative z-50 flex flex-col transition-all duration-500 ease-in-out ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
             
             {/* CONTENT A: The Legend (Visible when !isSplitView) */}
-            <div className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4 ${isSplitView ? 'hidden' : 'flex'}`}>
+            <div className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4 transition-opacity duration-300 ${isSplitView ? 'hidden opacity-0' : 'flex opacity-100'}`}>
                 {/* View Toggles (Closed State) */}
                 <div className="w-full md:w-auto flex justify-center md:justify-start">
                     <ViewToggles />
@@ -356,7 +361,7 @@ export default function MapPage() {
             </div>
 
             {/* CONTENT B: The Live List (Visible when isSplitView) */}
-            <div className={`flex flex-col h-full overflow-hidden ${isSplitView ? 'flex' : 'hidden'}`}>
+            <div className={`flex flex-col h-full overflow-hidden transition-opacity duration-500 ${isSplitView ? 'flex opacity-100' : 'hidden opacity-0'}`}>
                  
                  {/* Internal Dock Header */}
                  <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-[#09090b]">
