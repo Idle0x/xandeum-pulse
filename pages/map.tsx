@@ -282,10 +282,36 @@ export default function MapPage() {
                 <div className="mb-2 font-bold text-zinc-300">Color Intensity = Higher Value</div>
                 <div className="flex items-stretch gap-3">
                     <div className="w-1.5 rounded-full bg-gradient-to-b from-[#22d3ee] via-[#a855f7] to-[#f59e0b] shadow-[0_0_10px_rgba(59,130,246,0.3)]"></div>
-                    <div className="flex flex-col justify-between h-24 text-[8px] text-zinc-500 font-bold uppercase tracking-wider py-1">
-                        {viewMode === 'STORAGE' && <><span className="text-zinc-500">&lt; 1 GB</span><span>1-10 GB</span><span>10-100 GB</span><span>100-1T</span><span className="text-[#f59e0b]">&gt; 1 TB</span></>}
-                        {viewMode === 'CREDITS' && <><span className="text-zinc-500">&lt; 100</span><span>100-1k</span><span>1k-10k</span><span>10k-100k</span><span className="text-[#f59e0b]">&gt; 100k</span></>}
-                        {viewMode === 'HEALTH' && <><span className="text-zinc-500">&lt; 40%</span><span>40-60%</span><span>60-75%</span><span>75-90%</span><span className="text-[#f59e0b]">&gt; 90%</span></>}
+                    
+                    {/* COLORED TEXT LABELS */}
+                    <div className="flex flex-col justify-between h-24 text-[8px] font-bold uppercase tracking-wider py-1">
+                        {viewMode === 'STORAGE' && (
+                            <>
+                                <span style={{ color: TIER_COLORS[0] }}>&lt; 1 GB</span>
+                                <span style={{ color: TIER_COLORS[1] }}>1-10 GB</span>
+                                <span style={{ color: TIER_COLORS[2] }}>10-100 GB</span>
+                                <span style={{ color: TIER_COLORS[3] }}>100-1T</span>
+                                <span style={{ color: TIER_COLORS[4] }}>&gt; 1 TB</span>
+                            </>
+                        )}
+                        {viewMode === 'CREDITS' && (
+                            <>
+                                <span style={{ color: TIER_COLORS[0] }}>&lt; 100</span>
+                                <span style={{ color: TIER_COLORS[1] }}>100-1k</span>
+                                <span style={{ color: TIER_COLORS[2] }}>1k-10k</span>
+                                <span style={{ color: TIER_COLORS[3] }}>10k-100k</span>
+                                <span style={{ color: TIER_COLORS[4] }}>&gt; 100k</span>
+                            </>
+                        )}
+                        {viewMode === 'HEALTH' && (
+                            <>
+                                <span style={{ color: TIER_COLORS[0] }}>&lt; 40%</span>
+                                <span style={{ color: TIER_COLORS[1] }}>40-60%</span>
+                                <span style={{ color: TIER_COLORS[2] }}>60-75%</span>
+                                <span style={{ color: TIER_COLORS[3] }}>75-90%</span>
+                                <span style={{ color: TIER_COLORS[4] }}>&gt; 90%</span>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
