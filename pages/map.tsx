@@ -4,7 +4,7 @@ import Link from 'next/link';
 import axios from 'axios';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleSqrt } from 'd3-scale';
-import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Info } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -20,6 +20,12 @@ interface MapStats {
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
 const TIER_COLORS = ["#22d3ee", "#3b82f6", "#a855f7", "#ec4899", "#f59e0b"]; 
+
+const LEGEND_LABELS = {
+    STORAGE: ['< 1 GB', '1-10 GB', '10-100 GB', '100 GB-1 TB', '> 1 TB'],
+    CREDITS: ['< 100', '100-1k', '1k-10k', '10k-100k', '> 100k'],
+    HEALTH:  ['< 40%', '40-60%', '60-75%', '75-90%', '> 90%']
+};
 
 export default function MapPage() {
   const [locations, setLocations] = useState<LocationData[]>([]);
@@ -142,7 +148,6 @@ export default function MapPage() {
 
   const getDynamicSubtitle = () => {
      if (!leadingRegion) return "Analyzing network topology...";
-     
      const { name, totalStorage, totalCredits, avgHealth, count } = leadingRegion;
 
      switch (viewMode) {
@@ -196,8 +201,8 @@ export default function MapPage() {
         `}</style>
       </Head>
 
-      {/* --- HORIZONTAL HEADER BAR --- */}
-      <div className="w-full shrink-0 z-50 flex flex-col gap-4 px-6 py-4 bg-[#09090b]/80 backdrop-blur-md border-b border-zinc-800/50 shadow-lg">
+      {/* --- 1. HEADER (Fixed Top) --- */}
+      <div className="shrink-0 w-full z-50 flex flex-col gap-4 px-6 py-4 bg-[#09090b] border-b border-zinc-800/50 shadow-lg">
         <div className="flex items-center justify-between w-full">
             <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all cursor-pointer">
                 <ArrowLeft size={12} className="text-zinc-400 group-hover:text-white" />
@@ -226,12 +231,8 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* --- MAIN CONTENT AREA (Scrollable if screen is tiny, but generally fixed) --- */}
-      <div className="flex-grow flex flex-col relative overflow-hidden">
-        
-        {/* --- MAP CONTAINER --- */}
-        {/* Adjusted Height: Not full screen, leaves room for control dock */}
-        <div className="relative w-full h-[50vh] md:h-[55vh] border-b border-zinc-800/50 bg-[#080808] transition-all duration-500">
+      {/* --- 2. MAP AREA (Flexible Middle - Takes all remaining space) --- */}
+      <div className="flex-1 min-h-0 relative w-full bg-[#080808] border-b border-zinc-800/50">
             {loading ? (
                 <div className="absolute inset-0 flex items-center justify-center z-20"><Globe className="animate-pulse text-blue-500" /></div>
             ) : (
@@ -284,7 +285,7 @@ export default function MapPage() {
                 </ComposableMap>
             )}
 
-            {/* Floating Zoom Controls (Still fine on map) */}
+            {/* Zoom Controls */}
             <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-30">
                 <button onClick={handleZoomIn} title="Zoom In" className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Plus size={16} /></button>
                 <button onClick={handleZoomOut} title="Zoom Out" className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Minus size={16} /></button>
@@ -292,47 +293,47 @@ export default function MapPage() {
                     <button onClick={resetView} className="p-2 md:p-3 bg-red-900/80 border border-red-500/50 text-red-200 rounded-xl hover:text-white"><RotateCcw size={16} /></button>
                 )}
             </div>
-        </div>
+      </div>
 
-        {/* --- CONTROL DOCK (Dedicated Space Below Map) --- */}
-        <div className="flex-grow bg-[#09090b] flex flex-col md:flex-row items-center justify-between p-4 md:px-8 gap-4 overflow-y-auto">
+      {/* --- 3. CONTROL DOCK (Fixed Bottom, No Scroll on Desktop) --- */}
+      <div className="shrink-0 bg-[#09090b] border-b border-zinc-800 z-40 flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4">
             
             {/* Left: View Toggles */}
             <div className="w-full md:w-auto flex justify-center md:justify-start">
                  <ViewToggles />
             </div>
 
-            {/* Center/Right: The Legend (Now in a block, not floating) */}
-            <div className="w-full md:w-auto bg-zinc-900/30 border border-zinc-800 rounded-2xl p-3 md:p-4 flex flex-col md:flex-row items-center gap-4">
-                <div className="flex items-center gap-4 opacity-80 text-[10px] md:text-xs text-zinc-400">
-                    <div className="flex items-center gap-1"><div className="w-2 h-2 bg-zinc-500"></div><span>Storage</span></div>
-                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-zinc-500"></div><span>Credits</span></div>
-                    <div className="flex items-center gap-1"><div className="w-2 h-2 bg-zinc-500 rotate-45"></div><span>Health</span></div>
+            {/* Center/Right: THE DETAILED LEGEND & CONTEXT */}
+            <div className="w-full md:w-auto bg-zinc-900/30 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3">
+                
+                {/* The Labels - Brought Back! */}
+                <div className="grid grid-cols-3 md:grid-cols-5 gap-3 w-full">
+                    {LEGEND_LABELS[viewMode].map((label, idx) => (
+                        <div key={idx} className="flex flex-col items-center gap-1.5">
+                            <div className="w-8 h-1.5 rounded-full" style={{ backgroundColor: TIER_COLORS[idx] }}></div>
+                            <span className="text-[9px] font-mono text-zinc-400 font-bold whitespace-nowrap">{label}</span>
+                        </div>
+                    ))}
                 </div>
+                
+                <div className="w-full h-px bg-zinc-800/50"></div>
 
-                <div className="hidden md:block w-px h-8 bg-zinc-800"></div>
-
-                <div className="flex flex-col w-full md:w-auto">
-                    <div className="text-[10px] md:text-xs font-bold text-zinc-500 mb-1 text-center md:text-left">Metric Intensity</div>
-                    <div className="flex items-center gap-2">
-                         <div className="w-full md:w-32 h-2 rounded-full bg-gradient-to-r from-[#22d3ee] via-[#a855f7] to-[#f59e0b]"></div>
-                    </div>
-                    <div className="flex justify-between w-full md:w-32 text-[8px] md:text-[10px] font-mono text-zinc-500 mt-1">
-                        <span>Low</span>
-                        <span>High</span>
-                    </div>
+                {/* Context Text */}
+                <div className="flex items-start gap-2">
+                    <Info size={12} className="text-zinc-500 mt-0.5 shrink-0" />
+                    <p className="text-[10px] text-zinc-500 leading-tight max-w-xl">
+                        <strong className="text-zinc-400">Pulse Intensity</strong> represents node density in a region. The thicker/brighter the ping, the higher the concentration of active nodes in that specific cluster.
+                    </p>
                 </div>
             </div>
-        </div>
       </div>
 
-      {/* --- FOOTER: ACTION BUTTON --- */}
-      {/* Fixed at bottom, always accessible, clearly actionable */}
-      <div className="shrink-0 p-4 md:p-6 bg-[#09090b] border-t border-zinc-800 z-50">
+      {/* --- 4. ACTION BAR (Fixed Bottom) --- */}
+      <div className="shrink-0 p-4 md:px-6 md:py-4 bg-[#09090b] border-t border-zinc-800 z-50">
         {!drawerOpen ? (
             <button 
                 onClick={() => setDrawerOpen(true)}
-                className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 px-6 py-4 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-blue-500/50 rounded-xl shadow-lg transition-all group"
+                className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 px-6 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-blue-500/50 rounded-xl shadow-lg transition-all group"
             >
                 <Activity size={18} className="text-blue-400 group-hover:scale-110 transition-transform" />
                 <span className="text-xs md:text-sm font-bold uppercase tracking-widest text-zinc-200 group-hover:text-white">
@@ -341,13 +342,13 @@ export default function MapPage() {
                 <ChevronUp size={18} className="text-zinc-500 group-hover:-translate-y-1 transition-transform" />
             </button>
         ) : (
-            <div className="w-full text-center">
+            <div className="w-full text-center py-2">
                  <span className="text-xs text-zinc-500">Panel Open</span>
             </div>
         )}
       </div>
 
-      {/* --- DRAWER PANEL (Same as before) --- */}
+      {/* --- DRAWER PANEL --- */}
       <div 
         className={`absolute inset-x-0 bottom-0 z-[60] flex flex-col justify-end pointer-events-none transition-transform duration-300 ease-out ${drawerOpen ? 'translate-y-0' : 'translate-y-full'}`}
       >
