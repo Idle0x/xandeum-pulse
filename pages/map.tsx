@@ -4,7 +4,7 @@ import Link from 'next/link';
 import axios from 'axios';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleSqrt } from 'd3-scale';
-import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Copy } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -30,6 +30,7 @@ export default function MapPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeLocation, setActiveLocation] = useState<string | null>(null);
   const [position, setPosition] = useState({ coordinates: [10, 20], zoom: 1.2 });
+  const [copiedCoords, setCopiedCoords] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   // Fetch Data
@@ -48,15 +49,13 @@ export default function MapPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // --- INTERACTION LOGIC (Fixed: No Auto-Unlock) ---
+  // --- INTERACTION LOGIC ---
 
   const lockTarget = (name: string, lat: number, lon: number) => {
-    // If clicking the same node, toggle off
     if (activeLocation === name) {
         resetView();
         return;
     }
-
     setActiveLocation(name);
     setPosition({ coordinates: [lon, lat], zoom: 3 });
     
@@ -69,6 +68,13 @@ export default function MapPage() {
   const resetView = () => {
     setActiveLocation(null);
     setPosition({ coordinates: [10, 20], zoom: 1.2 });
+  };
+
+  const handleCopyCoords = (lat: number, lon: number, name: string) => {
+    const text = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+    navigator.clipboard.writeText(text);
+    setCopiedCoords(name);
+    setTimeout(() => setCopiedCoords(null), 2000);
   };
 
   const handleZoomIn = () => { if (position.zoom < 5) setPosition(pos => ({ ...pos, zoom: pos.zoom * 1.5 })); };
@@ -89,13 +95,8 @@ export default function MapPage() {
         const cr = loc.totalCredits;
         if (cr < 100) return 0; if (cr < 1000) return 1; if (cr < 10000) return 2; if (cr < 100000) return 3; return 4;
     }
-    // New Rebalanced Health Tiers
     const h = loc.avgHealth;
-    if (h < 40) return 0;  // Critical
-    if (h < 60) return 1;  // Poor
-    if (h < 75) return 2;  // Fair
-    if (h < 90) return 3;  // Good
-    return 4;              // Excellent (>90)
+    if (h < 40) return 0; if (h < 60) return 1; if (h < 75) return 2; if (h < 90) return 3; return 4;
   };
 
   const formatStorage = (gb: number) => {
@@ -153,7 +154,6 @@ export default function MapPage() {
     <div className="h-screen w-screen bg-black text-white font-sans overflow-hidden flex flex-col relative">
       <Head>
         <title>Xandeum Command Center</title>
-        {/* CSS for Safe Area Padding */}
         <style>{`
           @supports (padding: max(0px)) {
             .pb-safe { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
@@ -250,10 +250,9 @@ export default function MapPage() {
         )}
 
         <div className="absolute bottom-6 right-4 flex flex-col gap-2 z-30">
-            <button onClick={handleZoomIn} className="p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Plus size={18} /></button>
-            <button onClick={handleZoomOut} className="p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Minus size={18} /></button>
+            <button onClick={handleZoomIn} title="Zoom In" className="p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Plus size={18} /></button>
+            <button onClick={handleZoomOut} title="Zoom Out" className="p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Minus size={18} /></button>
             
-            {/* NEW RESET BUTTON: Only shows when map is interacted with */}
             {(position.zoom > 1.2 || activeLocation) && (
                 <button 
                     onClick={resetView}
@@ -273,7 +272,14 @@ export default function MapPage() {
                 <ViewToggles />
             </div>
             <div className="flex flex-col items-center text-[9px] text-zinc-400 font-mono bg-black/40 px-4 py-3 rounded-2xl border border-zinc-800/50 backdrop-blur-sm shadow-xl">
-                <div className="mb-2 font-bold text-zinc-300">Pulse shows node density</div>
+                {/* Visual Legend for Shapes */}
+                <div className="flex items-center gap-4 mb-2 opacity-80">
+                    <div className="flex items-center gap-1"><div className="w-2 h-2 bg-zinc-500"></div><span>Storage</span></div>
+                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-zinc-500"></div><span>Credits</span></div>
+                    <div className="flex items-center gap-1"><div className="w-2 h-2 bg-zinc-500 rotate-45"></div><span>Health</span></div>
+                </div>
+
+                <div className="mb-2 font-bold text-zinc-300">Color Intensity = Higher Value</div>
                 <div className="flex items-stretch gap-3">
                     <div className="w-1.5 rounded-full bg-gradient-to-b from-[#22d3ee] via-[#a855f7] to-[#f59e0b] shadow-[0_0_10px_rgba(59,130,246,0.3)]"></div>
                     <div className="flex flex-col justify-between h-24 text-[8px] text-zinc-500 font-bold uppercase tracking-wider py-1">
@@ -289,7 +295,6 @@ export default function MapPage() {
       {/* --- LAYER 3: TRIGGER BUTTONS --- */}
       {!drawerOpen && (
           <>
-            {/* DESKTOP */}
             <div className="hidden md:flex absolute top-[85vh] left-0 right-0 justify-center z-50 pointer-events-none">
                 <button 
                     onClick={() => setDrawerOpen(true)}
@@ -300,8 +305,6 @@ export default function MapPage() {
                     <ChevronUp size={16} className="text-zinc-500" />
                 </button>
             </div>
-
-            {/* MOBILE: Safe Area Supported */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#09090b] border-t border-zinc-800 pb-safe shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
                 <button 
                     onClick={() => setDrawerOpen(true)}
@@ -317,13 +320,12 @@ export default function MapPage() {
           </>
       )}
 
-      {/* --- LAYER 4: THE PANEL (Faster Animation) --- */}
+      {/* --- LAYER 4: THE PANEL --- */}
       <div 
         className={`absolute inset-x-0 bottom-0 z-50 flex flex-col justify-end pointer-events-none transition-transform duration-300 ease-out ${drawerOpen ? 'translate-y-0' : 'translate-y-full'}`}
       >
         <div className="pointer-events-auto w-full md:max-w-xl mx-auto md:mb-8 h-[45vh] md:h-[40vh] bg-[#09090b] md:bg-[#09090b]/95 border-t md:border border-zinc-700 md:rounded-[2rem] rounded-t-3xl shadow-[0_-10px_50px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden">
             
-            {/* Header */}
             <div className="flex flex-col gap-3 px-6 py-4 border-b border-zinc-800/50 bg-black/20 shrink-0 cursor-pointer" onClick={() => setDrawerOpen(false)}>
                 <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-white flex items-center gap-2">
@@ -333,13 +335,11 @@ export default function MapPage() {
                         <ChevronDown size={16} />
                     </button>
                 </div>
-                
                 <div className="w-full" onClick={(e) => e.stopPropagation()}>
                     <ViewToggles className="w-full justify-between bg-black/50" />
                 </div>
             </div>
 
-            {/* List with Empty State */}
             <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar">
                 {sortedLocations.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-50">
@@ -370,8 +370,16 @@ export default function MapPage() {
                                 </div>
                                 <div className="flex flex-col">
                                     <span className="text-sm font-bold text-zinc-200 group-hover:text-white">{loc.name}, {loc.country}</span>
-                                    <span className="text-[10px] text-zinc-500 flex items-center gap-1">
-                                        <MapPin size={10} /> {loc.lat.toFixed(2)}, {loc.lon.toFixed(2)}
+                                    <span 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleCopyCoords(loc.lat, loc.lon, loc.name);
+                                        }}
+                                        className="text-[10px] text-zinc-500 flex items-center gap-1 hover:text-blue-400 cursor-copy transition-colors"
+                                        title="Click to copy GPS"
+                                    >
+                                        <MapPin size={10} /> 
+                                        {copiedCoords === loc.name ? <span className="text-green-500 font-bold">Copied!</span> : `${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}`}
                                     </span>
                                 </div>
                             </div>
