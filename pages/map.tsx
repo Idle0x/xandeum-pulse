@@ -20,7 +20,7 @@ interface MapStats {
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
 // --- COLOR BUCKETS (5 Tiers) ---
-const TIER_COLORS = ["#22d3ee", "#3b82f6", "#a855f7", "#ec4899", "#f59e0b"]; 
+const TIER_COLORS = ["#22d3ee", "#3b82f6", "#a855f7", "#ec4899", "#f59e0b"]; // Cyan -> Blue -> Purple -> Pink -> Gold
 
 export default function MapPage() {
   const [locations, setLocations] = useState<LocationData[]>([]);
@@ -79,12 +79,6 @@ export default function MapPage() {
     }
     const h = loc.avgHealth;
     if (h < 50) return 0; if (h < 80) return 1; if (h < 90) return 2; if (h < 98) return 3; return 4;
-  };
-
-  const getLegendText = () => {
-    if (viewMode === 'STORAGE') return "Cyan: <1GB | Gold: >1TB";
-    if (viewMode === 'CREDITS') return "Cyan: <100 | Gold: >100k";
-    return "Cyan: <50% | Gold: 99%";
   };
 
   const formatStorage = (gb: number) => {
@@ -192,9 +186,11 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* --- LAYER 2: THE DOCK (Floating in the Gap) --- */}
+      {/* --- LAYER 2: THE DOCK & LEGEND --- */}
       <div className="absolute top-[55vh] mt-4 left-0 right-0 z-40 flex flex-col items-center pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-1 p-1.5 bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 rounded-2xl shadow-2xl">
+        
+        {/* Toggle Buttons */}
+        <div className="pointer-events-auto flex items-center gap-1 p-1.5 bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 rounded-2xl shadow-2xl mb-4">
             {(['STORAGE', 'HEALTH', 'CREDITS'] as ViewMode[]).map((mode) => {
                 let Icon = Database;
                 if (mode === 'HEALTH') Icon = Activity;
@@ -214,26 +210,52 @@ export default function MapPage() {
                 )
             })}
         </div>
-        <div className="mt-3 flex flex-col items-center gap-1">
-            <div className="text-[10px] text-zinc-400 font-mono bg-black/50 px-3 py-1 rounded-full border border-zinc-800">
-                {getLegendText()}
-            </div>
-            <div className="flex items-center gap-1 mt-1">
-                <span className="text-[8px] text-zinc-600">Low</span>
-                <div className="h-1 w-24 rounded-full bg-gradient-to-r from-cyan-400 via-purple-500 to-amber-500"></div>
-                <span className="text-[8px] text-zinc-600">High</span>
+        
+        {/* EXACT LEGEND TEXT */}
+        <div className="flex flex-col items-center text-[9px] text-zinc-400 font-mono bg-black/40 px-4 py-3 rounded-2xl border border-zinc-800/50 backdrop-blur-sm shadow-xl">
+            <div className="mb-2 font-bold text-zinc-300">Pulse instead shows the node density</div>
+            
+            {/* Dynamic Ranges based on ViewMode */}
+            <div className="flex flex-col items-start gap-1 w-full">
+                {viewMode === 'STORAGE' && (
+                    <>
+                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#22d3ee]"></div> Cyan = &lt; 1 GB</div>
+                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div> Blue = 1 GB - 10 GB</div>
+                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#a855f7]"></div> Purple = 10 GB - 100 GB</div>
+                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#ec4899]"></div> Pink = 100 GB - 1 TB</div>
+                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#f59e0b]"></div> Gold = &gt; 1 TB</div>
+                    </>
+                )}
+                {viewMode === 'CREDITS' && (
+                    <>
+                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#22d3ee]"></div> Cyan = &lt; 100</div>
+                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div> Blue = 100 - 1k</div>
+                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#a855f7]"></div> Purple = 1k - 10k</div>
+                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#ec4899]"></div> Pink = 10k - 100k</div>
+                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#f59e0b]"></div> Gold = &gt; 100k</div>
+                    </>
+                )}
+                {viewMode === 'HEALTH' && (
+                    <>
+                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#22d3ee]"></div> Cyan = &lt; 50%</div>
+                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div> Blue = 50% - 80%</div>
+                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#a855f7]"></div> Purple = 80% - 90%</div>
+                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#ec4899]"></div> Pink = 90% - 98%</div>
+                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#f59e0b]"></div> Gold = &gt; 98%</div>
+                    </>
+                )}
             </div>
         </div>
       </div>
 
-      {/* --- LAYER 3: FLOATING PILL DRAWER --- */}
+      {/* --- LAYER 3: FLOATING PILL (MIDDLE) --- */}
       
-      {/* 1. COLLAPSED STATE: Floating Pill Button */}
+      {/* 1. COLLAPSED STATE: Floating Pill Button in MIDDLE OF EMPTY SPACE */}
       {!drawerOpen && (
-          <div className="absolute bottom-8 left-0 right-0 flex justify-center z-50 pointer-events-none">
+          <div className="absolute top-[80vh] left-0 right-0 flex justify-center z-50 pointer-events-none">
               <button 
                 onClick={() => setDrawerOpen(true)}
-                className="pointer-events-auto flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-700 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.8)] text-zinc-200 hover:text-white hover:border-blue-500/50 hover:bg-zinc-800 transition-all active:scale-95"
+                className="pointer-events-auto flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-700 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.8)] text-zinc-200 hover:text-white hover:border-blue-500/50 hover:bg-zinc-800 transition-all active:scale-95 transform -translate-y-1/2"
               >
                 <Activity size={16} className="text-blue-400" />
                 <span className="text-xs font-bold uppercase tracking-widest">Live Statistics</span>
@@ -242,17 +264,18 @@ export default function MapPage() {
           </div>
       )}
 
-      {/* 2. EXPANDED STATE: Floating Card (Not Full Sheet) */}
+      {/* 2. EXPANDED STATE: Expands UP and DOWN */}
       {drawerOpen && (
-          <div className="absolute inset-0 z-50 flex flex-col justify-end pb-8 px-4 pointer-events-none">
+          <div className="absolute inset-x-0 z-50 px-4 pointer-events-none flex flex-col items-center justify-center h-full">
             {/* Click backdrop to close */}
-            <div className="absolute inset-0 pointer-events-auto" onClick={() => setDrawerOpen(false)}></div>
+            <div className="absolute inset-0 pointer-events-auto bg-black/20" onClick={() => setDrawerOpen(false)}></div>
             
-            {/* The Floating Card */}
-            <div className="pointer-events-auto w-full max-w-lg mx-auto bg-[#09090b]/95 border border-zinc-700 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.9)] h-[40vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
+            {/* The Floating Card - Anchored below Toggles, stretching down */}
+            {/* Top set to 62vh to start just below the dock, Bottom set to 2rem to allow gap */}
+            <div className="absolute top-[62vh] bottom-8 w-full max-w-lg mx-auto bg-[#09090b]/95 border border-zinc-700 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden animate-in zoom-in-95 fade-in duration-300 pointer-events-auto">
                 
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/50 bg-black/20" onClick={() => setDrawerOpen(false)}>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/50 bg-black/20 shrink-0" onClick={() => setDrawerOpen(false)}>
                     <div className="flex flex-col">
                         <span className="text-sm font-bold text-white flex items-center gap-2">
                             <Activity size={14} className="text-green-500" /> Live Network Breakdown
@@ -264,7 +287,7 @@ export default function MapPage() {
                     </button>
                 </div>
 
-                {/* List */}
+                {/* List - SCROLLABLE FIX APPLIED */}
                 <div className="flex-grow overflow-y-auto p-4 space-y-2">
                     {sortedLocations.map((loc, i) => (
                         <div 
