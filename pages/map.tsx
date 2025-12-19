@@ -331,10 +331,18 @@ export default function MapPage() {
                 <div className="w-full md:w-auto bg-zinc-900/30 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3">
                     
                     {/* The new "Professional" Context Text above Legend */}
-                    <div className="flex items-start gap-2 max-w-xl">
-                        <Info size={12} className="text-blue-400 mt-0.5 shrink-0" />
-                        <p className="text-[10px] text-zinc-400 leading-tight">
-                            <strong className="text-zinc-200">{getLegendContext()}</strong> Nodes are distributed according to the score range shown below. Regions with higher scores are visualized by increased color intensity.
+                    <div className="flex flex-col gap-2 max-w-xl">
+                        {/* 1. Data Context */}
+                        <div className="flex items-start gap-2">
+                            <Info size={12} className="text-blue-400 mt-0.5 shrink-0" />
+                            <p className="text-[10px] text-zinc-400 leading-tight">
+                                <strong className="text-zinc-200">{getLegendContext()}</strong> Nodes are distributed according to the score range shown below.
+                            </p>
+                        </div>
+                        
+                        {/* 2. Pulse Context (ADDED) */}
+                        <p className="text-[10px] text-zinc-500 leading-tight pl-5">
+                            <strong className="text-zinc-400">Pulse Intensity</strong> represents node density in a region. The thicker/brighter the intensity, the higher the nodes in that region.
                         </p>
                     </div>
 
