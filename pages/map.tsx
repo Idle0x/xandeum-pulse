@@ -128,7 +128,6 @@ export default function MapPage() {
     if (loading) return "Calibrating Global Sensors...";
     if (!leadingRegion) return "Waiting for Node Telemetry...";
 
-    // Headline uses the Country Name for a broader "Global" feel
     const { country } = leadingRegion;
 
     switch (viewMode) {
@@ -146,7 +145,6 @@ export default function MapPage() {
      
      const { name, totalStorage, totalCredits, avgHealth, count } = leadingRegion;
 
-     // Subtitle combines "What we are looking at" + "Proof from the top city"
      switch (viewMode) {
         case 'STORAGE':
              return `Visualizing regions by committed disk space. The largest hub, ${name}, is currently providing ${formatStorage(totalStorage)}.`;
@@ -198,35 +196,43 @@ export default function MapPage() {
         `}</style>
       </Head>
 
-      {/* --- HEADER --- */}
-      <div className="absolute top-6 left-6 z-50 flex flex-col items-start gap-4 max-w-[90%] md:max-w-[60%] pointer-events-none">
-        <div className="pointer-events-auto">
-            <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all">
-                <ArrowLeft size={14} className="text-zinc-400 group-hover:text-white" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-300">Operations / {viewMode}</span>
+      {/* --- HORIZONTAL HEADER BAR --- */}
+      {/* Changed from absolute to relative to prevent overlap */}
+      <div className="w-full z-50 flex flex-col gap-4 px-6 py-4 bg-[#09090b]/80 backdrop-blur-md border-b border-zinc-800/50 shadow-lg">
+        
+        {/* Top Row: Back Button */}
+        <div className="flex items-center justify-between w-full">
+            <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all cursor-pointer">
+                <ArrowLeft size={12} className="text-zinc-400 group-hover:text-white" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-300">
+                    Dashboard
+                </span>
             </Link>
+            
+            <div className="flex items-center gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                     viewMode === 'HEALTH' ? 'bg-green-500' : viewMode === 'CREDITS' ? 'bg-yellow-500' : 'bg-blue-500'
+                }`}></div>
+                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                    {viewMode} Mode
+                </span>
+            </div>
         </div>
         
-        <div className="pointer-events-auto mt-1">
-            {/* Dynamic Headline */}
-            <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight text-white leading-tight">
+        {/* Bottom Row: Dynamic Content */}
+        <div>
+            <h1 className="text-xl md:text-3xl font-extrabold tracking-tight text-white leading-tight">
                 {getDynamicTitle()}
             </h1>
-            
-            {/* Combined Context + Stat Subtitle */}
-            <div className="flex items-start gap-3 mt-3 max-w-lg">
-                <div className={`mt-1.5 w-1.5 h-1.5 shrink-0 rounded-full animate-pulse ${
-                    viewMode === 'HEALTH' ? 'bg-green-500' : viewMode === 'CREDITS' ? 'bg-yellow-500' : 'bg-blue-500'
-                }`}></div>
-                <p className="text-xs md:text-sm text-zinc-400 font-medium leading-relaxed">
-                   {getDynamicSubtitle()}
-                </p>
-            </div>
+            <p className="text-xs md:text-sm text-zinc-400 font-medium leading-relaxed mt-2 max-w-2xl">
+                {getDynamicSubtitle()}
+            </p>
         </div>
       </div>
 
       {/* --- LAYER 1: MAP FRAME --- */}
-      <div className="relative z-10 mx-6 mt-32 md:mt-40 h-[45vh] md:h-[50vh] border border-zinc-800/50 rounded-3xl overflow-hidden shadow-2xl bg-[#080808] transition-all duration-500">
+      {/* Reduced mt-32 to mt-6 because header now takes space */}
+      <div className="relative z-10 mx-6 mt-6 flex-grow border border-zinc-800/50 rounded-3xl overflow-hidden shadow-2xl bg-[#080808] transition-all duration-500 h-full max-h-[50vh]">
         <div className="absolute inset-0 pointer-events-none">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_#1a202c_0%,_#000000_80%)] opacity-50"></div>
             <div className="absolute inset-0 opacity-10" 
