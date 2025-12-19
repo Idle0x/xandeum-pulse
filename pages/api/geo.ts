@@ -56,35 +56,42 @@ async function fetchGeoBatch(ips: string[]) {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    // 1. FETCH DATA (RPC + CREDITS API)
+    // 1. FETCH DATA
     const [pods, creditsRes] = await Promise.all([
       getPodsFromRPC(),
       axios.get('https://podcredits.xandeum.network/api/pods-credits').catch(() => ({ data: {} }))
     ]);
 
-    // 2. CALCULATE CONSENSUS VERSION
+    // 2. CALCULATE NETWORK METRICS (Consensus & Median)
     const versionCounts: Record<string, number> = {};
+    const allCredits: number[] = [];
+    
+    // Parse Credits & Versions
+    const creditsMap = new Map<string, number>();
+    const creditsArray = creditsRes.data?.pods_credits || [];
+    if (Array.isArray(creditsArray)) {
+        creditsArray.forEach((c: any) => {
+            if (c.pod_id && c.credits !== undefined) {
+                const val = parseFloat(c.credits);
+                creditsMap.set(c.pod_id, val);
+                allCredits.push(val);
+            }
+        });
+    }
+
+    // Determine Consensus Version
     pods.forEach((p: any) => {
         const v = p.version || '0.0.0';
         versionCounts[v] = (versionCounts[v] || 0) + 1;
     });
     const consensusVersion = Object.keys(versionCounts).sort((a, b) => versionCounts[b] - versionCounts[a])[0] || '0.0.0';
 
-    // 3. BUILD CREDITS MAP (FIXED LOGIC)
-    const creditsMap = new Map<string, number>();
-    // Credits API returns { "pods_credits": [ ... ] }
-    const creditsArray = creditsRes.data?.pods_credits || [];
-    
-    if (Array.isArray(creditsArray)) {
-        creditsArray.forEach((c: any) => {
-            // Map 'pod_id' -> 'credits'
-            if (c.pod_id && c.credits !== undefined) {
-                creditsMap.set(c.pod_id, parseFloat(c.credits));
-            }
-        });
-    }
+    // Determine Median Credits (Middle Value of Network)
+    allCredits.sort((a, b) => a - b);
+    const mid = Math.floor(allCredits.length / 2);
+    const medianCredits = allCredits.length > 0 ? allCredits[mid] : 0;
 
-    // 4. GEOCODING
+    // 3. GEOCODING
     const uniqueIps = [...new Set(pods.map((p: any) => p.address.split(':')[0]))] as string[];
     const missingIps = uniqueIps.filter(ip => !geoCache.has(ip));
     
@@ -103,7 +110,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // 5. DATA MERGE
+    // 4. DATA MERGE
     const cityMap = new Map<string, any>();
 
     pods.forEach((node: any) => {
@@ -113,28 +120,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (geo) {
         const key = `${geo.city}-${geo.country}`;
         
-        // --- STORAGE FIX (Bytes -> GB) ---
+        // --- STORAGE FIX ---
         const rawStorage = parseFloat(node.storage_committed || '0');
         const storageGB = rawStorage / (1024 * 1024 * 1024);
 
-        // --- HEALTH CALCULATION (Hybrid) ---
+        // --- CREDITS ---
+        const credits = creditsMap.get(node.pubkey) || 0;
+
+        // --- HEALTH CALCULATION (The "Vitality Score") ---
         let health = 100;
         const nodeVersion = node.version || '0.0.0';
         const uptimeSeconds = node.uptime || 0;
 
-        // Penalty 1: Version Mismatch (-15)
-        if (compareVersions(nodeVersion, consensusVersion) < 0) {
-            health -= 15;
+        // A. The "Useless Node" Check (0 Storage = 0 Health)
+        if (storageGB <= 0) {
+            health = 0;
+        } else {
+            // B. Stability Check (Uptime < 24h)
+            if (uptimeSeconds < 86400) health -= 20;
+
+            // C. Consensus Check (Outdated Version)
+            if (compareVersions(nodeVersion, consensusVersion) < 0) health -= 15;
+
+            // D. Reputation Check (Relative to Network Median)
+            // If median is 50k, and you have < 5k (10%), you are penalized
+            if (medianCredits > 0) {
+                if (credits < (medianCredits * 0.01)) health -= 20; // Very low reputation
+                else if (credits < (medianCredits * 0.1)) health -= 10; // Low reputation
+            }
         }
 
-        // Penalty 2: Low Uptime (-20)
-        // If uptime is less than 24 hours (86400 seconds), it's not fully stable yet
-        if (uptimeSeconds < 86400) {
-            health -= 20;
-        }
-
-        // --- CREDITS FIX (Match by Pubkey) ---
-        const credits = creditsMap.get(node.pubkey) || 0;
+        // Clamp Health (0 - 100)
+        health = Math.max(0, Math.min(100, health));
 
         if (cityMap.has(key)) {
             const existing = cityMap.get(key)!;
