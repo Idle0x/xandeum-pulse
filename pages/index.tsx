@@ -76,6 +76,7 @@ const formatDetailedTimestamp = (timestamp: number) => {
   });
 };
 
+// Basic version comparator
 const compareVersions = (v1: string, v2: string) => {
   const parts1 = v1.split('.').map(Number);
   const parts2 = v2.split('.').map(Number);
@@ -88,19 +89,69 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
-const getHealthScore = (node: Node, consensusVersion: string) => {
-  let score = 100;
-  if (node.uptime < 3600) score -= 40;
-  else if (node.uptime < 86400) score -= 20;
-  else if (node.uptime < 259200) score -= 5;
+// --- THE NEW "VITALITY SCORE" LOGIC (Client-Side Implementation) ---
+const getHealthScore = (node: Node, consensusVersion: string, medianCredits: number) => {
+  // GATEKEEPER: 0 Storage = 0 Health
+  // storage_committed is in bytes. Convert to GB for calculation.
+  const storageGB = (node.storage_committed || 0) / (1024 ** 3);
+  if (storageGB <= 0) return 0;
+
+  // 1. UPTIME SCORE (30%)
+  let uptimeScore = 0;
+  const days = node.uptime / 86400;
+  if (days >= 30) uptimeScore = 100;
+  else if (days >= 7) uptimeScore = 70 + (days - 7) * (30 / 23);
+  else if (days >= 1) uptimeScore = 40 + (days - 1) * (30 / 6);
+  else uptimeScore = days * 40;
+
+  // 2. VERSION SCORE (20%)
+  let versionScore = 100;
+  if (consensusVersion !== 'N/A' && compareVersions(node.version, consensusVersion) < 0) {
+      const parts1 = node.version.split('.').map(Number);
+      const parts2 = consensusVersion.split('.').map(Number);
+      
+      const majorDiff = (parts2[0] || 0) - (parts1[0] || 0);
+      const minorDiff = (parts2[1] || 0) - (parts1[1] || 0);
+
+      if (majorDiff > 0) versionScore = 30; // Major version behind
+      else if (minorDiff > 2) versionScore = 60; // >2 Minor versions behind
+      else versionScore = 80; // 1-2 Minor versions behind
+  }
+
+  // 3. REPUTATION SCORE (25%)
+  let reputationScore = 50; // Baseline
+  const credits = node.credits || 0;
   
-  if (consensusVersion !== 'N/A' && compareVersions(node.version, consensusVersion) < 0) score -= 15;
-  
-  if (!node.is_public) score -= 10;
-  if (node.storage_used > 1000000) score += 5; 
-  return Math.max(0, Math.min(100, score));
+  if (medianCredits > 0 && credits > 0) {
+      const ratio = credits / medianCredits;
+      if (ratio >= 2) reputationScore = 100;
+      else if (ratio >= 1) reputationScore = 75 + (ratio - 1) * 25;
+      else if (ratio >= 0.5) reputationScore = 50 + (ratio - 0.5) * 50;
+      else if (ratio >= 0.1) reputationScore = 25 + (ratio - 0.1) * 62.5;
+      else reputationScore = ratio * 250;
+  } else if (credits === 0) {
+      reputationScore = 0; // No history
+  } else if (medianCredits === 0 && credits > 0) {
+      reputationScore = 100; // Early adopter bonus
+  }
+
+  // 4. CAPACITY SCORE (25%)
+  let capacityScore = 0;
+  if (storageGB >= 1000) capacityScore = 100; // > 1TB
+  else if (storageGB >= 100) capacityScore = 70 + (storageGB - 100) * (30 / 900);
+  else if (storageGB >= 10) capacityScore = 40 + (storageGB - 10) * (30 / 90);
+  else capacityScore = storageGB * 4;
+
+  const finalScore = 
+    (uptimeScore * 0.30) +
+    (versionScore * 0.20) +
+    (reputationScore * 0.25) +
+    (capacityScore * 0.25);
+
+  return Math.round(Math.max(0, Math.min(100, finalScore)));
 };
 
+// --- CALCULATE MEDIAN (ROBUST AGAINST OUTLIERS) ---
 const calculateMedian = (values: number[]) => {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -210,6 +261,7 @@ export default function Home() {
   const [totalNetworkCredits, setTotalNetworkCredits] = useState(0);
   
   const [medianCommitted, setMedianCommitted] = useState(0);
+  const [medianCredits, setMedianCredits] = useState(0); // NEW: Required for health score
 
   useEffect(() => {
     fetchData();
@@ -304,6 +356,7 @@ export default function Home() {
   };
 
   const copyStatusReport = (node: Node) => {
+    const health = getHealthScore(node, mostCommonVersion, medianCredits);
     const report = `[XANDEUM PULSE REPORT]
 -----------------------
 Node: ${node.address}
@@ -311,6 +364,7 @@ Status: ${node.uptime > 86400 ? 'STABLE' : 'BOOTING'}
 Rank: #${node.rank || '-'}
 Credits: ${node.credits?.toLocaleString() || 0}
 Storage: ${formatBytes(node.storage_used)} / ${formatBytes(node.storage_committed || 0)}
+Health Score: ${health}/100
 Uptime: ${formatUptime(node.uptime)}
 Version: ${node.version}
 -----------------------
@@ -321,7 +375,8 @@ Monitor at: https://xandeum-pulse.vercel.app`;
   };
 
   const shareToTwitter = (node: Node) => {
-    const text = `Just checked my pNode status on Xandeum Pulse! ⚡\n\n🟢 Status: ${node.uptime > 86400 ? 'Stable' : 'Booting'}\n🏆 Rank: #${node.rank || '-'}\n💰 Credits: ${node.credits?.toLocaleString() || 0}\n💾 Storage: ${formatBytes(node.storage_used)}\n\nMonitor the network here:`;
+    const health = getHealthScore(node, mostCommonVersion, medianCredits);
+    const text = `Just checked my pNode status on Xandeum Pulse! ⚡\n\n🟢 Status: ${node.uptime > 86400 ? 'Stable' : 'Booting'}\n❤️ Health: ${health}/100\n🏆 Rank: #${node.rank || '-'}\n💰 Credits: ${node.credits?.toLocaleString() || 0}\n💾 Storage: ${formatBytes(node.storage_used)}\n\nMonitor the network here:`;
     const url = "https://xandeum-pulse.vercel.app";
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
   };
@@ -421,6 +476,10 @@ Monitor at: https://xandeum-pulse.vercel.app`;
 
             const committedValues = mergedList.map(n => n.storage_committed || 0);
             setMedianCommitted(calculateMedian(committedValues));
+
+            // NEW: Calculate Median Credits for Health Score
+            const creditValues = mergedList.map(n => n.credits || 0);
+            setMedianCredits(calculateMedian(creditValues));
         }
         
         setError('');
@@ -474,7 +533,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
     const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Utilization_Percent,Health_Score,Network_Mode,Last_Seen_ISO,RPC_URL,Is_Favorite\n';
     
     const rows = filteredNodes.map(n => {
-        const health = getHealthScore(n, mostCommonVersion);
+        const health = getHealthScore(n, mostCommonVersion, medianCredits);
         const utilization = n.storage_usage_percentage?.replace('%', '') || '0';
         const mode = n.is_public ? 'Public' : 'Private';
         const isoTime = new Date(n.last_seen_timestamp < 10000000000 ? n.last_seen_timestamp * 1000 : n.last_seen_timestamp).toISOString();
@@ -497,7 +556,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
     } else if (step === 1) {
       return { label: 'Committed', value: formatBytes(node.storage_committed || 0), color: 'text-purple-400', icon: HardDrive };
     } else if (step === 2) {
-      const score = getHealthScore(node, mostCommonVersion);
+      const score = getHealthScore(node, mostCommonVersion, medianCredits);
       return { label: 'Health Score', value: `${score}/100`, color: score > 80 ? 'text-green-400' : 'text-yellow-400', icon: Activity };
     } else {
       return { 
@@ -616,7 +675,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
       {loading && <div className="fixed top-0 left-0 right-0 z-50"><LiveWireLoader /></div>}
 
       <div className="p-4 md:p-8 flex-grow">
-      {/* HEADER (NOW STICKY) */}
+      {/* HEADER (STICKY) */}
       <header className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-zinc-800 pb-6 sticky top-0 z-40 bg-[#09090b]/80 backdrop-blur-md pt-4 -mt-4 -mx-4 px-4 md:-mx-8 md:px-8">
         <div className="text-center md:text-left mb-4 md:mb-0">
           <h1 className="text-4xl font-extrabold tracking-tight text-white flex items-center gap-3 justify-center md:justify-start">
@@ -1052,7 +1111,7 @@ Monitor at: https://xandeum-pulse.vercel.app`;
                             </div>
                         )}
 
-                        <div className="text-5xl font-bold text-white mb-1">{getHealthScore(selectedNode, mostCommonVersion)}</div>
+                        <div className="text-5xl font-bold text-white mb-1">{getHealthScore(selectedNode, mostCommonVersion, medianCredits)}</div>
                         <div className="text-[9px] text-zinc-600">out of 100</div>
                     </div>
 
