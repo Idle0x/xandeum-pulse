@@ -205,7 +205,7 @@ export default function Home() {
   const [medianCommitted, setMedianCommitted] = useState(0);
   const [medianCredits, setMedianCredits] = useState(0);
 
-  const [isMenuOpen, setIsMenuOpen] = useState(false); // NEW: Menu State
+  const [isMenuOpen, setIsMenuOpen] = useState(false); 
 
   useEffect(() => {
     fetchData();
@@ -392,6 +392,27 @@ export default function Home() {
     });
 
   const watchListNodes = nodes.filter(node => favorites.includes(node.address));
+
+  // --- FIXED: exportCSV DEFINED HERE (Scope Accessible) ---
+  const exportCSV = () => {
+    const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Utilization_Percent,Health_Score,Network_Mode,Last_Seen_ISO,RPC_URL,Is_Favorite\n';
+    
+    const rows = filteredNodes.map(n => {
+        const health = getHealthScore(n, mostCommonVersion, medianCredits);
+        const utilization = n.storage_usage_percentage?.replace('%', '') || '0';
+        const mode = n.is_public ? 'Public' : 'Private';
+        const isoTime = new Date(n.last_seen_timestamp < 10000000000 ? n.last_seen_timestamp * 1000 : n.last_seen_timestamp).toISOString();
+        
+        return `${n.address},${n.pubkey},${n.rank},${n.credits},${n.version},${n.uptime},${n.storage_committed},${n.storage_used},${utilization},${health},${mode},${isoTime},http://${n.address.split(':')[0]}:6000,${favorites.includes(n.address)}`;
+    });
+    
+    const blob = new Blob([headers + rows.join('\n')], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `xandeum_pulse_export_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  };
 
   const getCycleContent = (node: Node, index: number) => {
     const step = (cycleStep + index) % 4;
@@ -683,6 +704,11 @@ export default function Home() {
             <span className="text-zinc-800">|</span>
             <a href="https://github.com/Idle0x/xandeum-pulse" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition flex items-center gap-1">Open Source <ExternalLink size={10} /></a>
         </div>
+        
+        {/* NEW DOCS LINK */}
+        <Link href="/docs" className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-4 decoration-zinc-700 flex items-center justify-center gap-1 mt-4">
+           <BookOpen size={10} /> System Architecture & Docs
+        </Link>
       </footer>
     </div>
   );
