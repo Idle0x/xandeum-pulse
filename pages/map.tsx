@@ -19,6 +19,7 @@ interface MapStats {
 
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
+// --- COLOR BUCKETS ---
 const TIER_COLORS = ["#22d3ee", "#3b82f6", "#a855f7", "#ec4899", "#f59e0b"]; 
 
 export default function MapPage() {
@@ -30,9 +31,11 @@ export default function MapPage() {
   // Interaction State
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeLocation, setActiveLocation] = useState<string | null>(null);
-  const [hoveredLocation, setHoveredLocation] = useState<string | null>(null); // New for "Surprise" Sync
   const [position, setPosition] = useState({ coordinates: [10, 20], zoom: 1.2 });
   const highlightTimeout = useRef<NodeJS.Timeout | null>(null);
+  
+  // Ref for the list container to enable auto-scrolling
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Fetch Data
   useEffect(() => {
@@ -51,9 +54,17 @@ export default function MapPage() {
   }, []);
 
   // --- LOGIC ---
+
   const lockTarget = (name: string, lat: number, lon: number) => {
     setActiveLocation(name);
     setPosition({ coordinates: [lon, lat], zoom: 3 });
+    
+    // Auto-scroll the list to this item if drawer is open
+    if (drawerOpen && listRef.current) {
+        const item = document.getElementById(`list-item-${name}`);
+        if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
     if (highlightTimeout.current) clearTimeout(highlightTimeout.current);
     highlightTimeout.current = setTimeout(() => setActiveLocation(null), 15000); 
   };
@@ -93,7 +104,7 @@ export default function MapPage() {
     }
   };
 
-  // Sort Logic
+  // --- SORTING ---
   const sortedLocations = useMemo(() => {
     return [...locations].sort((a, b) => {
         if (viewMode === 'STORAGE') return b.totalStorage - a.totalStorage;
@@ -103,15 +114,13 @@ export default function MapPage() {
   }, [locations, viewMode]);
 
   const locationsForMap = useMemo(() => {
-    // Sort so active/hovered nodes render last (on top)
-    const priority = activeLocation || hoveredLocation;
-    if (!priority) return locations;
-    const others = locations.filter(l => l.name !== priority);
-    const active = locations.find(l => l.name === priority);
+    if (!activeLocation) return locations;
+    const others = locations.filter(l => l.name !== activeLocation);
+    const active = locations.find(l => l.name === activeLocation);
     return active ? [...others, active] : others;
-  }, [locations, activeLocation, hoveredLocation]);
+  }, [locations, activeLocation]);
 
-  // Reusable Toggle Component
+  // --- COMPONENT: TOGGLES ---
   const ViewToggles = ({ className = "" }: { className?: string }) => (
     <div className={`flex items-center gap-1 p-1 bg-zinc-900/90 border border-zinc-800 rounded-xl shadow-lg ${className}`}>
         {(['STORAGE', 'HEALTH', 'CREDITS'] as ViewMode[]).map((mode) => {
@@ -141,11 +150,14 @@ export default function MapPage() {
 
       {/* --- HEADER --- */}
       <div className="absolute top-6 left-6 z-50 flex flex-col items-start gap-4 max-w-[80%] pointer-events-none">
-        <Link href="/" className="pointer-events-auto group flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all">
-            <ArrowLeft size={14} className="text-zinc-400 group-hover:text-white" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-300">Operations</span>
-        </Link>
-        <div>
+        <div className="pointer-events-auto">
+            <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all">
+                <ArrowLeft size={14} className="text-zinc-400 group-hover:text-white" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-300">Operations</span>
+            </Link>
+        </div>
+        
+        <div className="pointer-events-auto">
             <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-white to-zinc-400">
                 Global Distribution of {viewMode.charAt(0) + viewMode.slice(1).toLowerCase()}
             </h1>
@@ -158,9 +170,12 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* --- LAYER 1: MAP FRAME (Top 50-60%) --- */}
-      {/* Z-Index 10: Stays Interactive even when Drawer (Z-40) is open below it */}
-      <div className="relative z-10 mx-6 mt-32 h-[45vh] border border-zinc-800/50 rounded-3xl overflow-hidden shadow-2xl bg-[#080808] transition-all duration-500">
+      {/* --- LAYER 1: MAP FRAME (Top Half) --- */}
+      {/* Desktop: 45vh height, pushed down. 
+          Mobile: 50vh height, pushed down.
+          Crucially: z-10 so it sits BEHIND the panel but stays clickable because panel won't cover it.
+      */}
+      <div className="relative z-10 mx-6 mt-32 h-[45vh] md:h-[50vh] border border-zinc-800/50 rounded-3xl overflow-hidden shadow-2xl bg-[#080808] transition-all duration-500">
         <div className="absolute inset-0 pointer-events-none">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_#1a202c_0%,_#000000_80%)] opacity-50"></div>
             <div className="absolute inset-0 opacity-10" 
@@ -178,11 +193,9 @@ export default function MapPage() {
                     <Geography key={geo.rsmKey} geography={geo} fill="#1f1f1f" stroke="#333" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { fill: "#333", outline: "none" }, pressed: { outline: "none" }}} />
                 ))}
               </Geographies>
-              
               {locationsForMap.map((loc) => {
                 const size = sizeScale(loc.count);
-                // Active if Clicked OR Hovered in List
-                const isActive = activeLocation === loc.name || hoveredLocation === loc.name;
+                const isActive = activeLocation === loc.name;
                 const tier = getTier(loc);
                 const baseColor = TIER_COLORS[tier];
 
@@ -233,28 +246,38 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* --- LAYER 2: EXTERNAL DOCK (Fades out when Drawer Open) --- */}
-      {/* Hidden on Mobile (since drawer has toggles). Visible on Desktop. */}
-      <div className={`hidden md:flex absolute top-[55vh] mt-6 left-0 right-0 z-30 flex-col items-center transition-opacity duration-500 ${drawerOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-        <ViewToggles />
-        <div className="mt-4 flex flex-col items-center text-[9px] text-zinc-400 font-mono bg-black/40 px-4 py-3 rounded-2xl border border-zinc-800/50 backdrop-blur-sm shadow-xl">
-            <div className="mb-2 font-bold text-zinc-300">Pulse shows node density</div>
-            <div className="flex items-stretch gap-3">
-                <div className="w-1.5 rounded-full bg-gradient-to-b from-[#22d3ee] via-[#a855f7] to-[#f59e0b] shadow-[0_0_10px_rgba(59,130,246,0.3)]"></div>
-                <div className="flex flex-col justify-between h-24 text-[8px] text-zinc-500 font-bold uppercase tracking-wider py-1">
-                    {viewMode === 'STORAGE' && <>{['< 1 GB','1 - 10 GB','10 - 100 GB','100 GB - 1 TB'].map(t=><span key={t}>{t}</span>)}<span className="text-[#f59e0b]">&gt; 1 TB</span></>}
-                    {viewMode === 'CREDITS' && <>{['< 100','100 - 1k','1k - 10k','10k - 100k'].map(t=><span key={t}>{t}</span>)}<span className="text-[#f59e0b]">&gt; 100k</span></>}
-                    {viewMode === 'HEALTH' && <>{['< 50%','50% - 80%','80% - 90%','90% - 98%'].map(t=><span key={t}>{t}</span>)}<span className="text-[#f59e0b]">&gt; 98%</span></>}
+      {/* --- LAYER 2: THE DOCK (Visible when Panel is CLOSED) --- */}
+      {/* Desktop: Floating under map.
+          Mobile: Fixed bottom bar (disappears when panel opens).
+      */}
+      {!drawerOpen && (
+        <div className="absolute top-[58vh] md:top-[60vh] left-0 right-0 z-40 flex flex-col items-center pointer-events-none transition-opacity duration-300">
+            
+            {/* Desktop Toggles */}
+            <div className="hidden md:block pointer-events-auto mb-4">
+                <ViewToggles />
+            </div>
+            
+            {/* Legend */}
+            <div className="hidden md:flex flex-col items-center text-[9px] text-zinc-400 font-mono bg-black/40 px-4 py-3 rounded-2xl border border-zinc-800/50 backdrop-blur-sm shadow-xl">
+                <div className="mb-2 font-bold text-zinc-300">Pulse shows node density</div>
+                <div className="flex items-stretch gap-3">
+                    <div className="w-1.5 rounded-full bg-gradient-to-b from-[#22d3ee] via-[#a855f7] to-[#f59e0b] shadow-[0_0_10px_rgba(59,130,246,0.3)]"></div>
+                    <div className="flex flex-col justify-between h-24 text-[8px] text-zinc-500 font-bold uppercase tracking-wider py-1">
+                        {viewMode === 'STORAGE' && <><span className="text-zinc-500">&lt; 1 GB</span><span>1-10 GB</span><span>10-100 GB</span><span>100-1T</span><span className="text-[#f59e0b]">&gt; 1 TB</span></>}
+                        {viewMode === 'CREDITS' && <><span className="text-zinc-500">&lt; 100</span><span>100-1k</span><span>1k-10k</span><span>10k-100k</span><span className="text-[#f59e0b]">&gt; 100k</span></>}
+                        {viewMode === 'HEALTH' && <><span className="text-zinc-500">&lt; 50%</span><span>50-80%</span><span>80-90%</span><span>90-98%</span><span className="text-[#f59e0b]">&gt; 98%</span></>}
+                    </div>
                 </div>
             </div>
         </div>
-      </div>
+      )}
 
-      {/* --- LAYER 3: TRIGGERS --- */}
+      {/* --- LAYER 3: TRIGGER BUTTONS --- */}
       {!drawerOpen && (
           <>
-            {/* Desktop: Floating Pill */}
-            <div className="hidden md:flex absolute top-[80vh] left-0 right-0 justify-center z-50 pointer-events-none transition-all duration-500">
+            {/* DESKTOP TRIGGER: Floating Pill */}
+            <div className="hidden md:flex absolute top-[85vh] left-0 right-0 justify-center z-50 pointer-events-none">
                 <button 
                     onClick={() => setDrawerOpen(true)}
                     className="pointer-events-auto flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-700 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.8)] text-zinc-200 hover:text-white hover:border-blue-500/50 hover:bg-zinc-800 transition-all active:scale-95 transform -translate-y-1/2"
@@ -265,38 +288,38 @@ export default function MapPage() {
                 </button>
             </div>
 
-            {/* Mobile: Fixed Bottom Bar */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#09090b] border-t border-zinc-800 pb-safe">
+            {/* MOBILE TRIGGER: Fixed Bottom Dock (Full Width) */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#09090b] border-t border-zinc-800 pb-safe shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
                 <button 
                     onClick={() => setDrawerOpen(true)}
                     className="w-full flex items-center justify-between px-6 py-4 text-zinc-300 hover:text-white transition-colors"
                 >
-                    <div className="flex items-center gap-2">
-                        <Activity size={16} className="text-blue-400" />
-                        <span className="text-xs font-bold uppercase tracking-widest">Live Statistics</span>
+                    <div className="flex items-center gap-3">
+                        <Activity size={18} className="text-blue-400" />
+                        <span className="text-xs font-bold uppercase tracking-widest">Open Live Stats</span>
                     </div>
-                    <ChevronUp size={16} />
+                    <ChevronUp size={18} />
                 </button>
             </div>
           </>
       )}
 
-      {/* --- LAYER 4: UTILITY PANEL (Non-Blocking) --- */}
-      {/* 1. pointer-events-none container: Allows clicks to pass through to map
-          2. pointer-events-auto card: Allows interaction with the panel itself 
+      {/* --- LAYER 4: THE NON-BLOCKING PANEL --- */}
+      {/* This is the key change. We use 'pointer-events-none' on the wrapper so clicks pass through to the map.
+         The panel itself has 'pointer-events-auto'.
+         NO BACKDROP BLUR/COLOR.
       */}
       <div 
-        className={`fixed inset-x-0 bottom-0 z-40 flex flex-col items-center justify-end transition-transform duration-500 cubic-bezier(0.32, 0.72, 0, 1) pointer-events-none ${
-            drawerOpen ? 'translate-y-0' : 'translate-y-full'
-        }`}
-        style={{ height: '50vh' }} // Stops halfway up the screen
+        className={`absolute inset-x-0 bottom-0 z-50 flex flex-col justify-end pointer-events-none transition-transform duration-500 ease-in-out ${drawerOpen ? 'translate-y-0' : 'translate-y-full'}`}
       >
-        {/* The Card */}
-        <div className="w-full md:w-[600px] h-full bg-[#09090b]/95 border-t md:border border-zinc-700 md:rounded-t-3xl shadow-[0_-10px_50px_rgba(0,0,0,0.9)] flex flex-col pointer-events-auto">
+        {/* Desktop: Sits in the bottom 40% of screen.
+            Mobile: Sits at bottom, height 45vh.
+        */}
+        <div className="pointer-events-auto w-full md:max-w-xl mx-auto md:mb-8 h-[45vh] md:h-[40vh] bg-[#09090b] md:bg-[#09090b]/95 border-t md:border border-zinc-700 md:rounded-[2rem] rounded-t-3xl shadow-[0_-10px_50px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden">
             
-            {/* Header */}
-            <div className="flex flex-col gap-3 px-6 py-4 border-b border-zinc-800/50 bg-black/20 shrink-0">
-                <div className="flex items-center justify-between cursor-pointer" onClick={() => setDrawerOpen(false)}>
+            {/* Header (Acts as Close Button + Toggles) */}
+            <div className="flex flex-col gap-3 px-6 py-4 border-b border-zinc-800/50 bg-black/20 shrink-0 cursor-pointer" onClick={() => setDrawerOpen(false)}>
+                <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-white flex items-center gap-2">
                         <Activity size={14} className="text-green-500" /> Network Data
                     </span>
@@ -304,31 +327,32 @@ export default function MapPage() {
                         <ChevronDown size={16} />
                     </button>
                 </div>
-                {/* Toggles Inside Panel */}
-                <ViewToggles className="w-full justify-between bg-black/50" />
+                
+                {/* Internal Toggles (Usable without closing) */}
+                <div className="w-full" onClick={(e) => e.stopPropagation()}>
+                    <ViewToggles className="w-full justify-between bg-black/50" />
+                </div>
             </div>
 
-            {/* Scrollable List */}
-            <div className="flex-grow overflow-y-auto p-4 space-y-2 pb-8">
+            {/* Scrollable List with Ref */}
+            <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar">
                 {sortedLocations.map((loc, i) => (
                     <div 
+                        id={`list-item-${loc.name}`}
                         key={loc.name} 
-                        // SYNC MAGIC: Hovering list highlights map!
-                        onMouseEnter={() => setHoveredLocation(loc.name)}
-                        onMouseLeave={() => setHoveredLocation(null)}
                         onClick={(e) => {
                             e.stopPropagation();
                             lockTarget(loc.name, loc.lat, loc.lon);
                         }}
                         className={`group flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
-                            activeLocation === loc.name || hoveredLocation === loc.name
+                            activeLocation === loc.name 
                             ? 'bg-zinc-800 border-green-500/50' 
                             : 'bg-zinc-900/50 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800'
                         }`}
                     >
                         <div className="flex items-center gap-3">
                             <div className={`flex items-center justify-center w-8 h-8 rounded-full font-mono text-xs font-bold ${
-                                activeLocation === loc.name || hoveredLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'
+                                activeLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'
                             }`}>
                                 {i + 1}
                             </div>
@@ -340,7 +364,7 @@ export default function MapPage() {
                             </div>
                         </div>
                         <div className="text-right">
-                            <div className={`text-sm font-mono font-bold ${activeLocation === loc.name || hoveredLocation === loc.name ? 'text-green-400' : 'text-blue-400'}`}>{getMetricText(loc)}</div>
+                            <div className={`text-sm font-mono font-bold ${activeLocation === loc.name ? 'text-green-400' : 'text-blue-400'}`}>{getMetricText(loc)}</div>
                             <div className="text-[10px] text-zinc-500">{loc.count} Nodes</div>
                         </div>
                     </div>
@@ -348,7 +372,6 @@ export default function MapPage() {
             </div>
         </div>
       </div>
-
     </div>
   );
 }
