@@ -72,7 +72,7 @@ export default function MapPage() {
          setTimeout(() => {
              const item = document.getElementById(`list-item-${name}`);
              if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-         }, 300);
+         }, 100);
     }
   };
 
@@ -244,10 +244,12 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* --- 2. MAP AREA (Flexible - Shrinks when Split View is Active) --- */}
-      {/* Better proportions: ~40% when split, full when closed */}
+      {/* --- 2. MAP AREA --- */}
+      {/* REMOVED: transition-all duration-300 ease-out 
+          This forces an instant snap between full height and 40vh, preventing the jitter.
+      */}
       <div 
-        className={`relative w-full bg-[#080808] transition-all duration-300 ease-out ${
+        className={`relative w-full bg-[#080808] ${
             isSplitView ? 'h-[40vh] shrink-0' : 'flex-1 basis-0 min-h-0' 
         }`}
       >
@@ -303,7 +305,6 @@ export default function MapPage() {
                 </ComposableMap>
             )}
 
-            {/* Zoom Controls */}
             <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-30">
                 <button onClick={handleZoomIn} title="Zoom In" className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Plus size={16} /></button>
                 <button onClick={handleZoomOut} title="Zoom Out" className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Minus size={16} /></button>
@@ -313,21 +314,22 @@ export default function MapPage() {
             </div>
       </div>
 
-      {/* --- 3. THE DOCK (State-Dependent Layout) --- */}
-      {/* Better proportions: ~50% when split */}
-      <div className={`shrink-0 bg-[#09090b] relative z-50 flex flex-col transition-all duration-300 ease-out ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
+      {/* --- 3. THE DOCK --- */}
+      {/* REMOVED: transition-all duration-300 ease-out
+          This ensures the dock opens/closes instantly without the awkward height interpolation.
+      */}
+      <div className={`shrink-0 bg-[#09090b] relative z-50 flex flex-col ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
             
             {/* CONTENT A: The Legend (Visible when !isSplitView) */}
-            <div className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4 transition-all duration-200 ${isSplitView ? 'hidden' : 'flex'}`}>
+            <div className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4 ${isSplitView ? 'hidden' : 'flex'}`}>
                 {/* View Toggles (Closed State) */}
                 <div className="w-full md:w-auto flex justify-center md:justify-start">
                     <ViewToggles />
                 </div>
 
-                {/* The Legend & New Context Text */}
+                {/* The Legend & Context */}
                 <div className="w-full md:w-auto bg-zinc-900/30 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3">
                     
-                    {/* The new "Professional" Context Text above Legend */}
                     <div className="flex flex-col gap-2 max-w-xl">
                         {/* 1. Data Context */}
                         <div className="flex items-start gap-2">
@@ -337,7 +339,7 @@ export default function MapPage() {
                             </p>
                         </div>
                         
-                        {/* 2. Pulse Context (Confirmed Added) */}
+                        {/* 2. Pulse Context */}
                         <p className="text-[10px] text-zinc-500 leading-tight pl-5">
                             <strong className="text-zinc-400">Pulse Intensity</strong> represents node density in a region. The thicker/brighter the intensity, the higher the nodes in that region.
                         </p>
@@ -358,15 +360,13 @@ export default function MapPage() {
             </div>
 
             {/* CONTENT B: The Live List (Visible when isSplitView) */}
-            <div className={`flex flex-col h-full overflow-hidden transition-all duration-200 ${isSplitView ? 'flex' : 'hidden'}`}>
+            <div className={`flex flex-col h-full overflow-hidden ${isSplitView ? 'flex' : 'hidden'}`}>
                  
-                 {/* Internal Dock Header */}
                  <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-zinc-800/30 bg-[#09090b]">
                     <div className="flex items-center gap-3">
                         <h2 className="text-sm font-bold text-white flex items-center gap-2">
                              <Activity size={14} className="text-green-500" /> Live Data
                         </h2>
-                        {/* Internal Toggles so user can switch while dock is open */}
                         <div className="hidden md:block scale-90 origin-left"><ViewToggles /></div>
                     </div>
                     
