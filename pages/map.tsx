@@ -4,7 +4,7 @@ import Link from 'next/link';
 import axios from 'axios';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleSqrt } from 'd3-scale';
-import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, X } from 'lucide-react';
+import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, Target } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -20,7 +20,8 @@ interface MapStats {
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
 // --- COLOR BUCKETS (5 Tiers) ---
-const TIER_COLORS = ["#22d3ee", "#3b82f6", "#a855f7", "#ec4899", "#f59e0b"]; // Cyan -> Blue -> Purple -> Pink -> Gold
+// Used for the map markers. The Legend will visually blend these.
+const TIER_COLORS = ["#22d3ee", "#3b82f6", "#a855f7", "#ec4899", "#f59e0b"]; 
 
 export default function MapPage() {
   const [locations, setLocations] = useState<LocationData[]>([]);
@@ -56,7 +57,7 @@ export default function MapPage() {
     setActiveLocation(name);
     setPosition({ coordinates: [lon, lat], zoom: 3 });
     if (highlightTimeout.current) clearTimeout(highlightTimeout.current);
-    highlightTimeout.current = setTimeout(() => setActiveLocation(null), 15000); // 15s auto-revert
+    highlightTimeout.current = setTimeout(() => setActiveLocation(null), 15000); 
   };
 
   const handleZoomIn = () => { if (position.zoom < 5) setPosition(pos => ({ ...pos, zoom: pos.zoom * 1.5 })); };
@@ -211,51 +212,59 @@ export default function MapPage() {
             })}
         </div>
         
-        {/* EXACT LEGEND TEXT */}
+        {/* NEW LEGEND: Vertical Gradient Line */}
         <div className="flex flex-col items-center text-[9px] text-zinc-400 font-mono bg-black/40 px-4 py-3 rounded-2xl border border-zinc-800/50 backdrop-blur-sm shadow-xl">
-            <div className="mb-2 font-bold text-zinc-300">Pulse instead shows the node density</div>
+            <div className="mb-2 font-bold text-zinc-300">Pulse shows node density</div>
             
-            {/* Dynamic Ranges based on ViewMode */}
-            <div className="flex flex-col items-start gap-1 w-full">
-                {viewMode === 'STORAGE' && (
-                    <>
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#22d3ee]"></div> Cyan = &lt; 1 GB</div>
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div> Blue = 1 GB - 10 GB</div>
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#a855f7]"></div> Purple = 10 GB - 100 GB</div>
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#ec4899]"></div> Pink = 100 GB - 1 TB</div>
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#f59e0b]"></div> Gold = &gt; 1 TB</div>
-                    </>
-                )}
-                {viewMode === 'CREDITS' && (
-                    <>
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#22d3ee]"></div> Cyan = &lt; 100</div>
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div> Blue = 100 - 1k</div>
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#a855f7]"></div> Purple = 1k - 10k</div>
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#ec4899]"></div> Pink = 10k - 100k</div>
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#f59e0b]"></div> Gold = &gt; 100k</div>
-                    </>
-                )}
-                {viewMode === 'HEALTH' && (
-                    <>
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#22d3ee]"></div> Cyan = &lt; 50%</div>
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div> Blue = 50% - 80%</div>
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#a855f7]"></div> Purple = 80% - 90%</div>
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#ec4899]"></div> Pink = 90% - 98%</div>
-                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#f59e0b]"></div> Gold = &gt; 98%</div>
-                    </>
-                )}
+            <div className="flex items-stretch gap-3">
+                {/* THE VERTICAL GRADIENT LINE (Cyan -> Gold) */}
+                <div className="w-1.5 rounded-full bg-gradient-to-b from-[#22d3ee] via-[#a855f7] to-[#f59e0b] shadow-[0_0_10px_rgba(59,130,246,0.3)]"></div>
+                
+                {/* The Labels (Aligned to the gradient) */}
+                <div className="flex flex-col justify-between h-24 text-[8px] text-zinc-500 font-bold uppercase tracking-wider py-1">
+                    {viewMode === 'STORAGE' && (
+                        <>
+                            <span>&lt; 1 GB</span>
+                            <span>1 - 10 GB</span>
+                            <span>10 - 100 GB</span>
+                            <span>100 GB - 1 TB</span>
+                            <span className="text-[#f59e0b]">&gt; 1 TB</span>
+                        </>
+                    )}
+                    {viewMode === 'CREDITS' && (
+                        <>
+                            <span>&lt; 100</span>
+                            <span>100 - 1k</span>
+                            <span>1k - 10k</span>
+                            <span>10k - 100k</span>
+                            <span className="text-[#f59e0b]">&gt; 100k</span>
+                        </>
+                    )}
+                    {viewMode === 'HEALTH' && (
+                        <>
+                            <span>&lt; 50%</span>
+                            <span>50% - 80%</span>
+                            <span>80% - 90%</span>
+                            <span>90% - 98%</span>
+                            <span className="text-[#f59e0b]">&gt; 98%</span>
+                        </>
+                    )}
+                </div>
             </div>
         </div>
       </div>
 
-      {/* --- LAYER 3: FLOATING PILL (MIDDLE) --- */}
+      {/* --- LAYER 3: FLOATING PILL BUTTON --- */}
       
-      {/* 1. COLLAPSED STATE: Floating Pill Button in MIDDLE OF EMPTY SPACE */}
+      {/* RESPONSIVE POSITIONING: 
+          - Mobile (default): bottom-8 (Dock Style)
+          - Desktop (md:): top-[80vh] (Floating Middle Style) 
+      */}
       {!drawerOpen && (
-          <div className="absolute top-[80vh] left-0 right-0 flex justify-center z-50 pointer-events-none">
+          <div className="absolute bottom-8 md:bottom-auto md:top-[80vh] left-0 right-0 flex justify-center z-50 pointer-events-none transition-all duration-500">
               <button 
                 onClick={() => setDrawerOpen(true)}
-                className="pointer-events-auto flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-700 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.8)] text-zinc-200 hover:text-white hover:border-blue-500/50 hover:bg-zinc-800 transition-all active:scale-95 transform -translate-y-1/2"
+                className="pointer-events-auto flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-700 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.8)] text-zinc-200 hover:text-white hover:border-blue-500/50 hover:bg-zinc-800 transition-all active:scale-95 transform md:-translate-y-1/2"
               >
                 <Activity size={16} className="text-blue-400" />
                 <span className="text-xs font-bold uppercase tracking-widest">Live Statistics</span>
@@ -264,14 +273,12 @@ export default function MapPage() {
           </div>
       )}
 
-      {/* 2. EXPANDED STATE: Expands UP and DOWN */}
+      {/* 2. EXPANDED STATE: Floating Card */}
       {drawerOpen && (
           <div className="absolute inset-x-0 z-50 px-4 pointer-events-none flex flex-col items-center justify-center h-full">
-            {/* Click backdrop to close */}
             <div className="absolute inset-0 pointer-events-auto bg-black/20" onClick={() => setDrawerOpen(false)}></div>
             
-            {/* The Floating Card - Anchored below Toggles, stretching down */}
-            {/* Top set to 62vh to start just below the dock, Bottom set to 2rem to allow gap */}
+            {/* Expanded Card: Starts below dock, ends near bottom */}
             <div className="absolute top-[62vh] bottom-8 w-full max-w-lg mx-auto bg-[#09090b]/95 border border-zinc-700 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden animate-in zoom-in-95 fade-in duration-300 pointer-events-auto">
                 
                 {/* Header */}
@@ -287,7 +294,7 @@ export default function MapPage() {
                     </button>
                 </div>
 
-                {/* List - SCROLLABLE FIX APPLIED */}
+                {/* List - Scrollable */}
                 <div className="flex-grow overflow-y-auto p-4 space-y-2">
                     {sortedLocations.map((loc, i) => (
                         <div 
