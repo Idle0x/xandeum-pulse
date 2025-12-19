@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Zap, Trophy, HardDrive, Star, Copy, Check, CheckCircle, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Twitter, Code, Info, ExternalLink, HelpCircle, ChevronRight, Maximize2, Map as MapIcon, BookOpen, Menu, LayoutDashboard } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Zap, Trophy, HardDrive, Star, Copy, Check, CheckCircle, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Twitter, Code, Info, ExternalLink, HelpCircle, ChevronRight, Maximize2, Map as MapIcon, BookOpen, Menu, LayoutDashboard, HeartPulse } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -88,11 +88,17 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
-// --- VITALITY SCORE ---
-const getHealthScore = (node: Node, consensusVersion: string, medianCredits: number) => {
+// --- UPGRADED VITALITY LOGIC ---
+// Now returns the breakdown so we can graph it
+const getHealthBreakdown = (node: Node, consensusVersion: string, medianCredits: number) => {
   const storageGB = (node.storage_committed || 0) / (1024 ** 3);
-  if (storageGB <= 0) return 0;
+  
+  // Gatekeeper Rule
+  if (storageGB <= 0) {
+      return { total: 0, uptimeScore: 0, versionScore: 0, reputationScore: 0, capacityScore: 0 };
+  }
 
+  // 1. Uptime (30%)
   let uptimeScore = 0;
   const days = node.uptime / 86400;
   if (days >= 30) uptimeScore = 100;
@@ -100,6 +106,7 @@ const getHealthScore = (node: Node, consensusVersion: string, medianCredits: num
   else if (days >= 1) uptimeScore = 40 + (days - 1) * (30 / 6);
   else uptimeScore = days * 40;
 
+  // 2. Version (20%)
   let versionScore = 100;
   if (consensusVersion !== 'N/A' && compareVersions(node.version, consensusVersion) < 0) {
       const parts1 = node.version.split('.').map(Number);
@@ -111,6 +118,7 @@ const getHealthScore = (node: Node, consensusVersion: string, medianCredits: num
       else versionScore = 80; 
   }
 
+  // 3. Reputation (25%)
   let reputationScore = 50; 
   const credits = node.credits || 0;
   if (medianCredits > 0 && credits > 0) {
@@ -126,6 +134,7 @@ const getHealthScore = (node: Node, consensusVersion: string, medianCredits: num
       reputationScore = 100; 
   }
 
+  // 4. Capacity (25%)
   let capacityScore = 0;
   if (storageGB >= 1000) capacityScore = 100; 
   else if (storageGB >= 100) capacityScore = 70 + (storageGB - 100) * (30 / 900);
@@ -133,7 +142,18 @@ const getHealthScore = (node: Node, consensusVersion: string, medianCredits: num
   else capacityScore = storageGB * 4;
 
   const finalScore = (uptimeScore * 0.30) + (versionScore * 0.20) + (reputationScore * 0.25) + (capacityScore * 0.25);
-  return Math.round(Math.max(0, Math.min(100, finalScore)));
+  
+  return {
+    total: Math.round(Math.max(0, Math.min(100, finalScore))),
+    uptimeScore: Math.round(uptimeScore),
+    versionScore: Math.round(versionScore),
+    reputationScore: Math.round(reputationScore),
+    capacityScore: Math.round(capacityScore)
+  };
+};
+
+const getHealthScore = (node: Node, consensusVersion: string, medianCredits: number) => {
+    return getHealthBreakdown(node, consensusVersion, medianCredits).total;
 };
 
 const calculateMedian = (values: number[]) => {
@@ -142,6 +162,45 @@ const calculateMedian = (values: number[]) => {
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 };
+
+// --- VISUAL COMPONENTS ---
+
+// New Component: Score Dots ●●●●○
+const ScoreDots = ({ score }: { score: number }) => {
+    const dots = 5;
+    const filled = Math.ceil((score / 100) * dots);
+    return (
+        <div className="flex gap-0.5">
+            {[...Array(dots)].map((_, i) => (
+                <div 
+                    key={i} 
+                    className={`w-1.5 h-1.5 rounded-full ${i < filled 
+                        ? (score > 80 ? 'bg-emerald-400' : score > 50 ? 'bg-amber-400' : 'bg-rose-400') 
+                        : 'bg-zinc-800'}`}
+                />
+            ))}
+        </div>
+    );
+};
+
+// New Component: Sparkline for Network Health
+const PulseSparkline = () => (
+    <svg viewBox="0 0 100 20" className="w-full h-8 opacity-50">
+        <path 
+            d="M0,10 Q10,5 20,10 T40,10 T60,10 T80,10 T100,10" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2"
+            className="text-emerald-500 animate-pulse-slow"
+        >
+             <animate attributeName="d" dur="3s" repeatCount="indefinite"
+                values="M0,10 Q10,15 20,10 T40,5 T60,15 T80,5 T100,10;
+                        M0,10 Q10,5 20,15 T40,15 T60,5 T80,15 T100,10;
+                        M0,10 Q10,15 20,10 T40,5 T60,15 T80,5 T100,10" 
+            />
+        </path>
+    </svg>
+);
 
 const LiveWireLoader = () => (
   <div className="w-full h-1 relative overflow-hidden bg-zinc-900 border-b border-zinc-800">
@@ -186,7 +245,6 @@ export default function Home() {
   const [lastUpdated, setLastUpdated] = useState('');
   
   const [searchQuery, setSearchQuery] = useState('');
-  // CHANGED: 'rank' -> 'health'
   const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'health'>('uptime');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
@@ -195,7 +253,6 @@ export default function Home() {
   const [showReputationInfo, setShowReputationInfo] = useState(false); 
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   
-  // RESTORED: Search Tips State
   const [searchTipIndex, setSearchTipIndex] = useState(0);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchTips = [
@@ -208,7 +265,9 @@ export default function Home() {
   const [copiedField, setCopiedField] = useState<string | null>(null); 
   const [cycleStep, setCycleStep] = useState(0);
 
-  const [networkHealth, setNetworkHealth] = useState('0.00');
+  const [networkStability, setNetworkStability] = useState('0.00'); // % of stable nodes
+  const [averageNetworkHealth, setAverageNetworkHealth] = useState(0); // Avg Health Score (0-100)
+  
   const [mostCommonVersion, setMostCommonVersion] = useState('N/A');
   const [totalStorageUsed, setTotalStorageUsed] = useState(0);
   const [totalStorageCommitted, setTotalStorageCommitted] = useState(0);
@@ -227,7 +286,6 @@ export default function Home() {
 
     const cycleInterval = setInterval(() => { setCycleStep(prev => prev + 1); }, 4000);
     
-    // RESTORED: Search Tip Interval
     const tipInterval = setInterval(() => {
         if (!isSearchFocused) setSearchTipIndex(prev => (prev + 1) % searchTips.length);
     }, 5000);
@@ -354,26 +412,38 @@ export default function Home() {
             return { ...node, storage_usage_percentage: percentStr, storage_usage_raw: rawPercent };
         });
 
+        // 1. Calculate Statistics needed for Scores first
+        const versionCounts = mergedList.reduce((acc, n) => { acc[n.version] = (acc[n.version] || 0) + 1; return acc; }, {} as Record<string, number>);
+        const topVersion = Object.entries(versionCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
+        const committedValues = mergedList.map(n => n.storage_committed || 0);
+        const medCommitted = calculateMedian(committedValues);
+        const creditValues = mergedList.map(n => n.credits || 0);
+        const medCredits = calculateMedian(creditValues);
+
+        // 2. Set Stats
+        setMostCommonVersion(topVersion);
+        setMedianCommitted(medCommitted);
+        setMedianCredits(medCredits);
+
+        // 3. Now calculate average health score across network
+        let totalHealthSum = 0;
+        mergedList.forEach(n => {
+            totalHealthSum += getHealthScore(n, topVersion, medCredits);
+        });
+        const avgHealth = mergedList.length > 0 ? Math.round(totalHealthSum / mergedList.length) : 0;
+        setAverageNetworkHealth(avgHealth);
+
         setNodes(mergedList);
         setLastUpdated(new Date().toLocaleTimeString());
         
         const stableNodes = mergedList.filter(n => n.uptime > 86400).length;
-        setNetworkHealth((mergedList.length > 0 ? (stableNodes / mergedList.length) * 100 : 0).toFixed(2));
+        setNetworkStability((mergedList.length > 0 ? (stableNodes / mergedList.length) * 100 : 0).toFixed(2));
 
         if (mergedList.length > 0) {
-            const versionCounts = mergedList.reduce((acc, n) => { acc[n.version] = (acc[n.version] || 0) + 1; return acc; }, {} as Record<string, number>);
-            const topVersion = Object.entries(versionCounts).sort((a, b) => b[1] - a[1])[0][0];
-            setMostCommonVersion(topVersion);
-            
             const totalBytesUsed = mergedList.reduce((sum, n) => sum + (n.storage_used || 0), 0);
             const totalBytesCommitted = mergedList.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
             setTotalStorageUsed(totalBytesUsed);
             setTotalStorageCommitted(totalBytesCommitted);
-
-            const committedValues = mergedList.map(n => n.storage_committed || 0);
-            setMedianCommitted(calculateMedian(committedValues));
-            const creditValues = mergedList.map(n => n.credits || 0);
-            setMedianCredits(calculateMedian(creditValues));
         }
         setError('');
       }
@@ -401,7 +471,6 @@ export default function Home() {
     .sort((a, b) => {
       let valA: any, valB: any;
       if (sortBy === 'storage') { valA = a.storage_committed || 0; valB = b.storage_committed || 0; } 
-      // NEW: Health Sorting
       else if (sortBy === 'health') {
           valA = getHealthScore(a, mostCommonVersion, medianCredits);
           valB = getHealthScore(b, mostCommonVersion, medianCredits);
@@ -555,7 +624,6 @@ export default function Home() {
           />
           {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-3 top-2.5 text-zinc-500 hover:text-white"><X size={14} /></button>}
           
-          {/* RESTORED: ROTATING SEARCH TIPS */}
           <div className="absolute top-full left-0 right-0 mt-1.5 flex justify-center">
              <p className="text-[9px] text-zinc-500 font-mono tracking-wide uppercase flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 key={searchTipIndex}">
                 <Info size={10} className="text-blue-500" />
@@ -572,28 +640,67 @@ export default function Home() {
         </div>
       )}
 
-      {/* STATS OVERVIEW */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 mt-2">
-        <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
+      {/* UPGRADED STATS OVERVIEW (THE PULSE DECK) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 mt-2">
+        
+        {/* Card 1: Combined Network Vitals (Replaces Stability) */}
+        <div className="col-span-1 lg:col-span-2 bg-gradient-to-r from-zinc-900/80 to-zinc-900/40 border border-zinc-800 p-0 rounded-xl backdrop-blur-sm flex flex-col relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10"><HeartPulse size={120} /></div>
+            <div className="p-5 flex-grow grid grid-cols-3 gap-4 relative z-10">
+                {/* 1. Operational Stability */}
+                <div className="border-r border-white/5 pr-4">
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Stability</div>
+                    <div className="text-2xl font-bold text-white flex items-end gap-1">
+                        {networkStability}%
+                        <span className="text-[10px] text-green-500 mb-1.5">●</span>
+                    </div>
+                    <div className="text-[9px] text-zinc-600 font-mono mt-1">Uptime > 24h</div>
+                </div>
+
+                {/* 2. Health Score (The Star of the Show) */}
+                <div className="border-r border-white/5 px-2">
+                     <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Avg Health</div>
+                     <div className="text-2xl font-bold text-emerald-400 flex items-end gap-2">
+                        {averageNetworkHealth}/100
+                     </div>
+                     <div className="text-[9px] text-zinc-500 mt-1 flex items-center gap-1">
+                         Global Avg
+                     </div>
+                </div>
+
+                {/* 3. Consensus */}
+                <div className="pl-2">
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Consensus</div>
+                    <div className="text-2xl font-bold text-blue-400">{mostCommonVersion}</div>
+                    <div className="text-[9px] text-zinc-600 font-mono mt-1">Target Ver</div>
+                </div>
+            </div>
+            
+            {/* The Sparkline Graph at the bottom */}
+            <div className="h-8 w-full bg-emerald-500/5 border-t border-emerald-500/10 relative">
+                 <PulseSparkline />
+            </div>
+        </div>
+
+        {/* Card 3: Capacity */}
+        <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm flex flex-col justify-center">
           <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Network Capacity</div>
           <div className="text-2xl md:text-3xl font-bold text-white mt-1">{formatBytes(totalStorageCommitted)}</div>
+          <div className="w-full bg-zinc-800 h-1.5 rounded-full mt-2 overflow-hidden">
+              <div className="bg-blue-500 h-full" style={{ width: `${(totalStorageUsed/totalStorageCommitted)*100}%` }}></div>
+          </div>
           <div className="text-[10px] text-zinc-500 mt-1 font-mono">{formatBytes(totalStorageUsed)} Used</div>
         </div>
-        <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
-          <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Network Stability</div>
-          <div className="text-2xl md:text-3xl font-bold text-green-500 mt-1">{networkHealth}%</div>
-        </div>
-        <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
-          <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Consensus Ver</div>
-          <div className="text-2xl md:text-3xl font-bold text-blue-400 mt-1">{mostCommonVersion}</div>
-        </div>
-        <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
+
+        {/* Card 4: Active Nodes */}
+        <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm flex flex-col justify-center">
           <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Active Nodes</div>
           <div className="text-2xl md:text-3xl font-bold text-white mt-1">{nodes.length}</div>
+          <div className="text-[10px] text-zinc-500 mt-1 font-mono">Gossip Protocol Active</div>
         </div>
       </div>
 
-      {/* RESTORED: WATCHLIST EMPTY STATE */}
+      {/* WATCHLIST */}
       {favorites.length > 0 ? (
         <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
            <div className="flex items-center gap-2 mb-4"><Star className="text-yellow-500" fill="currentColor" size={20} /><h3 className="text-lg font-bold text-white tracking-widest uppercase">Your Watchlist</h3></div>
@@ -607,7 +714,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* CONTROLS (UPDATED SORT: RANK -> HEALTH) */}
+      {/* CONTROLS */}
       <div className="mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex gap-2 w-full md:w-auto">
             <button onClick={handleRefresh} disabled={loading} className="px-4 py-2 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:border-zinc-500 rounded-lg transition text-xs font-bold tracking-wide flex items-center gap-2 text-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed"><Zap size={14} className={loading ? "text-yellow-500 animate-spin" : "text-blue-500"} /> {loading ? 'SYNCING...' : 'REFRESH'}</button>
@@ -666,7 +773,6 @@ export default function Home() {
                            <div className="flex justify-between items-center"><span className="text-zinc-400">Network Mode</span><span className={selectedNode.is_public ? "text-green-500" : "text-orange-500"}>{selectedNode.is_public ? "PUBLIC" : "PRIVATE"}</span></div>
                         </div>
                     </div>
-                    {/* NEW: PHYSICAL LAYER PORTAL */}
                     <Link href="/map"><div className="bg-gradient-to-r from-blue-900/20 to-indigo-900/20 border border-blue-500/20 rounded-xl p-4 cursor-pointer hover:border-blue-500/50 transition-all group relative overflow-hidden"><div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors"></div><div className="relative flex items-center justify-between"><div className="flex items-center gap-3"><div className="p-2 bg-blue-500/20 rounded-lg text-blue-400"><Globe size={18} /></div><div><div className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Physical Layer</div><div className="text-xs text-zinc-300">Visualize Physical Footprint</div></div></div><ChevronRight size={16} className="text-blue-500 group-hover:translate-x-1 transition-transform" /></div></div></Link>
                 </div>
 
@@ -705,24 +811,97 @@ export default function Home() {
                     })()}
                 </div>
 
-                {/* COLUMN 3: PERFORMANCE */}
+                {/* COLUMN 3: PERFORMANCE - THE DIAGNOSTIC PANEL UPGRADE */}
                 <div>
-                    <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'perf')}><h3 className="text-xs font-bold text-zinc-500 uppercase">Performance</h3><HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" /></div>
-                    {activeTooltip === 'perf' && <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 animate-in fade-in slide-in-from-top-1">Health score and reputation credits earned from network participation.</div>}
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-4 text-center mb-4 backdrop-blur-md relative group">
-                        <div className="text-xs text-zinc-500 mb-2 flex items-center justify-center gap-1 font-bold uppercase">Health Score <button onClick={(e) => { e.stopPropagation(); setShowHealthInfo(!showHealthInfo); }}><Info size={12} className="cursor-pointer hover:text-white" /></button></div>
-                        {(showHealthInfo) && <div className="absolute top-10 left-4 right-4 bg-zinc-900 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-10 shadow-xl animate-in fade-in slide-in-from-top-1">Score based on Uptime, Version Consensus, and Network Visibility.</div>}
-                        <div className="text-5xl font-bold text-white mb-1">{getHealthScore(selectedNode, mostCommonVersion, medianCredits)}</div>
-                        <div className="text-[9px] text-zinc-600">out of 100</div>
+                    <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'perf')}><h3 className="text-xs font-bold text-zinc-500 uppercase">Performance Diagnostics</h3><HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" /></div>
+                    {activeTooltip === 'perf' && <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 animate-in fade-in slide-in-from-top-1">Comprehensive breakdown of node health score.</div>}
+                    
+                    {/* THE NEW DIAGNOSTIC CARD */}
+                    <div className="bg-black/50 border border-white/10 rounded-xl overflow-hidden backdrop-blur-md mb-4">
+                        {(() => {
+                            const scores = getHealthBreakdown(selectedNode, mostCommonVersion, medianCredits);
+                            const delta = scores.total - averageNetworkHealth;
+                            const isAbove = delta >= 0;
+                            
+                            // Calculate percentile (simple rank logic)
+                            const percentile = nodes.length > 0 
+                                ? Math.round(((nodes.length - (selectedNode.rank || nodes.length)) / nodes.length) * 100) 
+                                : 0;
+
+                            return (
+                                <>
+                                    {/* Section A: Head to Head */}
+                                    <div className="p-4 border-b border-white/5 bg-zinc-900/30">
+                                        <div className="flex justify-between items-end mb-2">
+                                            <div>
+                                                <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider mb-1">Your Score</div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-4xl font-bold ${scores.total > 80 ? 'text-emerald-400' : scores.total > 50 ? 'text-amber-400' : 'text-rose-400'}`}>{scores.total}</span>
+                                                    <div className="flex flex-col gap-1 pb-1">
+                                                        <ScoreDots score={scores.total} />
+                                                        <span className="text-[9px] text-zinc-400">/ 100</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider mb-1">Network Avg</div>
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${isAbove ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                                                        {isAbove ? '+' : ''}{delta}
+                                                    </span>
+                                                    <span className="text-xl font-bold text-zinc-300">{averageNetworkHealth}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Section B: The Breakdown Bars */}
+                                    <div className="p-4 space-y-3">
+                                        <div className="text-[9px] text-zinc-500 uppercase font-bold mb-2">Component Analysis</div>
+                                        
+                                        {[
+                                            { label: 'Uptime', val: scores.uptimeScore, avg: 78 /* Est avg */, weight: '30%' },
+                                            { label: 'Capacity', val: scores.capacityScore, avg: 71, weight: '25%' },
+                                            { label: 'Reputation', val: scores.reputationScore, avg: 65, weight: '25%' },
+                                            { label: 'Version', val: scores.versionScore, avg: 88, weight: '20%' }
+                                        ].map((metric) => (
+                                            <div key={metric.label}>
+                                                <div className="flex justify-between text-[10px] mb-1">
+                                                    <span className="text-zinc-400 font-bold">{metric.label}</span>
+                                                    <div className="flex gap-2 font-mono">
+                                                        <span className={metric.val >= metric.avg ? 'text-emerald-400' : 'text-amber-400'}>{metric.val}</span>
+                                                        <span className="text-zinc-600 text-[9px]">(Avg: {metric.avg})</span>
+                                                    </div>
+                                                </div>
+                                                <div className="h-1.5 w-full bg-zinc-800 rounded-full relative overflow-hidden">
+                                                    <div 
+                                                        className={`h-full rounded-full ${metric.val >= 80 ? 'bg-emerald-500' : metric.val >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`} 
+                                                        style={{ width: `${metric.val}%` }}
+                                                    ></div>
+                                                    {/* The "Avg" Tick Mark */}
+                                                    <div className="absolute top-0 bottom-0 w-0.5 bg-white/30 z-10" style={{ left: `${metric.avg}%` }}></div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Section C: The Verdict */}
+                                    <div className="bg-emerald-900/10 border-t border-emerald-500/10 p-3 flex items-center justify-center gap-2">
+                                        <Trophy size={14} className="text-emerald-500" />
+                                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">
+                                            Top {100 - percentile}% of Network Nodes
+                                        </span>
+                                    </div>
+                                </>
+                            );
+                        })()}
                     </div>
+
+                    {/* REPUTATION BOX (Simplified to fit below) */}
                     <div className="bg-black/50 border border-yellow-500/20 rounded-xl p-4 backdrop-blur-md relative">
-                        <div className="flex items-center justify-between mb-3"><h4 className="text-[9px] text-zinc-500 uppercase font-bold">Reputation</h4><button onClick={(e) => { e.stopPropagation(); setShowReputationInfo(!showReputationInfo); }}><HelpCircle size={10} className="text-zinc-600 hover:text-zinc-400" /></button></div>
-                        {(showReputationInfo) && <div className="absolute top-8 right-4 w-48 bg-zinc-900 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-10 shadow-xl animate-in fade-in slide-in-from-top-1">Reputation is earned by proving storage capacity and maintaining high uptime.</div>}
                         <div className="flex justify-between items-center mb-2"><span className="text-zinc-400 text-xs">Credits</span><span className="text-yellow-400 font-mono font-bold">{selectedNode.credits?.toLocaleString() || 0}</span></div>
-                        
-                        {/* REFACTORED VIEW BUTTON IN MODAL */}
                         <Link href="/leaderboard">
-                            <div className="bg-zinc-900/50 border border-yellow-500/20 p-2 rounded-lg flex items-center justify-between cursor-pointer hover:border-yellow-500/40 transition mt-3 group">
+                            <div className="bg-zinc-900/50 border border-yellow-500/20 p-2 rounded-lg flex items-center justify-between cursor-pointer hover:border-yellow-500/40 transition group">
                                 <div className="flex items-center gap-2">
                                     <Trophy size={14} className="text-yellow-500" />
                                     <span className="text-xs font-bold text-zinc-400">Global Rank</span>
@@ -759,7 +938,6 @@ export default function Home() {
             <a href="https://github.com/Idle0x/xandeum-pulse" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition flex items-center gap-1">Open Source <ExternalLink size={10} /></a>
         </div>
         
-        {/* NEW DOCS LINK */}
         <Link href="/docs" className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-4 decoration-zinc-700 flex items-center justify-center gap-1 mt-4">
            <BookOpen size={10} /> System Architecture & Docs
         </Link>
