@@ -1,37 +1,50 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
-// --- CONFIGURATION (Copied from your working Homepage API) ---
+// --- CONFIGURATION ---
 const PRIMARY_NODE = '173.212.203.145';
 const BACKUP_NODES = [
-  '161.97.97.41',
-  '192.190.136.36',
-  '192.190.136.38',
-  '207.244.255.1',
-  '192.190.136.28',
-  '192.190.136.29'
+  '161.97.97.41', '192.190.136.36', '192.190.136.38',
+  '207.244.255.1', '192.190.136.28', '192.190.136.29'
 ];
 const TIMEOUT_PRIMARY = 4000;
 const TIMEOUT_BACKUP = 6000;
 
-// Geo Cache
 let geoCache = new Map<string, { lat: number; lon: number; country: string; city: string }>();
 
-// --- HELPER: ROBUST PARSING ---
-const parseMetric = (value: any): number => {
-  if (typeof value === 'number') return value;
-  if (!value) return 0;
-  
-  const str = value.toString().toLowerCase().replace(/,/g, ''); // Remove commas
-  const clean = parseFloat(str.replace(/[^0-9.]/g, '')) || 0;
-  
-  // Normalize units
-  if (str.includes('tb')) return clean * 1024;
-  if (str.includes('mb')) return clean / 1024;
-  return clean;
+// --- HELPER: VERSION COMPARISON ---
+// Returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal
+const compareVersions = (v1: string, v2: string) => {
+  const p1 = v1.replace(/[^0-9.]/g, '').split('.').map(Number);
+  const p2 = v2.replace(/[^0-9.]/g, '').split('.').map(Number);
+  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+    const n1 = p1[i] || 0;
+    const n2 = p2[i] || 0;
+    if (n1 > n2) return 1;
+    if (n1 < n2) return -1;
+  }
+  return 0;
 };
 
-// --- HELPER: GEO BATCHING ---
+// --- HELPER: FETCH PODS (RPC) ---
+async function getPodsFromRPC() {
+  const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
+  try {
+    const response = await axios.post(`http://${PRIMARY_NODE}:6000/rpc`, payload, { timeout: TIMEOUT_PRIMARY });
+    if (response.data?.result?.pods) return response.data.result.pods;
+  } catch (error) { /* Fail silently */ }
+
+  const shuffled = BACKUP_NODES.sort(() => 0.5 - Math.random()).slice(0, 3);
+  try {
+    const winner = await Promise.any(shuffled.map(ip => 
+      axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_BACKUP })
+        .then(res => res.data?.result?.pods || [])
+    ));
+    return winner;
+  } catch (error) { return []; }
+}
+
+// --- HELPER: BATCH GEO ---
 async function fetchGeoBatch(ips: string[]) {
   if (ips.length === 0) return [];
   try {
@@ -39,67 +52,39 @@ async function fetchGeoBatch(ips: string[]) {
       ips.map(ip => ({ query: ip, fields: "lat,lon,country,city,query" }))
     );
     return response.data;
-  } catch (error) {
-    console.error("Geo-API Batch Error:", error);
-    return [];
-  }
-}
-
-// --- HELPER: FETCH PODS (The "Homepage" Logic) ---
-async function getPodsFromRPC() {
-  // Attempt 1: Hero Node
-  try {
-    const response = await axios.post(
-      `http://${PRIMARY_NODE}:6000/rpc`,
-      { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 },
-      { timeout: TIMEOUT_PRIMARY } 
-    );
-    if (response.data?.result?.pods) return response.data.result.pods;
-  } catch (error) {
-    console.warn(`Primary node failed. Switching to backups...`);
-  }
-
-  // Attempt 2: Backup Race
-  const shuffled = BACKUP_NODES.sort(() => 0.5 - Math.random()).slice(0, 3);
-  try {
-    const winner = await Promise.any(shuffled.map(ip => 
-      axios.post(
-        `http://${ip}:6000/rpc`,
-        { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 },
-        { timeout: TIMEOUT_BACKUP } 
-      ).then(res => {
-        if (res.data?.result?.pods) return res.data.result.pods;
-        throw new Error('Invalid Data');
-      })
-    ));
-    return winner;
-  } catch (error) {
-    console.error("All RPC nodes failed.");
-    return [];
-  }
+  } catch (error) { return []; }
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    // 1. PARALLEL FETCH (Direct RPC + Direct Credits API)
+    // 1. FETCH DATA
     const [pods, creditsRes] = await Promise.all([
       getPodsFromRPC(),
-      axios.get('https://podcredits.xandeum.network/api/pods-credits').catch(e => ({ data: [] }))
+      axios.get('https://podcredits.xandeum.network/api/pods-credits').catch(() => ({ data: [] }))
     ]);
 
-    // 2. CREATE CREDITS LOOKUP MAP
-    // We map Pubkey -> Amount for O(1) lookup
+    // 2. CALCULATE NETWORK HEALTH (Consensus Logic)
+    // Find the "Most Common" version (Consensus), not necessarily the "Highest"
+    const versionCounts: Record<string, number> = {};
+    pods.forEach((p: any) => {
+        const v = p.version || '0.0.0';
+        versionCounts[v] = (versionCounts[v] || 0) + 1;
+    });
+    
+    // Sort versions by frequency (count) descending
+    const consensusVersion = Object.keys(versionCounts).sort((a, b) => versionCounts[b] - versionCounts[a])[0] || '0.0.0';
+
+    // 3. BUILD CREDITS MAP
     const creditsMap = new Map<string, number>();
     const creditsData = Array.isArray(creditsRes.data) ? creditsRes.data : [];
-    
     creditsData.forEach((c: any) => {
-      // Try 'pubkey' (standard) or 'account' or 'id'
       const key = c.pubkey || c.account || c.node_id;
-      const amount = parseMetric(c.amount || c.balance || c.credits || 0);
+      // Credits API returns raw numbers, assume standard unit
+      const amount = parseFloat(c.amount || c.balance || 0);
       if (key) creditsMap.set(key, amount);
     });
 
-    // 3. GEOCODING
+    // 4. GEOCODING
     const uniqueIps = [...new Set(pods.map((p: any) => p.address.split(':')[0]))] as string[];
     const missingIps = uniqueIps.filter(ip => !geoCache.has(ip));
     
@@ -118,11 +103,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // 4. DATA MERGE & AGGREGATION
-    const cityMap = new Map<string, { 
-        lat: number; lon: number; name: string; country: string; 
-        count: number; totalStorage: number; totalCredits: number; healthSum: number;
-    }>();
+    // 5. DATA MERGE
+    const cityMap = new Map<string, any>();
 
     pods.forEach((node: any) => {
       const ip = node.address.split(':')[0];
@@ -131,24 +113,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (geo) {
         const key = `${geo.city}-${geo.country}`;
         
-        // --- THE METRIC EXTRACTION ---
-        // We use the exact keys that likely come from 'get-pods-with-stats'
-        const storage = parseMetric(node.total_storage || node.storage || 0);
+        // --- STORAGE FIX ---
+        // Raw data is in Bytes (e.g., 340000000000). Divide by 1024^3 to get GB.
+        const rawStorage = parseFloat(node.storage_committed || '0');
+        const storageGB = rawStorage / (1024 * 1024 * 1024);
+
+        // --- HEALTH CALCULATION ---
+        let health = 100;
+        const nodeVersion = node.version || '0.0.0';
         
-        // Health usually comes as 'health_score' or just 'score'
-        // If missing, we don't assume 100 anymore to avoid fake data, we check carefully
-        let health = 0;
-        if (node.health_score !== undefined) health = parseMetric(node.health_score);
-        else if (node.score !== undefined) health = parseMetric(node.score);
-        else if (node.health !== undefined) health = parseMetric(node.health);
-        
-        // Credits Merge
+        // Penalize if older than consensus
+        if (compareVersions(nodeVersion, consensusVersion) < 0) {
+            health -= 15;
+        }
+        // Penalize if uptime is suspiciously low (< 1 hour)
+        if ((node.uptime || 0) < 3600) {
+            health -= 5;
+        }
+
+        // --- CREDITS ---
         const credits = creditsMap.get(node.pubkey) || 0;
 
         if (cityMap.has(key)) {
             const existing = cityMap.get(key)!;
             existing.count += 1;
-            existing.totalStorage += storage;
+            existing.totalStorage += storageGB;
             existing.totalCredits += credits;
             existing.healthSum += health;
         } else {
@@ -158,7 +147,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 name: geo.city,
                 country: geo.country,
                 count: 1,
-                totalStorage: storage,
+                totalStorage: storageGB,
                 totalCredits: credits,
                 healthSum: health
             });
@@ -168,20 +157,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const mapData = Array.from(cityMap.values()).map(city => ({
         ...city,
-        // Avoid division by zero
         avgHealth: city.count > 0 ? Math.round(city.healthSum / city.count) : 0
     }));
 
-    // Stats for the HUD
-    const totalNodes = pods.length;
-    const countries = new Set(mapData.map(d => d.country)).size;
     const topRegionData = [...mapData].sort((a, b) => b.totalStorage - a.totalStorage)[0];
 
     res.status(200).json({
       locations: mapData,
       stats: {
-        totalNodes,
-        countries,
+        totalNodes: pods.length,
+        countries: new Set(mapData.map(d => d.country)).size,
         topRegion: topRegionData ? topRegionData.name : 'Global',
         topRegionMetric: topRegionData ? topRegionData.totalStorage : 0
       }
