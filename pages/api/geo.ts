@@ -1,17 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
-// --- IN-MEMORY CACHE ---
-// Note: In serverless (Vercel), this cache persists only while the container is "warm".
-// For a production app, you'd use Redis/Vercel KV. For a hackathon/portfolio, this is perfect.
+// --- IN-MEMORY CACHE (Prevents API Bans) ---
 let geoCache = new Map<string, { lat: number; lon: number; country: string; city: string }>();
 
-// Helper: Batch fetch from ip-api.com (Supports up to 100 IPs per request)
+// Helper: Batch fetch from ip-api.com
 async function fetchGeoBatch(ips: string[]) {
   if (ips.length === 0) return [];
-  
   try {
-    // ip-api.com/batch endpoint documentation
     const response = await axios.post('http://ip-api.com/batch', 
       ips.map(ip => ({ query: ip, fields: "lat,lon,country,city,query" }))
     );
@@ -24,26 +20,30 @@ async function fetchGeoBatch(ips: string[]) {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    // 1. Fetch Live Nodes from your existing source
-    // (Simulating the fetch you do in index.tsx - usually you'd extract this to a shared helper)
+    // 1. Dynamic URL Detection (Works on Localhost & Vercel)
     const protocol = req.headers['x-forwarded-proto'] || 'http';
     const host = req.headers.host;
-    const statsRes = await axios.get(`${protocol}://${host}/api/stats`);
-
-    // ^ IMPORTANT: In local dev, use http://localhost:3000/api/stats. 
-    // For now, I'll assume we can fetch from your live URL or you can replace this with your direct logic.
     
-    const pods = statsRes.data?.result?.pods || [];
+    // Fetch live node stats
+    // We try/catch this specific call so the map doesn't crash if the stats API is momentarily down
+    let pods = [];
+    try {
+        const statsRes = await axios.get(`${protocol}://${host}/api/stats`); 
+        pods = statsRes.data?.result?.pods || [];
+    } catch (e) {
+        console.error("Failed to fetch internal stats:", e);
+        // Fallback or empty array so map doesn't crash
+        pods = []; 
+    }
+
     const uniqueIps = [...new Set(pods.map((p: any) => p.address.split(':')[0]))] as string[];
 
-    // 2. Identify which IPs are missing from Cache
+    // 2. Identify missing IPs in Cache
     const missingIps = uniqueIps.filter(ip => !geoCache.has(ip));
     
-    // 3. Fetch missing IPs in batches (Rate limit protection)
+    // 3. Batch Fetch Geo Data (If needed)
     if (missingIps.length > 0) {
-      console.log(`Fetching Geo data for ${missingIps.length} new IPs...`);
-      
-      // Chunk into batches of 100 (API limit)
+      console.log(`Triangulating ${missingIps.length} new nodes...`);
       const chunkSize = 100;
       for (let i = 0; i < missingIps.length; i += chunkSize) {
         const chunk = missingIps.slice(i, i + chunkSize);
@@ -62,9 +62,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // 4. Construct the Final "Map-Ready" Data
-    // We aggregate stats by CITY to prevent dot-overlap
-    const cityMap = new Map<string, { lat: number; lon: number; name: string; country: string; count: number }>();
+    // 4. AGGREGATE DATA (The "Command Center" Logic)
+    // We group by City to sum up Storage/Credits and Average Health
+    const cityMap = new Map<string, { 
+        lat: number; 
+        lon: number; 
+        name: string; 
+        country: string; 
+        count: number;
+        // New Metrics
+        totalStorage: number;
+        totalCredits: number;
+        healthSum: number;
+    }>();
 
     pods.forEach((node: any) => {
       const ip = node.address.split(':')[0];
@@ -72,40 +82,59 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (geo) {
         const key = `${geo.city}-${geo.country}`;
+        
+        // Extract metrics safely (default to 0 if missing)
+        const storage = parseInt(node.total_storage || '0', 10);
+        const credits = parseInt(node.credits || '0', 10);
+        // Assuming health is a score 0-100. If missing, assume 100 for now.
+        const health = typeof node.health_score === 'number' ? node.health_score : 100; 
+
         if (cityMap.has(key)) {
             const existing = cityMap.get(key)!;
             existing.count += 1;
+            existing.totalStorage += storage;
+            existing.totalCredits += credits;
+            existing.healthSum += health;
         } else {
             cityMap.set(key, {
                 lat: geo.lat,
                 lon: geo.lon,
                 name: geo.city,
                 country: geo.country,
-                count: 1
+                count: 1,
+                totalStorage: storage,
+                totalCredits: credits,
+                healthSum: health
             });
         }
       }
     });
 
-    const mapData = Array.from(cityMap.values());
+    // 5. Finalize Averages & Stats
+    const mapData = Array.from(cityMap.values()).map(city => ({
+        ...city,
+        // Calculate average health for the city
+        avgHealth: Math.round(city.healthSum / city.count)
+    }));
 
-    // 5. Calculate Quick Stats
+    // Global Stats for the HUD
     const totalNodes = pods.length;
     const countries = new Set(mapData.map(d => d.country)).size;
-    // Find most dense region
-    const mostDense = mapData.sort((a, b) => b.count - a.count)[0];
+    // Find biggest storage hub
+    const storageHub = [...mapData].sort((a, b) => b.totalStorage - a.totalStorage)[0];
 
     res.status(200).json({
       locations: mapData,
       stats: {
         totalNodes,
         countries,
-        topRegion: mostDense ? `${mostDense.name}, ${mostDense.country}` : 'Global'
+        topRegion: storageHub ? `${storageHub.name}` : 'Global',
+        topRegionMetric: storageHub ? storageHub.totalStorage : 0
       }
     });
 
   } catch (error) {
-    console.error("Geo Handler Error:", error);
-    res.status(500).json({ error: "Failed to generate map data" });
+    console.error("Geo Handler Critical Error:", error);
+    res.status(500).json({ error: "Satellite link failed" });
   }
 }
