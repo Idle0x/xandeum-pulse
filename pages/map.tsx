@@ -95,7 +95,6 @@ export default function MapPage() {
   };
 
   // --- SORTING LOGIC ---
-  // 1. Sort for List (Drawer)
   const sortedLocations = useMemo(() => {
     return [...locations].sort((a, b) => {
         if (viewMode === 'STORAGE') return b.totalStorage - a.totalStorage;
@@ -104,9 +103,6 @@ export default function MapPage() {
     });
   }, [locations, viewMode]);
 
-  // 2. Sort for Map Rendering (Z-INDEX FIX)
-  // We move the 'activeLocation' to the VERY END of the array.
-  // In SVG, the last element drawn sits "on top" of previous elements.
   const locationsForMap = useMemo(() => {
     if (!activeLocation) return locations;
     const others = locations.filter(l => l.name !== activeLocation);
@@ -114,8 +110,7 @@ export default function MapPage() {
     return active ? [...others, active] : others;
   }, [locations, activeLocation]);
 
-
-  // --- COMPONENT: TOGGLE BUTTONS (Reusable) ---
+  // --- COMPONENT: TOGGLE BUTTONS ---
   const ViewToggles = ({ className = "" }: { className?: string }) => (
     <div className={`flex items-center gap-1 p-1 bg-zinc-900/90 border border-zinc-800 rounded-xl shadow-lg ${className}`}>
         {(['STORAGE', 'HEALTH', 'CREDITS'] as ViewMode[]).map((mode) => {
@@ -143,15 +138,13 @@ export default function MapPage() {
     <div className="h-screen w-screen bg-black text-white font-sans overflow-hidden flex flex-col relative">
       <Head><title>Xandeum Command Center</title></Head>
 
-      {/* --- NEW HEADER STRUCTURE --- */}
-      <div className="absolute top-6 left-6 z-50 flex flex-col items-start gap-4 max-w-[80%]">
-        {/* Minimal Back Button */}
-        <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all">
+      {/* --- HEADER --- */}
+      <div className="absolute top-6 left-6 z-50 flex flex-col items-start gap-4 max-w-[80%] pointer-events-none">
+        <Link href="/" className="pointer-events-auto group flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all">
             <ArrowLeft size={14} className="text-zinc-400 group-hover:text-white" />
             <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-300">Operations</span>
         </Link>
         
-        {/* Big Title & Subtitle */}
         <div>
             <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-white to-zinc-400">
                 Global Distribution of {viewMode.charAt(0) + viewMode.slice(1).toLowerCase()}
@@ -165,8 +158,7 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* --- MAP FRAME (50% Height) --- */}
-      {/* Added mt-32 to push map down below the new larger header */}
+      {/* --- LAYER 1: MAP FRAME --- */}
       <div className="relative z-10 mx-6 mt-32 h-[45vh] border border-zinc-800/50 rounded-3xl overflow-hidden shadow-2xl bg-[#080808] transition-all duration-500">
         <div className="absolute inset-0 pointer-events-none">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_#1a202c_0%,_#000000_80%)] opacity-50"></div>
@@ -186,7 +178,6 @@ export default function MapPage() {
                 ))}
               </Geographies>
               
-              {/* RENDER LOOP: Uses 'locationsForMap' where active node is LAST (Top Z-Index) */}
               {locationsForMap.map((loc) => {
                 const size = sizeScale(loc.count);
                 const isActive = activeLocation === loc.name;
@@ -240,15 +231,15 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* --- LAYER 2: THE DOCK & LEGEND (Desktop & Mobile) --- */}
+      {/* --- LAYER 2: THE DOCK & LEGEND (Visible on Mobile Too) --- */}
       <div className="absolute top-[55vh] mt-6 left-0 right-0 z-40 flex flex-col items-center pointer-events-none">
         
-        {/* Toggle Buttons (Visible outside modal only on Desktop) */}
-        <div className="hidden md:block pointer-events-auto mb-4">
+        {/* Toggle Buttons - VISIBLE ON MOBILE NOW */}
+        <div className="pointer-events-auto mb-4 block">
             <ViewToggles />
         </div>
         
-        {/* LEGEND: Vertical Gradient Line */}
+        {/* LEGEND */}
         <div className="flex flex-col items-center text-[9px] text-zinc-400 font-mono bg-black/40 px-4 py-3 rounded-2xl border border-zinc-800/50 backdrop-blur-sm shadow-xl">
             <div className="mb-2 font-bold text-zinc-300">Pulse shows node density</div>
             <div className="flex items-stretch gap-3">
@@ -268,11 +259,11 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* --- LAYER 3: TRIGGER BUTTONS (Responsive) --- */}
+      {/* --- LAYER 3: TRIGGER BUTTONS --- */}
       
       {!drawerOpen && (
           <>
-            {/* DESKTOP TRIGGER: Floating Pill in Middle */}
+            {/* DESKTOP TRIGGER: Floating Pill */}
             <div className="hidden md:flex absolute top-[80vh] left-0 right-0 justify-center z-50 pointer-events-none transition-all duration-500">
                 <button 
                     onClick={() => setDrawerOpen(true)}
@@ -284,7 +275,7 @@ export default function MapPage() {
                 </button>
             </div>
 
-            {/* MOBILE TRIGGER: Fixed Bottom Dock (Horizontal Bar) */}
+            {/* MOBILE TRIGGER: Fixed Bottom Dock */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#09090b] border-t border-zinc-800 pb-safe">
                 <button 
                     onClick={() => setDrawerOpen(true)}
@@ -300,16 +291,19 @@ export default function MapPage() {
           </>
       )}
 
-      {/* --- LAYER 4: EXPANDED MODAL --- */}
+      {/* --- LAYER 4: EXPANDED MODAL (NO BLUR, HALF SCREEN) --- */}
       {drawerOpen && (
+          // REMOVED 'bg-black/40 backdrop-blur-sm' to keep map visible
           <div className="absolute inset-x-0 z-50 px-0 md:px-4 pointer-events-none flex flex-col items-center justify-center h-full">
-            <div className="absolute inset-0 pointer-events-auto bg-black/40 backdrop-blur-sm" onClick={() => setDrawerOpen(false)}></div>
             
-            {/* Modal Card */}
-            {/* Desktop: Centered Floating Card. Mobile: Full Width Bottom Sheet */}
-            <div className="absolute bottom-0 md:bottom-8 md:top-[62vh] w-full md:w-[500px] h-[60vh] md:h-auto md:max-h-[35vh] bg-[#09090b] md:bg-[#09090b]/95 border-t md:border border-zinc-700 md:rounded-[2rem] rounded-t-3xl shadow-[0_-10px_50px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300 pointer-events-auto">
+            {/* Click empty space to close */}
+            <div className="absolute inset-0 pointer-events-auto" onClick={() => setDrawerOpen(false)}></div>
+            
+            {/* Modal Card - Sits below map/toggles (Halfway Logic) */}
+            {/* Top set to 65vh to ensure it starts AFTER the map area */}
+            <div className="absolute bottom-0 md:bottom-8 top-[65vh] w-full md:w-[500px] bg-[#09090b] md:bg-[#09090b]/95 border-t md:border border-zinc-700 md:rounded-[2rem] rounded-t-3xl shadow-[0_-10px_50px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300 pointer-events-auto">
                 
-                {/* Header with Toggles inside */}
+                {/* Header */}
                 <div className="flex flex-col gap-3 px-6 py-4 border-b border-zinc-800/50 bg-black/20 shrink-0">
                     <div className="flex items-center justify-between" onClick={() => setDrawerOpen(false)}>
                          <span className="text-sm font-bold text-white flex items-center gap-2">
@@ -326,7 +320,7 @@ export default function MapPage() {
                     </div>
                 </div>
 
-                {/* List - Scrollable */}
+                {/* List */}
                 <div className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe">
                     {sortedLocations.map((loc, i) => (
                         <div 
