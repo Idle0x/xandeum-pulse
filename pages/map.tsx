@@ -4,7 +4,7 @@ import Link from 'next/link';
 import axios from 'axios';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleSqrt } from 'd3-scale';
-import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Copy } from 'lucide-react';
+import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -112,6 +112,8 @@ export default function MapPage() {
     }
   };
 
+  // --- DYNAMIC TITLES & SORTING ---
+
   const sortedLocations = useMemo(() => {
     return [...locations].sort((a, b) => {
         if (viewMode === 'STORAGE') return b.totalStorage - a.totalStorage;
@@ -119,6 +121,41 @@ export default function MapPage() {
         return b.avgHealth - a.avgHealth;
     });
   }, [locations, viewMode]);
+
+  const leadingRegion = sortedLocations[0];
+
+  const getDynamicTitle = () => {
+    if (loading) return "Calibrating Global Sensors...";
+    if (!leadingRegion) return "Waiting for Node Telemetry...";
+
+    // Headline uses the Country Name for a broader "Global" feel
+    const { country } = leadingRegion;
+
+    switch (viewMode) {
+        case 'STORAGE':
+            return <><span className="text-blue-400">{country}</span> Leads Storage Capacity</>;
+        case 'CREDITS':
+            return <><span className="text-yellow-400">{country}</span> Tops Network Earnings</>;
+        case 'HEALTH':
+            return <><span className="text-green-400">{country}</span> Sets Vitality Standard</>;
+    }
+  };
+
+  const getDynamicSubtitle = () => {
+     if (!leadingRegion) return "Analyzing network topology...";
+     
+     const { name, totalStorage, totalCredits, avgHealth, count } = leadingRegion;
+
+     // Subtitle combines "What we are looking at" + "Proof from the top city"
+     switch (viewMode) {
+        case 'STORAGE':
+             return `Visualizing regions by committed disk space. The largest hub, ${name}, is currently providing ${formatStorage(totalStorage)}.`;
+        case 'CREDITS':
+             return `Tracking accumulated node rewards. Operators in ${name} have generated a total of ${totalCredits.toLocaleString()} Cr.`;
+        case 'HEALTH':
+             return `Monitoring uptime and stability. ${name} is performing optimally with an average health score of ${avgHealth}% across ${count} nodes.`;
+     }
+  };
 
   const locationsForMap = useMemo(() => {
     if (!activeLocation) return locations;
@@ -162,29 +199,34 @@ export default function MapPage() {
       </Head>
 
       {/* --- HEADER --- */}
-      <div className="absolute top-6 left-6 z-50 flex flex-col items-start gap-4 max-w-[80%] pointer-events-none">
+      <div className="absolute top-6 left-6 z-50 flex flex-col items-start gap-4 max-w-[90%] md:max-w-[60%] pointer-events-none">
         <div className="pointer-events-auto">
             <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all">
                 <ArrowLeft size={14} className="text-zinc-400 group-hover:text-white" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-300">Operations</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-300">Operations / {viewMode}</span>
             </Link>
         </div>
         
-        <div className="pointer-events-auto">
-            <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-white to-zinc-400">
-                Global Distribution of {viewMode.charAt(0) + viewMode.slice(1).toLowerCase()}
+        <div className="pointer-events-auto mt-1">
+            {/* Dynamic Headline */}
+            <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight text-white leading-tight">
+                {getDynamicTitle()}
             </h1>
-            <div className="flex items-center gap-2 mt-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                <p className="text-xs md:text-sm text-zinc-400 font-mono">
-                    Tracking <span className="text-white font-bold">{stats.totalNodes}</span> nodes across <span className="text-white font-bold">{stats.countries}</span> regions
+            
+            {/* Combined Context + Stat Subtitle */}
+            <div className="flex items-start gap-3 mt-3 max-w-lg">
+                <div className={`mt-1.5 w-1.5 h-1.5 shrink-0 rounded-full animate-pulse ${
+                    viewMode === 'HEALTH' ? 'bg-green-500' : viewMode === 'CREDITS' ? 'bg-yellow-500' : 'bg-blue-500'
+                }`}></div>
+                <p className="text-xs md:text-sm text-zinc-400 font-medium leading-relaxed">
+                   {getDynamicSubtitle()}
                 </p>
             </div>
         </div>
       </div>
 
       {/* --- LAYER 1: MAP FRAME --- */}
-      <div className="relative z-10 mx-6 mt-32 h-[45vh] md:h-[50vh] border border-zinc-800/50 rounded-3xl overflow-hidden shadow-2xl bg-[#080808] transition-all duration-500">
+      <div className="relative z-10 mx-6 mt-32 md:mt-40 h-[45vh] md:h-[50vh] border border-zinc-800/50 rounded-3xl overflow-hidden shadow-2xl bg-[#080808] transition-all duration-500">
         <div className="absolute inset-0 pointer-events-none">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_#1a202c_0%,_#000000_80%)] opacity-50"></div>
             <div className="absolute inset-0 opacity-10" 
