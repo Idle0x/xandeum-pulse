@@ -33,7 +33,7 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('STORAGE');
   
-  // Renamed for clarity: isSplitView controls the dashboard split state
+  // Controls the dashboard split state
   const [isSplitView, setIsSplitView] = useState(false);
   
   const [activeLocation, setActiveLocation] = useState<string | null>(null);
@@ -155,8 +155,6 @@ export default function MapPage() {
      if (!leadingRegion) return "Analyzing network topology...";
      const { name, totalStorage, totalCredits, avgHealth, count } = leadingRegion;
 
-     // REMOVED: Generic context (moved to legend).
-     // KEPT: Specific data story.
      switch (viewMode) {
         case 'STORAGE':
              return `The largest hub, ${name}, is currently providing ${formatStorage(totalStorage)}.`;
@@ -206,7 +204,9 @@ export default function MapPage() {
   );
 
   return (
-    <div className="h-screen w-screen bg-black text-white font-sans overflow-hidden flex flex-col relative">
+    // FIX 1: Use 'fixed inset-0' to strictly constrain the app window. 
+    // This prevents overflow and scrollbar issues on all devices.
+    <div className="fixed inset-0 bg-black text-white font-sans overflow-hidden flex flex-col">
       <Head>
         <title>Xandeum Command Center</title>
         <style>{`
@@ -216,7 +216,7 @@ export default function MapPage() {
         `}</style>
       </Head>
 
-      {/* --- 1. HEADER (Fixed Top) --- */}
+      {/* --- 1. HEADER (Fixed Top, Non-Shrinking) --- */}
       <div className="shrink-0 w-full z-50 flex flex-col gap-4 px-6 py-4 bg-[#09090b] border-b border-zinc-800/50 shadow-lg">
         <div className="flex items-center justify-between w-full">
             <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all cursor-pointer">
@@ -247,9 +247,10 @@ export default function MapPage() {
       </div>
 
       {/* --- 2. MAP AREA (Flexible - Shrinks when Split View is Active) --- */}
+      {/* FIX 2: 'flex-1 basis-0 min-h-0' ensures the map never pushes the Dock off-screen, even on Desktop */}
       <div 
         className={`relative w-full bg-[#080808] border-b border-zinc-800/50 transition-all duration-500 ease-in-out ${
-            isSplitView ? 'h-[50vh]' : 'flex-1 min-h-0' 
+            isSplitView ? 'h-[50vh] shrink-0' : 'flex-1 basis-0 min-h-0' 
         }`}
       >
             {loading ? (
@@ -315,10 +316,9 @@ export default function MapPage() {
       </div>
 
       {/* --- 3. THE DOCK (State-Dependent Layout) --- */}
-      {/* If Split View (OPEN): Takes remaining height (approx 50vh).
-         If Legend View (CLOSED): Auto height to fit Legend content.
-      */}
-      <div className={`shrink-0 bg-[#09090b] z-40 flex flex-col transition-all duration-500 ease-in-out ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
+      {/* FIX 3: Increased Z-Index to 50 and 'shrink-0' ensures it sits above map if needed, 
+          but flex layout should now prevent overlap. */}
+      <div className={`shrink-0 bg-[#09090b] relative z-50 flex flex-col transition-all duration-500 ease-in-out ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
             
             {/* CONTENT A: The Legend (Visible when !isSplitView) */}
             <div className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4 transition-opacity duration-300 ${isSplitView ? 'hidden opacity-0' : 'flex opacity-100'}`}>
@@ -340,7 +340,7 @@ export default function MapPage() {
                             </p>
                         </div>
                         
-                        {/* 2. Pulse Context (ADDED) */}
+                        {/* 2. Pulse Context (Confirmed Added) */}
                         <p className="text-[10px] text-zinc-500 leading-tight pl-5">
                             <strong className="text-zinc-400">Pulse Intensity</strong> represents node density in a region. The thicker/brighter the intensity, the higher the nodes in that region.
                         </p>
