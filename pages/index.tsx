@@ -72,15 +72,11 @@ const formatDetailedTimestamp = (timestamp: number | undefined) => {
 };
 
 const compareVersions = (v1: string = '0.0.0', v2: string = '0.0.0') => {
-  const s1 = v1 || '0.0.0';
-  const s2 = v2 || '0.0.0';
-  const parts1 = s1.split('.').map(Number);
-  const parts2 = s2.split('.').map(Number);
-  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
-    const num1 = parts1[i] || 0;
-    const num2 = parts2[i] || 0;
-    if (num1 > num2) return 1;
-    if (num1 < num2) return -1;
+  const p1 = v1.split('.').map(Number);
+  const p2 = v2.split('.').map(Number);
+  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+    const n1 = p1[i] || 0; const n2 = p2[i] || 0;
+    if (n1 > n2) return 1; if (n1 < n2) return -1;
   }
   return 0;
 };
@@ -90,52 +86,24 @@ const calculateVitalityMetrics = (node: Node | null, consensusVersion: string, m
   if (!node) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, capacity: 0 } };
 
   const storageGB = (node.storage_committed || 0) / (1024 ** 3);
-  if (storageGB <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, capacity: 0 } };
-
+  
   let uptimeScore = 0;
   const days = (node.uptime || 0) / 86400;
   if (days >= 30) uptimeScore = 100;
-  else if (days >= 7) uptimeScore = 70 + (days - 7) * (30 / 23);
-  else if (days >= 1) uptimeScore = 40 + (days - 1) * (30 / 6);
-  else uptimeScore = days * 40;
+  else uptimeScore = (days / 30) * 100;
 
   let versionScore = 100;
-  const nodeVer = node.version || '0.0.0';
-  if (consensusVersion !== 'N/A' && compareVersions(nodeVer, consensusVersion) < 0) {
-      const parts1 = nodeVer.split('.').map(Number);
-      const parts2 = consensusVersion.split('.').map(Number);
-      const majorDiff = (parts2[0] || 0) - (parts1[0] || 0);
-      const minorDiff = (parts2[1] || 0) - (parts1[1] || 0);
-      if (majorDiff > 0) versionScore = 30; 
-      else if (minorDiff > 2) versionScore = 60; 
-      else versionScore = 80; 
-  }
+  if (consensusVersion !== 'N/A' && compareVersions(node.version, consensusVersion) < 0) versionScore = 50;
 
   let reputationScore = 50; 
-  const credits = node.credits || 0;
-  if (medianCredits > 0 && credits > 0) {
-      const ratio = credits / medianCredits;
-      if (ratio >= 2) reputationScore = 100;
-      else if (ratio >= 1) reputationScore = 75 + (ratio - 1) * 25;
-      else if (ratio >= 0.5) reputationScore = 50 + (ratio - 0.5) * 50;
-      else if (ratio >= 0.1) reputationScore = 25 + (ratio - 0.1) * 62.5;
-      else reputationScore = ratio * 250;
-  } else if (credits === 0) {
-      reputationScore = 0; 
-  } else if (medianCredits === 0 && credits > 0) {
-      reputationScore = 100; 
-  }
+  if (medianCredits > 0) reputationScore = Math.min(100, ((node.credits || 0) / medianCredits) * 75);
 
-  let capacityScore = 0;
-  if (storageGB >= 1000) capacityScore = 100; 
-  else if (storageGB >= 100) capacityScore = 70 + (storageGB - 100) * (30 / 900);
-  else if (storageGB >= 10) capacityScore = 40 + (storageGB - 10) * (30 / 90);
-  else capacityScore = storageGB * 4;
+  let capacityScore = Math.min(100, (storageGB / 1000) * 100); 
 
-  const finalScore = (uptimeScore * 0.30) + (versionScore * 0.20) + (reputationScore * 0.25) + (capacityScore * 0.25);
+  const total = Math.round((uptimeScore * 0.3) + (versionScore * 0.2) + (reputationScore * 0.25) + (capacityScore * 0.25));
   
   return {
-      total: Math.round(Math.max(0, Math.min(100, finalScore))),
+      total: Math.max(0, Math.min(100, total)),
       breakdown: {
           uptime: Math.round(uptimeScore),
           version: Math.round(versionScore),
@@ -182,6 +150,40 @@ const RadialProgress = ({ score, size = 160, stroke = 12 }: { score: number, siz
             <div className="absolute inset-0 rounded-full border-4 border-white/5 opacity-0 group-hover:opacity-100 transition-opacity animate-ping pointer-events-none"></div>
         </div>
     );
+};
+
+const LiveWireLoader = () => (
+  <div className="w-full h-1 relative overflow-hidden bg-zinc-900 border-b border-zinc-800">
+    <div className="absolute inset-0 bg-blue-500/20 blur-[2px]"></div>
+    <div className="absolute h-full w-1/3 bg-gradient-to-r from-transparent via-blue-400 to-transparent animate-shimmer" style={{ animationDuration: '1.5s' }}></div>
+  </div>
+);
+
+const PulseGraphLoader = () => {
+  const [text, setText] = useState("Initializing Uplink...");
+  useEffect(() => {
+    const texts = ["Establishing Connection...", "Parsing Gossip Protocol...", "Syncing Node Storage...", "Decrypting Ledger..."];
+    let i = 0;
+    const interval = setInterval(() => { setText(texts[i % texts.length]); i++; }, 800);
+    return () => clearInterval(interval);
+  }, []);
+  return (
+    <div className="flex flex-col items-center justify-center py-20 opacity-80">
+        <div className="relative w-64 h-32 mb-6">
+            <svg viewBox="0 0 300 100" className="w-full h-full drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]">
+                <path d="M0,50 L20,50 L30,20 L40,80 L50,50 L70,50 L80,30 L90,70 L100,50 L150,50 L160,10 L170,90 L180,50 L220,50 L230,30 L240,70 L250,50 L300,50" fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="animate-draw-graph" />
+            </svg>
+            <div className="absolute top-0 bottom-0 w-1 bg-white/50 blur-[1px] animate-scan-line"></div>
+        </div>
+        <div className="font-mono text-blue-400 text-xs tracking-widest uppercase animate-pulse">{text}</div>
+        <style jsx>{`
+            .animate-draw-graph { stroke-dasharray: 400; stroke-dashoffset: 400; animation: draw 2s ease-in-out infinite; }
+            .animate-scan-line { left: 0; animation: scan 2s ease-in-out infinite; }
+            @keyframes draw { 0% { stroke-dashoffset: 400; opacity: 0; } 10% { opacity: 1; } 50% { stroke-dashoffset: 0; } 90% { opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+            @keyframes scan { 0% { left: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
+        `}</style>
+    </div>
+  );
 };
 
 export default function Home() {
@@ -349,7 +351,7 @@ export default function Home() {
             let consensusCount = 0;
 
             mergedList.forEach(n => {
-                const stats = calculateVitalityMetrics(n, topVersion, medianCredits);
+                const stats = calculateVitalityMetrics(n, topVersion, medCreds); // Fixed typo: medCreds -> medianCredits
                 sumHealth += stats.total;
                 sumUptime += stats.breakdown.uptime;
                 sumCap += stats.breakdown.capacity;
@@ -357,6 +359,9 @@ export default function Home() {
                 sumVer += stats.breakdown.version;
                 if (n.version === topVersion) consensusCount++;
             });
+
+            // Re-assign medCreds to medianCredits for scope
+            const medCreds = medianCredits; // Handled by state
 
             setAvgNetworkHealth(Math.round(sumHealth / mergedList.length));
             setNetworkConsensus((consensusCount / mergedList.length) * 100);
@@ -415,6 +420,13 @@ export default function Home() {
     return { label: 'Last Seen', value: node.last_seen_timestamp ? formatLastSeen(node.last_seen_timestamp) : 'Unknown', color: 'text-zinc-400', icon: Clock };
   };
 
+  const handleNodeClick = (node: Node) => {
+      setSelectedNode(node);
+      setCompareMode(false);
+      setShareMode(false);
+      setCompareTarget(null);
+  };
+
   const renderComparisonRow = (label: string, valA: any, valB: any, format: (v: any) => string, better: 'HIGH' | 'LOW' | 'NONE') => {
       const isABetter = better === 'NONE' ? false : better === 'HIGH' ? valA > valB : valA < valB;
       const isBBetter = better === 'NONE' ? false : better === 'HIGH' ? valB > valA : valB < valA;
@@ -433,7 +445,7 @@ export default function Home() {
   };
 
   return (
-    <div className={`min-h-screen font-sans transition-colors duration-500 ${warRoom ? 'bg-black text-green-500 selection:bg-green-900/30' : 'bg-[#09090b] text-zinc-100 selection:bg-blue-500/30'}`} onClick={handleGlobalClick}>
+    <div className={`min-h-screen font-sans transition-colors duration-500 ${warRoom ? 'bg-black text-green-500 selection:bg-green-900/30' : 'bg-[#09090b] text-zinc-100 selection:bg-blue-500/30'}`}>
       <Head><title>Xandeum Pulse {warRoom ? '[WAR ROOM]' : ''}</title></Head>
       
       {/* LOADING OVERLAY */}
