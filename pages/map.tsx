@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import axios from 'axios';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleSqrt } from 'd3-scale';
-import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Info, X, Server, Layers, TrendingUp, BarChart3, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Info, X, Server, Layers, TrendingUp, BarChart3, AlertCircle, Eye, EyeOff, HelpCircle } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -83,7 +83,6 @@ export default function MapPage() {
                           lockTarget(targetLoc.name, targetLoc.lat, targetLoc.lon);
                       }, 500);
                   } else {
-                      // CENTERED TOAST MESSAGE
                       setToast({ 
                           msg: `Node ${targetIP} is on a Private Network. Location Hidden.`, 
                           type: 'private' 
@@ -353,6 +352,24 @@ export default function MapPage() {
         <style>{`@supports (padding: max(0px)) { .pb-safe { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); } }`}</style>
       </Head>
 
+      {/* TOAST NOTIFICATION */}
+      {toast && (
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100] animate-in zoom-in-95 duration-300 w-[90%] max-w-sm pointer-events-none">
+              <div className={`flex items-start gap-3 px-5 py-4 rounded-2xl border shadow-2xl backdrop-blur-xl ${
+                  toast.type === 'error' ? 'bg-red-500/10 border-red-500/50 text-red-200' : 
+                  toast.type === 'private' ? 'bg-zinc-900/90 border-zinc-600 text-zinc-200' :
+                  'bg-zinc-800 border-zinc-700 text-white'
+              }`}>
+                  {toast.type === 'error' ? <AlertCircle size={20} className="text-red-500 mt-0.5 shrink-0" /> : 
+                   toast.type === 'private' ? <EyeOff size={20} className="text-zinc-400 mt-0.5 shrink-0" /> :
+                   <Info size={20} className="text-blue-500 mt-0.5 shrink-0" />}
+                  <div className="flex-1">
+                      <p className="text-sm font-bold leading-tight">{toast.msg}</p>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* HEADER */}
       <div className="shrink-0 w-full z-50 flex flex-col gap-3 px-4 md:px-6 py-3 bg-[#09090b] border-b border-zinc-800/30">
         <div className="flex items-center justify-between w-full">
@@ -368,14 +385,23 @@ export default function MapPage() {
                     <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{viewMode} Mode</span>
                 </div>
                 
-                {/* TRACKING COUNTER BADGE - NOW VISIBLE & PROMINENT */}
+                {/* TRACKING COUNTER BADGE (CLICKABLE TOOLTIP) */}
                 {!loading && (
-                    <div className="flex items-center gap-1.5 text-zinc-400">
-                        <Eye size={12} className="text-zinc-500" />
+                    <button 
+                        onClick={() => {
+                            setToast({ 
+                                msg: `${privateNodes} nodes are running on Private Networks/VPNs, preventing public geolocation. Their data is tracked, but their map pin is hidden.`, 
+                                type: 'private' 
+                            });
+                            setTimeout(() => setToast(null), 6000);
+                        }}
+                        className="hidden md:flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors cursor-help"
+                    >
+                        <HelpCircle size={12} className="text-zinc-500" />
                         <span className="text-xs md:text-sm font-bold tracking-tight">
                             Tracking {visibleNodes} <span className="text-zinc-600">/ {stats.totalNodes} Nodes</span>
                         </span>
-                    </div>
+                    </button>
                 )}
             </div>
         </div>
@@ -386,27 +412,8 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* MAP AREA (Relative Parent for Toast) */}
+      {/* MAP AREA */}
       <div className={`relative w-full bg-[#080808] ${isSplitView ? 'h-[40vh] shrink-0' : 'flex-1 basis-0 min-h-0'}`}>
-            
-            {/* CENTERED TOAST NOTIFICATION */}
-            {toast && (
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100] animate-in zoom-in-95 duration-300 w-[90%] max-w-sm pointer-events-none">
-                    <div className={`flex items-start gap-3 px-5 py-4 rounded-2xl border shadow-2xl backdrop-blur-xl ${
-                        toast.type === 'error' ? 'bg-red-500/10 border-red-500/50 text-red-200' : 
-                        toast.type === 'private' ? 'bg-black/80 border-zinc-700 text-zinc-200' :
-                        'bg-zinc-800 border-zinc-700 text-white'
-                    }`}>
-                        {toast.type === 'error' ? <AlertCircle size={20} className="text-red-500 mt-0.5 shrink-0" /> : 
-                         toast.type === 'private' ? <EyeOff size={20} className="text-zinc-400 mt-0.5 shrink-0" /> :
-                         <Info size={20} className="text-blue-500 mt-0.5 shrink-0" />}
-                        <div className="flex-1">
-                            <p className="text-sm font-bold leading-tight">{toast.msg}</p>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {loading ? (
                 <div className="absolute inset-0 flex items-center justify-center z-20"><Globe className="animate-pulse text-blue-500" /></div>
             ) : (
@@ -466,7 +473,17 @@ export default function MapPage() {
             <div className={`flex flex-col h-full overflow-hidden ${isSplitView ? 'flex' : 'hidden'}`}>
                  <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-zinc-800/30 bg-[#09090b]">
                     <div className="flex items-center gap-3"><h2 className="text-sm font-bold text-white flex items-center gap-2"><Activity size={14} className="text-green-500" /> Live Data</h2><div className="hidden md:block scale-90 origin-left"><ViewToggles /></div></div>
-                    <div className="flex items-center gap-2"><div className="md:hidden scale-75 origin-right"><ViewToggles /></div><button onClick={handleCloseDrawer} className="p-1.5 bg-zinc-800/50 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"><X size={14} /></button></div>
+                    
+                    {/* RED BIG CLOSE BUTTON */}
+                    <div className="flex items-center gap-2">
+                        <div className="md:hidden scale-75 origin-right"><ViewToggles /></div>
+                        <button 
+                            onClick={handleCloseDrawer} 
+                            className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg"
+                        >
+                            <X size={20} />
+                        </button>
+                    </div>
                  </div>
 
                  <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar bg-[#09090b]">
