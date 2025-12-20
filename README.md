@@ -9,7 +9,7 @@ Real-time network monitor, geographic visualizer, and analytics dashboard for th
 
 **⚡ Live Demo:** [https://xandeum-pulse.vercel.app](https://xandeum-pulse.vercel.app)
 
-![Main Dashboard](https://github.com/user-attachments/assets/0578eb50-2b8d-4a78-bc91-a50a1933f917)
+![Main Dashboard](https://imgur.com/gallery/node-dashboard-rZ5lM2Q)
 
 > **Optional Note:** This implements a custom **"Vitality Score" algorithm**, **RPC failover protection**, and a **3D geospatial engine** to provide deep analytics on network health.
 
@@ -63,7 +63,7 @@ A cinematic, interactive visualization of the network's physical infrastructure.
 * **Multi-Dimensional Views:** Toggle between Storage (Capacity), Health (Stability), and Credits (Reputation).
 * **Visual Logic:** Markers change shape and color intensity based on the active metric.
 
-![Global Map Visualization](https://github.com/user-attachments/assets/26b44b3e-8247-46bd-b44e-d33ecf5a1d4f)
+![Global Map Visualization](https://imgur.com/gallery/network-topology-NM4Fx3i)
 
 👉 **View Code:** [`pages/map.tsx`](pages/map.tsx)
 
@@ -74,7 +74,7 @@ The command center for operational monitoring. Click any node to open the **Insp
 * **Deep Inspection:** View raw JSON data directly from the pRPC stream.
 * **Operator Tools:** Watchlist (Star/Pin nodes) and deep linking.
 
-![Node Inspector Modal](https://github.com/user-attachments/assets/6677f3cb-6f8f-4fb7-85cd-35f01d84d6a2)
+![Node Inspector Modal](https://imgur.com/gallery/modal-inspection-R4CRcYQ)
 
 👉 **View Code:** [`pages/index.tsx`](pages/index.tsx)
 
@@ -83,7 +83,7 @@ A dual-fetch system that correlates on-chain reputation with live node status.
 * Fetches credit balances from the Xandeum rewards oracle.
 * Merges data with live pRPC stats to map anonymous Public Keys to physical IP addresses.
 
-![Reputation Leaderboard](Paste_Leaderboard_Image_Link_Here)
+![Reputation Leaderboard](https://imgur.com/gallery/reputation-credit-Rod7lha)
 
 👉 **View Code:** [`pages/leaderboard.tsx`](pages/leaderboard.tsx)
 
