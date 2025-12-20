@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { 
   ArrowLeft, Activity, Shield, Zap, Globe, Server, Database, 
   Trophy, Cpu, Map as MapIcon, BarChart3, Lock, 
-  HeartPulse, Search, Info, Check, X, MousePointer2, Layers
+  HeartPulse, Search, Info, Check, X, MousePointer2, Layers, LayoutDashboard
 } from 'lucide-react';
 
 export default function DocsPage() {
@@ -98,7 +98,8 @@ function CoreArchitectureSection() {
                     </p>
                     <ul className="space-y-3 text-xs text-zinc-500 mb-8">
                         <li className="flex gap-2"><div className="w-1 h-full bg-blue-500 rounded"></div> <strong>30% Stability:</strong> Penalizes frequent restarts (&lt;30 days).</li>
-                        <li className="flex gap-2"><div className="w-1 h-full bg-purple-500 rounded"></div> <strong>25% Capacity:</strong> Logarithmic scale favoring >1TB.</li>
+                        {/* FIX: Escaped > to &gt; below */}
+                        <li className="flex gap-2"><div className="w-1 h-full bg-purple-500 rounded"></div> <strong>25% Capacity:</strong> Logarithmic scale favoring &gt;1TB.</li>
                         <li className="flex gap-2"><div className="w-1 h-full bg-yellow-500 rounded"></div> <strong>25% Reputation:</strong> Comparing credits vs Network Median.</li>
                         <li className="flex gap-2"><div className="w-1 h-full bg-green-500 rounded"></div> <strong>20% Consensus:</strong> Must match majority version.</li>
                     </ul>
@@ -114,7 +115,7 @@ function CoreArchitectureSection() {
                     <h2 className="text-2xl font-bold text-white mb-4">"Hero & Race" Failover System</h2>
                     <p className="text-zinc-400 mb-8 text-sm">
                         Traditional apps crash when the API goes down. Pulse uses a two-stage fetch strategy. 
-                        First, we try the <strong>Hero</strong> (Primary Seed). If it hangs for >4s, we trigger a <strong>Race</strong> 
+                        First, we try the <strong>Hero</strong> (Primary Seed). If it hangs for &gt;4s, we trigger a <strong>Race</strong> 
                         between 3 random backup nodes.
                     </p>
                 </div>
@@ -245,7 +246,7 @@ function MapIntelligenceSection() {
                     <BarChart3 className="text-yellow-500"/> Dynamic Percentile Tiering
                 </h3>
                 <p className="text-zinc-400 text-sm mb-8 max-w-2xl">
-                    Hardcoded thresholds (e.g. ">1TB") become obsolete as the network grows. Pulse calculates 
+                    Hardcoded thresholds (e.g. &gt;1TB) become obsolete as the network grows. Pulse calculates 
                     <strong>Live Percentiles</strong> to color-code the map. "Gold" always means "Top 10%", whether that's 10TB today or 100PB tomorrow.
                 </p>
                 
