@@ -589,10 +589,11 @@ export default function Home() {
                     </div>
                 </div>
 
-                {/* MOBILE ONLY: Refresh Icon on Top Right */}
+                {/* MOBILE ONLY: Refresh Icon on Top Right (Text included) */}
                 <div className="md:hidden">
-                    <button onClick={handleRefresh} disabled={loading} className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-blue-400 hover:text-white disabled:opacity-50">
-                        <Zap size={20} className={loading ? "animate-spin" : ""} />
+                    <button onClick={handleRefresh} disabled={loading} className="px-3 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg text-blue-400 hover:text-white disabled:opacity-50 flex items-center gap-2">
+                        <Zap size={16} className={loading ? "animate-spin" : ""} />
+                        <span className="text-xs font-bold ml-1">REFRESH</span>
                     </button>
                 </div>
             </div>
@@ -621,7 +622,7 @@ export default function Home() {
         </div>
 
         {/* ROW 2: CONTROLS (Refresh + Filters) */}
-        <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 w-full justify-between">
             
             {/* DESKTOP ONLY: Big Refresh Button */}
             <div className="hidden md:block">
@@ -631,15 +632,15 @@ export default function Home() {
                 </button>
             </div>
 
-            {/* Filters (Horizontal Scroll on Mobile) */}
-            <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
+            {/* Filters (Align Right on Desktop, Scroll on Mobile) */}
+            <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide pt-2 mt-6 md:mt-0">
                 {[
                     { id: 'uptime', icon: Clock, label: 'UPTIME' },
                     { id: 'storage', icon: Database, label: 'STORAGE' },
                     { id: 'version', icon: Server, label: 'VERSION' },
                     { id: 'health', icon: HeartPulse, label: 'HEALTH' } 
                 ].map((opt) => (
-                    <button key={opt.id} onClick={() => { if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); else setSortBy(opt.id as any); }} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap shadow-sm ${sortBy === opt.id ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
+                    <button key={opt.id} onClick={() => { if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); else setSortBy(opt.id as any); }} className={`flex items-center gap-2 px-4 py-1 rounded-lg text-xs font-bold transition border whitespace-nowrap shadow-sm ${sortBy === opt.id ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
                         <opt.icon size={14} /> {opt.label}
                         {sortBy === opt.id && (sortOrder === 'asc' ? <ArrowUp size={12} className="ml-1" /> : <ArrowDown size={12} className="ml-1" />)}
                     </button>
