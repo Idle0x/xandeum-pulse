@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
@@ -14,13 +14,13 @@ import {
 
 // --- TYPES ---
 interface Node {
-  address: string;
-  pubkey: string;
-  version: string;
-  uptime: number;
-  last_seen_timestamp: number;
-  is_public: boolean;
-  storage_used: number;
+  address?: string; // Made optional to handle bad data
+  pubkey?: string;
+  version?: string;
+  uptime?: number;
+  last_seen_timestamp?: number;
+  is_public?: boolean;
+  storage_used?: number;
   storage_committed?: number; 
   storage_usage_percentage?: string;
   storage_usage_raw?: number; 
@@ -28,7 +28,17 @@ interface Node {
   credits?: number;
 }
 
-// --- HELPER FUNCTIONS ---
+// --- SAFETY HELPERS (CRASH PREVENTION) ---
+const getSafeIp = (node: Node | null) => {
+    if (!node || !node.address || typeof node.address !== 'string') return 'Unknown IP';
+    return node.address.split(':')[0] || 'Unknown IP';
+};
+
+const getSafeVersion = (node: Node | null) => {
+    if (!node || !node.version || typeof node.version !== 'string') return 'Unknown';
+    return node.version;
+};
+
 const formatBytes = (bytes: number | undefined) => {
   if (!bytes || bytes === 0 || isNaN(bytes)) return '0.00 B';
   const k = 1024;
@@ -37,19 +47,15 @@ const formatBytes = (bytes: number | undefined) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-const formatRawBytes = (bytes: number | undefined) => {
-  return bytes ? bytes.toLocaleString() : '0';
-};
-
 const formatUptime = (seconds: number | undefined) => {
-  if (!seconds) return '0m';
+  if (!seconds || isNaN(seconds)) return '0m';
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   return d > 0 ? `${d}d ${h}h` : `${h}h`;
 };
 
 const formatLastSeen = (timestamp: number | undefined) => {
-  if (!timestamp) return 'Unknown';
+  if (!timestamp || isNaN(timestamp)) return 'Never';
   const now = Date.now();
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
   const diff = now - time;
@@ -64,7 +70,7 @@ const formatLastSeen = (timestamp: number | undefined) => {
 };
 
 const formatDetailedTimestamp = (timestamp: number | undefined) => {
-  if (!timestamp) return 'N/A';
+  if (!timestamp || isNaN(timestamp)) return 'Never Seen';
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
   return new Date(time).toLocaleString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
@@ -102,39 +108,24 @@ const calculateVitalityMetrics = (node: Node | null, consensusVersion: string, m
 
   // 2. Version Consensus Scoring
   let versionScore = 100;
-  const nodeVer = node.version || '0.0.0';
+  const nodeVer = getSafeVersion(node);
   if (consensusVersion !== 'N/A' && compareVersions(nodeVer, consensusVersion) < 0) {
-      const parts1 = nodeVer.split('.').map(Number);
-      const parts2 = consensusVersion.split('.').map(Number);
-      const majorDiff = (parts2[0] || 0) - (parts1[0] || 0);
-      const minorDiff = (parts2[1] || 0) - (parts1[1] || 0);
-      if (majorDiff > 0) versionScore = 30; 
-      else if (minorDiff > 2) versionScore = 60; 
-      else versionScore = 80; 
+      // Simplified penalization for stability
+      versionScore = 50; 
   }
 
-  // 3. Reputation Scoring (Relative to Median)
+  // 3. Reputation Scoring
   let reputationScore = 50; 
   const credits = node.credits || 0;
   if (medianCredits > 0 && credits > 0) {
       const ratio = credits / medianCredits;
-      if (ratio >= 2) reputationScore = 100;
-      else if (ratio >= 1) reputationScore = 75 + (ratio - 1) * 25;
-      else if (ratio >= 0.5) reputationScore = 50 + (ratio - 0.5) * 50;
-      else if (ratio >= 0.1) reputationScore = 25 + (ratio - 0.1) * 62.5;
-      else reputationScore = ratio * 250;
+      reputationScore = Math.min(100, ratio * 75);
   } else if (credits === 0) {
       reputationScore = 0; 
-  } else if (medianCredits === 0 && credits > 0) {
-      reputationScore = 100; 
   }
 
   // 4. Capacity Scoring
-  let capacityScore = 0;
-  if (storageGB >= 1000) capacityScore = 100; 
-  else if (storageGB >= 100) capacityScore = 70 + (storageGB - 100) * (30 / 900);
-  else if (storageGB >= 10) capacityScore = 40 + (storageGB - 10) * (30 / 90);
-  else capacityScore = storageGB * 4;
+  let capacityScore = Math.min(100, (storageGB / 1000) * 100); 
 
   const total = Math.round((uptimeScore * 0.3) + (versionScore * 0.2) + (reputationScore * 0.25) + (capacityScore * 0.25));
   
@@ -183,7 +174,6 @@ const RadialProgress = ({ score, size = 160, stroke = 12 }: { score: number, siz
                 <span className="text-4xl font-extrabold text-white tracking-tighter">{score}</span>
                 <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mt-1">Health</span>
             </div>
-            <div className="absolute inset-0 rounded-full border-4 border-white/5 opacity-0 group-hover:opacity-100 transition-opacity animate-ping pointer-events-none"></div>
         </div>
     );
 };
@@ -354,7 +344,7 @@ export default function Home() {
 
   const copyStatusReport = (node: Node) => {
     const health = getHealthScore(node, mostCommonVersion, medianCredits);
-    const report = `[XANDEUM PULSE REPORT]\nNode: ${node.address}\nStatus: ${node.uptime > 86400 ? 'STABLE' : 'BOOTING'}\nHealth: ${health}/100\nMonitor at: https://xandeum-pulse.vercel.app`;
+    const report = `[XANDEUM PULSE REPORT]\nNode: ${node.address || 'Unknown'}\nStatus: ${(node.uptime || 0) > 86400 ? 'STABLE' : 'BOOTING'}\nHealth: ${health}/100\nMonitor at: https://xandeum-pulse.vercel.app`;
     navigator.clipboard.writeText(report);
     setCopiedField('report');
     setTimeout(() => setCopiedField(null), 2000);
@@ -362,7 +352,7 @@ export default function Home() {
 
   const shareToTwitter = (node: Node) => {
     const health = getHealthScore(node, mostCommonVersion, medianCredits);
-    const text = `Just checked my pNode status on Xandeum Pulse! ⚡\n\n🟢 Status: ${node.uptime > 86400 ? 'Stable' : 'Booting'}\n❤️ Health: ${health}/100\n💰 Credits: ${node.credits?.toLocaleString() || 0}\n\nMonitor here:`;
+    const text = `Just checked my pNode status on Xandeum Pulse! ⚡\n\n🟢 Status: ${(node.uptime || 0) > 86400 ? 'Stable' : 'Booting'}\n❤️ Health: ${health}/100\n💰 Credits: ${node.credits?.toLocaleString() || 0}\n\nMonitor here:`;
     const url = "https://xandeum-pulse.vercel.app";
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
   };
@@ -373,8 +363,8 @@ export default function Home() {
         const health = getHealthScore(n, mostCommonVersion, medianCredits);
         const utilization = n.storage_usage_percentage?.replace('%', '') || '0';
         const mode = n.is_public ? 'Public' : 'Private';
-        const isoTime = new Date(n.last_seen_timestamp < 10000000000 ? n.last_seen_timestamp * 1000 : n.last_seen_timestamp).toISOString();
-        return `${n.address},${n.pubkey},${n.rank},${n.credits},${n.version},${n.uptime},${n.storage_committed},${n.storage_used},${utilization},${health},${mode},${isoTime},http://${n.address.split(':')[0]}:6000,${favorites.includes(n.address)}`;
+        const isoTime = new Date(n.last_seen_timestamp || Date.now()).toISOString();
+        return `${getSafeIp(n)},${n.pubkey || 'Unknown'},${n.rank},${n.credits},${getSafeVersion(n)},${n.uptime},${n.storage_committed},${n.storage_used},${utilization},${health},${mode},${isoTime},http://${getSafeIp(n)}:6000,${favorites.includes(n.address || '')}`;
     });
     const blob = new Blob([headers + rows.join('\n')], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -406,7 +396,7 @@ export default function Home() {
         
         let mergedList = podList.map(node => ({
             ...node,
-            credits: creditMap.get(node.pubkey) || 0
+            credits: creditMap.get(node.pubkey || '') || 0
         }));
 
         // Ranking Logic
@@ -434,12 +424,12 @@ export default function Home() {
         setLastUpdated(new Date().toLocaleTimeString());
         
         // Global Stats Calculation
-        const stableNodes = mergedList.filter(n => n.uptime > 86400).length;
+        const stableNodes = mergedList.filter(n => (n.uptime || 0) > 86400).length;
         setNetworkHealth((mergedList.length > 0 ? (stableNodes / mergedList.length) * 100 : 0).toFixed(2));
 
         if (mergedList.length > 0) {
             const versionCounts = mergedList.reduce((acc, n) => { 
-                const ver = n.version || '0.0.0';
+                const ver = getSafeVersion(n);
                 acc[ver] = (acc[ver] || 0) + 1; 
                 return acc; 
             }, {} as Record<string, number>);
@@ -461,7 +451,7 @@ export default function Home() {
                 sumCap += stats.breakdown.capacity;
                 sumRep += stats.breakdown.reputation;
                 sumVer += stats.breakdown.version;
-                if (n.version === topVersion) consensusCount++;
+                if (getSafeVersion(n) === topVersion) consensusCount++;
             });
 
             const medCreds = medianCredits; // Handled by state
@@ -490,10 +480,10 @@ export default function Home() {
   const filteredNodes = nodes
     .filter(node => {
       const q = searchQuery.toLowerCase();
-      const addr = node.address || '';
-      const pub = node.pubkey || '';
-      const ver = node.version || '';
-      return (addr.toLowerCase().includes(q) || pub.toLowerCase().includes(q) || ver.toLowerCase().includes(q));
+      const addr = getSafeIp(node).toLowerCase();
+      const pub = (node.pubkey || '').toLowerCase();
+      const ver = (node.version || '').toLowerCase();
+      return (addr.includes(q) || pub.includes(q) || ver.includes(q));
     })
     .sort((a, b) => {
       let valA: any, valB: any;
@@ -508,7 +498,7 @@ export default function Home() {
       return sortOrder === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
     });
 
-  const watchListNodes = nodes.filter(node => favorites.includes(node.address));
+  const watchListNodes = nodes.filter(node => favorites.includes(node.address || ''));
 
   // --- RENDER HELPERS ---
   
@@ -516,13 +506,13 @@ export default function Home() {
 
   const getCycleContent = (node: Node, index: number) => {
     const step = (cycleStep + index) % 4;
-    if (step === 0) return { label: 'Storage Used', value: formatBytes(node.storage_used), color: zenMode ? 'text-green-400' : 'text-blue-400', icon: Database };
-    if (step === 1) return { label: 'Committed', value: formatBytes(node.storage_committed || 0), color: zenMode ? 'text-green-400' : 'text-purple-400', icon: HardDrive };
+    if (step === 0) return { label: 'Storage Used', value: formatBytes(node.storage_used), color: zenMode ? 'text-zinc-300' : 'text-blue-400', icon: Database };
+    if (step === 1) return { label: 'Committed', value: formatBytes(node.storage_committed || 0), color: zenMode ? 'text-zinc-300' : 'text-purple-400', icon: HardDrive };
     if (step === 2) {
       const score = getHealthScore(node, mostCommonVersion, medianCredits);
       return { label: 'Health Score', value: `${score}/100`, color: score > 80 ? 'text-green-400' : 'text-yellow-400', icon: Activity };
     }
-    return { label: 'Last Seen', value: node.last_seen_timestamp ? formatLastSeen(node.last_seen_timestamp) : 'Unknown', color: 'text-zinc-400', icon: Clock };
+    return { label: 'Last Seen', value: formatLastSeen(node.last_seen_timestamp), color: 'text-zinc-400', icon: Clock };
   };
 
   const handleNodeClick = (node: Node) => {
@@ -535,16 +525,16 @@ export default function Home() {
 
   const renderNodeCard = (node: Node, i: number) => {
     const cycleData = getCycleContent(node, i);
-    const isFav = favorites.includes(node.address);
-    const latest = isLatest(node.version || '0.0.0');
+    const isFav = favorites.includes(node.address || '');
+    const latest = isLatest(getSafeVersion(node));
     
     return (
       <div 
-        key={node.address} 
+        key={node.address || i} 
         onClick={() => handleNodeClick(node)}
         className={`group relative border rounded-xl p-5 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl 
         ${zenMode 
-            ? 'bg-black border-zinc-800 hover:border-white/20' 
+            ? 'bg-black border-zinc-800 hover:border-zinc-600' 
             : isFav ? 'bg-gradient-to-b from-zinc-900 to-black border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.1)]' : 'bg-gradient-to-b from-zinc-900 to-black border-zinc-800 hover:border-blue-500/50'
         }`}
       >
@@ -556,15 +546,15 @@ export default function Home() {
               <div className="flex items-center gap-2 mb-1"><div className="text-[10px] text-zinc-500 uppercase font-bold">NODE IDENTITY</div>{!node.is_public && <Shield size={10} className="text-zinc-600" />}</div>
               <div className="relative h-6 w-56">
                   <div className={`absolute inset-0 font-mono text-sm truncate transition-opacity duration-300 group-hover:opacity-0 ${zenMode ? 'text-zinc-300' : 'text-zinc-300'}`}>{(node.pubkey || '').length > 12 ? `${(node.pubkey || '').slice(0, 12)}...${(node.pubkey || '').slice(-4)}` : (node.pubkey || 'Unknown Identity')}</div>
-                  <div className="absolute inset-0 font-mono text-sm text-blue-400 truncate opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-center gap-2"><span className="text-[10px] text-zinc-500">IP:</span> {(node.address || '0.0.0.0').split(':')[0]}</div>
+                  <div className="absolute inset-0 font-mono text-sm text-blue-400 truncate opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-center gap-2"><span className="text-[10px] text-zinc-500">IP:</span> {getSafeIp(node)}</div>
               </div>
             </div>
-            <button onClick={(e) => toggleFavorite(e, node.address)} className={`p-1.5 rounded-full transition ${isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'}`}><Star size={16} fill={isFav ? "currentColor" : "none"} /></button>
+            <button onClick={(e) => toggleFavorite(e, node.address || '')} className={`p-1.5 rounded-full transition ${isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'}`}><Star size={16} fill={isFav ? "currentColor" : "none"} /></button>
         </div>
         <div className="space-y-3">
           <div className="flex justify-between items-center text-xs">
             <span className="text-zinc-500">Version</span>
-            <div className="flex items-center gap-2"><span className={`text-zinc-300 px-2 py-0.5 rounded ${zenMode ? 'bg-zinc-900 border border-zinc-800' : 'bg-zinc-800'}`}>{node.version || 'Unknown'}</span>{latest && <CheckCircle size={12} className="text-green-500" />}</div>
+            <div className="flex items-center gap-2"><span className={`text-zinc-300 px-2 py-0.5 rounded ${zenMode ? 'bg-zinc-900 border border-zinc-700' : 'bg-zinc-800'}`}>{getSafeVersion(node)}</span>{latest && <CheckCircle size={12} className="text-green-500" />}</div>
           </div>
           <div className="pt-2">
              <div className="text-[10px] text-zinc-600 uppercase font-bold mb-1 tracking-wider">Network Rewards</div>
@@ -582,21 +572,21 @@ export default function Home() {
   };
 
   const renderZenCard = (node: Node) => {
-      const latest = isLatest(node.version || '0.0.0');
+      const latest = isLatest(getSafeVersion(node));
       const health = getHealthScore(node, mostCommonVersion, medianCredits);
       
       return (
           <div 
-            key={node.address} 
+            key={node.address || node.pubkey} 
             onClick={() => handleNodeClick(node)}
-            className="group relative border border-zinc-800 bg-black/50 hover:border-zinc-600 p-4 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-lg flex flex-col justify-between"
+            className="group relative border border-zinc-800 bg-black hover:border-zinc-600 p-4 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-lg flex flex-col justify-between"
           >
               {/* HEADER */}
               <div className="flex justify-between items-start mb-4 border-b border-zinc-800 pb-3">
                   <div>
                       <div className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-1">NODE ID</div>
                       <div className="font-mono text-sm text-zinc-300 truncate w-32 md:w-48">{node.pubkey || 'Unknown'}</div>
-                      <div className="text-[10px] text-zinc-600 font-mono mt-0.5">{(node.address || '0.0.0.0').split(':')[0]}</div>
+                      <div className="text-[10px] text-zinc-600 font-mono mt-0.5">{getSafeIp(node)}</div>
                   </div>
                   <div className={`text-xl font-bold ${health >= 80 ? 'text-green-500' : health >= 50 ? 'text-yellow-500' : 'text-red-500'}`}>{health}</div>
               </div>
@@ -614,7 +604,7 @@ export default function Home() {
                   </div>
                   <div>
                       <div className="text-[9px] text-zinc-600 uppercase font-bold mb-1">Version</div>
-                      <div className="font-mono text-zinc-300 flex items-center gap-2">{node.version} {latest && <CheckCircle size={10} className="text-green-500"/>}</div>
+                      <div className="font-mono text-zinc-300 flex items-center gap-2">{getSafeVersion(node)} {latest && <CheckCircle size={10} className="text-green-500"/>}</div>
                   </div>
                   <div>
                       <div className="text-[9px] text-zinc-600 uppercase font-bold mb-1">Rank</div>
@@ -646,7 +636,6 @@ export default function Home() {
   
   const renderHealthBreakdown = () => {
       const stats = calculateVitalityMetrics(selectedNode, mostCommonVersion, medianCredits);
-      // Mock percentile calculation for visual (in real app, sort `nodes` and find index)
       const healthPercentile = Math.round((stats.total / 100) * 100); 
       
       return (
@@ -919,18 +908,24 @@ export default function Home() {
                   <div className={`p-6 border-b flex justify-between items-start ${zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
                       <div className="flex items-center gap-4">
                           <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-lg border border-white/10 ${zenMode ? 'bg-zinc-900 text-white border-zinc-700' : 'bg-gradient-to-br from-blue-600 to-purple-600 text-white'}`}>
-                              {selectedNode.pubkey.slice(0, 2)}
+                              {selectedNode.pubkey?.slice(0, 2) || '??'}
                           </div>
                           <div>
                               <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-2 mb-1">
                                   NODE INSPECTOR 
+                                  <HelpCircle size={12} className="cursor-help hover:text-white transition" onClick={(e) => toggleTooltip(e, 'modal_header')} />
                                   <span className={`px-2 py-0.5 rounded text-[9px] ${selectedNode.is_public ? 'bg-green-500/10 text-green-500' : 'bg-orange-500/10 text-orange-500'}`}>
                                       {selectedNode.is_public ? 'POLICY: OPEN' : 'POLICY: RESTRICTED'}
                                   </span>
                               </div>
+                              {activeTooltip === 'modal_header' && (
+                                  <div className="absolute z-50 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 mt-1 animate-in fade-in shadow-xl w-64">
+                                      Use the buttons below to interact with this node. 'Open Policy' means the node accepts public storage deals.
+                                  </div>
+                              )}
                               <h2 className={`text-lg md:text-xl font-mono truncate w-64 md:w-96 flex items-center gap-2 ${zenMode ? 'text-zinc-200' : 'text-white'}`}>
-                                  {selectedNode.pubkey}
-                                  <Copy size={14} className="text-zinc-600 hover:text-white cursor-pointer" onClick={() => copyToClipboard(selectedNode.pubkey, 'pubkey')} />
+                                  {selectedNode.pubkey || 'Unknown Pubkey'}
+                                  <Copy size={14} className="text-zinc-600 hover:text-white cursor-pointer" onClick={() => copyToClipboard(selectedNode.pubkey || '', 'pubkey')} />
                               </h2>
                           </div>
                       </div>
@@ -952,7 +947,7 @@ export default function Home() {
                                   {/* LEFT: CURRENT */}
                                   <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl text-center">
                                       <div className="text-xs text-blue-400 font-bold mb-1">CHAMPION</div>
-                                      <div className="font-mono text-sm text-white truncate">{(selectedNode.address || '0.0.0.0').split(':')[0]}</div>
+                                      <div className="font-mono text-sm text-white truncate">{getSafeIp(selectedNode)}</div>
                                   </div>
                                   
                                   {/* RIGHT: RIVAL (Selector) */}
@@ -967,14 +962,14 @@ export default function Home() {
                                                 onChange={(e) => setCompareTarget(nodes.find(n => n.pubkey === e.target.value) || null)}
                                               >
                                                   <option value="">Select a node...</option>
-                                                  {nodes.slice(0, 50).map(n => <option key={n.pubkey} value={n.pubkey}>{(n.address || '0.0.0.0').split(':')[0]} ({n.rank ? `#${n.rank}` : 'Unranked'})</option>)}
+                                                  {nodes.slice(0, 50).map(n => <option key={n.pubkey} value={n.pubkey}>{getSafeIp(n)} ({n.rank ? `#${n.rank}` : 'Unranked'})</option>)}
                                               </select>
                                           </div>
                                       ) : (
                                           <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-xl text-center relative group">
                                               <button onClick={() => setCompareTarget(null)} className="absolute top-2 right-2 text-zinc-600 hover:text-red-500 bg-black/50 rounded-full p-1"><X size={12}/></button>
                                               <div className="text-xs text-red-400 font-bold mb-1">CHALLENGER</div>
-                                              <div className="font-mono text-sm text-white truncate">{(compareTarget.address || '0.0.0.0').split(':')[0]}</div>
+                                              <div className="font-mono text-sm text-white truncate">{getSafeIp(compareTarget)}</div>
                                           </div>
                                       )}
                                   </div>
@@ -1000,7 +995,7 @@ export default function Home() {
                                           <Activity size={40} className="text-blue-500" />
                                       </div>
                                       <h2 className="text-2xl font-extrabold text-white mb-2 tracking-tight">NODE REPORT</h2>
-                                      <p className="font-mono text-xs text-zinc-500 mb-8 bg-zinc-900 px-3 py-1 rounded-full inline-block border border-zinc-800">{(selectedNode.address || '0.0.0.0').split(':')[0]}</p>
+                                      <p className="font-mono text-xs text-zinc-500 mb-8 bg-zinc-900 px-3 py-1 rounded-full inline-block border border-zinc-800">{getSafeIp(selectedNode)}</p>
                                       
                                       <div className="grid grid-cols-2 gap-4 mb-8">
                                           <div className="bg-zinc-900/80 p-4 rounded-xl border border-zinc-800">
@@ -1035,9 +1030,9 @@ export default function Home() {
                                   <RadialProgress score={getHealthScore(selectedNode, mostCommonVersion, medianCredits)} size={180} />
                                   <div className="mt-8 text-center w-full">
                                       <div className="text-[10px] text-zinc-500 font-bold uppercase mb-2 tracking-wider group-hover:text-blue-400 transition">Click for Breakdown</div>
-                                      <div className={`py-2 px-4 rounded-xl border text-xs font-bold inline-block ${selectedNode.uptime > 86400 ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                                      <div className={`py-2 px-4 rounded-xl border text-xs font-bold inline-block ${(selectedNode.uptime || 0) > 86400 ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
                                           <span className="group relative">
-                                              {selectedNode.uptime > 86400 ? 'ONLINE & STABLE' : 'UNSTABLE / SYNCING'}
+                                              {(selectedNode.uptime || 0) > 86400 ? 'ONLINE & STABLE' : 'UNSTABLE / SYNCING'}
                                               <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-black px-2 py-1 rounded border border-zinc-700 text-[9px] text-zinc-300 whitespace-nowrap">
                                                   Last seen {formatDetailedTimestamp(selectedNode.last_seen_timestamp)}
                                               </span>
@@ -1053,10 +1048,15 @@ export default function Home() {
                                       <div className="grid grid-cols-2 gap-4 h-full">
                                           {/* STORAGE CARD (Interactive) */}
                                           <div 
-                                            className={`p-5 rounded-2xl border flex flex-col justify-between cursor-pointer transition group ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'}`}
+                                            className={`p-5 rounded-2xl border flex flex-col justify-between cursor-pointer transition group relative ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'}`}
                                             onClick={() => setModalView('storage')}
                                           >
-                                              <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase group-hover:text-blue-400"><Database size={14}/> Storage <ChevronRight size={12} className="opacity-0 group-hover:opacity-100 transition"/></div>
+                                              <div className="flex items-center justify-between text-zinc-500 text-xs font-bold uppercase group-hover:text-blue-400 mb-2">
+                                                  <span className="flex items-center gap-2"><Database size={14}/> Storage</span>
+                                                  <HelpCircle size={10} className="cursor-help hover:text-white" onClick={(e) => toggleTooltip(e, 'card_storage')} />
+                                              </div>
+                                              {activeTooltip === 'card_storage' && <div className="absolute z-10 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-10 left-4 w-40 animate-in fade-in">Click to compare your storage vs the network median.</div>}
+                                              
                                               <div>
                                                   <div className={`text-2xl font-mono tracking-tight ${zenMode ? 'text-white' : 'text-white'}`}>{formatBytes(selectedNode.storage_used)}</div>
                                                   <div className="h-1.5 bg-zinc-800 mt-3 rounded-full overflow-hidden"><div className={`h-full ${zenMode ? 'bg-zinc-500' : 'bg-blue-500'}`} style={{ width: selectedNode.storage_usage_percentage }}></div></div>
@@ -1067,7 +1067,12 @@ export default function Home() {
                                           <Link href="/leaderboard">
                                               <div className={`h-full p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden animate-[pulse_4s_infinite] ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.1)]'}`}>
                                                   <div className="absolute top-0 right-0 p-8 bg-yellow-500/5 blur-xl rounded-full group-hover:bg-yellow-500/10 transition"></div>
-                                                  <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase"><Trophy size={14}/> Rank</div>
+                                                  <div className="flex items-center justify-between text-zinc-500 text-xs font-bold uppercase mb-2">
+                                                      <span className="flex items-center gap-2"><Trophy size={14}/> Rank</span>
+                                                      <HelpCircle size={10} className="cursor-help hover:text-white z-20" onClick={(e) => toggleTooltip(e, 'card_rank')} />
+                                                  </div>
+                                                  {activeTooltip === 'card_rank' && <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-10 left-4 w-40 animate-in fade-in">Your rank is based on reputation credits earned.</div>}
+                                                  
                                                   <div className={`text-3xl font-mono font-bold ${zenMode ? 'text-yellow-600' : 'text-yellow-500'}`}>#{selectedNode.rank || 'N/A'}</div>
                                                   <div className="text-xs text-zinc-400 font-mono mt-1">{selectedNode.credits ? `${(selectedNode.credits / 1000).toFixed(1)}k Credits` : '0 Credits'}</div>
                                                   <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-0 translate-x-2 text-yellow-500"><ChevronRight size={16}/></div>
@@ -1075,19 +1080,29 @@ export default function Home() {
                                           </Link>
 
                                           {/* LOCATION CARD (Interactive) */}
-                                          <Link href={`/map?focus=${(selectedNode.address || '0.0.0.0').split(':')[0]}`}>
+                                          <Link href={`/map?focus=${getSafeIp(selectedNode)}`}>
                                               <div className={`h-full p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden animate-[pulse_5s_infinite] ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]'}`}>
                                                   <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition"></div>
-                                                  <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase"><Globe size={14}/> Location</div>
-                                                  <div className={`text-lg font-mono truncate opacity-80 ${zenMode ? 'text-zinc-300' : 'text-white'}`}>{(selectedNode.address || '0.0.0.0').split(':')[0]}</div>
+                                                  <div className="flex items-center justify-between text-zinc-500 text-xs font-bold uppercase mb-2">
+                                                      <span className="flex items-center gap-2"><Globe size={14}/> Location</span>
+                                                      <HelpCircle size={10} className="cursor-help hover:text-white z-20" onClick={(e) => toggleTooltip(e, 'card_loc')} />
+                                                  </div>
+                                                  {activeTooltip === 'card_loc' && <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-10 left-4 w-40 animate-in fade-in">Approximate physical location based on IP triangulation.</div>}
+                                                  
+                                                  <div className={`text-lg font-mono truncate opacity-80 ${zenMode ? 'text-zinc-300' : 'text-white'}`}>{getSafeIp(selectedNode)}</div>
                                                   <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-0 translate-x-2 text-blue-400"><MapIcon size={16}/></div>
                                               </div>
                                           </Link>
 
                                           {/* VERSION CARD */}
-                                          <div className={`p-5 rounded-2xl border ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
-                                              <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase"><Server size={14}/> Version</div>
-                                              <div className={`text-xl font-mono ${zenMode ? 'text-white' : 'text-white'}`}>{selectedNode.version}</div>
+                                          <div className={`p-5 rounded-2xl border relative ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
+                                              <div className="flex items-center justify-between text-zinc-500 text-xs font-bold uppercase mb-2">
+                                                  <span className="flex items-center gap-2"><Server size={14}/> Version</span>
+                                                  <HelpCircle size={10} className="cursor-help hover:text-white" onClick={(e) => toggleTooltip(e, 'card_ver')} />
+                                              </div>
+                                              {activeTooltip === 'card_ver' && <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-10 left-4 w-40 animate-in fade-in">Ensure your node runs the latest software to maximize rewards.</div>}
+                                              
+                                              <div className={`text-xl font-mono ${zenMode ? 'text-white' : 'text-white'}`}>{getSafeVersion(selectedNode)}</div>
                                               <div className="text-[10px] text-green-500 mt-1 font-bold bg-green-500/10 inline-block px-2 py-0.5 rounded">LATEST</div>
                                           </div>
                                       </div>
