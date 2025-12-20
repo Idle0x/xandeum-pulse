@@ -52,7 +52,6 @@ const formatLastSeen = (timestamp: number | undefined) => {
   const now = Date.now();
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
   const diff = now - time;
-  if (diff < 1000) return 'Just now';
   if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`; 
   const mins = Math.floor(diff / 60000);
   if (mins < 60) return `${mins}m ago`;
@@ -72,38 +71,74 @@ const formatDetailedTimestamp = (timestamp: number | undefined) => {
 };
 
 const compareVersions = (v1: string = '0.0.0', v2: string = '0.0.0') => {
-  const p1 = v1.split('.').map(Number);
-  const p2 = v2.split('.').map(Number);
-  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
-    const n1 = p1[i] || 0; const n2 = p2[i] || 0;
-    if (n1 > n2) return 1; if (n1 < n2) return -1;
+  const s1 = v1 || '0.0.0';
+  const s2 = v2 || '0.0.0';
+  const parts1 = s1.split('.').map(Number);
+  const parts2 = s2.split('.').map(Number);
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const num1 = parts1[i] || 0;
+    const num2 = parts2[i] || 0;
+    if (num1 > num2) return 1;
+    if (num1 < num2) return -1;
   }
   return 0;
 };
 
-// --- VITALITY LOGIC ---
+// --- RESTORED COMPLEX HEALTH ALGORITHM ---
 const calculateVitalityMetrics = (node: Node | null, consensusVersion: string, medianCredits: number) => {
   if (!node) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, capacity: 0 } };
 
   const storageGB = (node.storage_committed || 0) / (1024 ** 3);
-  
+  if (storageGB <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, capacity: 0 } };
+
+  // 1. Tiered Uptime Scoring
   let uptimeScore = 0;
   const days = (node.uptime || 0) / 86400;
   if (days >= 30) uptimeScore = 100;
-  else uptimeScore = (days / 30) * 100;
+  else if (days >= 7) uptimeScore = 70 + (days - 7) * (30 / 23);
+  else if (days >= 1) uptimeScore = 40 + (days - 1) * (30 / 6);
+  else uptimeScore = days * 40;
 
+  // 2. Version Consensus Scoring
   let versionScore = 100;
-  if (consensusVersion !== 'N/A' && compareVersions(node.version, consensusVersion) < 0) versionScore = 50;
+  const nodeVer = node.version || '0.0.0';
+  if (consensusVersion !== 'N/A' && compareVersions(nodeVer, consensusVersion) < 0) {
+      const parts1 = nodeVer.split('.').map(Number);
+      const parts2 = consensusVersion.split('.').map(Number);
+      const majorDiff = (parts2[0] || 0) - (parts1[0] || 0);
+      const minorDiff = (parts2[1] || 0) - (parts1[1] || 0);
+      if (majorDiff > 0) versionScore = 30; 
+      else if (minorDiff > 2) versionScore = 60; 
+      else versionScore = 80; 
+  }
 
+  // 3. Reputation Scoring (Relative to Median)
   let reputationScore = 50; 
-  if (medianCredits > 0) reputationScore = Math.min(100, ((node.credits || 0) / medianCredits) * 75);
+  const credits = node.credits || 0;
+  if (medianCredits > 0 && credits > 0) {
+      const ratio = credits / medianCredits;
+      if (ratio >= 2) reputationScore = 100;
+      else if (ratio >= 1) reputationScore = 75 + (ratio - 1) * 25;
+      else if (ratio >= 0.5) reputationScore = 50 + (ratio - 0.5) * 50;
+      else if (ratio >= 0.1) reputationScore = 25 + (ratio - 0.1) * 62.5;
+      else reputationScore = ratio * 250;
+  } else if (credits === 0) {
+      reputationScore = 0; 
+  } else if (medianCredits === 0 && credits > 0) {
+      reputationScore = 100; 
+  }
 
-  let capacityScore = Math.min(100, (storageGB / 1000) * 100); 
+  // 4. Capacity Scoring
+  let capacityScore = 0;
+  if (storageGB >= 1000) capacityScore = 100; 
+  else if (storageGB >= 100) capacityScore = 70 + (storageGB - 100) * (30 / 900);
+  else if (storageGB >= 10) capacityScore = 40 + (storageGB - 10) * (30 / 90);
+  else capacityScore = storageGB * 4;
 
-  const total = Math.round((uptimeScore * 0.3) + (versionScore * 0.2) + (reputationScore * 0.25) + (capacityScore * 0.25));
+  const finalScore = (uptimeScore * 0.30) + (versionScore * 0.20) + (reputationScore * 0.25) + (capacityScore * 0.25);
   
   return {
-      total: Math.max(0, Math.min(100, total)),
+      total: Math.round(Math.max(0, Math.min(100, finalScore))),
       breakdown: {
           uptime: Math.round(uptimeScore),
           version: Math.round(versionScore),
@@ -398,6 +433,7 @@ export default function Home() {
                 if (n.version === topVersion) consensusCount++;
             });
 
+            // Re-assign medCreds to medianCredits for scope
             const medCreds = medianCredits; // Handled by state
 
             setAvgNetworkHealth(Math.round(sumHealth / mergedList.length));
@@ -466,7 +502,6 @@ export default function Home() {
       setCompareTarget(null);
   };
 
-  // --- RESTORED RENDER CARD FUNCTION ---
   const renderNodeCard = (node: Node, i: number) => {
     const cycleData = getCycleContent(node, i);
     const isFav = favorites.includes(node.address);
@@ -597,6 +632,21 @@ export default function Home() {
                         <Zap size={18} className={loading ? "animate-spin" : ""} />
                     </button>
                     <div className="h-6 w-px bg-zinc-800 mx-1"></div>
+                    
+                    {/* RESTORED SORT ARROWS IN FILTERS */}
+                    {[
+                        { id: 'uptime', icon: Clock, label: 'UPTIME' },
+                        { id: 'storage', icon: Database, label: 'STORAGE' },
+                        { id: 'version', icon: Server, label: 'VERSION' },
+                        { id: 'health', icon: HeartPulse, label: 'HEALTH' } 
+                    ].map((opt) => (
+                        <button key={opt.id} onClick={() => { if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); else setSortBy(opt.id as any); }} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${sortBy === opt.id ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
+                            <opt.icon size={14} /> {opt.label}
+                            {sortBy === opt.id && (sortOrder === 'asc' ? <ArrowUp size={12} className="ml-1" /> : <ArrowDown size={12} className="ml-1" />)}
+                        </button>
+                    ))}
+
+                    <div className="h-6 w-px bg-zinc-800 mx-1"></div>
                     <button 
                         onClick={() => setWarRoom(true)} 
                         className="p-2 bg-red-900/10 border border-red-500/20 text-red-500 rounded-lg hover:bg-red-900/30 hover:text-red-400 transition flex items-center gap-2 group"
@@ -620,7 +670,7 @@ export default function Home() {
 
       <main className={`p-4 md:p-8 ${warRoom ? 'max-w-full' : 'max-w-7xl mx-auto'}`}>
           
-          {/* NETWORK VITALS (Hidden in War Room to maximize grid) */}
+          {/* NETWORK VITALS (RESTORED CONSENSUS METRIC) */}
           {!warRoom && !loading && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
@@ -630,9 +680,10 @@ export default function Home() {
                 <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm relative overflow-hidden">
                     <div className="relative z-10">
                         <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1"><HeartPulse size={12} className="text-green-500" /> Network Vitals</div>
-                        <div className="mt-1 flex justify-between items-end">
-                            <span className="text-2xl font-bold text-white">{networkHealth}%</span>
-                            <span className="text-xs text-green-400 font-mono mb-1">{avgNetworkHealth}/100 Score</span>
+                        <div className="space-y-1 mt-1">
+                            <div className="flex justify-between text-xs"><span className="text-zinc-400">Stability</span><span className="font-mono font-bold text-white">{networkHealth}%</span></div>
+                            <div className="flex justify-between text-xs"><span className="text-zinc-400">Avg Health</span><span className="font-mono font-bold text-green-400">{avgNetworkHealth}/100</span></div>
+                            <div className="flex justify-between text-xs"><span className="text-zinc-400">Consensus</span><span className="font-mono font-bold text-blue-400">{networkConsensus.toFixed(1)}%</span></div>
                         </div>
                     </div>
                 </div>
@@ -667,7 +718,6 @@ export default function Home() {
           {loading && nodes.length === 0 ? <PulseGraphLoader /> : (
               <div className={`grid gap-4 ${warRoom ? 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'} pb-20`}>
                   {filteredNodes.slice(0, warRoom ? 500 : 50).map((node, i) => {
-                      const cycle = getCycleContent(node, i);
                       return renderNodeCard(node, i);
                   })}
               </div>
