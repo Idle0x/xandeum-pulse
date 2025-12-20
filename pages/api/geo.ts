@@ -30,7 +30,6 @@ function addToCache(ip: string, data: any) {
 
 // --- HELPERS ---
 const compareVersions = (v1: string, v2: string) => {
-  // Defensive: Ensure strings
   const s1 = v1 || '0.0.0';
   const s2 = v2 || '0.0.0';
   const p1 = s1.replace(/[^0-9.]/g, '').split('.').map(Number);
@@ -152,7 +151,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       axios.get('https://podcredits.xandeum.network/api/pods-credits').catch(() => ({ data: {} }))
     ]);
 
-    // Network Metrics
     const versionCounts: Record<string, number> = {};
     pods.forEach((p: any) => {
         const v = p.version || '0.0.0';
@@ -194,7 +192,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const version = node.version || '0.0.0';
         const health = calculateVitalityScore(storageGB, uptime, version, consensusVersion, credits, medianCredits);
 
-        // Precise Stats Counting for X-Ray
         const isStable = health >= 75;
         const isCritical = health < 50;
 
@@ -206,6 +203,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             existing.healthSum += health;
             if (isStable) existing.stableCount += 1;
             if (isCritical) existing.criticalCount += 1;
+            existing.ips.push(ip); // ADD IP TO COLLECTION
         } else {
             cityMap.set(key, {
                 lat: geo.lat,
@@ -217,7 +215,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 totalCredits: credits,
                 healthSum: health,
                 stableCount: isStable ? 1 : 0,
-                criticalCount: isCritical ? 1 : 0
+                criticalCount: isCritical ? 1 : 0,
+                ips: [ip] // INIT IP COLLECTION
             });
         }
       }
