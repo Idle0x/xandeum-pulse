@@ -7,6 +7,8 @@
 
 Real-time network monitor, geographic visualizer, and analytics dashboard for the Xandeum gossip protocol.
 
+![Xandeum Pulse Dashboard](PLACE_IMAGE_LINK_HERE)
+
 **⚡ Live Demo:** [https://xandeum-pulse.vercel.app](https://xandeum-pulse.vercel.app)
 
 > **Optional Note:** This project implements a custom **"Vitality Score" algorithm**, **RPC failover protection**, and a **3D geospatial engine** to provide deep analytics on network health.
