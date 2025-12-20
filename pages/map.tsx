@@ -4,7 +4,7 @@ import Link from 'next/link';
 import axios from 'axios';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleSqrt } from 'd3-scale';
-import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Info, X, Server, Layers, TrendingUp, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Info, X, Server, Layers, TrendingUp } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -20,8 +20,17 @@ interface MapStats {
 
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
+// MAP LEGEND COLORS (The Data Tiers)
 // Gold, Pink, Purple, Blue, Cyan
 const TIER_COLORS = ["#f59e0b", "#ec4899", "#a855f7", "#3b82f6", "#22d3ee"]; 
+
+// UI BRANDING COLORS (The Interface Modes)
+// Indigo (Storage), Emerald (Health), Orange (Credits) - Distinct from Tiers
+const MODE_COLORS = {
+    STORAGE: { hex: '#6366f1', tailwind: 'text-indigo-500', bg: 'bg-indigo-600', border: 'border-indigo-500/50' },
+    HEALTH:  { hex: '#10b981', tailwind: 'text-emerald-500', bg: 'bg-emerald-600', border: 'border-emerald-500/50' },
+    CREDITS: { hex: '#f97316', tailwind: 'text-orange-500', bg: 'bg-orange-600', border: 'border-orange-500/50' }
+};
 
 const TIER_LABELS = {
     STORAGE: ['Massive Hub', 'Major Zone', 'Standard', 'Entry Level', 'Micro Node'],
@@ -29,7 +38,6 @@ const TIER_LABELS = {
     HEALTH:  ['Flawless', 'Robust', 'Fair', 'Shaky', 'Critical']
 };
 
-// Fixed thresholds for Health (Quality is absolute)
 const HEALTH_THRESHOLDS = [90, 75, 60, 40];
 
 export default function MapPage() {
@@ -46,8 +54,7 @@ export default function MapPage() {
   const [copiedCoords, setCopiedCoords] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // --- DYNAMIC THRESHOLD STATE ---
-  // We store the calculated cutoff values for the active view mode here
+  // Dynamic Thresholds for Percentile Calculation
   const [dynamicThresholds, setDynamicThresholds] = useState<number[]>([0, 0, 0, 0]);
 
   useEffect(() => {
@@ -65,21 +72,17 @@ export default function MapPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // --- DYNAMIC TIER CALCULATION ---
-  // Recalculate percentiles whenever data or view mode changes
+  // Recalculate percentiles
   useEffect(() => {
       if (locations.length === 0) return;
 
       if (viewMode === 'HEALTH') {
-          // Health uses fixed standards, not relative curves
           setDynamicThresholds(HEALTH_THRESHOLDS);
           return;
       }
 
-      // 1. Extract values based on mode
       const values = locations.map(l => viewMode === 'STORAGE' ? l.totalStorage : l.totalCredits).sort((a, b) => a - b);
       
-      // 2. Helper for percentiles
       const getQuantile = (q: number) => {
           const pos = (values.length - 1) * q;
           const base = Math.floor(pos);
@@ -91,11 +94,6 @@ export default function MapPage() {
           }
       };
 
-      // 3. Calculate Top 10%, Top 25%, Top 50%, Top 75% cutoffs
-      // Tier 0 (Gold) > 90th percentile
-      // Tier 1 (Pink) > 75th percentile
-      // Tier 2 (Purple) > 50th percentile
-      // Tier 3 (Blue) > 25th percentile
       setDynamicThresholds([
           getQuantile(0.90),
           getQuantile(0.75),
@@ -113,7 +111,6 @@ export default function MapPage() {
     else if (viewMode === 'CREDITS') val = loc.totalCredits;
     else val = loc.avgHealth;
 
-    // Compare against the calculated thresholds
     if (val >= dynamicThresholds[0]) return 0; // Gold
     if (val >= dynamicThresholds[1]) return 1; // Pink
     if (val >= dynamicThresholds[2]) return 2; // Purple
@@ -121,18 +118,26 @@ export default function MapPage() {
     return 4; // Cyan
   };
 
-  // Helper to format legend text dynamically
+  const formatStorage = (gb: number) => {
+    if (gb >= 1000) return `${(gb / 1024).toFixed(1)} TB`;
+    return `${Math.round(gb)} GB`;
+  };
+
+  const formatCredits = (cr: number) => {
+      if (cr >= 1000000) return `${(cr/1000000).toFixed(1)}M`;
+      if (cr >= 1000) return `${(cr/1000).toFixed(0)}k`;
+      return cr.toString();
+  };
+
   const getLegendLabels = () => {
       if (viewMode === 'HEALTH') return ['> 90%', '75-90%', '60-75%', '40-60%', '< 40%'];
-      
-      const format = (v: number) => viewMode === 'STORAGE' ? formatStorage(v) : `${Math.round(v/1000)}k`;
-      
+      const format = (v: number) => viewMode === 'STORAGE' ? formatStorage(v) : formatCredits(v);
       return [
-          `> ${format(dynamicThresholds[0])}`, // Gold
-          `${format(dynamicThresholds[1])} - ${format(dynamicThresholds[0])}`, // Pink
-          `${format(dynamicThresholds[2])} - ${format(dynamicThresholds[1])}`, // Purple
-          `${format(dynamicThresholds[3])} - ${format(dynamicThresholds[2])}`, // Blue
-          `< ${format(dynamicThresholds[3])}`  // Cyan
+          `> ${format(dynamicThresholds[0])}`,
+          `${format(dynamicThresholds[1])} - ${format(dynamicThresholds[0])}`,
+          `${format(dynamicThresholds[2])} - ${format(dynamicThresholds[1])}`,
+          `${format(dynamicThresholds[3])} - ${format(dynamicThresholds[2])}`,
+          `< ${format(dynamicThresholds[3])}`
       ];
   };
 
@@ -154,8 +159,11 @@ export default function MapPage() {
   };
 
   const toggleExpansion = (name: string, lat: number, lon: number) => {
-      if (expandedLocation === name) resetView();
-      else lockTarget(name, lat, lon);
+      if (expandedLocation === name) {
+          resetView();
+      } else {
+          lockTarget(name, lat, lon);
+      }
   };
 
   const resetView = () => {
@@ -180,11 +188,6 @@ export default function MapPage() {
     return scaleSqrt().domain([0, maxVal]).range([5, 12]);
   }, [locations]);
 
-  const formatStorage = (gb: number) => {
-    if (gb >= 1000) return `${(gb / 1024).toFixed(1)} TB`;
-    return `${Math.round(gb)} GB`;
-  };
-
   const getMetricText = (loc: LocationData) => {
     switch (viewMode) {
         case 'STORAGE': return formatStorage(loc.totalStorage);
@@ -193,11 +196,15 @@ export default function MapPage() {
     }
   };
 
-  // --- 3-COLUMN X-RAY STATS ---
+  // --- X-RAY STATS (With Precise Percentiles) ---
   const getXRayStats = (loc: LocationData, index: number) => {
       const globalShare = ((loc.count / stats.totalNodes) * 100).toFixed(1);
-      const percentile = Math.round(((locations.length - index) / locations.length) * 100);
-      const rankText = `Top ${100 - percentile}%`;
+      
+      // Precise Percentile Logic
+      const rawPercentile = ((locations.length - index) / locations.length) * 100;
+      const topPercent = 100 - rawPercentile;
+      let rankText = `Top ${topPercent.toFixed(2)}%`;
+      if (topPercent < 0.01) rankText = "Top < 0.01%";
 
       if (viewMode === 'STORAGE') {
           const avgPerNode = loc.totalStorage / loc.count;
@@ -251,10 +258,12 @@ export default function MapPage() {
     if (loading) return "Calibrating Global Sensors...";
     if (!leadingRegion) return "Waiting for Node Telemetry...";
     const { country } = leadingRegion;
+    const colorClass = MODE_COLORS[viewMode].tailwind; // Unified Header Color
+
     switch (viewMode) {
-        case 'STORAGE': return <><span className="text-blue-400">{country}</span> Leads Storage Capacity</>;
-        case 'CREDITS': return <><span className="text-yellow-400">{country}</span> Tops Network Earnings</>;
-        case 'HEALTH': return <><span className="text-green-400">{country}</span> Sets Vitality Standard</>;
+        case 'STORAGE': return <><span className={colorClass}>{country}</span> Leads Storage Capacity</>;
+        case 'CREDITS': return <><span className={colorClass}>{country}</span> Tops Network Earnings</>;
+        case 'HEALTH': return <><span className={colorClass}>{country}</span> Sets Vitality Standard</>;
     }
   };
 
@@ -290,12 +299,14 @@ export default function MapPage() {
             if (mode === 'HEALTH') Icon = Activity;
             if (mode === 'CREDITS') Icon = Zap;
             const active = viewMode === mode;
+            const activeColorBg = MODE_COLORS[mode].bg;
+            
             return (
                 <button
                     key={mode}
                     onClick={(e) => { e.stopPropagation(); setViewMode(mode); }}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
-                        active ? 'bg-blue-600 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
+                        active ? `${activeColorBg} text-white shadow-md` : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
                     }`}
                 >
                     <Icon size={14} className={active ? "text-white" : "text-zinc-500"} />
@@ -321,7 +332,8 @@ export default function MapPage() {
                 <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-300">Dashboard</span>
             </Link>
             <div className="flex items-center gap-2">
-                <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${viewMode === 'HEALTH' ? 'bg-green-500' : viewMode === 'CREDITS' ? 'bg-yellow-500' : 'bg-blue-500'}`}></div>
+                {/* Unified Indicator Color */}
+                <div className={`w-1.5 h-1.5 rounded-full animate-pulse`} style={{ backgroundColor: MODE_COLORS[viewMode].hex }}></div>
                 <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{viewMode} Mode</span>
             </div>
         </div>
@@ -375,14 +387,12 @@ export default function MapPage() {
 
       <div className={`shrink-0 bg-[#09090b] relative z-50 flex flex-col ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
             
-            {/* DYNAMIC LEGEND (Visible when closed) */}
             <div className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4 ${isSplitView ? 'hidden' : 'flex'}`}>
                 <div className="w-full md:w-auto flex justify-center md:justify-start"><ViewToggles /></div>
                 <div className="w-full md:w-auto bg-zinc-900/30 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3">
                     <div className="flex flex-col gap-2 max-w-xl">
                         <div className="flex items-start gap-2"><Info size={12} className="text-blue-400 mt-0.5 shrink-0" /><p className="text-[10px] text-zinc-400 leading-tight"><strong className="text-zinc-200">{getLegendContext()}</strong> {viewMode === 'STORAGE' || viewMode === 'CREDITS' ? "Thresholds are dynamic (percentile-based)." : "Thresholds are fixed."}</p></div>
                     </div>
-                    {/* DYNAMIC LABELS */}
                     <div className="grid grid-cols-3 md:grid-cols-5 gap-3 w-full">
                         {getLegendLabels().map((label, idx) => (
                             <div key={idx} className="flex flex-col items-center gap-1.5"><div className="w-8 h-1.5 rounded-full" style={{ backgroundColor: TIER_COLORS[idx] }}></div><span className="text-[9px] font-mono text-zinc-500 font-bold whitespace-nowrap">{label}</span></div>
@@ -391,7 +401,6 @@ export default function MapPage() {
                 </div>
             </div>
 
-            {/* LIVE LIST (Visible when open) */}
             <div className={`flex flex-col h-full overflow-hidden ${isSplitView ? 'flex' : 'hidden'}`}>
                  <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-zinc-800/30 bg-[#09090b]">
                     <div className="flex items-center gap-3"><h2 className="text-sm font-bold text-white flex items-center gap-2"><Activity size={14} className="text-green-500" /> Live Data</h2><div className="hidden md:block scale-90 origin-left"><ViewToggles /></div></div>
@@ -428,16 +437,13 @@ export default function MapPage() {
                                     </div>
                                 </div>
 
-                                {/* 3-COLUMN X-RAY (CENTERED BADGE) */}
                                 {isExpanded && (
                                     <div className="bg-black/30 border-t border-white/5 p-4 animate-in slide-in-from-top-2 duration-300">
-                                        {/* CENTERED BADGE */}
                                         <div className="flex justify-center items-center mb-4">
                                             <div className="text-[10px] md:text-sm font-bold uppercase tracking-widest px-3 py-1 rounded border bg-black/50" style={{ color: tierColor, borderColor: `${tierColor}40` }}>
                                                 {TIER_LABELS[viewMode][tier]} TIER
                                             </div>
                                         </div>
-                                        {/* 3 COLUMNS */}
                                         <div className="grid grid-cols-3 gap-2 text-xs md:text-sm text-center">
                                             <div className="flex flex-col items-center">
                                                 <div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1">{xray.labelA}</div>
@@ -449,10 +455,9 @@ export default function MapPage() {
                                             </div>
                                             <div className="flex flex-col items-center border-l border-zinc-800/50">
                                                 <div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1">{xray.labelC}</div>
-                                                <div className="text-yellow-500 font-mono font-bold">{xray.valC}</div>
+                                                <div className="text-white font-mono font-bold">{xray.valC}</div>
                                             </div>
                                         </div>
-                                        {/* Progress Bar */}
                                         <div className="w-full h-1 bg-zinc-800 rounded-full mt-4 overflow-hidden">
                                             <div className="h-full bg-white/20" style={{ width: `${(loc.count / stats.totalNodes) * 100}%` }}></div>
                                         </div>
