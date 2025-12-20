@@ -8,7 +8,7 @@ import {
   HardDrive, Star, Copy, Check, CheckCircle, Globe, AlertTriangle, ArrowUp, 
   ArrowDown, Wallet, Medal, Twitter, Code, Info, ExternalLink, HelpCircle, 
   ChevronRight, Maximize2, Map as MapIcon, BookOpen, Menu, LayoutDashboard, 
-  HeartPulse, Swords, Share2, Monitor, ArrowLeftRight, Camera 
+  HeartPulse, Swords, Share2, Monitor, ArrowLeftRight, Camera, BarChart2, ChevronLeft 
 } from 'lucide-react';
 
 // --- TYPES ---
@@ -52,6 +52,7 @@ const formatLastSeen = (timestamp: number | undefined) => {
   const now = Date.now();
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
   const diff = now - time;
+  if (diff < 1000) return 'Just now';
   if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`; 
   const mins = Math.floor(diff / 60000);
   if (mins < 60) return `${mins}m ago`;
@@ -238,6 +239,7 @@ export default function Home() {
   const [compareMode, setCompareMode] = useState(false);
   const [compareTarget, setCompareTarget] = useState<Node | null>(null);
   const [shareMode, setShareMode] = useState(false);
+  const [modalView, setModalView] = useState<'overview' | 'health' | 'storage'>('overview'); // NEW: Drill-down state
   
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null); 
@@ -287,7 +289,10 @@ export default function Home() {
     if (!loading && nodes.length > 0 && router.query.open) {
         const pubkeyToOpen = router.query.open as string;
         const targetNode = nodes.find(n => n.pubkey === pubkeyToOpen);
-        if (targetNode) setSelectedNode(targetNode);
+        if (targetNode) {
+            setSelectedNode(targetNode);
+            setModalView('overview'); // Always start at overview
+        }
     }
   }, [loading, nodes, router.query.open]);
 
@@ -297,6 +302,7 @@ export default function Home() {
       setCompareMode(false);
       setShareMode(false);
       setCompareTarget(null);
+      setModalView('overview');
       if (router.query.open) router.replace('/', undefined, { shallow: true });
   };
 
@@ -500,6 +506,7 @@ export default function Home() {
       setCompareMode(false);
       setShareMode(false);
       setCompareTarget(null);
+      setModalView('overview'); // Reset view on new open
   };
 
   const renderNodeCard = (node: Node, i: number) => {
@@ -562,6 +569,105 @@ export default function Home() {
               <div className="px-4 text-[10px] text-zinc-600 uppercase font-bold w-32 text-center">{label}</div>
               <div className={`flex-1 text-left font-mono flex items-center justify-start gap-2 ${isBBetter ? 'text-green-400 font-bold' : 'text-zinc-400'}`}>
                   {isBBetter && <CheckCircle size={12} />} {format(valB)}
+              </div>
+          </div>
+      );
+  };
+
+  // --- SUB-RENDERERS FOR MODAL DEEP DIVE ---
+  
+  const renderHealthBreakdown = () => {
+      const stats = calculateVitalityMetrics(selectedNode, mostCommonVersion, medianCredits);
+      // Mock percentile calculation for visual (in real app, sort `nodes` and find index)
+      const healthPercentile = Math.round((stats.total / 100) * 100); 
+      
+      return (
+          <div className="animate-in fade-in slide-in-from-right-2 duration-200">
+              <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2"><Activity size={16} className="text-green-500" /> HEALTH BREAKDOWN</h3>
+                  <button onClick={() => setModalView('overview')} className="text-xs text-zinc-500 hover:text-white flex items-center gap-1"><ChevronLeft size={12} /> BACK</button>
+              </div>
+              <div className="space-y-4">
+                  {[
+                      { label: 'Uptime Stability', val: stats.breakdown.uptime, avg: globalHealthBreakdown.uptime },
+                      { label: 'Version Consensus', val: stats.breakdown.version, avg: globalHealthBreakdown.version },
+                      { label: 'Reputation', val: stats.breakdown.reputation, avg: globalHealthBreakdown.reputation },
+                      { label: 'Storage Capacity', val: stats.breakdown.capacity, avg: globalHealthBreakdown.capacity }
+                  ].map((m) => (
+                      <div key={m.label} className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800/50">
+                          <div className="flex justify-between text-xs mb-2">
+                              <span className="text-zinc-400">{m.label}</span>
+                              <div className="flex gap-2">
+                                  <span className="font-mono text-white">{m.val}/100</span>
+                                  <span className={`text-[10px] px-1.5 rounded ${m.val >= m.avg ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
+                                      {m.val >= m.avg ? '▲' : '▼'} vs Avg
+                                  </span>
+                              </div>
+                          </div>
+                          <div className="h-2 bg-zinc-800 rounded-full overflow-hidden relative">
+                              <div className="h-full bg-blue-500 transition-all duration-1000" style={{ width: `${m.val}%` }}></div>
+                              <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_4px_white] z-10" style={{ left: `${m.avg}%` }} title="Network Average"></div>
+                          </div>
+                      </div>
+                  ))}
+                  <div className="mt-4 p-3 bg-blue-900/10 border border-blue-500/20 rounded-xl text-center">
+                      <div className="text-[10px] text-blue-400 font-bold uppercase mb-1">Performance Ranking</div>
+                      <div className="text-lg text-white font-bold">Top {100 - healthPercentile}% <span className="text-zinc-500 text-xs font-normal">of Network</span></div>
+                  </div>
+              </div>
+          </div>
+      );
+  };
+
+  const renderStorageAnalysis = () => {
+      const nodeCap = selectedNode?.storage_committed || 0;
+      const median = medianCommitted || 1;
+      const diff = nodeCap - median;
+      const isPos = diff >= 0;
+      const percentDiff = ((diff / median) * 100).toFixed(1);
+      
+      // Scaling for visualization
+      const maxScale = Math.max(nodeCap, median) * 1.5;
+      const nodeWidth = Math.min(100, (nodeCap / maxScale) * 100);
+      const medianPos = Math.min(100, (median / maxScale) * 100);
+
+      return (
+          <div className="animate-in fade-in slide-in-from-right-2 duration-200">
+              <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2"><Database size={16} className="text-blue-500" /> STORAGE ANALYSIS</h3>
+                  <button onClick={() => setModalView('overview')} className="text-xs text-zinc-500 hover:text-white flex items-center gap-1"><ChevronLeft size={12} /> BACK</button>
+              </div>
+              
+              <div className="bg-zinc-900/50 p-6 rounded-xl border border-zinc-800 text-center mb-4">
+                  <div className="text-xs text-zinc-500 uppercase font-bold mb-2">Vs Network Median</div>
+                  <div className={`text-3xl font-extrabold ${isPos ? 'text-green-400' : 'text-red-400'}`}>
+                      {isPos ? '+' : ''}{percentDiff}%
+                  </div>
+                  <div className="text-xs text-zinc-400 mt-1">Capacity Difference</div>
+              </div>
+
+              <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 space-y-6">
+                  <div>
+                      <div className="flex justify-between text-xs mb-1 text-zinc-400">
+                          <span>Your Node</span>
+                          <span className="text-white font-mono">{formatBytes(nodeCap)}</span>
+                      </div>
+                      <div className="h-3 bg-zinc-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-blue-500" style={{ width: `${nodeWidth}%` }}></div>
+                      </div>
+                  </div>
+                  
+                  <div className="relative">
+                      <div className="flex justify-between text-xs mb-1 text-zinc-400">
+                          <span>Network Median</span>
+                          <span className="text-white font-mono">{formatBytes(median)}</span>
+                      </div>
+                      <div className="h-3 bg-zinc-800 rounded-full overflow-hidden relative">
+                          <div className="absolute top-0 bottom-0 w-0.5 bg-white z-10 h-full" style={{ left: `${medianPos}%` }}></div>
+                          <div className="h-full bg-zinc-700/50 w-full"></div>
+                      </div>
+                      <div className="text-[10px] text-center text-zinc-500 mt-2">The median represents the standard commitment level across all active nodes.</div>
+                  </div>
               </div>
           </div>
       );
@@ -633,7 +739,6 @@ export default function Home() {
                     </button>
                     <div className="h-6 w-px bg-zinc-800 mx-1"></div>
                     
-                    {/* RESTORED SORT ARROWS IN FILTERS */}
                     {[
                         { id: 'uptime', icon: Clock, label: 'UPTIME' },
                         { id: 'storage', icon: Database, label: 'STORAGE' },
@@ -670,7 +775,7 @@ export default function Home() {
 
       <main className={`p-4 md:p-8 ${warRoom ? 'max-w-full' : 'max-w-7xl mx-auto'}`}>
           
-          {/* NETWORK VITALS (RESTORED CONSENSUS METRIC) */}
+          {/* NETWORK VITALS */}
           {!warRoom && !loading && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
@@ -717,9 +822,7 @@ export default function Home() {
           {/* NODE GRID */}
           {loading && nodes.length === 0 ? <PulseGraphLoader /> : (
               <div className={`grid gap-4 ${warRoom ? 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'} pb-20`}>
-                  {filteredNodes.slice(0, warRoom ? 500 : 50).map((node, i) => {
-                      return renderNodeCard(node, i);
-                  })}
+                  {filteredNodes.slice(0, warRoom ? 500 : 50).map((node, i) => renderNodeCard(node, i))}
               </div>
           )}
       </main>
@@ -840,57 +943,69 @@ export default function Home() {
                               </div>
                           </div>
                       ) : (
-                          /* VIEW 3: STANDARD DASHBOARD (Overhauled) */
+                          /* VIEW 3: STANDARD DASHBOARD (Expanded) */
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                              {/* LEFT COL: VITALITY */}
-                              <div className="md:col-span-1 bg-zinc-900/30 rounded-3xl p-8 border border-zinc-800 flex flex-col items-center justify-center relative overflow-hidden shadow-inner">
+                              {/* LEFT COL: VITALITY (Interactive) */}
+                              <div 
+                                className="md:col-span-1 bg-zinc-900/30 rounded-3xl p-8 border border-zinc-800 flex flex-col items-center justify-center relative overflow-hidden shadow-inner cursor-pointer hover:border-blue-500/30 transition group"
+                                onClick={() => setModalView('health')}
+                              >
                                   <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none"></div>
                                   <RadialProgress score={getHealthScore(selectedNode, mostCommonVersion, medianCredits)} size={180} />
                                   <div className="mt-8 text-center w-full">
-                                      <div className="text-[10px] text-zinc-500 font-bold uppercase mb-2 tracking-wider">Operational Status</div>
+                                      <div className="text-[10px] text-zinc-500 font-bold uppercase mb-2 tracking-wider group-hover:text-blue-400 transition">Click for Breakdown</div>
                                       <div className={`py-2 px-4 rounded-xl border text-xs font-bold inline-block ${selectedNode.uptime > 86400 ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
                                           {selectedNode.uptime > 86400 ? 'ONLINE & STABLE' : 'UNSTABLE / SYNCING'}
                                       </div>
                                   </div>
                               </div>
 
-                              {/* CENTER COL: STATS GRID */}
-                              <div className="md:col-span-2 grid grid-cols-2 gap-4">
-                                  {/* STORAGE CARD */}
-                                  <div className="bg-zinc-900/50 p-5 rounded-2xl border border-zinc-800 flex flex-col justify-between">
-                                      <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase"><Database size={14}/> Storage</div>
-                                      <div>
-                                          <div className="text-2xl font-mono text-white tracking-tight">{formatBytes(selectedNode.storage_used)}</div>
-                                          <div className="h-1.5 bg-zinc-800 mt-3 rounded-full overflow-hidden"><div className="h-full bg-blue-500" style={{ width: selectedNode.storage_usage_percentage }}></div></div>
-                                      </div>
-                                  </div>
-                                  
-                                  {/* RANK CARD (Interactive) */}
-                                  <Link href="/leaderboard">
-                                      <div className="h-full bg-zinc-900/50 p-5 rounded-2xl border border-zinc-800 group cursor-pointer hover:border-yellow-500/30 transition relative overflow-hidden shadow-[0_0_15px_rgba(234,179,8,0.1)] hover:shadow-[0_0_25px_rgba(234,179,8,0.2)] animate-[pulse_4s_infinite]">
-                                          <div className="absolute top-0 right-0 p-8 bg-yellow-500/5 blur-xl rounded-full group-hover:bg-yellow-500/10 transition"></div>
-                                          <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase"><Trophy size={14}/> Rank</div>
-                                          <div className="text-3xl font-mono text-yellow-500 font-bold">#{selectedNode.rank || 'N/A'}</div>
-                                          <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-0 translate-x-2 text-yellow-500"><ChevronRight size={16}/></div>
-                                      </div>
-                                  </Link>
+                              {/* CENTER COL: DYNAMIC VIEW AREA */}
+                              <div className="md:col-span-2">
+                                  {modalView === 'health' ? renderHealthBreakdown() : 
+                                   modalView === 'storage' ? renderStorageAnalysis() : (
+                                      <div className="grid grid-cols-2 gap-4 h-full">
+                                          {/* STORAGE CARD (Interactive) */}
+                                          <div 
+                                            className="bg-zinc-900/50 p-5 rounded-2xl border border-zinc-800 flex flex-col justify-between cursor-pointer hover:border-blue-500/30 transition group"
+                                            onClick={() => setModalView('storage')}
+                                          >
+                                              <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase group-hover:text-blue-400"><Database size={14}/> Storage <ChevronRight size={12} className="opacity-0 group-hover:opacity-100 transition"/></div>
+                                              <div>
+                                                  <div className="text-2xl font-mono text-white tracking-tight">{formatBytes(selectedNode.storage_used)}</div>
+                                                  <div className="h-1.5 bg-zinc-800 mt-3 rounded-full overflow-hidden"><div className="h-full bg-blue-500" style={{ width: selectedNode.storage_usage_percentage }}></div></div>
+                                              </div>
+                                          </div>
+                                          
+                                          {/* RANK CARD (Interactive) */}
+                                          <Link href="/leaderboard">
+                                              <div className="h-full bg-zinc-900/50 p-5 rounded-2xl border border-zinc-800 group cursor-pointer hover:border-yellow-500/30 transition relative overflow-hidden shadow-[0_0_15px_rgba(234,179,8,0.1)] hover:shadow-[0_0_25px_rgba(234,179,8,0.2)] animate-[pulse_4s_infinite]">
+                                                  <div className="absolute top-0 right-0 p-8 bg-yellow-500/5 blur-xl rounded-full group-hover:bg-yellow-500/10 transition"></div>
+                                                  <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase"><Trophy size={14}/> Rank</div>
+                                                  <div className="text-3xl font-mono text-yellow-500 font-bold">#{selectedNode.rank || 'N/A'}</div>
+                                                  <div className="text-xs text-zinc-400 font-mono mt-1">{selectedNode.credits ? `${(selectedNode.credits / 1000).toFixed(1)}k Credits` : '0 Credits'}</div>
+                                                  <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-0 translate-x-2 text-yellow-500"><ChevronRight size={16}/></div>
+                                              </div>
+                                          </Link>
 
-                                  {/* LOCATION CARD (Interactive) */}
-                                  <Link href={`/map?focus=${selectedNode.address.split(':')[0]}`}>
-                                      <div className="h-full bg-zinc-900/50 p-5 rounded-2xl border border-zinc-800 group cursor-pointer hover:border-blue-500/30 transition relative overflow-hidden shadow-[0_0_15px_rgba(59,130,246,0.1)] hover:shadow-[0_0_25px_rgba(59,130,246,0.2)] animate-[pulse_5s_infinite]">
-                                          <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition"></div>
-                                          <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase"><Globe size={14}/> Location</div>
-                                          <div className="text-lg font-mono text-white truncate opacity-80">{selectedNode.address.split(':')[0]}</div>
-                                          <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-0 translate-x-2 text-blue-400"><MapIcon size={16}/></div>
-                                      </div>
-                                  </Link>
+                                          {/* LOCATION CARD (Interactive) */}
+                                          <Link href={`/map?focus=${selectedNode.address.split(':')[0]}`}>
+                                              <div className="h-full bg-zinc-900/50 p-5 rounded-2xl border border-zinc-800 group cursor-pointer hover:border-blue-500/30 transition relative overflow-hidden shadow-[0_0_15px_rgba(59,130,246,0.1)] hover:shadow-[0_0_25px_rgba(59,130,246,0.2)] animate-[pulse_5s_infinite]">
+                                                  <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition"></div>
+                                                  <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase"><Globe size={14}/> Location</div>
+                                                  <div className="text-lg font-mono text-white truncate opacity-80">{selectedNode.address.split(':')[0]}</div>
+                                                  <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-0 translate-x-2 text-blue-400"><MapIcon size={16}/></div>
+                                              </div>
+                                          </Link>
 
-                                  {/* VERSION CARD */}
-                                  <div className="bg-zinc-900/50 p-5 rounded-2xl border border-zinc-800">
-                                      <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase"><Server size={14}/> Version</div>
-                                      <div className="text-xl font-mono text-white">{selectedNode.version}</div>
-                                      <div className="text-[10px] text-green-500 mt-1 font-bold bg-green-500/10 inline-block px-2 py-0.5 rounded">LATEST</div>
-                                  </div>
+                                          {/* VERSION CARD */}
+                                          <div className="bg-zinc-900/50 p-5 rounded-2xl border border-zinc-800">
+                                              <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase"><Server size={14}/> Version</div>
+                                              <div className="text-xl font-mono text-white">{selectedNode.version}</div>
+                                              <div className="text-[10px] text-green-500 mt-1 font-bold bg-green-500/10 inline-block px-2 py-0.5 rounded">LATEST</div>
+                                          </div>
+                                      </div>
+                                  )}
                               </div>
                           </div>
                       )}
