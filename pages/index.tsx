@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Link from 'next/link';
-import { Search, Download, Server, Activity, Database, X, Shield, Clock, Zap, Trophy, HardDrive, Star, Copy, Check, CheckCircle, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Twitter, Code, Info, ExternalLink, HelpCircle, ChevronRight, Maximize2, Map as MapIcon, BookOpen, Menu, LayoutDashboard, HeartPulse } from 'lucide-react';
+import { Search, Download, Server, Activity, Database, X, Shield, Clock, Zap, Trophy, HardDrive, Star, Copy, Check, CheckCircle, Globe, AlertTriangle, ArrowUp, ArrowDown, Wallet, Medal, Twitter, Code, Info, ExternalLink, HelpCircle, ChevronRight, Maximize2, Map as MapIcon, BookOpen, Menu, LayoutDashboard, HeartPulse, Filter } from 'lucide-react';
 
 // --- TYPES ---
 interface Node {
@@ -569,67 +569,82 @@ export default function Home() {
       {isMenuOpen && <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>}
 
       <div className="p-4 md:p-8 flex-grow">
-      {/* HEADER (STICKY) - RESTRUCTURED PER REQUEST */}
+      
+      {/* HEADER (NEW LAYOUT) */}
       <header className="flex flex-col gap-4 mb-8 border-b border-zinc-800 pb-6 sticky top-0 z-30 bg-[#09090b]/95 backdrop-blur-md pt-4 -mt-4 -mx-4 px-4 md:-mx-8 md:px-8 shadow-xl">
         
-        {/* ROW 1: MENU + TITLE + SYNC/REFRESH */}
-        <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
-                {/* Bigger Menu Button */}
-                <button onClick={() => setIsMenuOpen(true)} className="p-3 bg-zinc-900 border border-zinc-700 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-500 transition shadow-lg"><Menu size={24}/></button>
-                
-                <div className="flex flex-col">
-                    <h1 className="text-2xl font-extrabold tracking-tight text-white flex items-center gap-2"><Activity className="text-blue-500" size={24}/> PULSE</h1>
-                    <div className="flex flex-col gap-1">
+        {/* ROW 1: TOP BAR */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            
+            {/* LEFT: Menu + Branding + Sync (Desktop) / + Refresh (Mobile) */}
+            <div className="flex items-center justify-between w-full md:w-auto">
+                <div className="flex items-center gap-4">
+                    <button onClick={() => setIsMenuOpen(true)} className="p-3 bg-zinc-900 border border-zinc-700 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-500 transition shadow-lg"><Menu size={24}/></button>
+                    <div className="flex flex-col">
+                        <h1 className="text-2xl font-extrabold tracking-tight text-white flex items-center gap-2"><Activity className="text-blue-500" size={24}/> PULSE</h1>
                         <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono">
                             <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
                             SYNC: {lastUpdated || '--:--'}
                         </div>
-                        {/* Refresh Button Under Sync */}
-                        <button onClick={handleRefresh} disabled={loading} className="mt-1 w-fit px-3 py-1 bg-zinc-900 border border-zinc-800 hover:border-blue-500 rounded text-[10px] font-bold text-blue-400 flex items-center gap-2 transition disabled:opacity-50">
-                            <Zap size={12} className={loading ? "animate-spin" : ""} />
-                            {loading ? 'SYNCING...' : 'REFRESH NETWORK'}
-                        </button>
                     </div>
+                </div>
+
+                {/* MOBILE ONLY: Refresh Icon on Top Right */}
+                <div className="md:hidden">
+                    <button onClick={handleRefresh} disabled={loading} className="p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-blue-400 hover:text-white disabled:opacity-50">
+                        <Zap size={20} className={loading ? "animate-spin" : ""} />
+                    </button>
+                </div>
+            </div>
+
+            {/* RIGHT: Search Bar (Desktop moves here) */}
+            <div className="relative w-full md:w-96">
+                <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
+                <input 
+                    type="text" 
+                    placeholder="Search nodes..." 
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2.5 pl-10 pr-8 text-sm text-white focus:border-blue-500 outline-none transition placeholder-zinc-600 shadow-inner"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => setIsSearchFocused(true)}
+                    onBlur={() => setIsSearchFocused(false)}
+                />
+                {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-3 top-3 text-zinc-500 hover:text-white"><X size={16} /></button>}
+                
+                <div className="absolute top-full left-0 right-0 mt-1.5 flex justify-center">
+                    <p className="text-[9px] text-zinc-500 font-mono tracking-wide uppercase flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 key={searchTipIndex}">
+                        <Info size={10} className="text-blue-500" />
+                        {isSearchFocused ? "Search by IP, Public Key, or Version" : searchTips[searchTipIndex]}
+                    </p>
                 </div>
             </div>
         </div>
 
-        {/* ROW 2: SEARCH */}
-        <div className="relative w-full">
-          <Search className="absolute left-3 top-3 text-zinc-500" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search nodes..." 
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2.5 pl-10 pr-8 text-sm text-white focus:border-blue-500 outline-none transition placeholder-zinc-600 shadow-inner"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => setIsSearchFocused(true)}
-            onBlur={() => setIsSearchFocused(false)}
-          />
-          {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-3 top-3 text-zinc-500 hover:text-white"><X size={16} /></button>}
-          
-          <div className="absolute top-full left-0 right-0 mt-1.5 flex justify-center">
-             <p className="text-[9px] text-zinc-500 font-mono tracking-wide uppercase flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 key={searchTipIndex}">
-                <Info size={10} className="text-blue-500" />
-                {isSearchFocused ? "Search by IP, Public Key, or Version" : searchTips[searchTipIndex]}
-             </p>
-          </div>
-        </div>
-
-        {/* ROW 3: FILTERS (UNDER SEARCH) */}
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide pt-2">
-            {[
-                { id: 'uptime', icon: Clock, label: 'UPTIME' },
-                { id: 'storage', icon: Database, label: 'STORAGE' },
-                { id: 'version', icon: Server, label: 'VERSION' },
-                { id: 'health', icon: HeartPulse, label: 'HEALTH' } 
-            ].map((opt) => (
-                <button key={opt.id} onClick={() => { if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); else setSortBy(opt.id as any); }} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap shadow-sm ${sortBy === opt.id ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
-                    <opt.icon size={14} /> {opt.label}
-                    {sortBy === opt.id && (sortOrder === 'asc' ? <ArrowUp size={12} className="ml-1" /> : <ArrowDown size={12} className="ml-1" />)}
+        {/* ROW 2: CONTROLS (Refresh + Filters) */}
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+            
+            {/* DESKTOP ONLY: Big Refresh Button */}
+            <div className="hidden md:block">
+                <button onClick={handleRefresh} disabled={loading} className="px-4 py-2 bg-zinc-900 border border-zinc-800 hover:border-blue-500 rounded-lg text-xs font-bold text-blue-400 flex items-center gap-2 transition disabled:opacity-50 shadow-md">
+                    <Zap size={14} className={loading ? "animate-spin" : ""} />
+                    {loading ? 'SYNCING...' : 'REFRESH NETWORK'}
                 </button>
-            ))}
+            </div>
+
+            {/* Filters (Horizontal Scroll on Mobile) */}
+            <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
+                {[
+                    { id: 'uptime', icon: Clock, label: 'UPTIME' },
+                    { id: 'storage', icon: Database, label: 'STORAGE' },
+                    { id: 'version', icon: Server, label: 'VERSION' },
+                    { id: 'health', icon: HeartPulse, label: 'HEALTH' } 
+                ].map((opt) => (
+                    <button key={opt.id} onClick={() => { if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); else setSortBy(opt.id as any); }} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap shadow-sm ${sortBy === opt.id ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
+                        <opt.icon size={14} /> {opt.label}
+                        {sortBy === opt.id && (sortOrder === 'asc' ? <ArrowUp size={12} className="ml-1" /> : <ArrowDown size={12} className="ml-1" />)}
+                    </button>
+                ))}
+            </div>
         </div>
       </header>
 
@@ -697,7 +712,7 @@ export default function Home() {
         </>
       )}
 
-      {/* --- ULTIMATE MODAL (RESTRUCTURED) --- */}
+      {/* --- ULTIMATE MODAL (CRASH PROOF + 2-COL LAYOUT) --- */}
       {selectedNode && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => closeModal()}>
           <div className="bg-gradient-to-b from-zinc-800 to-zinc-900 border border-white/5 w-full max-w-lg lg:max-w-4xl p-0 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => { e.stopPropagation(); handleGlobalClick(); }}>
@@ -712,100 +727,104 @@ export default function Home() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
                 {/* COL 1: IDENTITY */}
-                <div>
-                    <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'identity')}>
-                        <h3 className="text-xs font-bold text-zinc-500 uppercase">Identity & Status</h3>
-                        <HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" />
-                        <div className="flex-grow flex justify-end"><button onClick={(e) => toggleFavorite(e, selectedNode.address)} className={`p-1.5 rounded transition border ${favorites.includes(selectedNode.address) ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500' : 'bg-zinc-900 border-zinc-700 text-zinc-500 hover:text-white'}`}><Star size={12} fill={favorites.includes(selectedNode.address) ? "currentColor" : "none"} /></button></div>
-                    </div>
-                    {activeTooltip === 'identity' && <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 animate-in fade-in slide-in-from-top-1">Core identifiers and current network synchronization status.</div>}
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-4 space-y-3 mb-4 backdrop-blur-md">
-                        <div><div className="text-[9px] text-zinc-500 uppercase mb-1">Public Key</div><div className="font-mono text-sm text-zinc-300 flex items-center justify-between"><span className="truncate w-full">{(selectedNode.pubkey || '').slice(0, 12)}...</span><Copy size={12} onClick={() => copyToClipboard(selectedNode.pubkey || '', 'pubkey')} className="cursor-pointer hover:text-white shrink-0" />{copiedField === 'pubkey' && <span className="absolute right-8 text-[9px] text-green-500 font-bold">COPIED</span>}</div></div>
-                        <div><div className="text-[9px] text-zinc-500 uppercase mb-1">RPC Endpoint</div><div className="font-mono text-sm text-zinc-300 flex items-center justify-between"><span className="truncate w-full">http://{(selectedNode.address || '0.0.0.0').split(':')[0]}:6000</span><Copy size={12} onClick={() => copyToClipboard(`http://${(selectedNode.address || '0.0.0.0').split(':')[0]}:6000`, 'rpc')} className="cursor-pointer hover:text-white shrink-0" />{copiedField === 'rpc' && <span className="absolute right-8 text-[9px] text-green-500 font-bold">COPIED</span>}</div></div>
-                    </div>
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-4 backdrop-blur-md mb-4">
-                        <div className="space-y-3 text-xs">
+                <div className="space-y-6">
+                    <div>
+                        <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'identity')}>
+                            <h3 className="text-xs font-bold text-zinc-500 uppercase">Identity & Status</h3>
+                            <HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" />
+                            <div className="flex-grow flex justify-end"><button onClick={(e) => toggleFavorite(e, selectedNode.address)} className={`p-1.5 rounded transition border ${favorites.includes(selectedNode.address) ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500' : 'bg-zinc-900 border-zinc-700 text-zinc-500 hover:text-white'}`}><Star size={12} fill={favorites.includes(selectedNode.address) ? "currentColor" : "none"} /></button></div>
+                        </div>
+                        {activeTooltip === 'identity' && <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 animate-in fade-in slide-in-from-top-1">Core identifiers and current network synchronization status.</div>}
+                        <div className="bg-black/50 border border-white/5 rounded-xl p-4 space-y-3 mb-4 backdrop-blur-md">
+                            <div><div className="text-[9px] text-zinc-500 uppercase mb-1">Public Key</div><div className="font-mono text-sm text-zinc-300 flex items-center justify-between"><span className="truncate w-full">{(selectedNode.pubkey || '').slice(0, 12)}...</span><Copy size={12} onClick={() => copyToClipboard(selectedNode.pubkey || '', 'pubkey')} className="cursor-pointer hover:text-white shrink-0" />{copiedField === 'pubkey' && <span className="absolute right-8 text-[9px] text-green-500 font-bold">COPIED</span>}</div></div>
+                            <div><div className="text-[9px] text-zinc-500 uppercase mb-1">RPC Endpoint</div><div className="font-mono text-sm text-zinc-300 flex items-center justify-between"><span className="truncate w-full">http://{(selectedNode.address || '0.0.0.0').split(':')[0]}:6000</span><Copy size={12} onClick={() => copyToClipboard(`http://${(selectedNode.address || '0.0.0.0').split(':')[0]}:6000`, 'rpc')} className="cursor-pointer hover:text-white shrink-0" />{copiedField === 'rpc' && <span className="absolute right-8 text-[9px] text-green-500 font-bold">COPIED</span>}</div></div>
+                        </div>
+                        <div className="bg-black/50 border border-white/5 rounded-xl p-4 backdrop-blur-md mb-4">
+                            <div className="space-y-3 text-xs">
                             <div className="flex justify-between items-center"><span className="text-zinc-400">Uptime Stability</span><span className={(selectedNode.uptime || 0) > 86400 ? "text-green-500" : "text-yellow-500"}>{(selectedNode.uptime || 0) > 86400 ? "STABLE" : "BOOTING"}</span></div>
                             <div className="flex justify-between items-center"><span className="text-zinc-400">Software Version</span><div className="flex items-center gap-1.5"><span className={`${selectedNode.version === mostCommonVersion ? 'text-zinc-300 bg-zinc-800' : compareVersions(selectedNode.version, mostCommonVersion) < 0 ? 'text-red-400 bg-zinc-800' : 'text-white bg-zinc-800'} px-1.5 rounded transition-colors`}>{selectedNode.version || 'Unknown'}</span>{selectedNode.version === mostCommonVersion && <span className="text-[9px] text-green-500 bg-green-500/10 px-1 rounded uppercase font-bold">Majority</span>}</div></div>
                             <div className="flex justify-between items-center"><span className="text-zinc-400">Network Mode</span><span className={selectedNode.is_public ? "text-green-500" : "text-orange-500"}>{selectedNode.is_public ? "PUBLIC" : "PRIVATE"}</span></div>
+                            </div>
+                        </div>
+                        <Link href="/map"><div className="bg-gradient-to-r from-blue-900/20 to-indigo-900/20 border border-blue-500/20 rounded-xl p-4 cursor-pointer hover:border-blue-500/50 transition-all group relative overflow-hidden"><div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors"></div><div className="relative flex items-center justify-between"><div className="flex items-center gap-3"><div className="p-2 bg-blue-500/20 rounded-lg text-blue-400"><Globe size={18} /></div><div><div className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Physical Layer</div><div className="text-xs text-zinc-300">Visualize Physical Footprint</div></div></div><ChevronRight size={16} className="text-blue-500 group-hover:translate-x-1 transition-transform" /></div></div></Link>
+                    </div>
+
+                    {/* STORAGE METRICS (ROW 2 LEFT) */}
+                    <div>
+                        <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'infra')}><h3 className="text-xs font-bold text-zinc-500 uppercase">Storage Metrics</h3><HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" /></div>
+                        {activeTooltip === 'infra' && <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 animate-in fade-in slide-in-from-top-1">Real-time storage capacity and utilization compared to network averages.</div>}
+                        <div className="bg-black/50 rounded-xl p-4 border border-white/5 space-y-4 backdrop-blur-md mb-4">
+                            <div>
+                                <div className="flex justify-between items-end mb-2">
+                                    <div className="flex flex-col items-start"><span className="mb-1 inline-block bg-zinc-900 border border-zinc-800/50 rounded px-1.5 py-0.5 text-[9px] text-zinc-500 font-mono">{formatRawBytes(selectedNode.storage_used)} raw bytes</span><span className="text-xl font-mono font-bold text-blue-400">{formatBytes(selectedNode.storage_used)}</span><span className="text-[10px] text-zinc-600 uppercase tracking-wider mt-0.5">USED</span></div>
+                                    <div className="text-zinc-700 text-xl font-light pb-4">/</div>
+                                    <div className="flex flex-col items-end"><span className="text-xl font-mono font-bold text-purple-400">{formatBytes(selectedNode.storage_committed)}</span><span className="text-[10px] text-zinc-600 uppercase tracking-wider mt-0.5">CAPACITY</span></div>
+                                </div>
+                                <div className="h-2 bg-zinc-800 rounded-full overflow-hidden w-full mb-2"><div className="h-full bg-blue-500" style={{ width: `${Math.min(selectedNode.storage_usage_raw || 0, 100)}%` }}></div></div>
+                                <div className="flex justify-center"><span className="text-[10px] text-zinc-400 font-mono bg-zinc-900/80 px-2 py-1 rounded-full border border-zinc-800">{selectedNode.storage_usage_percentage || '0%'} Utilization</span></div>
+                            </div>
                         </div>
                     </div>
-                    <Link href="/map"><div className="bg-gradient-to-r from-blue-900/20 to-indigo-900/20 border border-blue-500/20 rounded-xl p-4 cursor-pointer hover:border-blue-500/50 transition-all group relative overflow-hidden"><div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors"></div><div className="relative flex items-center justify-between"><div className="flex items-center gap-3"><div className="p-2 bg-blue-500/20 rounded-lg text-blue-400"><Globe size={18} /></div><div><div className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Physical Layer</div><div className="text-xs text-zinc-300">Visualize Physical Footprint</div></div></div><ChevronRight size={16} className="text-blue-500 group-hover:translate-x-1 transition-transform" /></div></div></Link>
                 </div>
 
                 {/* COL 2: HEALTH DIAGNOSTICS */}
-                <div>
-                    <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'perf')}><h3 className="text-xs font-bold text-zinc-500 uppercase">Health Diagnostics</h3><HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" /></div>
-                    {activeTooltip === 'perf' && <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 animate-in fade-in slide-in-from-top-1">Comprehensive breakdown of node vitality compared to network averages.</div>}
-                    
-                    <div className="bg-black/50 border border-white/5 rounded-xl p-4 mb-4 backdrop-blur-md">
-                        {(() => {
-                            const stats = calculateVitalityMetrics(selectedNode, mostCommonVersion, medianCredits);
-                            const delta = stats.total - avgNetworkHealth;
-                            const isAbove = delta >= 0;
-                            const allHealths = nodes.map(n => getHealthScore(n, mostCommonVersion, medianCredits)).sort((a,b) => b-a);
-                            const rankIndex = allHealths.indexOf(stats.total);
-                            const percentile = Math.round(((nodes.length - rankIndex) / nodes.length) * 100);
+                <div className="space-y-6">
+                    <div>
+                        <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'perf')}><h3 className="text-xs font-bold text-zinc-500 uppercase">Health Diagnostics</h3><HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" /></div>
+                        {activeTooltip === 'perf' && <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 animate-in fade-in slide-in-from-top-1">Comprehensive breakdown of node vitality compared to network averages.</div>}
+                        
+                        <div className="bg-black/50 border border-white/5 rounded-xl p-4 mb-4 backdrop-blur-md">
+                            {(() => {
+                                const stats = calculateVitalityMetrics(selectedNode, mostCommonVersion, medianCredits);
+                                const delta = stats.total - avgNetworkHealth;
+                                const isAbove = delta >= 0;
+                                const allHealths = nodes.map(n => getHealthScore(n, mostCommonVersion, medianCredits)).sort((a,b) => b-a);
+                                const rankIndex = allHealths.indexOf(stats.total);
+                                const percentile = Math.round(((nodes.length - rankIndex) / nodes.length) * 100);
 
+                                return (
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-end border-b border-white/5 pb-3">
+                                            <div><div className="text-[10px] text-zinc-500 uppercase">Your Score</div><div className="text-3xl font-bold text-white">{stats.total}<span className="text-sm text-zinc-600 font-normal">/100</span></div></div>
+                                            <div className="text-right"><div className="text-[10px] text-zinc-500 uppercase">Network Avg</div><div className={`text-sm font-mono font-bold ${isAbove ? 'text-green-400' : 'text-red-400'}`}>{avgNetworkHealth} <span className="text-[10px] bg-white/5 px-1 rounded ml-1">{isAbove ? '+' : ''}{delta}</span></div></div>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {[{ label: 'Uptime', val: stats.breakdown.uptime, avg: globalHealthBreakdown.uptime }, { label: 'Capacity', val: stats.breakdown.capacity, avg: globalHealthBreakdown.capacity }, { label: 'Reputation', val: stats.breakdown.reputation, avg: globalHealthBreakdown.reputation }, { label: 'Version', val: stats.breakdown.version, avg: globalHealthBreakdown.version }].map((m) => (
+                                                <div key={m.label}><div className="flex justify-between text-[10px] text-zinc-400 mb-1"><span>{m.label}</span><span className="font-mono">{m.val} <span className="text-zinc-600">(Avg: {m.avg})</span></span></div><div className="h-1.5 bg-zinc-800 rounded-full w-full relative"><div className={`h-full rounded-full ${m.val >= m.avg ? 'bg-blue-500' : 'bg-orange-500'}`} style={{ width: `${m.val}%` }}></div><div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_4px_white]" style={{ left: `${m.avg}%` }}></div></div></div>
+                                            ))}
+                                        </div>
+                                        <div className="pt-2 border-t border-white/5 text-center"><div className="inline-block px-3 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-full text-[10px] text-yellow-500 font-bold uppercase tracking-wide">⚡ Top {100 - percentile}% of Network</div></div>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    </div>
+
+                    {/* STORAGE MEDIAN (ROW 2 RIGHT) */}
+                    <div>
+                        <h4 className="text-[9px] text-zinc-500 uppercase mb-3 font-bold pl-1 mt-0">VS Network Median</h4>
+                        {(() => {
+                            const nodeCap = selectedNode.storage_committed || 0;
+                            const median = medianCommitted || 1; 
+                            const diff = nodeCap - median;
+                            const isPos = diff >= 0;
+                            const percentDiff = (Math.abs(diff) / median) * 100;
+                            const maxScale = Math.max(nodeCap, median) * 1.1; 
+                            const nodeWidth = (nodeCap / maxScale) * 100;
+                            const medianPos = (median / maxScale) * 100;
                             return (
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-end border-b border-white/5 pb-3">
-                                        <div><div className="text-[10px] text-zinc-500 uppercase">Your Score</div><div className="text-3xl font-bold text-white">{stats.total}<span className="text-sm text-zinc-600 font-normal">/100</span></div></div>
-                                        <div className="text-right"><div className="text-[10px] text-zinc-500 uppercase">Network Avg</div><div className={`text-sm font-mono font-bold ${isAbove ? 'text-green-400' : 'text-red-400'}`}>{avgNetworkHealth} <span className="text-[10px] bg-white/5 px-1 rounded ml-1">{isAbove ? '+' : ''}{delta}</span></div></div>
-                                    </div>
-                                    <div className="space-y-3">
-                                        {[{ label: 'Uptime', val: stats.breakdown.uptime, avg: globalHealthBreakdown.uptime }, { label: 'Capacity', val: stats.breakdown.capacity, avg: globalHealthBreakdown.capacity }, { label: 'Reputation', val: stats.breakdown.reputation, avg: globalHealthBreakdown.reputation }, { label: 'Version', val: stats.breakdown.version, avg: globalHealthBreakdown.version }].map((m) => (
-                                            <div key={m.label}><div className="flex justify-between text-[10px] text-zinc-400 mb-1"><span>{m.label}</span><span className="font-mono">{m.val} <span className="text-zinc-600">(Avg: {m.avg})</span></span></div><div className="h-1.5 bg-zinc-800 rounded-full w-full relative"><div className={`h-full rounded-full ${m.val >= m.avg ? 'bg-blue-500' : 'bg-orange-500'}`} style={{ width: `${m.val}%` }}></div><div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_4px_white]" style={{ left: `${m.avg}%` }}></div></div></div>
-                                        ))}
-                                    </div>
-                                    <div className="pt-2 border-t border-white/5 text-center"><div className="inline-block px-3 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-full text-[10px] text-yellow-500 font-bold uppercase tracking-wide">⚡ Top {100 - percentile}% of Network</div></div>
+                                <div className="bg-black/50 rounded-xl p-4 border border-white/5 backdrop-blur-md">
+                                    <div className="flex justify-between items-center mb-2"><span className="text-[10px] text-zinc-400">Storage Capacity</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${isPos ? 'bg-green-900/20 text-green-400 border-green-900/50' : 'bg-red-900/20 text-red-400 border-red-900/50'}`}>{isPos ? '▲' : '▼'} {percentDiff.toFixed(1)}% vs median</span></div>
+                                    <div className="relative h-3 bg-zinc-800 rounded-full overflow-hidden w-full"><div className={`h-full transition-all duration-700 ${isPos ? 'bg-purple-500' : 'bg-orange-500'}`} style={{ width: `${nodeWidth}%` }}></div><div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] z-10" style={{ left: `${medianPos}%` }} title={`Network Median: ${formatBytes(median)}`}></div></div>
+                                    <div className="flex justify-between text-[9px] text-zinc-600 mt-1 font-mono"><span>0 B</span><span className="text-zinc-400">Median: {formatBytes(median)}</span></div>
                                 </div>
                             );
                         })()}
                     </div>
                 </div>
 
-                {/* COL 1 (ROW 2): STORAGE USED */}
-                <div>
-                    <div className="flex items-center gap-2 mb-3 cursor-help group" onClick={(e) => toggleTooltip(e, 'infra')}><h3 className="text-xs font-bold text-zinc-500 uppercase">Storage Metrics</h3><HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" /></div>
-                    {activeTooltip === 'infra' && <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 animate-in fade-in slide-in-from-top-1">Real-time storage capacity and utilization compared to network averages.</div>}
-                    <div className="bg-black/50 rounded-xl p-4 border border-white/5 space-y-4 backdrop-blur-md mb-4">
-                        <div>
-                            <div className="flex justify-between items-end mb-2">
-                                <div className="flex flex-col items-start"><span className="mb-1 inline-block bg-zinc-900 border border-zinc-800/50 rounded px-1.5 py-0.5 text-[9px] text-zinc-500 font-mono">{formatRawBytes(selectedNode.storage_used)} raw bytes</span><span className="text-xl font-mono font-bold text-blue-400">{formatBytes(selectedNode.storage_used)}</span><span className="text-[10px] text-zinc-600 uppercase tracking-wider mt-0.5">USED</span></div>
-                                <div className="text-zinc-700 text-xl font-light pb-4">/</div>
-                                <div className="flex flex-col items-end"><span className="text-xl font-mono font-bold text-purple-400">{formatBytes(selectedNode.storage_committed)}</span><span className="text-[10px] text-zinc-600 uppercase tracking-wider mt-0.5">CAPACITY</span></div>
-                            </div>
-                            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden w-full mb-2"><div className="h-full bg-blue-500" style={{ width: `${Math.min(selectedNode.storage_usage_raw || 0, 100)}%` }}></div></div>
-                            <div className="flex justify-center"><span className="text-[10px] text-zinc-400 font-mono bg-zinc-900/80 px-2 py-1 rounded-full border border-zinc-800">{selectedNode.storage_usage_percentage || '0%'} Utilization</span></div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* COL 2 (ROW 2): STORAGE MEDIAN */}
-                <div>
-                    <h4 className="text-[9px] text-zinc-500 uppercase mb-3 font-bold pl-1 mt-8 lg:mt-0">VS Network Median</h4>
-                    {(() => {
-                        const nodeCap = selectedNode.storage_committed || 0;
-                        const median = medianCommitted || 1; 
-                        const diff = nodeCap - median;
-                        const isPos = diff >= 0;
-                        const percentDiff = (Math.abs(diff) / median) * 100;
-                        const maxScale = Math.max(nodeCap, median) * 1.1; 
-                        const nodeWidth = (nodeCap / maxScale) * 100;
-                        const medianPos = (median / maxScale) * 100;
-                        return (
-                            <div className="bg-black/50 rounded-xl p-4 border border-white/5 backdrop-blur-md">
-                                <div className="flex justify-between items-center mb-2"><span className="text-[10px] text-zinc-400">Storage Capacity</span><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${isPos ? 'bg-green-900/20 text-green-400 border-green-900/50' : 'bg-red-900/20 text-red-400 border-red-900/50'}`}>{isPos ? '▲' : '▼'} {percentDiff.toFixed(1)}% vs median</span></div>
-                                <div className="relative h-3 bg-zinc-800 rounded-full overflow-hidden w-full"><div className={`h-full transition-all duration-700 ${isPos ? 'bg-purple-500' : 'bg-orange-500'}`} style={{ width: `${nodeWidth}%` }}></div><div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] z-10" style={{ left: `${medianPos}%` }} title={`Network Median: ${formatBytes(median)}`}></div></div>
-                                <div className="flex justify-between text-[9px] text-zinc-600 mt-1 font-mono"><span>0 B</span><span className="text-zinc-400">Median: {formatBytes(median)}</span></div>
-                            </div>
-                        );
-                    })()}
-                </div>
-
                 {/* BOTTOM ROW (FULL WIDTH): REPUTATION + FOOTER */}
-                <div className="lg:col-span-2 space-y-6">
+                <div className="lg:col-span-2 space-y-6 pt-4 border-t border-white/5">
                     <div className="bg-black/50 border border-yellow-500/20 rounded-xl p-4 backdrop-blur-md relative">
                         <div className="flex items-center justify-between mb-3"><h4 className="text-[9px] text-zinc-500 uppercase font-bold">Reputation</h4><button onClick={(e) => { e.stopPropagation(); setShowReputationInfo(!showReputationInfo); }}><HelpCircle size={10} className="text-zinc-600 hover:text-zinc-400" /></button></div>
                         {(showReputationInfo) && <div className="absolute top-8 right-4 w-48 bg-zinc-900 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-10 shadow-xl animate-in fade-in slide-in-from-top-1">Reputation is earned by proving storage capacity and maintaining high uptime.</div>}
