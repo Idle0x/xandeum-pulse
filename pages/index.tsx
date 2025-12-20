@@ -21,7 +21,7 @@ interface Node {
   credits?: number;
 }
 
-// --- HELPER FUNCTIONS (NOW CRASH-PROOF) ---
+// --- HELPER FUNCTIONS (CRASH PROOF) ---
 const formatBytes = (bytes: number | undefined) => {
   if (!bytes || bytes === 0 || isNaN(bytes)) return '0.00 B';
   const k = 1024;
@@ -69,8 +69,8 @@ const formatDetailedTimestamp = (timestamp: number | undefined) => {
 
 // CRASH FIX: Handle undefined versions gracefully
 const compareVersions = (v1: string = '0.0.0', v2: string = '0.0.0') => {
-  const s1 = v1 || '0.0.0'; // Fallback
-  const s2 = v2 || '0.0.0'; // Fallback
+  const s1 = v1 || '0.0.0';
+  const s2 = v2 || '0.0.0';
   const parts1 = s1.split('.').map(Number);
   const parts2 = s2.split('.').map(Number);
   for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
@@ -84,7 +84,6 @@ const compareVersions = (v1: string = '0.0.0', v2: string = '0.0.0') => {
 
 // --- CORE VITALITY LOGIC (CRASH PROOF) ---
 const calculateVitalityMetrics = (node: Node | null, consensusVersion: string, medianCredits: number) => {
-  // Safe defaults if node is missing or malformed
   if (!node) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, capacity: 0 } };
 
   const storageGB = (node.storage_committed || 0) / (1024 ** 3);
@@ -466,7 +465,7 @@ export default function Home() {
       }
       else { valA = a[sortBy] as any; valB = b[sortBy] as any; }
       
-      if (sortBy === 'version') return sortOrder === 'asc' ? compareVersions(a.version, b.version) : compareVersions(b.version, a.version);
+      if (sortBy === 'version') return sortOrder === 'asc' ? compareVersions(a.version || '0.0.0', b.version || '0.0.0') : compareVersions(b.version || '0.0.0', a.version || '0.0.0');
       return sortOrder === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
     });
 
@@ -694,7 +693,7 @@ export default function Home() {
             <div className="bg-white/5 p-6 border-b border-white/5 flex justify-between items-start shrink-0">
               <div className="flex-1 overflow-hidden mr-4">
                  <div className="flex justify-between items-start"><h2 className="text-xl font-bold text-white flex items-center gap-2"><Server size={20} className="text-blue-500" /> Node Inspector</h2></div>
-                <div className="flex items-center gap-2 mt-1"><p className="text-zinc-500 font-mono text-xs truncate">{selectedNode.address || 'Unknown Address'}</p><button onClick={() => copyToClipboard(selectedNode.address || '', 'ip')} className="text-zinc-600 hover:text-white transition">{copiedField === 'ip' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}</button></div>
+                <div className="flex items-center gap-2 mt-1"><p className="text-zinc-500 font-mono text-xs truncate">{selectedNode.address}</p><button onClick={() => copyToClipboard(selectedNode.address, 'ip')} className="text-zinc-600 hover:text-white transition">{copiedField === 'ip' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}</button></div>
               </div>
               <button onClick={() => closeModal()} className="text-zinc-500 hover:text-white transition"><X size={24} /></button>
             </div>
@@ -807,3 +806,61 @@ export default function Home() {
                                                     <span className="font-mono">{m.val} <span className="text-zinc-600">(Avg: {m.avg})</span></span>
                                                 </div>
                                                 <div className="h-1.5 bg-zinc-800 rounded-full w-full relative">
+                                                    <div className={`h-full rounded-full ${m.val >= m.avg ? 'bg-blue-500' : 'bg-orange-500'}`} style={{ width: `${m.val}%` }}></div>
+                                                    <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_4px_white]" style={{ left: `${m.avg}%` }}></div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="pt-2 border-t border-white/5 text-center">
+                                        <div className="inline-block px-3 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-full text-[10px] text-yellow-500 font-bold uppercase tracking-wide">
+                                            ⚡ Top {100 - percentile}% of Network
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+
+                    <div className="bg-black/50 border border-yellow-500/20 rounded-xl p-4 backdrop-blur-md relative">
+                        <div className="flex items-center justify-between mb-3"><h4 className="text-[9px] text-zinc-500 uppercase font-bold">Reputation</h4><button onClick={(e) => { e.stopPropagation(); setShowReputationInfo(!showReputationInfo); }}><HelpCircle size={10} className="text-zinc-600 hover:text-zinc-400" /></button></div>
+                        {(showReputationInfo) && <div className="absolute top-8 right-4 w-48 bg-zinc-900 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-10 shadow-xl animate-in fade-in slide-in-from-top-1">Reputation is earned by proving storage capacity and maintaining high uptime.</div>}
+                        <div className="flex justify-between items-center mb-2"><span className="text-zinc-400 text-xs">Credits</span><span className="text-yellow-400 font-mono font-bold">{(selectedNode.credits || 0).toLocaleString()}</span></div>
+                        
+                        <Link href="/leaderboard">
+                            <div className="bg-zinc-900/50 border border-yellow-500/20 p-2 rounded-lg flex items-center justify-between cursor-pointer hover:border-yellow-500/40 transition mt-3 group">
+                                <div className="flex items-center gap-2"><Trophy size={14} className="text-yellow-500" /><span className="text-xs font-bold text-zinc-400">Global Rank</span></div>
+                                <div className="flex items-center gap-3"><span className="text-lg font-bold text-white">#{(selectedNode.rank && selectedNode.rank < 9999) ? selectedNode.rank : '-'}</span><div className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[9px] font-bold flex items-center gap-1 border border-blue-500/20 group-hover:bg-blue-500/20 transition">VIEW <ChevronRight size={8} /></div></div>
+                            </div>
+                        </Link>
+                    </div>
+                    <div className="mt-4 text-xs text-center text-zinc-500 group relative cursor-help"><Clock size={12} className="inline mr-1" />Last seen {formatLastSeen(selectedNode.last_seen_timestamp)}<div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black border border-zinc-700 rounded px-2 py-1 text-[10px] whitespace-nowrap z-10">{formatDetailedTimestamp(selectedNode.last_seen_timestamp)}</div></div>
+                </div>
+              </div>
+              <div className="mt-6 pt-4 border-t border-white/5 grid grid-cols-3 gap-2">
+                 <button onClick={() => copyStatusReport(selectedNode)} className="flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white text-[10px] font-bold py-3 rounded-xl transition border border-zinc-700">{copiedField === 'report' ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}{copiedField === 'report' ? 'COPIED' : 'REPORT'}</button>
+                 <button onClick={() => shareToTwitter(selectedNode)} className="flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-400 text-white text-[10px] font-bold py-3 rounded-xl transition"><Twitter size={12} fill="currentColor" />SHARE ON X</button>
+                 <button onClick={() => copyRawJson(selectedNode)} className="flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 text-[10px] font-mono py-3 rounded-xl transition border border-zinc-800">{copiedField === 'json' ? <Check size={12} className="text-green-500" /> : <Code size={12} />}{copiedField === 'json' ? 'COPIED' : 'DIAGNOSTIC DATA'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
+      
+      {/* FOOTER */}
+      <footer className="border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto text-center">
+        <h3 className="text-white font-bold mb-2">XANDEUM PULSE MONITOR</h3>
+        <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.</p>
+        <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-600 mb-4">
+            <span className="opacity-50">pRPC Powered</span><span className="text-zinc-800">|</span>
+            <div className="flex items-center gap-1"><span>Built by</span><a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-blue-400 transition font-bold flex items-center gap-1">riot' <Twitter size={10} /></a></div>
+            <span className="text-zinc-800">|</span>
+            <a href="https://github.com/Idle0x/xandeum-pulse" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition flex items-center gap-1">Open Source <ExternalLink size={10} /></a>
+        </div>
+        <Link href="/docs" className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-4 decoration-zinc-700 flex items-center justify-center gap-1 mt-4"><BookOpen size={10} /> System Architecture & Docs</Link>
+      </footer>
+    </div>
+  );
+}
