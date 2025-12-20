@@ -84,7 +84,7 @@ export default function MapPage() {
                       }, 500);
                   } else {
                       setToast({ 
-                          msg: `Node ${targetIP} is on a Private Network. Location Hidden.`, 
+                          msg: `Node ${targetIP} uses a Masked IP (VPN/CGNAT). Geolocation unavailable.`, 
                           type: 'private' 
                       });
                       setTimeout(() => setToast(null), 6000);
