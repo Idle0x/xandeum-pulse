@@ -446,6 +446,8 @@ export default function Home() {
 
   // --- RENDER HELPERS ---
   
+  const isLatest = (nodeVersion: string) => { return mostCommonVersion !== 'N/A' && compareVersions(nodeVersion, mostCommonVersion) >= 0; };
+
   const getCycleContent = (node: Node, index: number) => {
     const step = (cycleStep + index) % 4;
     if (step === 0) return { label: 'Storage Used', value: formatBytes(node.storage_used), color: warRoom ? 'text-green-400' : 'text-blue-400', icon: Database };
@@ -462,6 +464,55 @@ export default function Home() {
       setCompareMode(false);
       setShareMode(false);
       setCompareTarget(null);
+  };
+
+  // --- RESTORED RENDER CARD FUNCTION ---
+  const renderNodeCard = (node: Node, i: number) => {
+    const cycleData = getCycleContent(node, i);
+    const isFav = favorites.includes(node.address);
+    const latest = isLatest(node.version || '0.0.0');
+    
+    return (
+      <div 
+        key={node.address} 
+        onClick={() => handleNodeClick(node)}
+        className={`group relative border rounded-xl p-5 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl 
+        ${warRoom 
+            ? 'bg-black border-green-900/30 hover:border-green-500' 
+            : isFav ? 'bg-gradient-to-b from-zinc-900 to-black border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.1)]' : 'bg-gradient-to-b from-zinc-900 to-black border-zinc-800 hover:border-blue-500/50'
+        }`}
+      >
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition duration-300 text-[9px] text-blue-400 font-bold uppercase tracking-widest flex items-center gap-1 bg-black/50 px-2 py-1 rounded-full border border-blue-500/20">
+            View Details <Maximize2 size={8} />
+        </div>
+        <div className="mb-4 flex justify-between items-start">
+            <div>
+              <div className="flex items-center gap-2 mb-1"><div className="text-[10px] text-zinc-500 uppercase font-bold">NODE IDENTITY</div>{!node.is_public && <Shield size={10} className="text-zinc-600" />}</div>
+              <div className="relative h-6 w-56">
+                  <div className={`absolute inset-0 font-mono text-sm truncate transition-opacity duration-300 group-hover:opacity-0 ${warRoom ? 'text-green-500' : 'text-zinc-300'}`}>{(node.pubkey || '').length > 12 ? `${(node.pubkey || '').slice(0, 12)}...${(node.pubkey || '').slice(-4)}` : (node.pubkey || 'Unknown Identity')}</div>
+                  <div className="absolute inset-0 font-mono text-sm text-blue-400 truncate opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-center gap-2"><span className="text-[10px] text-zinc-500">IP:</span> {node.address || 'N/A'}</div>
+              </div>
+            </div>
+            <button onClick={(e) => toggleFavorite(e, node.address)} className={`p-1.5 rounded-full transition ${isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'}`}><Star size={16} fill={isFav ? "currentColor" : "none"} /></button>
+        </div>
+        <div className="space-y-3">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-zinc-500">Version</span>
+            <div className="flex items-center gap-2"><span className={`text-zinc-300 px-2 py-0.5 rounded ${warRoom ? 'bg-zinc-900 border border-green-900' : 'bg-zinc-800'}`}>{node.version || 'Unknown'}</span>{latest && <CheckCircle size={12} className="text-green-500" />}</div>
+          </div>
+          <div className="pt-2">
+             <div className="text-[10px] text-zinc-600 uppercase font-bold mb-1 tracking-wider">Network Rewards</div>
+             <div className={`flex justify-between items-center text-xs p-2 rounded-lg border ${warRoom ? 'bg-zinc-900/50 border-zinc-800' : 'bg-black/40 border-zinc-800/50'}`}>
+                <div className="flex items-center gap-1.5"><Medal size={12} className={node.rank === 1 ? 'text-yellow-400' : 'text-zinc-500'} /><span className="text-zinc-400 font-bold">#{node.rank && node.rank < 9999 ? node.rank : '-'}</span></div>
+                <div className="flex items-center gap-1.5"><span className="text-zinc-300 font-mono">{node.credits?.toLocaleString() || 0}</span><Wallet size={12} className="text-yellow-600" /></div>
+             </div>
+          </div>
+          <div className="pt-3 mt-3 border-t border-white/5 flex justify-between items-end">
+            <div className="transition-all duration-500 ease-in-out"><span className="text-[10px] text-zinc-500 uppercase font-bold block mb-0.5 flex items-center gap-1"><cycleData.icon size={10} /> {cycleData.label}</span><span className={`text-lg font-bold ${cycleData.color} font-mono tracking-tight`}>{cycleData.value}</span></div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const renderComparisonRow = (label: string, valA: any, valB: any, format: (v: any) => string, better: 'HIGH' | 'LOW' | 'NONE') => {
@@ -617,32 +668,7 @@ export default function Home() {
               <div className={`grid gap-4 ${warRoom ? 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'} pb-20`}>
                   {filteredNodes.slice(0, warRoom ? 500 : 50).map((node, i) => {
                       const cycle = getCycleContent(node, i);
-                      return (
-                          <div 
-                            key={node.address} 
-                            onClick={() => handleNodeClick(node)}
-                            className={`
-                                group relative border rounded-xl p-4 cursor-pointer transition-all duration-300
-                                ${warRoom 
-                                    ? 'bg-black border-green-900/20 hover:border-green-500 hover:shadow-[0_0_15px_rgba(34,197,94,0.3)]' 
-                                    : 'bg-zinc-900/40 border-zinc-800 hover:border-blue-500/50 hover:shadow-xl hover:-translate-y-1'
-                                }
-                            `}
-                          >
-                              <div className="flex justify-between items-start mb-3">
-                                  <div className={`text-xs font-mono truncate w-24 ${warRoom ? 'text-green-500' : 'text-zinc-400'}`}>{node.address}</div>
-                                  <div className={`w-2 h-2 rounded-full ${node.uptime > 86400 ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-yellow-500'}`}></div>
-                              </div>
-                              
-                              <div className="flex flex-col gap-1">
-                                  <span className="text-[10px] text-zinc-600 uppercase font-bold">{warRoom ? 'HEALTH' : 'STATUS'}</span>
-                                  <div className="flex justify-between items-end">
-                                      <span className={`text-xl font-bold font-mono ${warRoom ? 'text-white' : cycle.color}`}>{warRoom ? getHealthScore(node, mostCommonVersion, medianCredits) : cycle.value}</span>
-                                      {!warRoom && <cycle.icon size={16} className={cycle.color} />}
-                                  </div>
-                              </div>
-                          </div>
-                      );
+                      return renderNodeCard(node, i);
                   })}
               </div>
           )}
