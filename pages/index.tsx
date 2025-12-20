@@ -217,6 +217,8 @@ const PulseGraphLoader = () => {
             .animate-scan-line { left: 0; animation: scan 2s ease-in-out infinite; }
             @keyframes draw { 0% { stroke-dashoffset: 400; opacity: 0; } 10% { opacity: 1; } 50% { stroke-dashoffset: 0; } 90% { opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
             @keyframes scan { 0% { left: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
+            @keyframes ekg { 0% { left: -10px; opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
+            .ekg-line { position: absolute; top: 0; bottom: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(34,197,94,0.5), transparent); animation: ekg 2s linear infinite; }
         `}</style>
     </div>
   );
@@ -354,7 +356,8 @@ export default function Home() {
 
   const copyStatusReport = (node: Node) => {
     const health = getHealthScore(node, mostCommonVersion, medianCredits);
-    const report = `[XANDEUM PULSE REPORT]\nNode: ${node.address}\nStatus: ${node.uptime > 86400 ? 'STABLE' : 'BOOTING'}\nHealth: ${health}/100\nMonitor at: https://xandeum-pulse.vercel.app`;
+    const address = node.address || '0.0.0.0'; // Fallback for ghost nodes
+    const report = `[XANDEUM PULSE REPORT]\nNode: ${address}\nStatus: ${node.uptime > 86400 ? 'STABLE' : 'BOOTING'}\nHealth: ${health}/100\nMonitor at: https://xandeum-pulse.vercel.app`;
     navigator.clipboard.writeText(report);
     setCopiedField('report');
     setTimeout(() => setCopiedField(null), 2000);
@@ -373,8 +376,9 @@ export default function Home() {
         const health = getHealthScore(n, mostCommonVersion, medianCredits);
         const utilization = n.storage_usage_percentage?.replace('%', '') || '0';
         const mode = n.is_public ? 'Public' : 'Private';
+        const address = n.address || '0.0.0.0'; // Fallback
         const isoTime = new Date(n.last_seen_timestamp < 10000000000 ? n.last_seen_timestamp * 1000 : n.last_seen_timestamp).toISOString();
-        return `${n.address},${n.pubkey},${n.rank},${n.credits},${n.version},${n.uptime},${n.storage_committed},${n.storage_used},${utilization},${health},${mode},${isoTime},http://${n.address.split(':')[0]}:6000,${favorites.includes(n.address)}`;
+        return `${address},${n.pubkey},${n.rank},${n.credits},${n.version},${n.uptime},${n.storage_committed},${n.storage_used},${utilization},${health},${mode},${isoTime},http://${address.split(':')[0]}:6000,${favorites.includes(address)}`;
     });
     const blob = new Blob([headers + rows.join('\n')], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -589,7 +593,7 @@ export default function Home() {
           <div 
             key={node.address} 
             onClick={() => handleNodeClick(node)}
-            className="group relative border border-zinc-800 bg-black hover:border-zinc-600 p-4 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-lg flex flex-col justify-between"
+            className="group relative border border-zinc-800 bg-black/50 hover:border-zinc-600 p-4 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-lg flex flex-col justify-between"
           >
               {/* HEADER */}
               <div className="flex justify-between items-start mb-4 border-b border-zinc-800 pb-3">
@@ -786,7 +790,7 @@ export default function Home() {
           <div className="flex justify-between items-center w-full">
               {/* LEFT */}
               <div className="flex items-center gap-4">
-                  <button onClick={() => setIsMenuOpen(true)} className={`p-2 rounded-xl transition ${zenMode ? 'text-zinc-400 border border-zinc-800' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white'}`}><Menu size={24}/></button>
+                  <button onClick={() => setIsMenuOpen(true)} className={`p-3 rounded-xl transition ${zenMode ? 'text-zinc-400 border border-zinc-800' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white'}`}><Menu size={24}/></button>
                   <div className="hidden md:flex flex-col">
                       <h1 className={`text-xl font-extrabold tracking-tight flex items-center gap-2 ${zenMode ? 'text-white' : 'text-white'}`}><Activity className={zenMode ? 'text-zinc-500' : 'text-blue-500'} /> PULSE</h1>
                   </div>
@@ -805,9 +809,9 @@ export default function Home() {
                       onBlur={() => setIsSearchFocused(false)}
                   />
                   {!zenMode && (
-                      <div className="absolute top-full left-0 right-0 mt-2 flex justify-center pointer-events-none">
-                          <p className="text-[9px] text-zinc-500 font-mono tracking-wide uppercase flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 key={searchTipIndex} bg-black/80 px-2 py-1 rounded border border-zinc-800 backdrop-blur-sm">
-                              <Info size={10} className="text-blue-500" />
+                      <div className="absolute top-full left-0 right-0 mt-4 flex justify-center pointer-events-none">
+                          <p className="text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 key={searchTipIndex} bg-black/80 px-3 py-1.5 rounded border border-zinc-800 backdrop-blur-sm shadow-xl">
+                              <Info size={12} className="text-blue-500" />
                               {isSearchFocused ? "Type to filter nodes instantly" : searchTips[searchTipIndex]}
                           </p>
                       </div>
@@ -825,11 +829,11 @@ export default function Home() {
           </div>
 
           {/* ROW 2: Refresh & Filters (Scrollable on Mobile) */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-              <button onClick={fetchData} className={`p-2 rounded-lg transition ${zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800'}`}>
-                  <Zap size={18} className={loading ? "animate-spin" : ""} />
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide mt-4 justify-between md:justify-start">
+              <button onClick={fetchData} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition text-xs font-bold ${zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800'}`}>
+                  <Zap size={14} className={loading ? "animate-spin" : ""} /> REFRESH
               </button>
-              <div className={`h-6 w-px mx-1 ${zenMode ? 'bg-zinc-800' : 'bg-zinc-800'}`}></div>
+              <div className={`h-6 w-px mx-2 ${zenMode ? 'bg-zinc-800' : 'bg-zinc-800'}`}></div>
               
               {[
                   { id: 'uptime', icon: Clock, label: 'UPTIME' },
@@ -855,6 +859,8 @@ export default function Home() {
                     <div className="text-2xl md:text-3xl font-bold text-white mt-1">{formatBytes(totalStorageCommitted)}</div>
                 </div>
                 <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm relative overflow-hidden">
+                    {/* EKG SCANNING LINE */}
+                    <div className="absolute inset-0 z-0 opacity-20"><div className="ekg-line"></div></div>
                     <div className="relative z-10">
                         <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1"><HeartPulse size={12} className="text-green-500" /> Network Vitals</div>
                         <div className="space-y-1 mt-1">
@@ -875,7 +881,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* ERROR DISPLAY (REPLACED WITH SYNC INDICATOR) */}
+          {/* SYNC INDICATOR */}
           {error && (
             <div className="mb-8 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center gap-2 text-blue-400 animate-pulse">
               <RefreshCw size={14} className="animate-spin" />
@@ -913,7 +919,7 @@ export default function Home() {
                   <div className={`p-6 border-b flex justify-between items-start ${zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
                       <div className="flex items-center gap-4">
                           <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-lg border border-white/10 ${zenMode ? 'bg-zinc-900 text-white border-zinc-700' : 'bg-gradient-to-br from-blue-600 to-purple-600 text-white'}`}>
-                              {selectedNode.pubkey.slice(0, 2)}
+                              {(selectedNode.pubkey || 'UN').slice(0, 2)}
                           </div>
                           <div>
                               <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-2 mb-1">
@@ -923,8 +929,8 @@ export default function Home() {
                                   </span>
                               </div>
                               <h2 className={`text-lg md:text-xl font-mono truncate w-64 md:w-96 flex items-center gap-2 ${zenMode ? 'text-zinc-200' : 'text-white'}`}>
-                                  {selectedNode.pubkey}
-                                  <Copy size={14} className="text-zinc-600 hover:text-white cursor-pointer" onClick={() => copyToClipboard(selectedNode.pubkey, 'pubkey')} />
+                                  {selectedNode.pubkey || 'Unknown Public Key'}
+                                  <Copy size={14} className="text-zinc-600 hover:text-white cursor-pointer" onClick={() => copyToClipboard(selectedNode.pubkey || '', 'pubkey')} />
                               </h2>
                           </div>
                       </div>
@@ -946,7 +952,7 @@ export default function Home() {
                                   {/* LEFT: CURRENT */}
                                   <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl text-center">
                                       <div className="text-xs text-blue-400 font-bold mb-1">CHAMPION</div>
-                                      <div className="font-mono text-sm text-white truncate">{selectedNode.address}</div>
+                                      <div className="font-mono text-sm text-white truncate">{(selectedNode.address || '0.0.0.0').split(':')[0]}</div>
                                   </div>
                                   
                                   {/* RIGHT: RIVAL (Selector) */}
@@ -968,7 +974,7 @@ export default function Home() {
                                           <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-xl text-center relative group">
                                               <button onClick={() => setCompareTarget(null)} className="absolute top-2 right-2 text-zinc-600 hover:text-red-500 bg-black/50 rounded-full p-1"><X size={12}/></button>
                                               <div className="text-xs text-red-400 font-bold mb-1">CHALLENGER</div>
-                                              <div className="font-mono text-sm text-white truncate">{compareTarget.address}</div>
+                                              <div className="font-mono text-sm text-white truncate">{(compareTarget.address || '0.0.0.0').split(':')[0]}</div>
                                           </div>
                                       )}
                                   </div>
@@ -994,7 +1000,7 @@ export default function Home() {
                                           <Activity size={40} className="text-blue-500" />
                                       </div>
                                       <h2 className="text-2xl font-extrabold text-white mb-2 tracking-tight">NODE REPORT</h2>
-                                      <p className="font-mono text-xs text-zinc-500 mb-8 bg-zinc-900 px-3 py-1 rounded-full inline-block border border-zinc-800">{selectedNode.address}</p>
+                                      <p className="font-mono text-xs text-zinc-500 mb-8 bg-zinc-900 px-3 py-1 rounded-full inline-block border border-zinc-800">{(selectedNode.address || '0.0.0.0').split(':')[0]}</p>
                                       
                                       <div className="grid grid-cols-2 gap-4 mb-8">
                                           <div className="bg-zinc-900/80 p-4 rounded-xl border border-zinc-800">
@@ -1069,11 +1075,11 @@ export default function Home() {
                                           </Link>
 
                                           {/* LOCATION CARD (Interactive) */}
-                                          <Link href={`/map?focus=${selectedNode.address.split(':')[0]}`}>
+                                          <Link href={`/map?focus=${(selectedNode.address || '0.0.0.0').split(':')[0]}`}>
                                               <div className={`h-full p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden animate-[pulse_5s_infinite] ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]'}`}>
                                                   <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition"></div>
                                                   <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase"><Globe size={14}/> Location</div>
-                                                  <div className={`text-lg font-mono truncate opacity-80 ${zenMode ? 'text-zinc-300' : 'text-white'}`}>{selectedNode.address.split(':')[0]}</div>
+                                                  <div className={`text-lg font-mono truncate opacity-80 ${zenMode ? 'text-zinc-300' : 'text-white'}`}>{(selectedNode.address || '0.0.0.0').split(':')[0]}</div>
                                                   <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-0 translate-x-2 text-blue-400"><MapIcon size={16}/></div>
                                               </div>
                                           </Link>
