@@ -9,7 +9,7 @@ import {
   ArrowDown, Wallet, Medal, Twitter, Code, Info, ExternalLink, HelpCircle, 
   ChevronRight, Maximize2, Map as MapIcon, BookOpen, Menu, LayoutDashboard, 
   HeartPulse, Swords, Share2, Monitor, ArrowLeftRight, Camera, BarChart2, 
-  ChevronLeft, FileJson, ClipboardCopy, Eye 
+  ChevronLeft, FileJson, ClipboardCopy, RefreshCw 
 } from 'lucide-react';
 
 // --- TYPES ---
@@ -257,7 +257,7 @@ export default function Home() {
   const [cycleStep, setCycleStep] = useState(0);
 
   // GLOBAL STATES
-  const [zenMode, setZenMode] = useState(false); // Renamed from War Room
+  const [zenMode, setZenMode] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // NETWORK DATA
@@ -480,7 +480,7 @@ export default function Home() {
       }
     } catch (err: any) {
       console.error("Fetch error:", err);
-      if (isFirstLoad) setError('Connection failed. Retrying...');
+      if (isFirstLoad) setError('Syncing latest network data...'); // User requested friendly error
     } finally {
         setLoading(false);
         setIsFirstLoad(false);
@@ -517,8 +517,8 @@ export default function Home() {
 
   const getCycleContent = (node: Node, index: number) => {
     const step = (cycleStep + index) % 4;
-    if (step === 0) return { label: 'Storage Used', value: formatBytes(node.storage_used), color: zenMode ? 'text-green-400' : 'text-blue-400', icon: Database };
-    if (step === 1) return { label: 'Committed', value: formatBytes(node.storage_committed || 0), color: zenMode ? 'text-green-400' : 'text-purple-400', icon: HardDrive };
+    if (step === 0) return { label: 'Storage Used', value: formatBytes(node.storage_used), color: 'text-blue-400', icon: Database };
+    if (step === 1) return { label: 'Committed', value: formatBytes(node.storage_committed || 0), color: 'text-purple-400', icon: HardDrive };
     if (step === 2) {
       const score = getHealthScore(node, mostCommonVersion, medianCredits);
       return { label: 'Health Score', value: `${score}/100`, color: score > 80 ? 'text-green-400' : 'text-yellow-400', icon: Activity };
@@ -543,8 +543,8 @@ export default function Home() {
       <div 
         key={node.address} 
         onClick={() => handleNodeClick(node)}
-        className={`group relative border rounded-xl p-5 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl 
-        ${isFav ? 'bg-gradient-to-b from-zinc-900 to-black border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.1)]' : 'bg-gradient-to-b from-zinc-900 to-black border-zinc-800 hover:border-blue-500/50'}`}
+        className={`group relative border rounded-xl p-5 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl bg-gradient-to-b from-zinc-900 to-black border-zinc-800 hover:border-blue-500/50
+        ${isFav ? 'border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.1)]' : ''}`}
       >
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition duration-300 text-[9px] text-blue-400 font-bold uppercase tracking-widest flex items-center gap-1 bg-black/50 px-2 py-1 rounded-full border border-blue-500/20">
             View Details <Maximize2 size={8} />
@@ -587,36 +587,36 @@ export default function Home() {
           <div 
             key={node.address} 
             onClick={() => handleNodeClick(node)}
-            className="group relative border border-green-900/30 bg-black hover:border-green-500 p-4 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-[0_0_20px_rgba(34,197,94,0.15)] flex flex-col justify-between"
+            className="group relative border border-zinc-800 bg-black/50 hover:border-zinc-600 p-4 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-lg flex flex-col justify-between"
           >
               {/* HEADER */}
-              <div className="flex justify-between items-start mb-4 border-b border-green-900/30 pb-3">
+              <div className="flex justify-between items-start mb-4 border-b border-zinc-800 pb-3">
                   <div>
-                      <div className="text-[9px] text-green-700 font-bold uppercase tracking-widest mb-1">NODE ID</div>
-                      <div className="font-mono text-sm text-green-400 truncate w-32 md:w-48">{node.pubkey || 'Unknown'}</div>
-                      <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{node.address}</div>
+                      <div className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-1">NODE ID</div>
+                      <div className="font-mono text-sm text-zinc-300 truncate w-32 md:w-48">{node.pubkey || 'Unknown'}</div>
+                      <div className="text-[10px] text-zinc-600 font-mono mt-0.5">{node.address}</div>
                   </div>
-                  <div className={`text-xl font-bold ${health >= 80 ? 'text-green-500' : 'text-yellow-500'}`}>{health}</div>
+                  <div className={`text-xl font-bold ${health >= 80 ? 'text-green-500' : health >= 50 ? 'text-yellow-500' : 'text-red-500'}`}>{health}</div>
               </div>
 
               {/* STATS GRID */}
               <div className="grid grid-cols-2 gap-4 text-xs">
                   <div>
                       <div className="text-[9px] text-zinc-600 uppercase font-bold mb-1">Storage</div>
-                      <div className="font-mono text-white">{formatBytes(node.storage_used)} <span className="text-zinc-600">/ {formatBytes(node.storage_committed)}</span></div>
-                      <div className="w-full h-1 bg-zinc-900 rounded-full mt-1"><div className="h-full bg-green-600" style={{ width: node.storage_usage_percentage }}></div></div>
+                      <div className="font-mono text-zinc-300">{formatBytes(node.storage_used)}</div>
+                      <div className="w-full h-1 bg-zinc-900 rounded-full mt-1"><div className="h-full bg-zinc-600" style={{ width: node.storage_usage_percentage }}></div></div>
                   </div>
                   <div>
                       <div className="text-[9px] text-zinc-600 uppercase font-bold mb-1">Uptime</div>
-                      <div className="font-mono text-white">{formatUptime(node.uptime)}</div>
+                      <div className="font-mono text-zinc-300">{formatUptime(node.uptime)}</div>
                   </div>
                   <div>
                       <div className="text-[9px] text-zinc-600 uppercase font-bold mb-1">Version</div>
-                      <div className="font-mono text-white flex items-center gap-2">{node.version} {latest && <CheckCircle size={10} className="text-green-500"/>}</div>
+                      <div className="font-mono text-zinc-300 flex items-center gap-2">{node.version} {latest && <CheckCircle size={10} className="text-green-500"/>}</div>
                   </div>
                   <div>
                       <div className="text-[9px] text-zinc-600 uppercase font-bold mb-1">Rank</div>
-                      <div className="font-mono text-yellow-500">#{node.rank || '-'}</div>
+                      <div className="font-mono text-yellow-600">#{node.rank || '-'}</div>
                   </div>
               </div>
           </div>
@@ -650,7 +650,7 @@ export default function Home() {
       return (
           <div className="animate-in fade-in slide-in-from-right-2 duration-200">
               <div className="flex justify-between items-center mb-4">
-                  <h3 className={`text-sm font-bold flex items-center gap-2 ${zenMode ? 'text-green-500' : 'text-white'}`}><Activity size={16} /> HEALTH BREAKDOWN</h3>
+                  <h3 className={`text-sm font-bold flex items-center gap-2 ${zenMode ? 'text-zinc-200' : 'text-white'}`}><Activity size={16} /> HEALTH BREAKDOWN</h3>
                   <button onClick={() => setModalView('overview')} className="text-xs text-zinc-500 hover:text-white flex items-center gap-1"><ChevronLeft size={12} /> BACK</button>
               </div>
               <div className="space-y-4">
@@ -660,11 +660,11 @@ export default function Home() {
                       { label: 'Reputation', val: stats.breakdown.reputation, avg: globalHealthBreakdown.reputation },
                       { label: 'Storage Capacity', val: stats.breakdown.capacity, avg: globalHealthBreakdown.capacity }
                   ].map((m) => (
-                      <div key={m.label} className={`p-3 rounded-xl border ${zenMode ? 'bg-black border-green-900/50' : 'bg-zinc-900/50 border-zinc-800/50'}`}>
+                      <div key={m.label} className={`p-3 rounded-xl border ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-800/50'}`}>
                           <div className="flex justify-between text-xs mb-2">
-                              <span className={`flex items-center gap-1 ${zenMode ? 'text-green-700' : 'text-zinc-400'}`}>{m.label} <HelpCircle size={10} className="cursor-help" onClick={(e) => toggleTooltip(e, m.label)} /></span>
+                              <span className={`flex items-center gap-1 ${zenMode ? 'text-zinc-400' : 'text-zinc-400'}`}>{m.label} <HelpCircle size={10} className="cursor-help" onClick={(e) => toggleTooltip(e, m.label)} /></span>
                               <div className="flex gap-2">
-                                  <span className={`font-mono ${zenMode ? 'text-green-400' : 'text-white'}`}>{m.val}/100</span>
+                                  <span className={`font-mono ${zenMode ? 'text-white' : 'text-white'}`}>{m.val}/100</span>
                                   <span className={`text-[10px] px-1.5 rounded ${m.val >= m.avg ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
                                       {m.val >= m.avg ? '▲' : '▼'} vs Avg
                                   </span>
@@ -678,14 +678,14 @@ export default function Home() {
                               </div>
                           )}
                           <div className="h-2 bg-zinc-800 rounded-full overflow-hidden relative">
-                              <div className={`h-full transition-all duration-1000 ${zenMode ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${m.val}%` }}></div>
+                              <div className={`h-full transition-all duration-1000 ${zenMode ? 'bg-zinc-500' : 'bg-blue-500'}`} style={{ width: `${m.val}%` }}></div>
                               <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_4px_white] z-10" style={{ left: `${m.avg}%` }} title="Network Average"></div>
                           </div>
                       </div>
                   ))}
-                  <div className={`mt-4 p-3 border rounded-xl text-center ${zenMode ? 'bg-green-900/10 border-green-500/20' : 'bg-blue-900/10 border-blue-500/20'}`}>
-                      <div className={`text-[10px] font-bold uppercase mb-1 ${zenMode ? 'text-green-600' : 'text-blue-400'}`}>Performance Ranking</div>
-                      <div className={`text-lg font-bold ${zenMode ? 'text-green-400' : 'text-white'}`}>Top {100 - healthPercentile}% <span className="text-zinc-500 text-xs font-normal">of Network</span></div>
+                  <div className={`mt-4 p-3 border rounded-xl text-center ${zenMode ? 'bg-zinc-900 border-zinc-700' : 'bg-blue-900/10 border-blue-500/20'}`}>
+                      <div className={`text-[10px] font-bold uppercase mb-1 ${zenMode ? 'text-zinc-500' : 'text-blue-400'}`}>Performance Ranking</div>
+                      <div className={`text-lg font-bold ${zenMode ? 'text-white' : 'text-white'}`}>Top {100 - healthPercentile}% <span className="text-zinc-500 text-xs font-normal">of Network</span></div>
                   </div>
               </div>
           </div>
@@ -706,11 +706,11 @@ export default function Home() {
       return (
           <div className="animate-in fade-in slide-in-from-right-2 duration-200">
               <div className="flex justify-between items-center mb-4">
-                  <h3 className={`text-sm font-bold flex items-center gap-2 ${zenMode ? 'text-green-500' : 'text-white'}`}><Database size={16} /> STORAGE ANALYSIS</h3>
+                  <h3 className={`text-sm font-bold flex items-center gap-2 ${zenMode ? 'text-zinc-200' : 'text-white'}`}><Database size={16} /> STORAGE ANALYSIS</h3>
                   <button onClick={() => setModalView('overview')} className="text-xs text-zinc-500 hover:text-white flex items-center gap-1"><ChevronLeft size={12} /> BACK</button>
               </div>
               
-              <div className={`p-6 rounded-xl border text-center mb-4 ${zenMode ? 'bg-black border-green-900/50' : 'bg-zinc-900/50 border-zinc-800'}`}>
+              <div className={`p-6 rounded-xl border text-center mb-4 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
                   <div className="text-xs text-zinc-500 uppercase font-bold mb-2">Vs Network Median</div>
                   <div className={`text-3xl font-extrabold ${isPos ? 'text-green-400' : 'text-red-400'}`}>
                       {isPos ? '+' : ''}{percentDiff}%
@@ -718,21 +718,21 @@ export default function Home() {
                   <div className="text-xs text-zinc-400 mt-1">Capacity Difference</div>
               </div>
 
-              <div className={`p-4 rounded-xl border space-y-6 ${zenMode ? 'bg-black border-green-900/50' : 'bg-zinc-900/50 border-zinc-800'}`}>
+              <div className={`p-4 rounded-xl border space-y-6 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
                   <div>
                       <div className="flex justify-between text-xs mb-1 text-zinc-400">
                           <span>Your Node</span>
-                          <span className={`font-mono ${zenMode ? 'text-green-400' : 'text-white'}`}>{formatBytes(nodeCap)}</span>
+                          <span className={`font-mono ${zenMode ? 'text-white' : 'text-white'}`}>{formatBytes(nodeCap)}</span>
                       </div>
                       <div className="h-3 bg-zinc-800 rounded-full overflow-hidden">
-                          <div className={`h-full ${zenMode ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${nodeWidth}%` }}></div>
+                          <div className={`h-full ${zenMode ? 'bg-zinc-500' : 'bg-blue-500'}`} style={{ width: `${nodeWidth}%` }}></div>
                       </div>
                   </div>
                   
                   <div className="relative">
                       <div className="flex justify-between text-xs mb-1 text-zinc-400">
                           <span>Network Median</span>
-                          <span className={`font-mono ${zenMode ? 'text-green-700' : 'text-white'}`}>{formatBytes(median)}</span>
+                          <span className={`font-mono ${zenMode ? 'text-zinc-400' : 'text-white'}`}>{formatBytes(median)}</span>
                       </div>
                       <div className="h-3 bg-zinc-800 rounded-full overflow-hidden relative">
                           <div className="absolute top-0 bottom-0 w-0.5 bg-white z-10 h-full" style={{ left: `${medianPos}%` }}></div>
@@ -746,7 +746,7 @@ export default function Home() {
   };
 
   return (
-    <div className={`min-h-screen font-sans transition-colors duration-500 ${zenMode ? 'bg-black text-green-500 selection:bg-green-900/30' : 'bg-[#09090b] text-zinc-100 selection:bg-blue-500/30'}`} onClick={handleGlobalClick}>
+    <div className={`min-h-screen font-sans transition-colors duration-500 ${zenMode ? 'bg-black text-zinc-300 selection:bg-zinc-700' : 'bg-[#09090b] text-zinc-100 selection:bg-blue-500/30'}`} onClick={handleGlobalClick}>
       <Head><title>Xandeum Pulse {zenMode ? '[ZEN MODE]' : ''}</title></Head>
       
       {/* LOADING OVERLAY */}
@@ -778,27 +778,27 @@ export default function Home() {
       {isMenuOpen && <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* --- HEADER --- */}
-      <header className={`sticky top-0 z-40 backdrop-blur-md border-b px-6 py-4 flex flex-col gap-4 ${zenMode ? 'bg-black/90 border-green-900/50' : 'bg-[#09090b]/90 border-zinc-800'}`}>
+      <header className={`sticky top-0 z-40 backdrop-blur-md border-b px-6 py-4 flex flex-col gap-4 ${zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'}`}>
           
           {/* ROW 1: Logo - Search - Toggle */}
           <div className="flex justify-between items-center w-full">
               {/* LEFT */}
               <div className="flex items-center gap-4">
-                  <button onClick={() => setIsMenuOpen(true)} className={`p-2 rounded-xl transition ${zenMode ? 'text-green-500 border border-green-900' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white'}`}><Menu size={24}/></button>
+                  <button onClick={() => setIsMenuOpen(true)} className={`p-2 rounded-xl transition ${zenMode ? 'text-zinc-400 border border-zinc-800' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white'}`}><Menu size={24}/></button>
                   <div className="hidden md:flex flex-col">
-                      <h1 className={`text-xl font-extrabold tracking-tight flex items-center gap-2 ${zenMode ? 'text-green-500' : 'text-white'}`}><Activity className={zenMode ? 'text-green-500' : 'text-blue-500'} /> PULSE</h1>
+                      <h1 className={`text-xl font-extrabold tracking-tight flex items-center gap-2 ${zenMode ? 'text-white' : 'text-white'}`}><Activity className={zenMode ? 'text-zinc-500' : 'text-blue-500'} /> PULSE</h1>
                   </div>
               </div>
 
               {/* CENTER SEARCH */}
               <div className="flex-1 max-w-md mx-4 relative">
-                  <Search className={`absolute left-3 top-2.5 size-4 ${zenMode ? 'text-green-700' : 'text-zinc-500'}`} />
+                  <Search className={`absolute left-3 top-2.5 size-4 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
                   <input 
                       type="text" 
                       placeholder="Search IP / PubKey..." 
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className={`w-full rounded-lg py-2 pl-10 pr-4 text-sm outline-none shadow-inner transition-all ${zenMode ? 'bg-black border border-green-900 text-green-500 focus:border-green-500 placeholder-green-900' : 'bg-zinc-900 border border-zinc-800 text-white focus:border-blue-500'}`}
+                      className={`w-full rounded-lg py-2 pl-10 pr-4 text-sm outline-none shadow-inner transition-all ${zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-300 focus:border-zinc-600' : 'bg-zinc-900 border border-zinc-800 text-white focus:border-blue-500'}`}
                       onFocus={() => setIsSearchFocused(true)}
                       onBlur={() => setIsSearchFocused(false)}
                   />
@@ -815,7 +815,7 @@ export default function Home() {
               {/* RIGHT */}
               <button 
                   onClick={() => setZenMode(!zenMode)} 
-                  className={`p-2 rounded-lg transition flex items-center gap-2 group ${zenMode ? 'bg-green-900/20 border border-green-500 text-green-500' : 'bg-red-900/10 border border-red-500/20 text-red-500 hover:bg-red-900/30'}`}
+                  className={`p-2 rounded-lg transition flex items-center gap-2 group ${zenMode ? 'bg-zinc-800 border border-zinc-700 text-zinc-400' : 'bg-red-900/10 border border-red-500/20 text-red-500 hover:bg-red-900/30'}`}
                   title={zenMode ? "Exit Zen Mode" : "Enter Zen Mode"}
               >
                   <Monitor size={18} /> <span className="hidden md:inline text-xs font-bold">{zenMode ? 'EXIT ZEN' : 'ZEN MODE'}</span>
@@ -824,10 +824,10 @@ export default function Home() {
 
           {/* ROW 2: Refresh & Filters (Scrollable on Mobile) */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-              <button onClick={fetchData} className={`p-2 rounded-lg transition ${zenMode ? 'bg-black border border-green-900 text-green-500' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800'}`}>
+              <button onClick={fetchData} className={`p-2 rounded-lg transition ${zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800'}`}>
                   <Zap size={18} className={loading ? "animate-spin" : ""} />
               </button>
-              <div className={`h-6 w-px mx-1 ${zenMode ? 'bg-green-900' : 'bg-zinc-800'}`}></div>
+              <div className={`h-6 w-px mx-1 ${zenMode ? 'bg-zinc-800' : 'bg-zinc-800'}`}></div>
               
               {[
                   { id: 'uptime', icon: Clock, label: 'UPTIME' },
@@ -835,7 +835,7 @@ export default function Home() {
                   { id: 'version', icon: Server, label: 'VERSION' },
                   { id: 'health', icon: HeartPulse, label: 'HEALTH' } 
               ].map((opt) => (
-                  <button key={opt.id} onClick={() => { if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); else setSortBy(opt.id as any); }} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${sortBy === opt.id ? (zenMode ? 'bg-green-900/20 border-green-500 text-green-500' : 'bg-blue-500/10 border-blue-500/50 text-blue-400') : (zenMode ? 'bg-black border-green-900 text-green-700 hover:text-green-500' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800')}`}>
+                  <button key={opt.id} onClick={() => { if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); else setSortBy(opt.id as any); }} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${sortBy === opt.id ? (zenMode ? 'bg-zinc-800 border-zinc-600 text-zinc-200' : 'bg-blue-500/10 border-blue-500/50 text-blue-400') : (zenMode ? 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800')}`}>
                       <opt.icon size={14} /> {opt.label}
                       {sortBy === opt.id && (sortOrder === 'asc' ? <ArrowUp size={12} className="ml-1" /> : <ArrowDown size={12} className="ml-1" />)}
                   </button>
@@ -873,11 +873,11 @@ export default function Home() {
             </div>
           )}
 
-          {/* ERROR DISPLAY */}
+          {/* ERROR DISPLAY (REPLACED WITH SYNC INDICATOR) */}
           {error && (
-            <div className="mb-8 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center justify-between text-red-400">
-              <div className="flex items-center gap-2"><AlertTriangle size={20} /><span>{error}</span></div>
-              <button onClick={fetchData} className="text-xs underline hover:text-white">Retry</button>
+            <div className="mb-8 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center gap-2 text-blue-400 animate-pulse">
+              <RefreshCw size={14} className="animate-spin" />
+              <span className="text-xs font-bold">{error}</span>
             </div>
           )}
 
@@ -889,10 +889,10 @@ export default function Home() {
             </div>
           )}
 
-          {/* NODE GRID */}
+          {/* NODE GRID - UNCAPPED */}
           {loading && nodes.length === 0 ? <PulseGraphLoader /> : (
               <div className={`grid gap-4 ${zenMode ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'} pb-20`}>
-                  {filteredNodes.map((node, i) => {
+                  {filteredNodes.map((node, i) => { // REMOVED SLICE LIMIT
                       if (zenMode) return renderZenCard(node);
                       return renderNodeCard(node, i);
                   })}
@@ -904,13 +904,13 @@ export default function Home() {
       {selectedNode && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={closeModal}>
               <div 
-                className={`border w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300 ${zenMode ? 'bg-black border-green-500/30 shadow-[0_0_50px_rgba(34,197,94,0.1)]' : 'bg-[#09090b] border-zinc-800'}`}
+                className={`border w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300 ${zenMode ? 'bg-black border-zinc-800 shadow-none' : 'bg-[#09090b] border-zinc-800'}`}
                 onClick={(e) => e.stopPropagation()}
               >
                   {/* MODAL HEADER */}
-                  <div className={`p-6 border-b flex justify-between items-start ${zenMode ? 'bg-black border-green-900/50' : 'bg-zinc-900/50 border-zinc-800'}`}>
+                  <div className={`p-6 border-b flex justify-between items-start ${zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
                       <div className="flex items-center gap-4">
-                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-lg border border-white/10 ${zenMode ? 'bg-black text-green-500 border-green-500' : 'bg-gradient-to-br from-blue-600 to-purple-600 text-white'}`}>
+                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-lg border border-white/10 ${zenMode ? 'bg-zinc-900 text-white border-zinc-700' : 'bg-gradient-to-br from-blue-600 to-purple-600 text-white'}`}>
                               {selectedNode.pubkey.slice(0, 2)}
                           </div>
                           <div>
@@ -920,7 +920,7 @@ export default function Home() {
                                       {selectedNode.is_public ? 'POLICY: OPEN' : 'POLICY: RESTRICTED'}
                                   </span>
                               </div>
-                              <h2 className={`text-lg md:text-xl font-mono truncate w-64 md:w-96 flex items-center gap-2 ${zenMode ? 'text-green-400' : 'text-white'}`}>
+                              <h2 className={`text-lg md:text-xl font-mono truncate w-64 md:w-96 flex items-center gap-2 ${zenMode ? 'text-zinc-200' : 'text-white'}`}>
                                   {selectedNode.pubkey}
                                   <Copy size={14} className="text-zinc-600 hover:text-white cursor-pointer" onClick={() => copyToClipboard(selectedNode.pubkey, 'pubkey')} />
                               </h2>
@@ -1020,7 +1020,7 @@ export default function Home() {
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                               {/* LEFT COL: VITALITY (Interactive) */}
                               <div 
-                                className={`md:col-span-1 rounded-3xl p-8 border flex flex-col items-center justify-center relative overflow-hidden shadow-inner cursor-pointer transition group ${zenMode ? 'bg-black border-green-900/50 hover:border-green-500' : 'bg-zinc-900/30 border-zinc-800 hover:border-blue-500/30'}`}
+                                className={`md:col-span-1 rounded-3xl p-8 border flex flex-col items-center justify-center relative overflow-hidden shadow-inner cursor-pointer transition group ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/30 border-zinc-800 hover:border-blue-500/30'}`}
                                 onClick={() => setModalView('health')}
                               >
                                   <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none"></div>
@@ -1038,109 +1038,4 @@ export default function Home() {
                                   </div>
                               </div>
 
-                              {/* CENTER COL: DYNAMIC VIEW AREA */}
-                              <div className="md:col-span-2">
-                                  {modalView === 'health' ? renderHealthBreakdown() : 
-                                   modalView === 'storage' ? renderStorageAnalysis() : (
-                                      <div className="grid grid-cols-2 gap-4 h-full">
-                                          {/* STORAGE CARD (Interactive) */}
-                                          <div 
-                                            className={`p-5 rounded-2xl border flex flex-col justify-between cursor-pointer transition group ${zenMode ? 'bg-black border-green-900/50 hover:border-green-500' : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'}`}
-                                            onClick={() => setModalView('storage')}
-                                          >
-                                              <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase group-hover:text-blue-400"><Database size={14}/> Storage <ChevronRight size={12} className="opacity-0 group-hover:opacity-100 transition"/></div>
-                                              <div>
-                                                  <div className={`text-2xl font-mono tracking-tight ${zenMode ? 'text-green-400' : 'text-white'}`}>{formatBytes(selectedNode.storage_used)}</div>
-                                                  <div className="h-1.5 bg-zinc-800 mt-3 rounded-full overflow-hidden"><div className={`h-full ${zenMode ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: selectedNode.storage_usage_percentage }}></div></div>
-                                              </div>
-                                          </div>
-                                          
-                                          {/* RANK CARD (Interactive) */}
-                                          <Link href="/leaderboard">
-                                              <div className={`h-full p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden animate-[pulse_4s_infinite] ${zenMode ? 'bg-black border-green-900/50 hover:border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'bg-zinc-900/50 border-zinc-800 hover:border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.1)]'}`}>
-                                                  <div className="absolute top-0 right-0 p-8 bg-yellow-500/5 blur-xl rounded-full group-hover:bg-yellow-500/10 transition"></div>
-                                                  <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase"><Trophy size={14}/> Rank</div>
-                                                  <div className={`text-3xl font-mono font-bold ${zenMode ? 'text-green-400' : 'text-yellow-500'}`}>#{selectedNode.rank || 'N/A'}</div>
-                                                  <div className="text-xs text-zinc-400 font-mono mt-1">{selectedNode.credits ? `${(selectedNode.credits / 1000).toFixed(1)}k Credits` : '0 Credits'}</div>
-                                                  <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-0 translate-x-2 text-yellow-500"><ChevronRight size={16}/></div>
-                                              </div>
-                                          </Link>
-
-                                          {/* LOCATION CARD (Interactive) */}
-                                          <Link href={`/map?focus=${selectedNode.address.split(':')[0]}`}>
-                                              <div className={`h-full p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden animate-[pulse_5s_infinite] ${zenMode ? 'bg-black border-green-900/50 hover:border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]'}`}>
-                                                  <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition"></div>
-                                                  <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase"><Globe size={14}/> Location</div>
-                                                  <div className={`text-lg font-mono truncate opacity-80 ${zenMode ? 'text-green-400' : 'text-white'}`}>{selectedNode.address.split(':')[0]}</div>
-                                                  <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-0 translate-x-2 text-blue-400"><MapIcon size={16}/></div>
-                                              </div>
-                                          </Link>
-
-                                          {/* VERSION CARD */}
-                                          <div className={`p-5 rounded-2xl border ${zenMode ? 'bg-black border-green-900/50' : 'bg-zinc-900/50 border-zinc-800'}`}>
-                                              <div className="flex items-center gap-2 mb-2 text-zinc-500 text-xs font-bold uppercase"><Server size={14}/> Version</div>
-                                              <div className={`text-xl font-mono ${zenMode ? 'text-green-400' : 'text-white'}`}>{selectedNode.version}</div>
-                                              <div className="text-[10px] text-green-500 mt-1 font-bold bg-green-500/10 inline-block px-2 py-0.5 rounded">LATEST</div>
-                                          </div>
-                                      </div>
-                                  )}
-                              </div>
-                          </div>
-                      )}
-                  </div>
-
-                  {/* MODAL FOOTER (ACTION BAR) */}
-                  <div className={`p-6 border-t flex flex-col gap-4 ${zenMode ? 'bg-black border-green-900/30' : 'bg-zinc-900/30 border-zinc-800'}`}>
-                      {!compareMode && !shareMode && (
-                          <>
-                              {/* UTILITY ROW */}
-                              <div className="flex gap-2 justify-center pb-2">
-                                  <button onClick={() => shareToTwitter(selectedNode)} className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 text-blue-400 transition" title="Share on X">
-                                      <Twitter size={14} />
-                                  </button>
-                                  <button onClick={() => copyStatusReport(selectedNode)} className="p-2 rounded-lg bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition" title="Copy Report">
-                                      {copiedField === 'report' ? <Check size={14} className="text-green-500"/> : <ClipboardCopy size={14} />}
-                                  </button>
-                                  <button onClick={() => copyRawJson(selectedNode)} className="p-2 rounded-lg bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition" title="Copy JSON">
-                                      {copiedField === 'json' ? <Check size={14} className="text-green-500"/> : <FileJson size={14} />}
-                                  </button>
-                              </div>
-
-                              <div className="flex gap-4">
-                                  <button 
-                                    onClick={() => setCompareMode(true)}
-                                    className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] border border-zinc-700"
-                                  >
-                                      <Swords size={16} className="text-red-400" /> COMPARE NODES
-                                  </button>
-                                  <button 
-                                    onClick={() => setShareMode(true)}
-                                    className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] shadow-lg shadow-blue-900/20"
-                                  >
-                                      <Camera size={16} /> PROOF OF PULSE
-                                  </button>
-                              </div>
-                          </>
-                      )}
-                  </div>
-              </div>
-          </div>
-      )}
-      
-      {/* FOOTER - Hidden in Zen Mode */}
-      {!zenMode && (
-        <footer className="border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto text-center">
-            <h3 className="text-white font-bold mb-2">XANDEUM PULSE MONITOR</h3>
-            <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.</p>
-            <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-600 mb-4">
-                <span className="opacity-50">pRPC Powered</span><span className="text-zinc-800">|</span>
-                <div className="flex items-center gap-1"><span>Built by</span><a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-blue-400 transition font-bold flex items-center gap-1">riot' <Twitter size={10} /></a></div>
-                <span className="text-zinc-800">|</span>
-                <a href="https://github.com/Idle0x/xandeum-pulse" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition flex items-center gap-1">Open Source <ExternalLink size={10} /></a>
-            </div>
-            <Link href="/docs" className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-4 decoration-zinc-700 flex items-center justify-center gap-1 mt-4"><BookOpen size={10} /> System Architecture & Docs</Link>
-        </footer>
-      )}
-    </div>
-  );
-}
+                              {/*
