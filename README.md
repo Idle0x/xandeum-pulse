@@ -9,7 +9,7 @@ Real-time network monitor, geographic visualizer, and analytics dashboard for th
 
 **⚡ Live Demo:** [https://xandeum-pulse.vercel.app](https://xandeum-pulse.vercel.app)
 
-> **Note to Judges:** This project goes beyond a UI wrapper. It implements a custom **"Vitality Score" algorithm**, **RPC failover protection**, and a **3D geospatial engine** to provide deep analytics on network health.
+> **Optional Note:** This project implements a custom **"Vitality Score" algorithm**, **RPC failover protection**, and a **3D geospatial engine** to provide deep analytics on network health.
 
 ---
 
