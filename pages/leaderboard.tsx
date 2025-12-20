@@ -3,7 +3,7 @@ import Head from 'next/head';
 import axios from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Trophy, Medal, ArrowLeft, Search, Wallet, X, ChevronRight, Activity, Users, BarChart3, HelpCircle, Star, Calculator, TrendingUp, Zap, Info, ChevronDown, ChevronUp, PlayCircle, RefreshCw, ExternalLink, ArrowUpRight } from 'lucide-react';
+import { Trophy, Medal, ArrowLeft, Search, Wallet, X, ChevronRight, Activity, Users, BarChart3, HelpCircle, Star, Calculator, TrendingUp, Zap, Info, ChevronDown, ChevronUp, PlayCircle, RefreshCw, ExternalLink, ArrowUpRight, Eye } from 'lucide-react';
 
 interface RankedNode {
   rank: number;
@@ -205,17 +205,17 @@ export default function Leaderboard() {
         <div className="w-32 hidden md:block"></div>
       </div>
 
-      {/* --- STOINC SIMULATOR WIDGET --- */}
-      <div className="max-w-5xl mx-auto mb-10 bg-gradient-to-b from-zinc-900 to-black border border-yellow-500/30 rounded-2xl overflow-hidden shadow-2xl transition-all duration-300">
+      {/* --- STOINC SIMULATOR WIDGET (With Glow) --- */}
+      <div className="max-w-5xl mx-auto mb-10 bg-gradient-to-b from-zinc-900 to-black border border-yellow-500/30 rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.1)] transition-all duration-300">
           <div 
             className="p-4 bg-yellow-500/10 border-b border-yellow-500/20 flex justify-between items-center cursor-pointer hover:bg-yellow-500/20 transition"
             onClick={() => setShowSim(!showSim)}
           >
               <div className="flex items-center gap-3">
-                  <div className="p-2 bg-yellow-500 text-black rounded-lg"><Calculator size={20} /></div>
+                  <div className="p-2 bg-yellow-500 text-black rounded-lg animate-pulse"><Calculator size={20} /></div>
                   <div>
                       <h2 className="font-bold text-yellow-500 text-sm uppercase tracking-widest">STOINC Simulator</h2>
-                      <p className="text-[10px] text-zinc-400">Estimate your projected earnings based on the official Xandeum economic model</p>
+                      <p className="text-[10px] text-zinc-400">Estimate forecasted earnings based on official Xandeum calculations</p>
                   </div>
               </div>
               {showSim ? <ChevronUp size={20} className="text-yellow-500" /> : <ChevronDown size={20} className="text-zinc-500" />}
@@ -228,31 +228,28 @@ export default function Leaderboard() {
                       {/* LEFT: INPUTS */}
                       <div className="space-y-8">
                           
-                          {/* BASE CREDIT INPUT */}
-                          <div className="relative">
+                          {/* BASE CREDIT INPUT - HIDDEN WHEN HARDWARE CALC IS OPEN */}
+                          <div className={`relative ${showHardwareCalc ? 'hidden' : 'block'}`}>
                               <div className="flex justify-between items-end mb-2">
                                   <div className="flex items-center gap-2 text-zinc-400">
                                       <span className="text-xs font-bold uppercase tracking-wider text-white">Base Reputation Credits</span>
                                       <HelpCircle size={12} className="cursor-help hover:text-white" onClick={() => toggleTooltip('base_input')} />
                                   </div>
                                   <button 
-                                    onClick={() => setShowHardwareCalc(!showHardwareCalc)}
+                                    onClick={() => setShowHardwareCalc(true)}
                                     className="text-[10px] text-blue-400 hover:text-blue-300 underline underline-offset-2 flex items-center gap-1"
                                   >
-                                      {showHardwareCalc ? "Hide Calculator" : "Don't know? Calculate from Hardware"}
+                                      Don't know? Calculate from Hardware
                                   </button>
                               </div>
                               {activeTooltip === 'base_input' && <div className="absolute z-10 bg-zinc-800 border border-zinc-700 p-3 rounded text-[10px] text-zinc-300 w-full -top-12 left-0 shadow-xl">The raw score derived from (Nodes × Storage × Stake). Select a node below to auto-fill, or type a hypothetical value.</div>}
                               
-                              <div className={`flex items-center bg-zinc-900 border rounded-xl overflow-hidden transition-all ${showHardwareCalc ? 'border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.1)]' : 'border-zinc-700 focus-within:border-yellow-500'}`}>
+                              <div className="flex items-center bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden focus-within:border-yellow-500 transition-all">
                                   <input 
                                     type="number" 
                                     min="0" 
                                     value={baseCreditsInput} 
-                                    onChange={(e) => {
-                                        setBaseCreditsInput(Number(e.target.value));
-                                        setShowHardwareCalc(false); // Disable hardware sync if user types manually
-                                    }}
+                                    onChange={(e) => setBaseCreditsInput(Number(e.target.value))}
                                     className="w-full bg-transparent p-4 text-white text-2xl font-mono font-bold outline-none"
                                     placeholder="0"
                                   />
@@ -260,10 +257,18 @@ export default function Leaderboard() {
                               </div>
                           </div>
 
-                          {/* HARDWARE CALCULATOR (COLLAPSIBLE) */}
+                          {/* HARDWARE CALCULATOR (TOGGLEABLE) */}
                           {showHardwareCalc && (
-                              <div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-top-2">
-                                  <div className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-2">Hardware Specs Calculator</div>
+                              <div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-top-2 relative">
+                                  <div className="flex justify-between items-center mb-2">
+                                      <div className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Hardware Specs Calculator</div>
+                                      <button 
+                                        onClick={() => setShowHardwareCalc(false)}
+                                        className="text-[10px] text-zinc-500 hover:text-white underline"
+                                      >
+                                          Hide Calculator
+                                      </button>
+                                  </div>
                                   
                                   <div className="grid grid-cols-2 gap-4">
                                       <div>
@@ -387,8 +392,8 @@ export default function Leaderboard() {
         </div>
       )}
 
-      {/* SEARCH */}
-      <div className="max-w-5xl mx-auto mb-6 relative space-y-2">
+      {/* SEARCH & TIPS */}
+      <div className="max-w-5xl mx-auto mb-6 relative space-y-3">
         <div className="relative">
             <Search className="absolute left-4 top-3.5 text-zinc-500" size={20} />
             <input 
@@ -408,10 +413,16 @@ export default function Leaderboard() {
             )}
         </div>
         
-        {/* DISCLAIMER / UPDATE FREQUENCY */}
-        <div className="flex items-center gap-2 text-[10px] text-zinc-500 px-2">
-            <RefreshCw size={10} />
-            <span>Credits & Rank update per <strong>Epoch</strong>. Liveness updates in real-time.</span>
+        {/* DUAL TIPS - STACKED ON MOBILE, ROW ON DESKTOP */}
+        <div className="flex flex-col md:flex-row gap-2 md:gap-6 px-2">
+            <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                <RefreshCw size={10} />
+                <span>Credits update per <strong>Epoch</strong>. Liveness updates in real-time.</span>
+            </div>
+            <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                <Star size={10} className="text-yellow-500" />
+                <span>Highlighted rows indicate nodes in your <strong>Watchlist</strong>.</span>
+            </div>
         </div>
       </div>
 
@@ -477,28 +488,30 @@ export default function Leaderboard() {
                     </div>
                     </div>
 
-                    {/* EXPANDED VIEW (ACCORDION) */}
+                    {/* EXPANDED VIEW (ACCORDION - SPACIOUS LAYOUT) */}
                     {isExpanded && (
-                        <div className="bg-black/40 border-b border-zinc-800/50 p-4 pl-8 md:pl-16 animate-in slide-in-from-top-2 duration-200">
-                            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-                                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest hidden md:block mr-4">
+                        <div className="bg-black/40 border-b border-zinc-800/50 p-4 pl-4 md:pl-12 animate-in slide-in-from-top-2 duration-200">
+                            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest hidden md:block">
                                     Quick Actions
                                 </div>
-                                <Link href={`/?open=${node.pubkey}`} className="w-full md:w-auto">
-                                    <button className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-xs font-bold text-white transition-all shadow-lg hover:shadow-blue-500/10">
-                                        <Activity size={14} className="text-blue-400" />
-                                        VIEW NODE DIAGNOSTICS
-                                        <ExternalLink size={10} className="text-zinc-500" />
+                                <div className="flex gap-4 w-full md:w-auto">
+                                    <Link href={`/?open=${node.pubkey}`} className="flex-1 md:flex-none">
+                                        <button className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-xs font-bold text-white transition-all shadow-lg hover:shadow-blue-500/10">
+                                            <Activity size={14} className="text-blue-400" />
+                                            VIEW NODE DIAGNOSTICS
+                                            <ExternalLink size={10} className="text-zinc-500" />
+                                        </button>
+                                    </Link>
+                                    <button 
+                                        onClick={handleUseInSim}
+                                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/20 text-xs font-bold text-yellow-500 transition-all shadow-lg hover:shadow-yellow-500/10"
+                                    >
+                                        <Calculator size={14} />
+                                        CALCULATE EARNINGS
+                                        <ArrowUpRight size={10} className="text-yellow-500/50" />
                                     </button>
-                                </Link>
-                                <button 
-                                    onClick={handleUseInSim}
-                                    className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/20 text-xs font-bold text-yellow-500 transition-all shadow-lg hover:shadow-yellow-500/10"
-                                >
-                                    <Calculator size={14} />
-                                    CALCULATE EARNINGS
-                                    <ArrowUpRight size={10} className="text-yellow-500/50" />
-                                </button>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -513,7 +526,7 @@ export default function Leaderboard() {
       {!loading && (
         <div className="max-w-5xl mx-auto mt-6 text-center text-xs text-zinc-600 flex flex-col md:flex-row items-center justify-center gap-2">
           <div className="flex items-center gap-2">
-            <HelpCircle size={12} />
+            <Eye size={12} />
             <span>Tracking <span className="text-zinc-400 font-bold">{ranking.length}</span> earning nodes. Top 100 displayed.</span>
           </div>
           <span className="hidden md:inline text-zinc-700">•</span>
