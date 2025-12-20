@@ -8,7 +8,8 @@ import {
   HardDrive, Star, Copy, Check, CheckCircle, Globe, AlertTriangle, ArrowUp, 
   ArrowDown, Wallet, Medal, Twitter, Code, Info, ExternalLink, HelpCircle, 
   ChevronRight, Maximize2, Map as MapIcon, BookOpen, Menu, LayoutDashboard, 
-  HeartPulse, Swords, Share2, Monitor, ArrowLeftRight, Camera, BarChart2, ChevronLeft 
+  HeartPulse, Swords, Share2, Monitor, ArrowLeftRight, Camera, BarChart2, 
+  ChevronLeft, FileJson, ClipboardCopy 
 } from 'lucide-react';
 
 // --- TYPES ---
@@ -237,7 +238,7 @@ export default function Home() {
   // UX STATE RESTORATION
   const [searchTipIndex, setSearchTipIndex] = useState(0);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [activeTooltip, setActiveTooltip] = useState<string | null>(null); // Restored Tooltips
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null); 
   const searchTips = [
     "Search by IP, Public Key, or Version",
     "Tip: Click any node card for deep inspection",
@@ -280,7 +281,7 @@ export default function Home() {
 
     const cycleInterval = setInterval(() => { setCycleStep(prev => prev + 1); }, 4000);
     
-    // RESTORED SEARCH TIP ROTATION
+    // SEARCH TIP ROTATION
     const tipInterval = setInterval(() => {
         if (!isSearchFocused) setSearchTipIndex(prev => (prev + 1) % searchTips.length);
     }, 5000);
@@ -863,10 +864,7 @@ export default function Home() {
           {/* NODE GRID */}
           {loading && nodes.length === 0 ? <PulseGraphLoader /> : (
               <div className={`grid gap-4 ${warRoom ? 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'} pb-20`}>
-                  {filteredNodes.slice(0, warRoom ? 500 : 50).map((node, i) => {
-                      const cycle = getCycleContent(node, i);
-                      return renderNodeCard(node, i);
-                  })}
+                  {filteredNodes.slice(0, warRoom ? 500 : 50).map((node, i) => renderNodeCard(node, i))}
               </div>
           )}
       </main>
@@ -888,7 +886,7 @@ export default function Home() {
                               <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-2 mb-1">
                                   NODE INSPECTOR 
                                   <span className={`px-2 py-0.5 rounded text-[9px] ${selectedNode.is_public ? 'bg-green-500/10 text-green-500' : 'bg-orange-500/10 text-orange-500'}`}>
-                                      {selectedNode.is_public ? 'ACCESS: OPEN' : 'ACCESS: RESTRICTED'}
+                                      {selectedNode.is_public ? 'POLICY: OPEN' : 'POLICY: RESTRICTED'}
                                   </span>
                               </div>
                               <h2 className="text-lg md:text-xl font-mono text-white truncate w-64 md:w-96 flex items-center gap-2">
@@ -1061,21 +1059,36 @@ export default function Home() {
                   </div>
 
                   {/* MODAL FOOTER (ACTION BAR) */}
-                  <div className="p-6 border-t border-zinc-800 bg-zinc-900/30 flex gap-4">
+                  <div className="p-6 border-t border-zinc-800 bg-zinc-900/30 flex flex-col gap-4">
                       {!compareMode && !shareMode && (
                           <>
-                              <button 
-                                onClick={() => setCompareMode(true)}
-                                className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] border border-zinc-700"
-                              >
-                                  <Swords size={16} className="text-red-400" /> COMPARE NODES
-                              </button>
-                              <button 
-                                onClick={() => setShareMode(true)}
-                                className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] shadow-lg shadow-blue-900/20"
-                              >
-                                  <Camera size={16} /> PROOF OF PULSE
-                              </button>
+                              {/* UTILITY ROW */}
+                              <div className="flex gap-2 justify-center pb-2">
+                                  <button onClick={() => shareToTwitter(selectedNode)} className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 text-blue-400 transition" title="Share on X">
+                                      <Twitter size={14} />
+                                  </button>
+                                  <button onClick={() => copyStatusReport(selectedNode)} className="p-2 rounded-lg bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition" title="Copy Report">
+                                      {copiedField === 'report' ? <Check size={14} className="text-green-500"/> : <ClipboardCopy size={14} />}
+                                  </button>
+                                  <button onClick={() => copyRawJson(selectedNode)} className="p-2 rounded-lg bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition" title="Copy JSON">
+                                      {copiedField === 'json' ? <Check size={14} className="text-green-500"/> : <FileJson size={14} />}
+                                  </button>
+                              </div>
+
+                              <div className="flex gap-4">
+                                  <button 
+                                    onClick={() => setCompareMode(true)}
+                                    className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] border border-zinc-700"
+                                  >
+                                      <Swords size={16} className="text-red-400" /> COMPARE NODES
+                                  </button>
+                                  <button 
+                                    onClick={() => setShareMode(true)}
+                                    className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] shadow-lg shadow-blue-900/20"
+                                  >
+                                      <Camera size={16} /> PROOF OF PULSE
+                                  </button>
+                              </div>
                           </>
                       )}
                   </div>
