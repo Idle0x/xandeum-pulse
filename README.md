@@ -9,7 +9,7 @@ Real-time network monitor, geographic visualizer, and analytics dashboard for th
 
 **⚡ Live Demo:** [https://xandeum-pulse.vercel.app](https://xandeum-pulse.vercel.app)
 
-![Main Dashboard](https://private-user-images.githubusercontent.com/140549997/528860744-0578eb50-2b8d-4a78-bc91-a50a1933f917.jpg?)
+![Main Dashboard]([https://private-user-images.githubusercontent.com/140549997/528860744-0578eb50-2b8d-4a78-bc91-a50a1933f917.jpg?](https://private-user-images.githubusercontent.com/140549997/528860744-0578eb50-2b8d-4a78-bc91-a50a1933f917.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjYyMjc1OTAsIm5iZiI6MTc2NjIyNzI5MCwicGF0aCI6Ii8xNDA1NDk5OTcvNTI4ODYwNzQ0LTA1NzhlYjUwLTJiOGQtNGE3OC1iYzkxLWE1MGExOTMzZjkxNy5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjIwJTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyMFQxMDQxMzBaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT03YzljNTk5ZDQzMTg3ODUxNWZhOGJjOTZhNzE5YTc4NDljNjRjNWVkNjk5OWUxN2U2NjIxYzM4ZWZjOWU3YmEzJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.ryJXgNYyMWqgUBklmntZiZ2wFjKBjV-t9m4bF8K3Yko))
 
 > **Optional Note:** This implements a custom **"Vitality Score" algorithm**, **RPC failover protection**, and a **3D geospatial engine** to provide deep analytics on network health.
 
