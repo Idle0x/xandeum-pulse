@@ -62,6 +62,22 @@ export default function MapPage() {
   const visibleNodes = useMemo(() => locations.reduce((sum, loc) => sum + loc.count, 0), [locations]);
   const privateNodes = Math.max(0, stats.totalNodes - visibleNodes);
 
+  // --- NEW: AUTO-SCROLL ON TOGGLE SWITCH ---
+  // This effect runs whenever 'viewMode' changes.
+  // If a location is selected, it finds it in the new sorted list and scrolls to it.
+  useEffect(() => {
+      if (activeLocation && isSplitView) {
+          // Small timeout to allow the list to re-sort and render first
+          const timer = setTimeout(() => {
+              const item = document.getElementById(`list-item-${activeLocation}`);
+              if (item) {
+                  item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+          }, 150); 
+          return () => clearTimeout(timer);
+      }
+  }, [viewMode, activeLocation, isSplitView]);
+
   // --- FETCH DATA & HANDLE DEEP LINK ---
   useEffect(() => {
     const fetchGeo = async () => {
@@ -170,24 +186,27 @@ export default function MapPage() {
 
   const lockTarget = (name: string, lat: number, lon: number) => {
     if (activeLocation === name) {
-        resetView();
-        return;
+        // If clicking the same target, don't reset, just ensure visibility
+        // This allows re-clicking to center without full reset logic if already active
+    } else {
+        setActiveLocation(name);
+        setExpandedLocation(name); 
+        setPosition({ coordinates: [lon, lat], zoom: 3 });
+        setIsSplitView(true);
     }
-    setActiveLocation(name);
-    setExpandedLocation(name); 
-    setPosition({ coordinates: [lon, lat], zoom: 3 });
-    setIsSplitView(true);
+    
+    // Always scroll on explicit lock command
     if (listRef.current) {
          setTimeout(() => {
              const item = document.getElementById(`list-item-${name}`);
              if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-         }, 500);
+         }, 300);
     }
   };
 
   const toggleExpansion = (name: string, lat: number, lon: number) => {
       if (expandedLocation === name) {
-          resetView();
+          handleCloseDrawer(); // Use the proper close handler
       } else {
           lockTarget(name, lat, lon);
       }
@@ -473,17 +492,7 @@ export default function MapPage() {
             <div className={`flex flex-col h-full overflow-hidden ${isSplitView ? 'flex' : 'hidden'}`}>
                  <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-zinc-800/30 bg-[#09090b]">
                     <div className="flex items-center gap-3"><h2 className="text-sm font-bold text-white flex items-center gap-2"><Activity size={14} className="text-green-500" /> Live Data</h2><div className="hidden md:block scale-90 origin-left"><ViewToggles /></div></div>
-                    
-                    {/* RED BIG CLOSE BUTTON */}
-                    <div className="flex items-center gap-2">
-                        <div className="md:hidden scale-75 origin-right"><ViewToggles /></div>
-                        <button 
-                            onClick={handleCloseDrawer} 
-                            className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg"
-                        >
-                            <X size={20} />
-                        </button>
-                    </div>
+                    <div className="flex items-center gap-2"><div className="md:hidden scale-75 origin-right"><ViewToggles /></div><button onClick={handleCloseDrawer} className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg"><X size={20} /></button></div>
                  </div>
 
                  <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar bg-[#09090b]">
