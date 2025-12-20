@@ -75,7 +75,7 @@ export default function DocsPage() {
                         <h3 className="text-2xl font-bold text-white mb-4">"Hero & Race" Failover</h3>
                         <p className="text-zinc-400 mb-6 text-sm leading-relaxed">
                             Traditional dashboards crash when the API goes down. Pulse uses a high-frequency trading strategy. 
-                            First, we try the <strong>Hero</strong> (Primary Seed). If it hangs for >4s, we trigger a <strong>Race</strong> 
+                            First, we try the <strong>Hero</strong> (Primary Seed). If it hangs for &gt;4s, we trigger a <strong>Race</strong> 
                             between 3 random backup nodes.
                         </p>
                         <ul className="space-y-4">
@@ -540,4 +540,7 @@ function FeatureCard({ icon: Icon, title, desc, color = "blue" }: { icon: any, t
                 <Icon size={24} />
             </div>
             <h3 className="text-lg font-bold text-white mb-3">{title}</h3>
-            <p className="text-sm
+            <p className="text-sm text-zinc-400 leading-relaxed">{desc}</p>
+        </div>
+    )
+}
