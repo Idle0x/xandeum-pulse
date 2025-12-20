@@ -63,11 +63,8 @@ export default function MapPage() {
   const privateNodes = Math.max(0, stats.totalNodes - visibleNodes);
 
   // --- NEW: AUTO-SCROLL ON TOGGLE SWITCH ---
-  // This effect runs whenever 'viewMode' changes.
-  // If a location is selected, it finds it in the new sorted list and scrolls to it.
   useEffect(() => {
       if (activeLocation && isSplitView) {
-          // Small timeout to allow the list to re-sort and render first
           const timer = setTimeout(() => {
               const item = document.getElementById(`list-item-${activeLocation}`);
               if (item) {
@@ -186,8 +183,7 @@ export default function MapPage() {
 
   const lockTarget = (name: string, lat: number, lon: number) => {
     if (activeLocation === name) {
-        // If clicking the same target, don't reset, just ensure visibility
-        // This allows re-clicking to center without full reset logic if already active
+        // Just recenter, don't reset
     } else {
         setActiveLocation(name);
         setExpandedLocation(name); 
@@ -195,7 +191,6 @@ export default function MapPage() {
         setIsSplitView(true);
     }
     
-    // Always scroll on explicit lock command
     if (listRef.current) {
          setTimeout(() => {
              const item = document.getElementById(`list-item-${name}`);
@@ -204,9 +199,10 @@ export default function MapPage() {
     }
   };
 
+  // FIX: Collapsing now ONLY resets view, keeping drawer OPEN
   const toggleExpansion = (name: string, lat: number, lon: number) => {
       if (expandedLocation === name) {
-          handleCloseDrawer(); // Use the proper close handler
+          resetView(); 
       } else {
           lockTarget(name, lat, lon);
       }
@@ -492,7 +488,17 @@ export default function MapPage() {
             <div className={`flex flex-col h-full overflow-hidden ${isSplitView ? 'flex' : 'hidden'}`}>
                  <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-zinc-800/30 bg-[#09090b]">
                     <div className="flex items-center gap-3"><h2 className="text-sm font-bold text-white flex items-center gap-2"><Activity size={14} className="text-green-500" /> Live Data</h2><div className="hidden md:block scale-90 origin-left"><ViewToggles /></div></div>
-                    <div className="flex items-center gap-2"><div className="md:hidden scale-75 origin-right"><ViewToggles /></div><button onClick={handleCloseDrawer} className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg"><X size={20} /></button></div>
+                    
+                    {/* RED BIG CLOSE BUTTON */}
+                    <div className="flex items-center gap-2">
+                        <div className="md:hidden scale-75 origin-right"><ViewToggles /></div>
+                        <button 
+                            onClick={handleCloseDrawer} 
+                            className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg"
+                        >
+                            <X size={20} />
+                        </button>
+                    </div>
                  </div>
 
                  <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar bg-[#09090b]">
@@ -559,10 +565,15 @@ export default function MapPage() {
 
             {!isSplitView && (
                 <div className="shrink-0 p-3 md:px-6 md:py-4 bg-[#09090b] border-t border-zinc-800/30 z-50">
-                    <button onClick={() => setIsSplitView(true)} className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 px-6 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-blue-500/50 rounded-xl transition-all group">
-                        <Activity size={16} className="text-blue-400 group-hover:scale-110 transition-transform" />
-                        <span className="text-xs md:text-sm font-bold uppercase tracking-widest text-zinc-200 group-hover:text-white">Open Live Stats</span>
-                        <ChevronUp size={16} className="text-zinc-500 group-hover:-translate-y-1 transition-transform" />
+                    <button 
+                        onClick={() => setIsSplitView(true)}
+                        className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 px-6 py-3 bg-zinc-900/80 hover:bg-zinc-800 border border-blue-500/30 hover:border-blue-500/60 rounded-xl transition-all group shadow-[0_0_20px_rgba(59,130,246,0.15)] hover:shadow-[0_0_30px_rgba(59,130,246,0.3)] animate-[pulse_3s_infinite]"
+                    >
+                        <Activity size={16} className="text-blue-400 group-hover:scale-110 transition-transform animate-pulse" />
+                        <span className="text-xs md:text-sm font-bold uppercase tracking-widest text-blue-100 group-hover:text-white">
+                            Open Live Stats
+                        </span>
+                        <ChevronUp size={16} className="text-blue-500/50 group-hover:-translate-y-1 transition-transform" />
                     </button>
                 </div>
             )}
