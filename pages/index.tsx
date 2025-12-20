@@ -752,9 +752,9 @@ export default function Home() {
                             </div>
                             </div>
                         </div>
-                        {/* DEEP LINK TO MAP */}
+                        {/* DEEP LINK TO MAP (PULSING) */}
                         <Link href={`/map?focus=${selectedNode.address.split(':')[0]}`}>
-                            <div className="bg-gradient-to-r from-blue-900/20 to-indigo-900/20 border border-blue-500/20 rounded-xl p-4 cursor-pointer hover:border-blue-500/50 transition-all group relative overflow-hidden">
+                            <div className="bg-gradient-to-r from-blue-900/20 to-indigo-900/20 border border-blue-500/20 rounded-xl p-4 cursor-pointer hover:border-blue-500/50 transition-all group relative overflow-hidden shadow-[0_0_15px_rgba(59,130,246,0.15)] hover:shadow-[0_0_25px_rgba(59,130,246,0.3)] animate-[pulse_3s_infinite]">
                                 <div className="absolute inset-0 bg-blue-500/5 group-hover:bg-blue-500/10 transition-colors"></div>
                                 <div className="relative flex items-center justify-between">
                                     <div className="flex items-center gap-3">
@@ -847,7 +847,14 @@ export default function Home() {
                         <div className="flex items-center justify-between mb-3"><h4 className="text-[9px] text-zinc-500 uppercase font-bold">Reputation</h4><button onClick={(e) => { e.stopPropagation(); setShowReputationInfo(!showReputationInfo); }}><HelpCircle size={10} className="text-zinc-600 hover:text-zinc-400" /></button></div>
                         {(showReputationInfo) && <div className="absolute top-8 right-4 w-48 bg-zinc-900 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-10 shadow-xl animate-in fade-in slide-in-from-top-1">Reputation is earned by proving storage capacity and maintaining high uptime.</div>}
                         <div className="flex justify-between items-center mb-2"><span className="text-zinc-400 text-xs">Credits</span><span className="text-yellow-400 font-mono font-bold">{(selectedNode.credits || 0).toLocaleString()}</span></div>
-                        <Link href="/leaderboard"><div className="bg-zinc-900/50 border border-yellow-500/20 p-2 rounded-lg flex items-center justify-between cursor-pointer hover:border-yellow-500/40 transition mt-3 group"><div className="flex items-center gap-2"><Trophy size={14} className="text-yellow-500" /><span className="text-xs font-bold text-zinc-400">Global Rank</span></div><div className="flex items-center gap-3"><span className="text-lg font-bold text-white">#{(selectedNode.rank && selectedNode.rank < 9999) ? selectedNode.rank : '-'}</span><div className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[9px] font-bold flex items-center gap-1 border border-blue-500/20 group-hover:bg-blue-500/20 transition">VIEW <ChevronRight size={8} /></div></div></div></Link>
+                        
+                        {/* GLOBAL RANK LINK (PULSING) */}
+                        <Link href="/leaderboard">
+                            <div className="bg-zinc-900/50 border border-yellow-500/20 p-2 rounded-lg flex items-center justify-between cursor-pointer hover:border-yellow-500/40 transition mt-3 group shadow-[0_0_15px_rgba(234,179,8,0.15)] hover:shadow-[0_0_25px_rgba(234,179,8,0.3)] animate-[pulse_3s_infinite]">
+                                <div className="flex items-center gap-2"><Trophy size={14} className="text-yellow-500" /><span className="text-xs font-bold text-zinc-400">Global Rank</span></div>
+                                <div className="flex items-center gap-3"><span className="text-lg font-bold text-white">#{(selectedNode.rank && selectedNode.rank < 9999) ? selectedNode.rank : '-'}</span><div className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[9px] font-bold flex items-center gap-1 border border-blue-500/20 group-hover:bg-blue-500/20 transition">VIEW <ChevronRight size={8} /></div></div>
+                            </div>
+                        </Link>
                     </div>
                     <div className="mt-4 text-xs text-center text-zinc-500 group relative cursor-help"><Clock size={12} className="inline mr-1" />Last seen {formatLastSeen(selectedNode.last_seen_timestamp)}<div className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black border border-zinc-700 rounded px-2 py-1 text-[10px] whitespace-nowrap z-10">{formatDetailedTimestamp(selectedNode.last_seen_timestamp)}</div></div>
                     <div className="mt-6 pt-4 border-t border-white/5 grid grid-cols-3 gap-2">
