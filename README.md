@@ -55,7 +55,7 @@ To visualize physical decentralization without hitting API rate limits or slowin
 
 ## Key Features
 
-### 🌍 Global Topology Map
+### Global Topology Map
 A cinematic, interactive visualization of the network's physical infrastructure.
 * **Smart Aggregation:** Nodes are grouped by city to reduce visual clutter while preserving density data.
 * **Multi-Dimensional Views:** Toggle between Storage (Capacity), Health (Stability), and Credits (Reputation).
@@ -63,7 +63,7 @@ A cinematic, interactive visualization of the network's physical infrastructure.
 
 👉 **View Code:** [`pages/map.tsx`](pages/map.tsx)
 
-### 📊 Network Dashboard
+### Network Dashboard
 The command center for operational monitoring.
 * **Real-time Grid:** Filter nodes by IP, Public Key, or Version.
 * **Deep Inspection:** Click any node to view raw JSON data directly from the pRPC stream.
@@ -71,7 +71,7 @@ The command center for operational monitoring.
 
 👉 **View Code:** [`pages/index.tsx`](pages/index.tsx)
 
-### 🏆 Reputation Leaderboard
+### Reputation Leaderboard
 A dual-fetch system that correlates on-chain reputation with live node status.
 * Fetches credit balances from the Xandeum rewards oracle.
 * Merges data with live pRPC stats to map anonymous Public Keys to physical IP addresses.
