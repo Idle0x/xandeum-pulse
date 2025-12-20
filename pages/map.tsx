@@ -83,9 +83,9 @@ export default function MapPage() {
                           lockTarget(targetLoc.name, targetLoc.lat, targetLoc.lon);
                       }, 500);
                   } else {
-                      // NEW: Professional "Private Network" Message
+                      // CENTERED TOAST MESSAGE
                       setToast({ 
-                          msg: `Node ${targetIP} is on a Private Network. Location hidden.`, 
+                          msg: `Node ${targetIP} is on a Private Network. Location Hidden.`, 
                           type: 'private' 
                       });
                       setTimeout(() => setToast(null), 6000);
@@ -353,25 +353,6 @@ export default function MapPage() {
         <style>{`@supports (padding: max(0px)) { .pb-safe { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); } }`}</style>
       </Head>
 
-      {/* TOAST NOTIFICATION */}
-      {toast && (
-          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-2 fade-in duration-300 w-[90%] max-w-sm">
-              <div className={`flex items-start gap-3 px-4 py-3 rounded-xl border shadow-2xl backdrop-blur-md ${
-                  toast.type === 'error' ? 'bg-red-500/10 border-red-500/50 text-red-200' : 
-                  toast.type === 'private' ? 'bg-zinc-800 border-zinc-600 text-zinc-300' :
-                  'bg-zinc-800 border-zinc-700 text-white'
-              }`}>
-                  {toast.type === 'error' ? <AlertCircle size={18} className="text-red-500 mt-0.5" /> : 
-                   toast.type === 'private' ? <EyeOff size={18} className="text-zinc-400 mt-0.5" /> :
-                   <Info size={18} className="text-blue-500 mt-0.5" />}
-                  <div className="flex-1">
-                      <p className="text-xs font-bold leading-tight">{toast.msg}</p>
-                  </div>
-                  <button onClick={() => setToast(null)}><X size={14} className="opacity-50 hover:opacity-100" /></button>
-              </div>
-          </div>
-      )}
-
       {/* HEADER */}
       <div className="shrink-0 w-full z-50 flex flex-col gap-3 px-4 md:px-6 py-3 bg-[#09090b] border-b border-zinc-800/30">
         <div className="flex items-center justify-between w-full">
@@ -379,27 +360,53 @@ export default function MapPage() {
                 <ArrowLeft size={12} className="text-zinc-400 group-hover:text-white" />
                 <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-300">Dashboard</span>
             </Link>
-            <div className="flex items-center gap-2">
-                {/* TRACKING COUNTER BADGE */}
+            
+            {/* RIGHT SIDE STACK */}
+            <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full animate-pulse`} style={{ backgroundColor: MODE_COLORS[viewMode].hex }}></div>
+                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{viewMode} Mode</span>
+                </div>
+                
+                {/* TRACKING COUNTER BADGE - NOW VISIBLE & PROMINENT */}
                 {!loading && (
-                    <div className="hidden md:flex items-center gap-2 px-2 py-1 bg-zinc-900 rounded border border-zinc-800 text-[9px] font-mono text-zinc-500">
-                        <Eye size={10} className="text-zinc-600" />
-                        <span>Tracking {visibleNodes}/{stats.totalNodes} Nodes</span>
-                        {privateNodes > 0 && <span className="text-zinc-600">({privateNodes} Private)</span>}
+                    <div className="flex items-center gap-1.5 text-zinc-400">
+                        <Eye size={12} className="text-zinc-500" />
+                        <span className="text-xs md:text-sm font-bold tracking-tight">
+                            Tracking {visibleNodes} <span className="text-zinc-600">/ {stats.totalNodes} Nodes</span>
+                        </span>
                     </div>
                 )}
-                <div className={`w-1.5 h-1.5 rounded-full animate-pulse`} style={{ backgroundColor: MODE_COLORS[viewMode].hex }}></div>
-                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{viewMode} Mode</span>
             </div>
         </div>
+        
         <div>
             <h1 className="text-lg md:text-2xl font-bold tracking-tight text-white leading-tight">{getDynamicTitle()}</h1>
             <p className="text-xs text-zinc-400 leading-relaxed mt-1 max-w-2xl">{getDynamicSubtitle()}</p>
         </div>
       </div>
 
-      {/* MAP AREA */}
+      {/* MAP AREA (Relative Parent for Toast) */}
       <div className={`relative w-full bg-[#080808] ${isSplitView ? 'h-[40vh] shrink-0' : 'flex-1 basis-0 min-h-0'}`}>
+            
+            {/* CENTERED TOAST NOTIFICATION */}
+            {toast && (
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100] animate-in zoom-in-95 duration-300 w-[90%] max-w-sm pointer-events-none">
+                    <div className={`flex items-start gap-3 px-5 py-4 rounded-2xl border shadow-2xl backdrop-blur-xl ${
+                        toast.type === 'error' ? 'bg-red-500/10 border-red-500/50 text-red-200' : 
+                        toast.type === 'private' ? 'bg-black/80 border-zinc-700 text-zinc-200' :
+                        'bg-zinc-800 border-zinc-700 text-white'
+                    }`}>
+                        {toast.type === 'error' ? <AlertCircle size={20} className="text-red-500 mt-0.5 shrink-0" /> : 
+                         toast.type === 'private' ? <EyeOff size={20} className="text-zinc-400 mt-0.5 shrink-0" /> :
+                         <Info size={20} className="text-blue-500 mt-0.5 shrink-0" />}
+                        <div className="flex-1">
+                            <p className="text-sm font-bold leading-tight">{toast.msg}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {loading ? (
                 <div className="absolute inset-0 flex items-center justify-center z-20"><Globe className="animate-pulse text-blue-500" /></div>
             ) : (
