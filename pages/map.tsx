@@ -4,14 +4,14 @@ import Link from 'next/link';
 import axios from 'axios';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleSqrt } from 'd3-scale';
-import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Info, X, Server, Layers, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Info, X, Server, Layers, TrendingUp, BarChart3 } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
 interface LocationData {
   name: string; country: string; lat: number; lon: number; count: number;
   totalStorage: number; totalCredits: number; avgHealth: number;
-  stableCount?: number; criticalCount?: number; // Optional fields from API
+  stableCount?: number; criticalCount?: number;
 }
 
 interface MapStats {
@@ -20,6 +20,7 @@ interface MapStats {
 
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
+// Gold, Pink, Purple, Blue, Cyan
 const TIER_COLORS = ["#f59e0b", "#ec4899", "#a855f7", "#3b82f6", "#22d3ee"]; 
 
 const TIER_LABELS = {
@@ -28,11 +29,8 @@ const TIER_LABELS = {
     HEALTH:  ['Flawless', 'Robust', 'Fair', 'Shaky', 'Critical']
 };
 
-const LEGEND_LABELS = {
-    STORAGE: ['> 1 TB', '100 GB+', '10-100 GB', '1-10 GB', '< 1 GB'],
-    CREDITS: ['> 100k', '10k-100k', '1k-10k', '100-1k', '< 100'],
-    HEALTH:  ['> 90%', '75-90%', '60-75%', '40-60%', '< 40%']
-};
+// Fixed thresholds for Health (Quality is absolute)
+const HEALTH_THRESHOLDS = [90, 75, 60, 40];
 
 export default function MapPage() {
   const [locations, setLocations] = useState<LocationData[]>([]);
@@ -42,12 +40,15 @@ export default function MapPage() {
   
   const [isSplitView, setIsSplitView] = useState(false);
   const [activeLocation, setActiveLocation] = useState<string | null>(null);
-  
   const [expandedLocation, setExpandedLocation] = useState<string | null>(null);
 
   const [position, setPosition] = useState({ coordinates: [10, 20], zoom: 1.2 });
   const [copiedCoords, setCopiedCoords] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // --- DYNAMIC THRESHOLD STATE ---
+  // We store the calculated cutoff values for the active view mode here
+  const [dynamicThresholds, setDynamicThresholds] = useState<number[]>([0, 0, 0, 0]);
 
   useEffect(() => {
     const fetchGeo = async () => {
@@ -64,35 +65,86 @@ export default function MapPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // --- DYNAMIC TIER CALCULATION ---
+  // Recalculate percentiles whenever data or view mode changes
+  useEffect(() => {
+      if (locations.length === 0) return;
+
+      if (viewMode === 'HEALTH') {
+          // Health uses fixed standards, not relative curves
+          setDynamicThresholds(HEALTH_THRESHOLDS);
+          return;
+      }
+
+      // 1. Extract values based on mode
+      const values = locations.map(l => viewMode === 'STORAGE' ? l.totalStorage : l.totalCredits).sort((a, b) => a - b);
+      
+      // 2. Helper for percentiles
+      const getQuantile = (q: number) => {
+          const pos = (values.length - 1) * q;
+          const base = Math.floor(pos);
+          const rest = pos - base;
+          if ((values[base + 1] !== undefined)) {
+              return values[base] + rest * (values[base + 1] - values[base]);
+          } else {
+              return values[base];
+          }
+      };
+
+      // 3. Calculate Top 10%, Top 25%, Top 50%, Top 75% cutoffs
+      // Tier 0 (Gold) > 90th percentile
+      // Tier 1 (Pink) > 75th percentile
+      // Tier 2 (Purple) > 50th percentile
+      // Tier 3 (Blue) > 25th percentile
+      setDynamicThresholds([
+          getQuantile(0.90),
+          getQuantile(0.75),
+          getQuantile(0.50),
+          getQuantile(0.25)
+      ]);
+
+  }, [locations, viewMode]);
+
   // --- LOGIC HELPERS ---
 
   const getTierIndex = (loc: LocationData): number => {
-    if (viewMode === 'STORAGE') {
-        const gb = loc.totalStorage;
-        if (gb >= 1000) return 0; if (gb >= 100) return 1; if (gb >= 10) return 2; if (gb >= 1) return 3; return 4;
-    }
-    if (viewMode === 'CREDITS') {
-        const cr = loc.totalCredits;
-        if (cr >= 100000) return 0; if (cr >= 10000) return 1; if (cr >= 1000) return 2; if (cr >= 100) return 3; return 4;
-    }
-    const h = loc.avgHealth;
-    if (h >= 90) return 0; if (h >= 75) return 1; if (h >= 60) return 2; if (h >= 40) return 3; return 4;
+    let val = 0;
+    if (viewMode === 'STORAGE') val = loc.totalStorage;
+    else if (viewMode === 'CREDITS') val = loc.totalCredits;
+    else val = loc.avgHealth;
+
+    // Compare against the calculated thresholds
+    if (val >= dynamicThresholds[0]) return 0; // Gold
+    if (val >= dynamicThresholds[1]) return 1; // Pink
+    if (val >= dynamicThresholds[2]) return 2; // Purple
+    if (val >= dynamicThresholds[3]) return 3; // Blue
+    return 4; // Cyan
+  };
+
+  // Helper to format legend text dynamically
+  const getLegendLabels = () => {
+      if (viewMode === 'HEALTH') return ['> 90%', '75-90%', '60-75%', '40-60%', '< 40%'];
+      
+      const format = (v: number) => viewMode === 'STORAGE' ? formatStorage(v) : `${Math.round(v/1000)}k`;
+      
+      return [
+          `> ${format(dynamicThresholds[0])}`, // Gold
+          `${format(dynamicThresholds[1])} - ${format(dynamicThresholds[0])}`, // Pink
+          `${format(dynamicThresholds[2])} - ${format(dynamicThresholds[1])}`, // Purple
+          `${format(dynamicThresholds[3])} - ${format(dynamicThresholds[2])}`, // Blue
+          `< ${format(dynamicThresholds[3])}`  // Cyan
+      ];
   };
 
   const lockTarget = (name: string, lat: number, lon: number) => {
-    // If clicking the same target, FULL RESET
     if (activeLocation === name) {
         resetView();
         return;
     }
-    
-    // Otherwise, expand and zoom
     setActiveLocation(name);
     setExpandedLocation(name); 
     setPosition({ coordinates: [lon, lat], zoom: 3 });
-    
     if (!isSplitView) setIsSplitView(true);
-
     if (listRef.current) {
          setTimeout(() => {
              const item = document.getElementById(`list-item-${name}`);
@@ -101,13 +153,9 @@ export default function MapPage() {
     }
   };
 
-  // Fixed: Single click collapse now resets everything
   const toggleExpansion = (name: string, lat: number, lon: number) => {
-      if (expandedLocation === name) {
-          resetView(); // IMMEDIATE RESET
-      } else {
-          lockTarget(name, lat, lon);
-      }
+      if (expandedLocation === name) resetView();
+      else lockTarget(name, lat, lon);
   };
 
   const resetView = () => {
@@ -145,10 +193,12 @@ export default function MapPage() {
     }
   };
 
-  // --- UPDATED X-RAY STATS (Now using real API counts) ---
-  const getXRayStats = (loc: LocationData) => {
+  // --- 3-COLUMN X-RAY STATS ---
+  const getXRayStats = (loc: LocationData, index: number) => {
       const globalShare = ((loc.count / stats.totalNodes) * 100).toFixed(1);
-      
+      const percentile = Math.round(((locations.length - index) / locations.length) * 100);
+      const rankText = `Top ${100 - percentile}%`;
+
       if (viewMode === 'STORAGE') {
           const avgPerNode = loc.totalStorage / loc.count;
           return {
@@ -156,6 +206,8 @@ export default function MapPage() {
               valA: `${formatStorage(avgPerNode)} / Node`,
               labelB: 'Global Share',
               valB: `${globalShare}% of Network`,
+              labelC: 'Percentile',
+              valC: rankText,
               icon: Database
           };
       }
@@ -166,20 +218,21 @@ export default function MapPage() {
               valA: `${avgCred.toLocaleString()} Cr / Node`,
               labelB: 'Contribution',
               valB: `${globalShare}% of Economy`,
+              labelC: 'Percentile',
+              valC: rankText,
               icon: Zap
           };
       }
-      // HEALTH MODE: USES PRECISE COUNTS
+      // Health Mode
       const stable = loc.stableCount ?? 0;
       const critical = loc.criticalCount ?? 0;
-      // Calculate "Fair" nodes (implied rest)
-      const fair = loc.count - (stable + critical);
-      
       return {
           labelA: 'Status Breakdown',
-          valA: `${stable} Stable • ${critical} Critical`, // Precise breakdown
+          valA: `${stable} Stable • ${critical} Critical`,
           labelB: 'Node Count',
-          valB: `${globalShare}% of Network`, // Percentile share
+          valB: `${globalShare}% of Network`,
+          labelC: 'Percentile',
+          valC: rankText,
           icon: Activity
       };
   };
@@ -320,18 +373,18 @@ export default function MapPage() {
             </div>
       </div>
 
-      {/* DOCK */}
       <div className={`shrink-0 bg-[#09090b] relative z-50 flex flex-col ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
             
-            {/* LEGEND (Visible when closed) */}
+            {/* DYNAMIC LEGEND (Visible when closed) */}
             <div className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4 ${isSplitView ? 'hidden' : 'flex'}`}>
                 <div className="w-full md:w-auto flex justify-center md:justify-start"><ViewToggles /></div>
                 <div className="w-full md:w-auto bg-zinc-900/30 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3">
                     <div className="flex flex-col gap-2 max-w-xl">
-                        <div className="flex items-start gap-2"><Info size={12} className="text-blue-400 mt-0.5 shrink-0" /><p className="text-[10px] text-zinc-400 leading-tight"><strong className="text-zinc-200">{getLegendContext()}</strong> Nodes are distributed according to the score range shown below.</p></div>
+                        <div className="flex items-start gap-2"><Info size={12} className="text-blue-400 mt-0.5 shrink-0" /><p className="text-[10px] text-zinc-400 leading-tight"><strong className="text-zinc-200">{getLegendContext()}</strong> {viewMode === 'STORAGE' || viewMode === 'CREDITS' ? "Thresholds are dynamic (percentile-based)." : "Thresholds are fixed."}</p></div>
                     </div>
+                    {/* DYNAMIC LABELS */}
                     <div className="grid grid-cols-3 md:grid-cols-5 gap-3 w-full">
-                        {LEGEND_LABELS[viewMode].map((label, idx) => (
+                        {getLegendLabels().map((label, idx) => (
                             <div key={idx} className="flex flex-col items-center gap-1.5"><div className="w-8 h-1.5 rounded-full" style={{ backgroundColor: TIER_COLORS[idx] }}></div><span className="text-[9px] font-mono text-zinc-500 font-bold whitespace-nowrap">{label}</span></div>
                         ))}
                     </div>
@@ -350,7 +403,7 @@ export default function MapPage() {
                         const tier = getTierIndex(loc);
                         const tierColor = TIER_COLORS[tier];
                         const isExpanded = expandedLocation === loc.name;
-                        const xray = getXRayStats(loc);
+                        const xray = getXRayStats(loc, i);
 
                         return (
                             <div 
@@ -375,26 +428,32 @@ export default function MapPage() {
                                     </div>
                                 </div>
 
-                                {/* X-Ray View (Now legible on Desktop) */}
+                                {/* 3-COLUMN X-RAY (CENTERED BADGE) */}
                                 {isExpanded && (
                                     <div className="bg-black/30 border-t border-white/5 p-4 animate-in slide-in-from-top-2 duration-300">
-                                        <div className="flex justify-between items-center mb-3">
-                                            <div className="text-[10px] md:text-sm font-bold uppercase tracking-widest px-2 py-1 rounded border bg-black/50" style={{ color: tierColor, borderColor: `${tierColor}40` }}>
+                                        {/* CENTERED BADGE */}
+                                        <div className="flex justify-center items-center mb-4">
+                                            <div className="text-[10px] md:text-sm font-bold uppercase tracking-widest px-3 py-1 rounded border bg-black/50" style={{ color: tierColor, borderColor: `${tierColor}40` }}>
                                                 {TIER_LABELS[viewMode][tier]} TIER
                                             </div>
-                                            <xray.icon size={16} className="text-zinc-500 md:text-zinc-400" />
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4 text-xs md:text-sm">
-                                            <div>
-                                                <div className="text-zinc-500 text-[10px] md:text-xs uppercase mb-1">{xray.labelA}</div>
-                                                <div className="text-white font-mono">{xray.valA}</div>
+                                        {/* 3 COLUMNS */}
+                                        <div className="grid grid-cols-3 gap-2 text-xs md:text-sm text-center">
+                                            <div className="flex flex-col items-center">
+                                                <div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1">{xray.labelA}</div>
+                                                <div className="text-white font-mono font-bold">{xray.valA}</div>
                                             </div>
-                                            <div>
-                                                <div className="text-zinc-500 text-[10px] md:text-xs uppercase mb-1">{xray.labelB}</div>
-                                                <div className="text-white font-mono">{xray.valB}</div>
+                                            <div className="flex flex-col items-center border-l border-zinc-800/50">
+                                                <div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1">{xray.labelB}</div>
+                                                <div className="text-white font-mono font-bold">{xray.valB}</div>
+                                            </div>
+                                            <div className="flex flex-col items-center border-l border-zinc-800/50">
+                                                <div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1">{xray.labelC}</div>
+                                                <div className="text-yellow-500 font-mono font-bold">{xray.valC}</div>
                                             </div>
                                         </div>
-                                        <div className="w-full h-1 bg-zinc-800 rounded-full mt-3 overflow-hidden">
+                                        {/* Progress Bar */}
+                                        <div className="w-full h-1 bg-zinc-800 rounded-full mt-4 overflow-hidden">
                                             <div className="h-full bg-white/20" style={{ width: `${(loc.count / stats.totalNodes) * 100}%` }}></div>
                                         </div>
                                     </div>
