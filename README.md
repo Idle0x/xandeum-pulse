@@ -7,11 +7,11 @@
 
 Real-time network monitor, geographic visualizer, and analytics dashboard for the Xandeum gossip protocol.
 
-![Xandeum Pulse Dashboard](PLACE_IMAGE_LINK_HERE)
-
 **⚡ Live Demo:** [https://xandeum-pulse.vercel.app](https://xandeum-pulse.vercel.app)
 
-> **Optional Note:** This project implements a custom **"Vitality Score" algorithm**, **RPC failover protection**, and a **3D geospatial engine** to provide deep analytics on network health.
+![Main Dashboard](https://github.com/user-attachments/assets/0578eb50-2b8d-4a78-bc91-a50a1933f917)
+
+> **Optional Note:** This implements a custom **"Vitality Score" algorithm**, **RPC failover protection**, and a **3D geospatial engine** to provide deep analytics on network health.
 
 ---
 
@@ -40,7 +40,7 @@ We moved beyond simple uptime tracking to a comprehensive **Vitality Score (0-10
 - **Uptime (30%):** Heavily penalizes stability issues (<24h uptime).
 - **Consensus (20%):** Penalizes nodes running outdated software versions relative to the network majority.
 - **Reputation (25%):** Compares a node's accumulated credits against the network median to identify underperforming peers.
-- **Capacity (25%):** Rewards storage commitment, with zero-storage nodes receiving a score of 0 regardless of other metrics.
+- **Capacity (25%):** Rewards storage commitment.
 
 👉 **Code Implementation:** [`pages/api/geo.ts`](pages/api/geo.ts) (See `calculateVitalityScore`)
 
@@ -63,13 +63,18 @@ A cinematic, interactive visualization of the network's physical infrastructure.
 * **Multi-Dimensional Views:** Toggle between Storage (Capacity), Health (Stability), and Credits (Reputation).
 * **Visual Logic:** Markers change shape and color intensity based on the active metric.
 
+![Global Map Visualization](https://github.com/user-attachments/assets/26b44b3e-8247-46bd-b44e-d33ecf5a1d4f)
+
 👉 **View Code:** [`pages/map.tsx`](pages/map.tsx)
 
-### Network Dashboard
-The command center for operational monitoring.
+### Network Dashboard & Deep Inspection
+The command center for operational monitoring. Click any node to open the **Inspector Modal**, which reveals the calculated Vitality Score and raw JSON data.
+
 * **Real-time Grid:** Filter nodes by IP, Public Key, or Version.
-* **Deep Inspection:** Click any node to view raw JSON data directly from the pRPC stream.
-* **Operator Tools:** Watchlist (Star/Pin nodes) and deep linking for sharing specific node states.
+* **Deep Inspection:** View raw JSON data directly from the pRPC stream.
+* **Operator Tools:** Watchlist (Star/Pin nodes) and deep linking.
+
+![Node Inspector Modal](https://github.com/user-attachments/assets/6677f3cb-6f8f-4fb7-85cd-35f01d84d6a2)
 
 👉 **View Code:** [`pages/index.tsx`](pages/index.tsx)
 
@@ -77,6 +82,8 @@ The command center for operational monitoring.
 A dual-fetch system that correlates on-chain reputation with live node status.
 * Fetches credit balances from the Xandeum rewards oracle.
 * Merges data with live pRPC stats to map anonymous Public Keys to physical IP addresses.
+
+![Reputation Leaderboard](Paste_Leaderboard_Image_Link_Here)
 
 👉 **View Code:** [`pages/leaderboard.tsx`](pages/leaderboard.tsx)
 
@@ -90,21 +97,6 @@ The intelligence layer for the map. Returns aggregated city-level data with pre-
 
 ### `GET /api/stats`
 Proxies the raw pRPC `get-pods-with-stats` method with failover protection.
-
-```json
-{
-  "result": {
-    "pods": [
-      {
-        "address": "173.212.203.145:9001",
-        "version": "1.0.4",
-        "storage_committed": 1099511627776,
-        "is_public": true
-      }
-    ]
-  }
-}
-```
 
 ### `GET /api/credits`
 Proxies the Xandeum rewards oracle to retrieve the global credit ledger.
@@ -126,25 +118,6 @@ npm run dev
 ```
 
 Open http://localhost:3000. No environment variables are required—the pRPC proxy configuration is self-contained.
-
----
-
-## Project Structure
-
-```
-xandeum-pulse/
-├── pages/
-│   ├── index.tsx           # Main Dashboard (Grid, Search)
-│   ├── map.tsx             # Global Topology (Visualizations, Drawer)
-│   ├── leaderboard.tsx     # Reputation Ranking
-│   └── api/
-│       ├── geo.ts          # Aggregation, Caching & Health Logic
-│       ├── stats.ts        # pRPC Proxy & Failover
-│       └── credits.ts      # Oracle Proxy
-├── styles/
-│   └── globals.css         # Tailwind & Safe Area configs
-└── package.json
-```
 
 ---
 
