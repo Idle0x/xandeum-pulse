@@ -21,7 +21,7 @@ interface Node {
   credits?: number;
 }
 
-// --- HELPER FUNCTIONS (CRASH PROOF) ---
+// --- HELPER FUNCTIONS ---
 const formatBytes = (bytes: number | undefined) => {
   if (!bytes || bytes === 0 || isNaN(bytes)) return '0.00 B';
   const k = 1024;
@@ -67,7 +67,6 @@ const formatDetailedTimestamp = (timestamp: number | undefined) => {
   });
 };
 
-// CRASH FIX: Handle undefined versions gracefully
 const compareVersions = (v1: string = '0.0.0', v2: string = '0.0.0') => {
   const s1 = v1 || '0.0.0';
   const s2 = v2 || '0.0.0';
@@ -82,7 +81,7 @@ const compareVersions = (v1: string = '0.0.0', v2: string = '0.0.0') => {
   return 0;
 };
 
-// --- CORE VITALITY LOGIC (CRASH PROOF) ---
+// --- VITALITY LOGIC ---
 const calculateVitalityMetrics = (node: Node | null, consensusVersion: string, medianCredits: number) => {
   if (!node) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, capacity: 0 } };
 
@@ -735,7 +734,7 @@ export default function Home() {
                             <HelpCircle size={10} className="text-zinc-600 group-hover:text-zinc-400" />
                             <div className="flex-grow flex justify-end"><button onClick={(e) => toggleFavorite(e, selectedNode.address)} className={`p-1.5 rounded transition border ${favorites.includes(selectedNode.address) ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500' : 'bg-zinc-900 border-zinc-700 text-zinc-500 hover:text-white'}`}><Star size={12} fill={favorites.includes(selectedNode.address) ? "currentColor" : "none"} /></button></div>
                         </div>
-                        {activeTooltip === 'identity' && <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 animate-in fade-in slide-in-from-top-1">Core identifiers and current network synchronization status.</div>}
+                        {activeTooltip === 'identity' && <div className="mb-3 p-2 bg-zinc-900 border border-zinc-700 rounded text-[10px] text-zinc-400 animate-in fade-in slide-in-from-top-1">Core identifiers. 'Access Policy' indicates if the node accepts public storage data.</div>}
                         <div className="bg-black/50 border border-white/5 rounded-xl p-4 space-y-3 mb-4 backdrop-blur-md">
                             <div><div className="text-[9px] text-zinc-500 uppercase mb-1">Public Key</div><div className="font-mono text-sm text-zinc-300 flex items-center justify-between"><span className="truncate w-full">{(selectedNode.pubkey || '').slice(0, 12)}...</span><Copy size={12} onClick={() => copyToClipboard(selectedNode.pubkey || '', 'pubkey')} className="cursor-pointer hover:text-white shrink-0" />{copiedField === 'pubkey' && <span className="absolute right-8 text-[9px] text-green-500 font-bold">COPIED</span>}</div></div>
                             <div><div className="text-[9px] text-zinc-500 uppercase mb-1">RPC Endpoint</div><div className="font-mono text-sm text-zinc-300 flex items-center justify-between"><span className="truncate w-full">http://{(selectedNode.address || '0.0.0.0').split(':')[0]}:6000</span><Copy size={12} onClick={() => copyToClipboard(`http://${(selectedNode.address || '0.0.0.0').split(':')[0]}:6000`, 'rpc')} className="cursor-pointer hover:text-white shrink-0" />{copiedField === 'rpc' && <span className="absolute right-8 text-[9px] text-green-500 font-bold">COPIED</span>}</div></div>
@@ -744,7 +743,13 @@ export default function Home() {
                             <div className="space-y-3 text-xs">
                             <div className="flex justify-between items-center"><span className="text-zinc-400">Uptime Stability</span><span className={(selectedNode.uptime || 0) > 86400 ? "text-green-500" : "text-yellow-500"}>{(selectedNode.uptime || 0) > 86400 ? "STABLE" : "BOOTING"}</span></div>
                             <div className="flex justify-between items-center"><span className="text-zinc-400">Software Version</span><div className="flex items-center gap-1.5"><span className={`${selectedNode.version === mostCommonVersion ? 'text-zinc-300 bg-zinc-800' : compareVersions(selectedNode.version, mostCommonVersion) < 0 ? 'text-red-400 bg-zinc-800' : 'text-white bg-zinc-800'} px-1.5 rounded transition-colors`}>{selectedNode.version || 'Unknown'}</span>{selectedNode.version === mostCommonVersion && <span className="text-[9px] text-green-500 bg-green-500/10 px-1 rounded uppercase font-bold">Majority</span>}</div></div>
-                            <div className="flex justify-between items-center"><span className="text-zinc-400">Network Mode</span><span className={selectedNode.is_public ? "text-green-500" : "text-orange-500"}>{selectedNode.is_public ? "PUBLIC" : "PRIVATE"}</span></div>
+                            {/* RENAMED "NETWORK MODE" TO "ACCESS POLICY" */}
+                            <div className="flex justify-between items-center">
+                                <span className="text-zinc-400">Access Policy</span>
+                                <span className={selectedNode.is_public ? "text-green-500" : "text-orange-500"}>
+                                    {selectedNode.is_public ? "OPEN / PUBLIC" : "RESTRICTED"}
+                                </span>
+                            </div>
                             </div>
                         </div>
                         {/* DEEP LINK TO MAP */}
