@@ -280,6 +280,45 @@ export default function Home() {
     setTimeout(() => setCopiedField(null), 2000);
   };
 
+  const copyRawJson = (node: Node) => {
+    navigator.clipboard.writeText(JSON.stringify(node, null, 2));
+    setCopiedField('json');
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const copyStatusReport = (node: Node) => {
+    const health = getHealthScore(node, mostCommonVersion, medianCredits);
+    const report = `[XANDEUM PULSE REPORT]\nNode: ${node.address}\nStatus: ${node.uptime > 86400 ? 'STABLE' : 'BOOTING'}\nHealth: ${health}/100\nMonitor at: https://xandeum-pulse.vercel.app`;
+    navigator.clipboard.writeText(report);
+    setCopiedField('report');
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const shareToTwitter = (node: Node) => {
+    const health = getHealthScore(node, mostCommonVersion, medianCredits);
+    const text = `Just checked my pNode status on Xandeum Pulse! ⚡\n\n🟢 Status: ${node.uptime > 86400 ? 'Stable' : 'Booting'}\n❤️ Health: ${health}/100\n💰 Credits: ${node.credits?.toLocaleString() || 0}\n\nMonitor here:`;
+    const url = "https://xandeum-pulse.vercel.app";
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
+  };
+
+  // --- RE-ADDED MISSING FUNCTION ---
+  const exportCSV = () => {
+    const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Utilization_Percent,Health_Score,Access_Policy,Last_Seen_ISO,RPC_URL,Is_Favorite\n';
+    const rows = filteredNodes.map(n => {
+        const health = getHealthScore(n, mostCommonVersion, medianCredits);
+        const utilization = n.storage_usage_percentage?.replace('%', '') || '0';
+        const mode = n.is_public ? 'Public' : 'Private';
+        const isoTime = new Date(n.last_seen_timestamp < 10000000000 ? n.last_seen_timestamp * 1000 : n.last_seen_timestamp).toISOString();
+        return `${n.address},${n.pubkey},${n.rank},${n.credits},${n.version},${n.uptime},${n.storage_committed},${n.storage_used},${utilization},${health},${mode},${isoTime},http://${n.address.split(':')[0]}:6000,${favorites.includes(n.address)}`;
+    });
+    const blob = new Blob([headers + rows.join('\n')], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `xandeum_pulse_export_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  };
+
   const fetchData = async () => {
     try {
       const [statsRes, creditsRes] = await Promise.all([
@@ -351,7 +390,7 @@ export default function Home() {
             let consensusCount = 0;
 
             mergedList.forEach(n => {
-                const stats = calculateVitalityMetrics(n, topVersion, medCreds); // Fixed typo: medCreds -> medianCredits
+                const stats = calculateVitalityMetrics(n, topVersion, medianCredits); // Fixed typo: medCreds -> medianCredits
                 sumHealth += stats.total;
                 sumUptime += stats.breakdown.uptime;
                 sumCap += stats.breakdown.capacity;
@@ -360,7 +399,6 @@ export default function Home() {
                 if (n.version === topVersion) consensusCount++;
             });
 
-            // Re-assign medCreds to medianCredits for scope
             const medCreds = medianCredits; // Handled by state
 
             setAvgNetworkHealth(Math.round(sumHealth / mergedList.length));
