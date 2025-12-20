@@ -63,7 +63,7 @@ A cinematic, interactive visualization of the network's physical infrastructure.
 * **Multi-Dimensional Views:** Toggle between Storage (Capacity), Health (Stability), and Credits (Reputation).
 * **Visual Logic:** Markers change shape and color intensity based on the active metric.
 
-![Global Map Visualization](https://imgur.com/gallery/network-topology-NM4Fx3i)
+![Global Map Visualization](https://private-user-images.githubusercontent.com/140549997/528861309-26b44b3e-8247-46bd-b44e-d33ecf5a1d4f.jpg?)
 
 👉 **View Code:** [`pages/map.tsx`](pages/map.tsx)
 
@@ -74,7 +74,7 @@ The command center for operational monitoring. Click any node to open the **Insp
 * **Deep Inspection:** View raw JSON data directly from the pRPC stream.
 * **Operator Tools:** Watchlist (Star/Pin nodes) and deep linking.
 
-![Node Inspector Modal](https://imgur.com/gallery/modal-inspection-R4CRcYQ)
+![Node Inspector Modal](https://private-user-images.githubusercontent.com/140549997/528861818-6677f3cb-6f8f-4fb7-85cd-35f01d84d6a2.jpg?)
 
 👉 **View Code:** [`pages/index.tsx`](pages/index.tsx)
 
@@ -83,7 +83,7 @@ A dual-fetch system that correlates on-chain reputation with live node status.
 * Fetches credit balances from the Xandeum rewards oracle.
 * Merges data with live pRPC stats to map anonymous Public Keys to physical IP addresses.
 
-![Reputation Leaderboard](https://imgur.com/gallery/reputation-credit-Rod7lha)
+![Reputation Leaderboard](https://private-user-images.githubusercontent.com/140549997/528861498-35e352fa-ab30-44d0-b7e6-a5d6e70eacc1.jpg?)
 
 👉 **View Code:** [`pages/leaderboard.tsx`](pages/leaderboard.tsx)
 
