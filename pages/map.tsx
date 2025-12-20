@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import axios from 'axios';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleSqrt } from 'd3-scale';
-import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Info, X, Server, Layers, TrendingUp, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Info, X, Server, Layers, TrendingUp, BarChart3, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -22,14 +22,12 @@ interface MapStats {
 
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
-// UI BRANDING COLORS
 const MODE_COLORS = {
     STORAGE: { hex: '#6366f1', tailwind: 'text-indigo-500', bg: 'bg-indigo-600', border: 'border-indigo-500/50' },
     HEALTH:  { hex: '#10b981', tailwind: 'text-emerald-500', bg: 'bg-emerald-600', border: 'border-emerald-500/50' },
     CREDITS: { hex: '#f97316', tailwind: 'text-orange-500', bg: 'bg-orange-600', border: 'border-orange-500/50' }
 };
 
-// MAP LEGEND COLORS
 const TIER_COLORS = ["#f59e0b", "#ec4899", "#a855f7", "#3b82f6", "#22d3ee"]; 
 
 const TIER_LABELS = {
@@ -51,14 +49,18 @@ export default function MapPage() {
   const [activeLocation, setActiveLocation] = useState<string | null>(null);
   const [expandedLocation, setExpandedLocation] = useState<string | null>(null);
 
+  const [toast, setToast] = useState<{ msg: string; type: 'error' | 'info' | 'private' } | null>(null);
+
   const [position, setPosition] = useState({ coordinates: [10, 20], zoom: 1.2 });
   const [copiedCoords, setCopiedCoords] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   
-  // FIX 1: Ref to track if we have already handled the ?focus param
   const hasDeepLinked = useRef(false);
-
   const [dynamicThresholds, setDynamicThresholds] = useState<number[]>([0, 0, 0, 0]);
+
+  // Calculate Visibility Stats
+  const visibleNodes = useMemo(() => locations.reduce((sum, loc) => sum + loc.count, 0), [locations]);
+  const privateNodes = Math.max(0, stats.totalNodes - visibleNodes);
 
   // --- FETCH DATA & HANDLE DEEP LINK ---
   useEffect(() => {
@@ -69,32 +71,36 @@ export default function MapPage() {
           setLocations(res.data.locations || []);
           setStats(res.data.stats || { totalNodes: 0, countries: 0, topRegion: 'Unknown', topRegionMetric: 0 });
           
-          // FIX 1: DEEP LINK LOGIC (ONE-SHOT)
-          // Only run if we haven't done it yet AND the router is ready AND we have data
-          if (router.isReady && router.query.focus && !hasDeepLinked.current && res.data.locations) {
+          if (router.isReady && router.query.focus && !hasDeepLinked.current) {
+              hasDeepLinked.current = true;
               const targetIP = router.query.focus as string;
-              const targetLoc = res.data.locations.find((l: LocationData) => l.ips && l.ips.includes(targetIP));
               
-              if (targetLoc) {
-                  hasDeepLinked.current = true; // Mark as handled immediately
-                  setTimeout(() => {
-                      lockTarget(targetLoc.name, targetLoc.lat, targetLoc.lon);
-                  }, 500);
+              if (res.data.locations && res.data.locations.length > 0) {
+                  const targetLoc = res.data.locations.find((l: LocationData) => l.ips && l.ips.includes(targetIP));
+                  
+                  if (targetLoc) {
+                      setTimeout(() => {
+                          lockTarget(targetLoc.name, targetLoc.lat, targetLoc.lon);
+                      }, 500);
+                  } else {
+                      // NEW: Professional "Private Network" Message
+                      setToast({ 
+                          msg: `Node ${targetIP} is on a Private Network. Location hidden.`, 
+                          type: 'private' 
+                      });
+                      setTimeout(() => setToast(null), 6000);
+                  }
               }
           }
         }
       } catch (err) { console.error(err); } finally { setLoading(false); }
     };
     
-    // Initial Fetch
     fetchGeo();
-    
-    // Poll every 10s
     const interval = setInterval(fetchGeo, 10000);
     return () => clearInterval(interval);
   }, [router.isReady, router.query.focus]); 
 
-  // --- TIER CALCULATIONS ---
   useEffect(() => {
       if (locations.length === 0) return;
 
@@ -172,7 +178,6 @@ export default function MapPage() {
     setExpandedLocation(name); 
     setPosition({ coordinates: [lon, lat], zoom: 3 });
     setIsSplitView(true);
-    
     if (listRef.current) {
          setTimeout(() => {
              const item = document.getElementById(`list-item-${name}`);
@@ -195,7 +200,6 @@ export default function MapPage() {
     setPosition({ coordinates: [10, 20], zoom: 1.2 });
   };
 
-  // FIX 2: Close Drawer AND Reset Map
   const handleCloseDrawer = () => {
       setIsSplitView(false);
       resetView();
@@ -349,6 +353,25 @@ export default function MapPage() {
         <style>{`@supports (padding: max(0px)) { .pb-safe { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); } }`}</style>
       </Head>
 
+      {/* TOAST NOTIFICATION */}
+      {toast && (
+          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-2 fade-in duration-300 w-[90%] max-w-sm">
+              <div className={`flex items-start gap-3 px-4 py-3 rounded-xl border shadow-2xl backdrop-blur-md ${
+                  toast.type === 'error' ? 'bg-red-500/10 border-red-500/50 text-red-200' : 
+                  toast.type === 'private' ? 'bg-zinc-800 border-zinc-600 text-zinc-300' :
+                  'bg-zinc-800 border-zinc-700 text-white'
+              }`}>
+                  {toast.type === 'error' ? <AlertCircle size={18} className="text-red-500 mt-0.5" /> : 
+                   toast.type === 'private' ? <EyeOff size={18} className="text-zinc-400 mt-0.5" /> :
+                   <Info size={18} className="text-blue-500 mt-0.5" />}
+                  <div className="flex-1">
+                      <p className="text-xs font-bold leading-tight">{toast.msg}</p>
+                  </div>
+                  <button onClick={() => setToast(null)}><X size={14} className="opacity-50 hover:opacity-100" /></button>
+              </div>
+          </div>
+      )}
+
       {/* HEADER */}
       <div className="shrink-0 w-full z-50 flex flex-col gap-3 px-4 md:px-6 py-3 bg-[#09090b] border-b border-zinc-800/30">
         <div className="flex items-center justify-between w-full">
@@ -357,6 +380,14 @@ export default function MapPage() {
                 <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-300">Dashboard</span>
             </Link>
             <div className="flex items-center gap-2">
+                {/* TRACKING COUNTER BADGE */}
+                {!loading && (
+                    <div className="hidden md:flex items-center gap-2 px-2 py-1 bg-zinc-900 rounded border border-zinc-800 text-[9px] font-mono text-zinc-500">
+                        <Eye size={10} className="text-zinc-600" />
+                        <span>Tracking {visibleNodes}/{stats.totalNodes} Nodes</span>
+                        {privateNodes > 0 && <span className="text-zinc-600">({privateNodes} Private)</span>}
+                    </div>
+                )}
                 <div className={`w-1.5 h-1.5 rounded-full animate-pulse`} style={{ backgroundColor: MODE_COLORS[viewMode].hex }}></div>
                 <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{viewMode} Mode</span>
             </div>
@@ -428,7 +459,6 @@ export default function MapPage() {
             <div className={`flex flex-col h-full overflow-hidden ${isSplitView ? 'flex' : 'hidden'}`}>
                  <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-zinc-800/30 bg-[#09090b]">
                     <div className="flex items-center gap-3"><h2 className="text-sm font-bold text-white flex items-center gap-2"><Activity size={14} className="text-green-500" /> Live Data</h2><div className="hidden md:block scale-90 origin-left"><ViewToggles /></div></div>
-                    {/* FIX 2: Updated X button to call handleCloseDrawer */}
                     <div className="flex items-center gap-2"><div className="md:hidden scale-75 origin-right"><ViewToggles /></div><button onClick={handleCloseDrawer} className="p-1.5 bg-zinc-800/50 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"><X size={14} /></button></div>
                  </div>
 
