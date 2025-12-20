@@ -11,6 +11,7 @@ const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
 interface LocationData {
   name: string; country: string; lat: number; lon: number; count: number;
   totalStorage: number; totalCredits: number; avgHealth: number;
+  stableCount?: number; criticalCount?: number; // Optional fields from API
 }
 
 interface MapStats {
@@ -19,10 +20,8 @@ interface MapStats {
 
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
-// Gold, Pink, Purple, Blue, Cyan/Amber
 const TIER_COLORS = ["#f59e0b", "#ec4899", "#a855f7", "#3b82f6", "#22d3ee"]; 
 
-// Human Readable Labels for X-Ray
 const TIER_LABELS = {
     STORAGE: ['Massive Hub', 'Major Zone', 'Standard', 'Entry Level', 'Micro Node'],
     CREDITS: ['Legendary', 'Elite', 'Proven', 'Active', 'New Entry'],
@@ -44,7 +43,6 @@ export default function MapPage() {
   const [isSplitView, setIsSplitView] = useState(false);
   const [activeLocation, setActiveLocation] = useState<string | null>(null);
   
-  // New State for X-Ray Expansion
   const [expandedLocation, setExpandedLocation] = useState<string | null>(null);
 
   const [position, setPosition] = useState({ coordinates: [10, 20], zoom: 1.2 });
@@ -69,7 +67,6 @@ export default function MapPage() {
   // --- LOGIC HELPERS ---
 
   const getTierIndex = (loc: LocationData): number => {
-    // Returns 0 (Best/Gold) to 4 (Worst/Cyan) based on thresholds
     if (viewMode === 'STORAGE') {
         const gb = loc.totalStorage;
         if (gb >= 1000) return 0; if (gb >= 100) return 1; if (gb >= 10) return 2; if (gb >= 1) return 3; return 4;
@@ -83,16 +80,18 @@ export default function MapPage() {
   };
 
   const lockTarget = (name: string, lat: number, lon: number) => {
+    // If clicking the same target, FULL RESET
     if (activeLocation === name) {
         resetView();
-        setExpandedLocation(null);
         return;
     }
+    
+    // Otherwise, expand and zoom
     setActiveLocation(name);
-    setExpandedLocation(name); // Auto-expand when clicked on map
+    setExpandedLocation(name); 
     setPosition({ coordinates: [lon, lat], zoom: 3 });
     
-    if (!isSplitView) setIsSplitView(true); // Auto-open drawer if closed
+    if (!isSplitView) setIsSplitView(true);
 
     if (listRef.current) {
          setTimeout(() => {
@@ -102,11 +101,12 @@ export default function MapPage() {
     }
   };
 
+  // Fixed: Single click collapse now resets everything
   const toggleExpansion = (name: string, lat: number, lon: number) => {
       if (expandedLocation === name) {
-          setExpandedLocation(null); // Collapse
+          resetView(); // IMMEDIATE RESET
       } else {
-          lockTarget(name, lat, lon); // Expand & Lock
+          lockTarget(name, lat, lon);
       }
   };
 
@@ -145,14 +145,14 @@ export default function MapPage() {
     }
   };
 
-  // --- X-RAY STATS GENERATOR ---
+  // --- UPDATED X-RAY STATS (Now using real API counts) ---
   const getXRayStats = (loc: LocationData) => {
       const globalShare = ((loc.count / stats.totalNodes) * 100).toFixed(1);
       
       if (viewMode === 'STORAGE') {
           const avgPerNode = loc.totalStorage / loc.count;
           return {
-              labelA: 'Density',
+              labelA: 'Avg Density',
               valA: `${formatStorage(avgPerNode)} / Node`,
               labelB: 'Global Share',
               valB: `${globalShare}% of Network`,
@@ -169,13 +169,17 @@ export default function MapPage() {
               icon: Zap
           };
       }
-      // Health Mode
-      const reliability = loc.avgHealth > 90 ? 'High Reliability' : loc.avgHealth > 75 ? 'Stable' : 'Degraded';
+      // HEALTH MODE: USES PRECISE COUNTS
+      const stable = loc.stableCount ?? 0;
+      const critical = loc.criticalCount ?? 0;
+      // Calculate "Fair" nodes (implied rest)
+      const fair = loc.count - (stable + critical);
+      
       return {
-          labelA: 'Status',
-          valA: reliability,
+          labelA: 'Status Breakdown',
+          valA: `${stable} Stable • ${critical} Critical`, // Precise breakdown
           labelB: 'Node Count',
-          valB: `${loc.count} Active Nodes`,
+          valB: `${globalShare}% of Network`, // Percentile share
           icon: Activity
       };
   };
@@ -210,6 +214,14 @@ export default function MapPage() {
         case 'HEALTH': return `${name} is performing optimally with an average health score of ${avgHealth}% across ${count} nodes.`;
      }
   };
+
+  const getLegendContext = () => {
+      switch(viewMode) {
+          case 'STORAGE': return "Visualizing global committed disk space.";
+          case 'HEALTH': return "Monitoring uptime, version consensus, and stability.";
+          case 'CREDITS': return "Tracking accumulated node rewards and reputation.";
+      }
+  }
 
   const locationsForMap = useMemo(() => {
     if (!activeLocation) return locations;
@@ -291,7 +303,7 @@ export default function MapPage() {
                             {isActive ? (
                                 <polygon points="0,-12 3,-4 11,-4 5,1 7,9 0,5 -7,9 -5,1 -11,-4 -3,-4" transform={`scale(${size/6})`} fill="#52525b" stroke="#22c55e" strokeWidth={1.5} className="drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
                             ) : (
-                                <><circle r={size} fill={baseColor} stroke="#fff" strokeWidth={1} /></>
+                                <>{viewMode === 'STORAGE' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} />}{viewMode === 'CREDITS' && <circle r={size} fill={baseColor} stroke="#fff" strokeWidth={1} />}{viewMode === 'HEALTH' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} className="rotate-45" />}</>
                             )}
                             {isActive && <text y={-size - 15} textAnchor="middle" className="font-mono text-[8px] fill-white font-bold uppercase tracking-widest pointer-events-none drop-shadow-md z-50">{loc.name}</text>}
                         </g>
@@ -316,7 +328,7 @@ export default function MapPage() {
                 <div className="w-full md:w-auto flex justify-center md:justify-start"><ViewToggles /></div>
                 <div className="w-full md:w-auto bg-zinc-900/30 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3">
                     <div className="flex flex-col gap-2 max-w-xl">
-                        <div className="flex items-start gap-2"><Info size={12} className="text-blue-400 mt-0.5 shrink-0" /><p className="text-[10px] text-zinc-400 leading-tight"><strong className="text-zinc-200">{viewMode === 'STORAGE' ? "Visualizing global committed disk space." : viewMode === 'HEALTH' ? "Monitoring uptime and stability." : "Tracking node rewards."}</strong> Nodes are colored by tier.</p></div>
+                        <div className="flex items-start gap-2"><Info size={12} className="text-blue-400 mt-0.5 shrink-0" /><p className="text-[10px] text-zinc-400 leading-tight"><strong className="text-zinc-200">{getLegendContext()}</strong> Nodes are distributed according to the score range shown below.</p></div>
                     </div>
                     <div className="grid grid-cols-3 md:grid-cols-5 gap-3 w-full">
                         {LEGEND_LABELS[viewMode].map((label, idx) => (
@@ -349,7 +361,6 @@ export default function MapPage() {
                                     activeLocation === loc.name ? 'bg-zinc-800 border-green-500/50' : 'bg-zinc-900/50 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800'
                                 }`}
                             >
-                                {/* Main Row */}
                                 <div className="p-3 flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className={`flex items-center justify-center w-8 h-8 rounded-full font-mono text-xs font-bold ${activeLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'}`}>{i + 1}</div>
@@ -364,22 +375,22 @@ export default function MapPage() {
                                     </div>
                                 </div>
 
-                                {/* X-Ray Expanded View */}
+                                {/* X-Ray View (Now legible on Desktop) */}
                                 {isExpanded && (
                                     <div className="bg-black/30 border-t border-white/5 p-4 animate-in slide-in-from-top-2 duration-300">
                                         <div className="flex justify-between items-center mb-3">
-                                            <div className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded border bg-black/50" style={{ color: tierColor, borderColor: `${tierColor}40` }}>
+                                            <div className="text-[10px] md:text-sm font-bold uppercase tracking-widest px-2 py-1 rounded border bg-black/50" style={{ color: tierColor, borderColor: `${tierColor}40` }}>
                                                 {TIER_LABELS[viewMode][tier]} TIER
                                             </div>
-                                            <xray.icon size={14} className="text-zinc-600" />
+                                            <xray.icon size={16} className="text-zinc-500 md:text-zinc-400" />
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4 text-xs">
+                                        <div className="grid grid-cols-2 gap-4 text-xs md:text-sm">
                                             <div>
-                                                <div className="text-zinc-500 text-[10px] uppercase mb-1">{xray.labelA}</div>
+                                                <div className="text-zinc-500 text-[10px] md:text-xs uppercase mb-1">{xray.labelA}</div>
                                                 <div className="text-white font-mono">{xray.valA}</div>
                                             </div>
                                             <div>
-                                                <div className="text-zinc-500 text-[10px] uppercase mb-1">{xray.labelB}</div>
+                                                <div className="text-zinc-500 text-[10px] md:text-xs uppercase mb-1">{xray.labelB}</div>
                                                 <div className="text-white font-mono">{xray.valB}</div>
                                             </div>
                                         </div>
