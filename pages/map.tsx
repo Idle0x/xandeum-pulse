@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router'; // IMPORT ROUTER
 import axios from 'axios';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleSqrt } from 'd3-scale';
-import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Info, X, Server, Layers, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Info, X, Server, Layers, TrendingUp, BarChart3 } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -12,6 +13,7 @@ interface LocationData {
   name: string; country: string; lat: number; lon: number; count: number;
   totalStorage: number; totalCredits: number; avgHealth: number;
   stableCount?: number; criticalCount?: number;
+  ips?: string[]; // Added IPs to interface
 }
 
 interface MapStats {
@@ -25,7 +27,6 @@ type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 const TIER_COLORS = ["#f59e0b", "#ec4899", "#a855f7", "#3b82f6", "#22d3ee"]; 
 
 // UI BRANDING COLORS (The Interface Modes)
-// Indigo (Storage), Emerald (Health), Orange (Credits) - Distinct from Tiers
 const MODE_COLORS = {
     STORAGE: { hex: '#6366f1', tailwind: 'text-indigo-500', bg: 'bg-indigo-600', border: 'border-indigo-500/50' },
     HEALTH:  { hex: '#10b981', tailwind: 'text-emerald-500', bg: 'bg-emerald-600', border: 'border-emerald-500/50' },
@@ -41,6 +42,7 @@ const TIER_LABELS = {
 const HEALTH_THRESHOLDS = [90, 75, 60, 40];
 
 export default function MapPage() {
+  const router = useRouter(); // Initialize Router
   const [locations, setLocations] = useState<LocationData[]>([]);
   const [stats, setStats] = useState<MapStats>({ totalNodes: 0, countries: 0, topRegion: 'Scanning...', topRegionMetric: 0 });
   const [loading, setLoading] = useState(true);
@@ -57,6 +59,7 @@ export default function MapPage() {
   // Dynamic Thresholds for Percentile Calculation
   const [dynamicThresholds, setDynamicThresholds] = useState<number[]>([0, 0, 0, 0]);
 
+  // --- FETCH DATA & HANDLE DEEP LINK ---
   useEffect(() => {
     const fetchGeo = async () => {
       try {
@@ -64,13 +67,31 @@ export default function MapPage() {
         if (res.data) {
           setLocations(res.data.locations || []);
           setStats(res.data.stats || { totalNodes: 0, countries: 0, topRegion: 'Unknown', topRegionMetric: 0 });
+          
+          // DEEP LINK LOGIC: Check if URL has ?focus=IP
+          if (router.query.focus && res.data.locations) {
+              const targetIP = router.query.focus as string;
+              // Find the region containing this IP
+              const targetLoc = res.data.locations.find((l: LocationData) => l.ips && l.ips.includes(targetIP));
+              
+              if (targetLoc) {
+                  // Wait a tick for state to settle, then lock target
+                  setTimeout(() => {
+                      lockTarget(targetLoc.name, targetLoc.lat, targetLoc.lon);
+                  }, 500);
+              }
+          }
         }
       } catch (err) { console.error(err); } finally { setLoading(false); }
     };
-    fetchGeo();
+    
+    if (router.isReady) {
+        fetchGeo();
+    }
+    
     const interval = setInterval(fetchGeo, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [router.isReady, router.query.focus]); // Depend on router params
 
   // Recalculate percentiles
   useEffect(() => {
@@ -142,19 +163,17 @@ export default function MapPage() {
   };
 
   const lockTarget = (name: string, lat: number, lon: number) => {
-    if (activeLocation === name) {
-        resetView();
-        return;
-    }
+    // If we're deep linking, we force the update even if activeLocation matches
     setActiveLocation(name);
     setExpandedLocation(name); 
     setPosition({ coordinates: [lon, lat], zoom: 3 });
-    if (!isSplitView) setIsSplitView(true);
+    setIsSplitView(true); // Always open drawer
+    
     if (listRef.current) {
          setTimeout(() => {
              const item = document.getElementById(`list-item-${name}`);
              if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-         }, 100);
+         }, 500); // Slight delay for smoother entry
     }
   };
 
