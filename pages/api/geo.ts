@@ -10,30 +10,25 @@ const BACKUP_NODES = [
 const TIMEOUT_PRIMARY = 4000;
 const TIMEOUT_BACKUP = 6000;
 
-// --- CACHE SYSTEM (Fixes Memory Leaks & Race Conditions) ---
+// --- CACHE SYSTEM ---
 const MAX_CACHE_SIZE = 500;
 const geoCache = new Map<string, { lat: number; lon: number; country: string; city: string }>();
-let cacheAccessOrder: string[] = []; // LRU Tracker
-const pendingGeoRequests = new Map<string, Promise<any>>(); // In-flight deduping
+let cacheAccessOrder: string[] = []; 
+const pendingGeoRequests = new Map<string, Promise<any>>(); 
 
-// Helper: Add to cache with LRU eviction
 function addToCache(ip: string, data: any) {
   if (!data || !data.lat || !data.lon) return;
-  
   if (geoCache.has(ip)) {
-    // Refresh position in LRU
     cacheAccessOrder = cacheAccessOrder.filter(k => k !== ip);
   } else if (geoCache.size >= MAX_CACHE_SIZE) {
-    // Evict oldest
     const oldest = cacheAccessOrder.shift();
     if (oldest) geoCache.delete(oldest);
   }
-  
   geoCache.set(ip, data);
   cacheAccessOrder.push(ip);
 }
 
-// --- HELPER: VERSION COMPARISON ---
+// --- HELPERS ---
 const compareVersions = (v1: string, v2: string) => {
   const p1 = v1.replace(/[^0-9.]/g, '').split('.').map(Number);
   const p2 = v2.replace(/[^0-9.]/g, '').split('.').map(Number);
@@ -46,7 +41,6 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
-// --- HELPER: THE "VITALITY SCORE" ALGORITHM ---
 const calculateVitalityScore = (
   storageGB: number, 
   uptimeSeconds: number, 
@@ -55,10 +49,8 @@ const calculateVitalityScore = (
   credits: number, 
   medianCredits: number
 ): number => {
-  // GATE: 0 Storage = 0 Health (Useless Node)
   if (storageGB <= 0) return 0;
 
-  // 1. UPTIME SCORE (30% Weight)
   let uptimeScore = 0;
   const days = uptimeSeconds / 86400;
   if (days >= 30) uptimeScore = 100;
@@ -66,7 +58,6 @@ const calculateVitalityScore = (
   else if (days >= 1) uptimeScore = 40 + (days - 1) * (30 / 6);
   else uptimeScore = days * 40;
 
-  // 2. VERSION SCORE (20% Weight)
   let versionScore = 100;
   const comparison = compareVersions(version, consensusVersion);
   if (comparison < 0) {
@@ -77,7 +68,6 @@ const calculateVitalityScore = (
     else versionScore = 80;
   }
 
-  // 3. REPUTATION SCORE (25% Weight)
   let reputationScore = 50; 
   if (medianCredits > 0 && credits > 0) {
     const ratio = credits / medianCredits;
@@ -86,29 +76,19 @@ const calculateVitalityScore = (
     else if (ratio >= 0.5) reputationScore = 50 + (ratio - 0.5) * 50;
     else if (ratio >= 0.1) reputationScore = 25 + (ratio - 0.1) * 62.5;
     else reputationScore = ratio * 250;
-  } else if (credits === 0) {
-    reputationScore = 0;
-  } else if (medianCredits === 0 && credits > 0) {
-    reputationScore = 100;
-  }
+  } else if (credits === 0) reputationScore = 0;
+  else if (medianCredits === 0 && credits > 0) reputationScore = 100;
 
-  // 4. CAPACITY SCORE (25% Weight)
   let capacityScore = 0;
   if (storageGB >= 1000) capacityScore = 100;
   else if (storageGB >= 100) capacityScore = 70 + (storageGB - 100) * (30 / 900);
   else if (storageGB >= 10) capacityScore = 40 + (storageGB - 10) * (30 / 90);
   else capacityScore = storageGB * 4;
 
-  const finalScore = 
-    (uptimeScore * 0.30) +
-    (versionScore * 0.20) +
-    (reputationScore * 0.25) +
-    (capacityScore * 0.25);
-
+  const finalScore = (uptimeScore * 0.30) + (versionScore * 0.20) + (reputationScore * 0.25) + (capacityScore * 0.25);
   return Math.round(Math.max(0, Math.min(100, finalScore)));
 };
 
-// --- HELPER: FETCH PODS (RPC) ---
 async function getPodsFromRPC() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
   try {
@@ -119,22 +99,19 @@ async function getPodsFromRPC() {
   const shuffled = BACKUP_NODES.sort(() => 0.5 - Math.random()).slice(0, 3);
   try {
     const winner = await Promise.any(shuffled.map(ip => 
-      axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_BACKUP })
-        .then(res => res.data?.result?.pods || [])
+      axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_BACKUP }).then(res => res.data?.result?.pods || [])
     ));
     return winner;
   } catch (error) { return []; }
 }
 
-// --- HELPER: BATCH GEO (With De-duping) ---
 async function getGeoDataForIps(ips: string[]) {
   const missing = ips.filter(ip => !geoCache.has(ip));
   const toFetch: string[] = [];
-
   const promises: Promise<any>[] = [];
+
   missing.forEach(ip => {
     if (pendingGeoRequests.has(ip)) {
-      // FIX: Added '!' non-null assertion because we verified it exists with .has()
       promises.push(pendingGeoRequests.get(ip)!);
     } else {
       toFetch.push(ip);
@@ -156,27 +133,22 @@ async function getGeoDataForIps(ips: string[]) {
       }).catch(err => {
         console.error("Geo Batch Error:", err);
         return [];
-      }).finally(() => {
-        chunk.forEach(ip => pendingGeoRequests.delete(ip));
-      });
+      }).finally(() => chunk.forEach(ip => pendingGeoRequests.delete(ip)));
 
       chunk.forEach(ip => pendingGeoRequests.set(ip, promise));
       promises.push(promise);
     }
   }
-
   await Promise.allSettled(promises);
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    // 1. FETCH DATA
     const [pods, creditsRes] = await Promise.all([
       getPodsFromRPC(),
       axios.get('https://podcredits.xandeum.network/api/pods-credits').catch(() => ({ data: {} }))
     ]);
 
-    // 2. CALCULATE NETWORK METRICS
     const versionCounts: Record<string, number> = {};
     pods.forEach((p: any) => {
         const v = p.version || '0.0.0';
@@ -200,11 +172,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const mid = Math.floor(allCredits.length / 2);
     const medianCredits = allCredits.length > 0 ? allCredits[mid] : 0;
 
-    // 3. GEOCODING
     const uniqueIps = [...new Set(pods.map((p: any) => p.address.split(':')[0]))] as string[];
     await getGeoDataForIps(uniqueIps);
 
-    // 4. DATA MERGE
     const cityMap = new Map<string, any>();
 
     pods.forEach((node: any) => {
@@ -213,14 +183,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (geo) {
         const key = `${geo.city}-${geo.country}`;
-        
         const rawStorage = parseFloat(node.storage_committed || '0');
         const storageGB = rawStorage / (1024 * 1024 * 1024);
         const credits = creditsMap.get(node.pubkey) || 0;
         const uptime = node.uptime || 0;
         const version = node.version || '0.0.0';
-
         const health = calculateVitalityScore(storageGB, uptime, version, consensusVersion, credits, medianCredits);
+
+        // NEW: Precise Stats Counting
+        const isStable = health >= 75;
+        const isCritical = health < 50;
 
         if (cityMap.has(key)) {
             const existing = cityMap.get(key)!;
@@ -228,6 +200,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             existing.totalStorage += storageGB;
             existing.totalCredits += credits;
             existing.healthSum += health;
+            if (isStable) existing.stableCount += 1;
+            if (isCritical) existing.criticalCount += 1;
         } else {
             cityMap.set(key, {
                 lat: geo.lat,
@@ -237,7 +211,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 count: 1,
                 totalStorage: storageGB,
                 totalCredits: credits,
-                healthSum: health
+                healthSum: health,
+                stableCount: isStable ? 1 : 0,
+                criticalCount: isCritical ? 1 : 0
             });
         }
       }
