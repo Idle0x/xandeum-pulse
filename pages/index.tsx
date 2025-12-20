@@ -85,7 +85,7 @@ const compareVersions = (v1: string = '0.0.0', v2: string = '0.0.0') => {
   return 0;
 };
 
-// --- RESTORED COMPLEX HEALTH ALGORITHM ---
+// --- HEALTH ALGORITHM ---
 const calculateVitalityMetrics = (node: Node | null, consensusVersion: string, medianCredits: number) => {
   if (!node) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, capacity: 0 } };
 
@@ -234,12 +234,22 @@ export default function Home() {
   const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'health'>('uptime');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
+  // UX STATE RESTORATION
+  const [searchTipIndex, setSearchTipIndex] = useState(0);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null); // Restored Tooltips
+  const searchTips = [
+    "Search by IP, Public Key, or Version",
+    "Tip: Click any node card for deep inspection",
+    "Use the map to visualize network topology"
+  ];
+
   // MODAL STATES
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const [compareTarget, setCompareTarget] = useState<Node | null>(null);
   const [shareMode, setShareMode] = useState(false);
-  const [modalView, setModalView] = useState<'overview' | 'health' | 'storage'>('overview'); // NEW: Drill-down state
+  const [modalView, setModalView] = useState<'overview' | 'health' | 'storage'>('overview'); 
   
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null); 
@@ -270,7 +280,11 @@ export default function Home() {
 
     const cycleInterval = setInterval(() => { setCycleStep(prev => prev + 1); }, 4000);
     
-    // Auto-refresh interval (30s)
+    // RESTORED SEARCH TIP ROTATION
+    const tipInterval = setInterval(() => {
+        if (!isSearchFocused) setSearchTipIndex(prev => (prev + 1) % searchTips.length);
+    }, 5000);
+
     const dataInterval = setInterval(fetchData, 30000);
 
     const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') { closeModal(); } };
@@ -278,11 +292,12 @@ export default function Home() {
 
     return () => {
         clearInterval(cycleInterval);
+        clearInterval(tipInterval);
         clearInterval(dataInterval);
         document.removeEventListener('visibilitychange', handleVisibility);
         document.removeEventListener('keydown', handleEscape);
     };
-  }, []);
+  }, [isSearchFocused]);
 
   // Sync Modal with URL
   useEffect(() => {
@@ -291,7 +306,7 @@ export default function Home() {
         const targetNode = nodes.find(n => n.pubkey === pubkeyToOpen);
         if (targetNode) {
             setSelectedNode(targetNode);
-            setModalView('overview'); // Always start at overview
+            setModalView('overview'); 
         }
     }
   }, [loading, nodes, router.query.open]);
@@ -303,7 +318,17 @@ export default function Home() {
       setShareMode(false);
       setCompareTarget(null);
       setModalView('overview');
+      setActiveTooltip(null);
       if (router.query.open) router.replace('/', undefined, { shallow: true });
+  };
+
+  const handleGlobalClick = () => {
+      if (activeTooltip) setActiveTooltip(null);
+  };
+
+  const toggleTooltip = (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
+      setActiveTooltip(activeTooltip === id ? null : id);
   };
 
   const toggleFavorite = (e: React.MouseEvent, address: string) => {
@@ -439,7 +464,6 @@ export default function Home() {
                 if (n.version === topVersion) consensusCount++;
             });
 
-            // Re-assign medCreds to medianCredits for scope
             const medCreds = medianCredits; // Handled by state
 
             setAvgNetworkHealth(Math.round(sumHealth / mergedList.length));
@@ -596,7 +620,7 @@ export default function Home() {
                   ].map((m) => (
                       <div key={m.label} className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800/50">
                           <div className="flex justify-between text-xs mb-2">
-                              <span className="text-zinc-400">{m.label}</span>
+                              <span className="text-zinc-400 flex items-center gap-1">{m.label} <HelpCircle size={10} className="cursor-help" onClick={(e) => toggleTooltip(e, m.label)} /></span>
                               <div className="flex gap-2">
                                   <span className="font-mono text-white">{m.val}/100</span>
                                   <span className={`text-[10px] px-1.5 rounded ${m.val >= m.avg ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
@@ -604,6 +628,13 @@ export default function Home() {
                                   </span>
                               </div>
                           </div>
+                          {activeTooltip === m.label && (
+                              <div className="mb-2 p-2 bg-black border border-zinc-700 rounded text-[10px] text-zinc-300 animate-in fade-in">
+                                  {m.label === 'Uptime Stability' ? 'Scores 30-day uptime consistency. >30 days = 100.' : 
+                                   m.label === 'Version Consensus' ? 'Checks if node software matches network majority.' : 
+                                   m.label === 'Reputation' ? 'Rewards accumulated for valid proofs of storage.' : 'Raw storage committed to the network.'}
+                              </div>
+                          )}
                           <div className="h-2 bg-zinc-800 rounded-full overflow-hidden relative">
                               <div className="h-full bg-blue-500 transition-all duration-1000" style={{ width: `${m.val}%` }}></div>
                               <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_4px_white] z-10" style={{ left: `${m.avg}%` }} title="Network Average"></div>
@@ -674,7 +705,7 @@ export default function Home() {
   };
 
   return (
-    <div className={`min-h-screen font-sans transition-colors duration-500 ${warRoom ? 'bg-black text-green-500 selection:bg-green-900/30' : 'bg-[#09090b] text-zinc-100 selection:bg-blue-500/30'}`}>
+    <div className={`min-h-screen font-sans transition-colors duration-500 ${warRoom ? 'bg-black text-green-500 selection:bg-green-900/30' : 'bg-[#09090b] text-zinc-100 selection:bg-blue-500/30'}`} onClick={handleGlobalClick}>
       <Head><title>Xandeum Pulse {warRoom ? '[WAR ROOM]' : ''}</title></Head>
       
       {/* LOADING OVERLAY */}
@@ -729,7 +760,17 @@ export default function Home() {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="bg-zinc-900 border border-zinc-800 rounded-lg py-2 pl-10 pr-4 text-sm focus:border-blue-500 outline-none w-full shadow-inner text-white"
+                        onFocus={() => setIsSearchFocused(true)}
+                        onBlur={() => setIsSearchFocused(false)}
                     />
+                    
+                    {/* RESTORED SEARCH TIPS */}
+                    <div className="absolute top-full left-0 right-0 mt-2 flex justify-center pointer-events-none">
+                        <p className="text-[9px] text-zinc-500 font-mono tracking-wide uppercase flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 key={searchTipIndex} bg-black/80 px-2 py-1 rounded border border-zinc-800 backdrop-blur-sm">
+                            <Info size={10} className="text-blue-500" />
+                            {isSearchFocused ? "Type to filter nodes instantly" : searchTips[searchTipIndex]}
+                        </p>
+                    </div>
                 </div>
                 
                 {/* DESKTOP CONTROLS */}
@@ -822,7 +863,10 @@ export default function Home() {
           {/* NODE GRID */}
           {loading && nodes.length === 0 ? <PulseGraphLoader /> : (
               <div className={`grid gap-4 ${warRoom ? 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'} pb-20`}>
-                  {filteredNodes.slice(0, warRoom ? 500 : 50).map((node, i) => renderNodeCard(node, i))}
+                  {filteredNodes.slice(0, warRoom ? 500 : 50).map((node, i) => {
+                      const cycle = getCycleContent(node, i);
+                      return renderNodeCard(node, i);
+                  })}
               </div>
           )}
       </main>
@@ -955,7 +999,12 @@ export default function Home() {
                                   <div className="mt-8 text-center w-full">
                                       <div className="text-[10px] text-zinc-500 font-bold uppercase mb-2 tracking-wider group-hover:text-blue-400 transition">Click for Breakdown</div>
                                       <div className={`py-2 px-4 rounded-xl border text-xs font-bold inline-block ${selectedNode.uptime > 86400 ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
-                                          {selectedNode.uptime > 86400 ? 'ONLINE & STABLE' : 'UNSTABLE / SYNCING'}
+                                          <span className="group relative">
+                                              {selectedNode.uptime > 86400 ? 'ONLINE & STABLE' : 'UNSTABLE / SYNCING'}
+                                              <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-black px-2 py-1 rounded border border-zinc-700 text-[9px] text-zinc-300 whitespace-nowrap">
+                                                  Last seen {formatDetailedTimestamp(selectedNode.last_seen_timestamp)}
+                                              </span>
+                                          </span>
                                       </div>
                                   </div>
                               </div>
