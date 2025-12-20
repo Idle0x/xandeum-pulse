@@ -3,7 +3,7 @@ import Head from 'next/head';
 import axios from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Trophy, Medal, ArrowLeft, Search, Wallet, X, ChevronRight, Activity, Users, BarChart3, HelpCircle, Star, Calculator, TrendingUp, Zap, Info, ChevronDown, ChevronUp, PlayCircle, RefreshCw } from 'lucide-react';
+import { Trophy, Medal, ArrowLeft, Search, Wallet, X, ChevronRight, Activity, Users, BarChart3, HelpCircle, Star, Calculator, TrendingUp, Zap, Info, ChevronDown, ChevronUp, PlayCircle, RefreshCw, ExternalLink, ArrowUpRight } from 'lucide-react';
 
 interface RankedNode {
   rank: number;
@@ -12,7 +12,6 @@ interface RankedNode {
   address?: string;
 }
 
-// Boost Constants
 const ERA_BOOSTS = {
     'DeepSouth': 16,
     'South': 10,
@@ -40,9 +39,9 @@ export default function Leaderboard() {
   
   // --- SIMULATOR STATE ---
   const [showSim, setShowSim] = useState(false);
-  const [showHardwareCalc, setShowHardwareCalc] = useState(false); // Toggle for the "Calculate from Specs" section
+  const [showHardwareCalc, setShowHardwareCalc] = useState(false);
   
-  // The Core Input
+  // The Core Input (Auto-filled on row click)
   const [baseCreditsInput, setBaseCreditsInput] = useState<number>(0);
   
   // Hardware Calculator Inputs
@@ -55,6 +54,9 @@ export default function Leaderboard() {
   // Boosts
   const [simBoosts, setSimBoosts] = useState<number[]>([]); 
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+
+  // EXPANDED ROW STATE
+  const [expandedNode, setExpandedNode] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -139,10 +141,24 @@ export default function Leaderboard() {
     n.pubkey.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleSimulate = (credit: number) => {
-      setBaseCreditsInput(credit);
+  // --- INTERACTION HANDLERS ---
+
+  const handleRowClick = (node: RankedNode) => {
+      // 1. Auto-fill the simulator (Backend Logic)
+      setBaseCreditsInput(node.credits);
+      setShowHardwareCalc(false); // Switch to manual/auto input mode
+
+      // 2. Toggle Expansion (UI Logic)
+      if (expandedNode === node.pubkey) {
+          setExpandedNode(null);
+      } else {
+          setExpandedNode(node.pubkey);
+      }
+  };
+
+  const handleUseInSim = (e: React.MouseEvent) => {
+      e.stopPropagation();
       setShowSim(true);
-      setShowHardwareCalc(false); // Close hardware calc if using a real node
       window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -150,8 +166,6 @@ export default function Leaderboard() {
       let multiplier = 1;
       if (simBoosts.length > 0) {
           const totalBoostProduct = simBoosts.reduce((a, b) => a * b, 1);
-          // Geometric mean logic: (Product)^(1/Nodes). 
-          // For simplicity in this "Estimate" tool, we treat selected boosts as the fleet average.
           multiplier = totalBoostProduct; 
       }
       return { 
@@ -186,13 +200,13 @@ export default function Leaderboard() {
           <h1 className="text-3xl font-extrabold flex items-center gap-3 text-yellow-500 justify-center">
             <Trophy size={32} /> REPUTATION LEDGER
           </h1>
-          <p className="text-xs text-zinc-600 mt-1 font-mono tracking-wide">OFFICIAL RANKING & EARNINGS FORECASTER</p>
+          <p className="text-xs text-zinc-500 mt-1 font-mono tracking-wide uppercase">The definitive registry of node reputation and network contribution</p>
         </div>
         <div className="w-32 hidden md:block"></div>
       </div>
 
-      {/* --- EARNINGS FORECASTER --- */}
-      <div className="max-w-5xl mx-auto mb-10 bg-gradient-to-b from-zinc-900 to-black border border-yellow-500/30 rounded-2xl overflow-hidden shadow-2xl">
+      {/* --- STOINC SIMULATOR WIDGET --- */}
+      <div className="max-w-5xl mx-auto mb-10 bg-gradient-to-b from-zinc-900 to-black border border-yellow-500/30 rounded-2xl overflow-hidden shadow-2xl transition-all duration-300">
           <div 
             className="p-4 bg-yellow-500/10 border-b border-yellow-500/20 flex justify-between items-center cursor-pointer hover:bg-yellow-500/20 transition"
             onClick={() => setShowSim(!showSim)}
@@ -200,8 +214,8 @@ export default function Leaderboard() {
               <div className="flex items-center gap-3">
                   <div className="p-2 bg-yellow-500 text-black rounded-lg"><Calculator size={20} /></div>
                   <div>
-                      <h2 className="font-bold text-yellow-500 text-sm uppercase tracking-widest">Earnings Forecaster</h2>
-                      <p className="text-[10px] text-zinc-400">Estimate potential rewards using hypothetical or real data</p>
+                      <h2 className="font-bold text-yellow-500 text-sm uppercase tracking-widest">STOINC Simulator</h2>
+                      <p className="text-[10px] text-zinc-400">Estimate your projected earnings based on the official Xandeum economic model</p>
                   </div>
               </div>
               {showSim ? <ChevronUp size={20} className="text-yellow-500" /> : <ChevronDown size={20} className="text-zinc-500" />}
@@ -278,7 +292,7 @@ export default function Leaderboard() {
                                   <span className="text-xs font-bold uppercase tracking-wider">Apply Boosts (NFTs / Eras)</span>
                                   <HelpCircle size={12} className="cursor-help hover:text-white" onClick={() => toggleTooltip('boost')} />
                               </div>
-                              {activeTooltip === 'boost' && <div className="absolute z-10 bg-zinc-800 border border-zinc-700 p-3 rounded text-[10px] text-zinc-300 w-64 -top-12 left-0 shadow-xl">Multipliers from NFTs and pNode Eras. These stack geometrically to massively increase your share.</div>}
+                              {activeTooltip === 'boost' && <div className="absolute z-10 bg-zinc-800 border border-zinc-700 p-3 rounded text-[10px] text-zinc-300 w-64 -top-12 left-0 shadow-xl">Multipliers from NFTs and pNode Eras. Stacks geometrically (Product of boosts).</div>}
                               <div className="flex flex-wrap gap-2">
                                   {Object.entries({...ERA_BOOSTS, ...NFT_BOOSTS}).map(([name, val]) => (
                                       <button 
@@ -397,7 +411,7 @@ export default function Leaderboard() {
         {/* DISCLAIMER / UPDATE FREQUENCY */}
         <div className="flex items-center gap-2 text-[10px] text-zinc-500 px-2">
             <RefreshCw size={10} />
-            <span>Credits & Rank update per <strong>Epoch (~2 days)</strong>. Liveness updates in real-time.</span>
+            <span>Credits & Rank update per <strong>Epoch</strong>. Liveness updates in real-time.</span>
         </div>
       </div>
 
@@ -425,45 +439,69 @@ export default function Leaderboard() {
           <div className="divide-y divide-zinc-800/50">
             {filtered.slice(0, 100).map((node) => {
               const isMyNode = node.address && favorites.includes(node.address);
+              const isExpanded = expandedNode === node.pubkey;
 
               return (
-                <div 
-                  key={node.pubkey} 
-                  className={`grid grid-cols-12 gap-4 p-4 hover:bg-white/5 transition items-center group relative cursor-pointer ${
-                    isMyNode ? 'bg-yellow-500/5 border-l-4 border-yellow-500' : 'border-l-4 border-transparent'
-                  }`}
-                >
-                  
-                  {/* RANK BADGE */}
-                  <div className="col-span-2 md:col-span-1 flex justify-center items-center gap-1 relative">
-                    {isMyNode && <Star size={12} className="text-yellow-500 absolute left-0 md:left-4" fill="currentColor" />}
-                    {node.rank === 1 && <Trophy size={20} className="text-yellow-400" />}
-                    {node.rank === 2 && <Medal size={20} className="text-zinc-300" />}
-                    {node.rank === 3 && <Medal size={20} className="text-amber-600" />}
-                    {node.rank > 3 && <span className="text-sm font-bold text-zinc-500">#{node.rank}</span>}
-                  </div>
-
-                  {/* PUBLIC KEY */}
-                  <div className="col-span-6 md:col-span-7 font-mono text-sm text-zinc-300 truncate group-hover:text-white transition flex items-center justify-between">
-                    {node.pubkey}
-                    
-                    {/* SIMULATE BUTTON */}
-                    <button 
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            handleSimulate(node.credits);
-                        }}
-                        className="hidden md:flex opacity-0 group-hover:opacity-100 transition items-center gap-1 bg-yellow-500/10 text-yellow-500 text-[9px] font-bold px-2 py-1 rounded border border-yellow-500/20 hover:bg-yellow-500/20"
+                <div key={node.pubkey} className="group transition-all duration-300">
+                    <div 
+                    className={`grid grid-cols-12 gap-4 p-4 hover:bg-white/5 items-center cursor-pointer relative ${
+                        isExpanded ? 'bg-white/5 border-l-4 border-yellow-500' : 
+                        isMyNode ? 'bg-yellow-500/5 border-l-4 border-yellow-500' : 'border-l-4 border-transparent'
+                    }`}
+                    onClick={() => handleRowClick(node)}
                     >
-                        <PlayCircle size={10} /> USE IN FORECAST
-                    </button>
-                  </div>
+                    
+                    {/* RANK BADGE */}
+                    <div className="col-span-2 md:col-span-1 flex justify-center items-center gap-1 relative">
+                        {isMyNode && <Star size={12} className="text-yellow-500 absolute left-0 md:left-4" fill="currentColor" />}
+                        {node.rank === 1 && <Trophy size={20} className="text-yellow-400" />}
+                        {node.rank === 2 && <Medal size={20} className="text-zinc-300" />}
+                        {node.rank === 3 && <Medal size={20} className="text-amber-600" />}
+                        {node.rank > 3 && <span className="text-sm font-bold text-zinc-500">#{node.rank}</span>}
+                    </div>
 
-                  {/* CREDITS */}
-                  <div className="col-span-4 text-right font-bold font-mono text-yellow-500 flex items-center justify-end gap-2">
-                    {node.credits.toLocaleString()}
-                    <Wallet size={14} className="text-zinc-600 group-hover:text-yellow-500 transition hidden md:block" />
-                  </div>
+                    {/* PUBLIC KEY */}
+                    <div className="col-span-6 md:col-span-7 font-mono text-sm text-zinc-300 truncate group-hover:text-white transition flex items-center justify-between">
+                        {node.pubkey}
+                        
+                        {/* EXPAND INDICATOR */}
+                        <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180 text-white' : 'text-zinc-600 group-hover:text-zinc-400'}`}>
+                            <ChevronDown size={16} />
+                        </div>
+                    </div>
+
+                    {/* CREDITS */}
+                    <div className="col-span-4 text-right font-bold font-mono text-yellow-500 flex items-center justify-end gap-2">
+                        {node.credits.toLocaleString()}
+                        <Wallet size={14} className="text-zinc-600 group-hover:text-yellow-500 transition hidden md:block" />
+                    </div>
+                    </div>
+
+                    {/* EXPANDED VIEW (ACCORDION) */}
+                    {isExpanded && (
+                        <div className="bg-black/40 border-b border-zinc-800/50 p-4 pl-8 md:pl-16 animate-in slide-in-from-top-2 duration-200">
+                            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+                                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest hidden md:block mr-4">
+                                    Quick Actions
+                                </div>
+                                <Link href={`/?open=${node.pubkey}`} className="w-full md:w-auto">
+                                    <button className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-xs font-bold text-white transition-all shadow-lg hover:shadow-blue-500/10">
+                                        <Activity size={14} className="text-blue-400" />
+                                        VIEW NODE DIAGNOSTICS
+                                        <ExternalLink size={10} className="text-zinc-500" />
+                                    </button>
+                                </Link>
+                                <button 
+                                    onClick={handleUseInSim}
+                                    className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/20 text-xs font-bold text-yellow-500 transition-all shadow-lg hover:shadow-yellow-500/10"
+                                >
+                                    <Calculator size={14} />
+                                    CALCULATE EARNINGS
+                                    <ArrowUpRight size={10} className="text-yellow-500/50" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
               );
             })}
