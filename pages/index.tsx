@@ -217,8 +217,6 @@ const PulseGraphLoader = () => {
             .animate-scan-line { left: 0; animation: scan 2s ease-in-out infinite; }
             @keyframes draw { 0% { stroke-dashoffset: 400; opacity: 0; } 10% { opacity: 1; } 50% { stroke-dashoffset: 0; } 90% { opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
             @keyframes scan { 0% { left: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
-            @keyframes ekg { 0% { left: -10px; opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
-            .ekg-line { position: absolute; top: 0; bottom: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(34,197,94,0.5), transparent); animation: ekg 2s linear infinite; }
         `}</style>
     </div>
   );
@@ -356,8 +354,7 @@ export default function Home() {
 
   const copyStatusReport = (node: Node) => {
     const health = getHealthScore(node, mostCommonVersion, medianCredits);
-    const address = node.address || '0.0.0.0'; // Fallback for ghost nodes
-    const report = `[XANDEUM PULSE REPORT]\nNode: ${address}\nStatus: ${node.uptime > 86400 ? 'STABLE' : 'BOOTING'}\nHealth: ${health}/100\nMonitor at: https://xandeum-pulse.vercel.app`;
+    const report = `[XANDEUM PULSE REPORT]\nNode: ${node.address}\nStatus: ${node.uptime > 86400 ? 'STABLE' : 'BOOTING'}\nHealth: ${health}/100\nMonitor at: https://xandeum-pulse.vercel.app`;
     navigator.clipboard.writeText(report);
     setCopiedField('report');
     setTimeout(() => setCopiedField(null), 2000);
@@ -376,9 +373,8 @@ export default function Home() {
         const health = getHealthScore(n, mostCommonVersion, medianCredits);
         const utilization = n.storage_usage_percentage?.replace('%', '') || '0';
         const mode = n.is_public ? 'Public' : 'Private';
-        const address = n.address || '0.0.0.0'; // Fallback
         const isoTime = new Date(n.last_seen_timestamp < 10000000000 ? n.last_seen_timestamp * 1000 : n.last_seen_timestamp).toISOString();
-        return `${address},${n.pubkey},${n.rank},${n.credits},${n.version},${n.uptime},${n.storage_committed},${n.storage_used},${utilization},${health},${mode},${isoTime},http://${address.split(':')[0]}:6000,${favorites.includes(address)}`;
+        return `${n.address},${n.pubkey},${n.rank},${n.credits},${n.version},${n.uptime},${n.storage_committed},${n.storage_used},${utilization},${health},${mode},${isoTime},http://${n.address.split(':')[0]}:6000,${favorites.includes(n.address)}`;
     });
     const blob = new Blob([headers + rows.join('\n')], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -560,7 +556,7 @@ export default function Home() {
               <div className="flex items-center gap-2 mb-1"><div className="text-[10px] text-zinc-500 uppercase font-bold">NODE IDENTITY</div>{!node.is_public && <Shield size={10} className="text-zinc-600" />}</div>
               <div className="relative h-6 w-56">
                   <div className={`absolute inset-0 font-mono text-sm truncate transition-opacity duration-300 group-hover:opacity-0 ${zenMode ? 'text-zinc-300' : 'text-zinc-300'}`}>{(node.pubkey || '').length > 12 ? `${(node.pubkey || '').slice(0, 12)}...${(node.pubkey || '').slice(-4)}` : (node.pubkey || 'Unknown Identity')}</div>
-                  <div className="absolute inset-0 font-mono text-sm text-blue-400 truncate opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-center gap-2"><span className="text-[10px] text-zinc-500">IP:</span> {node.address || 'N/A'}</div>
+                  <div className="absolute inset-0 font-mono text-sm text-blue-400 truncate opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-center gap-2"><span className="text-[10px] text-zinc-500">IP:</span> {(node.address || '0.0.0.0').split(':')[0]}</div>
               </div>
             </div>
             <button onClick={(e) => toggleFavorite(e, node.address)} className={`p-1.5 rounded-full transition ${isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'}`}><Star size={16} fill={isFav ? "currentColor" : "none"} /></button>
@@ -600,7 +596,7 @@ export default function Home() {
                   <div>
                       <div className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-1">NODE ID</div>
                       <div className="font-mono text-sm text-zinc-300 truncate w-32 md:w-48">{node.pubkey || 'Unknown'}</div>
-                      <div className="text-[10px] text-zinc-600 font-mono mt-0.5">{node.address}</div>
+                      <div className="text-[10px] text-zinc-600 font-mono mt-0.5">{(node.address || '0.0.0.0').split(':')[0]}</div>
                   </div>
                   <div className={`text-xl font-bold ${health >= 80 ? 'text-green-500' : health >= 50 ? 'text-yellow-500' : 'text-red-500'}`}>{health}</div>
               </div>
@@ -784,7 +780,7 @@ export default function Home() {
       {isMenuOpen && <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* --- HEADER --- */}
-      <header className={`sticky top-0 z-40 backdrop-blur-md border-b px-6 py-4 flex flex-col gap-4 ${zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'}`}>
+      <header className={`sticky top-0 z-40 backdrop-blur-md border-b px-6 py-4 flex flex-col gap-6 ${zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'}`}>
           
           {/* ROW 1: Logo - Search - Toggle */}
           <div className="flex justify-between items-center w-full">
@@ -809,8 +805,8 @@ export default function Home() {
                       onBlur={() => setIsSearchFocused(false)}
                   />
                   {!zenMode && (
-                      <div className="absolute top-full left-0 right-0 mt-4 flex justify-center pointer-events-none">
-                          <p className="text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 key={searchTipIndex} bg-black/80 px-3 py-1.5 rounded border border-zinc-800 backdrop-blur-sm shadow-xl">
+                      <div className="absolute top-full left-0 right-0 mt-2 flex justify-center pointer-events-none">
+                          <p className="text-[10px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 key={searchTipIndex} bg-black/80 px-2 py-1 rounded border border-zinc-800 backdrop-blur-sm shadow-xl">
                               <Info size={12} className="text-blue-500" />
                               {isSearchFocused ? "Type to filter nodes instantly" : searchTips[searchTipIndex]}
                           </p>
@@ -828,24 +824,25 @@ export default function Home() {
               </button>
           </div>
 
-          {/* ROW 2: Refresh & Filters (Scrollable on Mobile) */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide mt-4 justify-between md:justify-start">
-              <button onClick={fetchData} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition text-xs font-bold ${zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800'}`}>
-                  <Zap size={14} className={loading ? "animate-spin" : ""} /> REFRESH
+          {/* ROW 2: Refresh & Filters (Scrollable on Mobile) - MOVED DOWN & JUSTIFIED */}
+          <div className="flex items-center justify-between gap-4 overflow-x-auto pb-2 scrollbar-hide w-full mt-6 border-t border-zinc-800/50 pt-4">
+              <button onClick={fetchData} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition font-bold text-xs ${zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800'}`}>
+                  <Zap size={16} className={loading ? "animate-spin" : ""} /> REFRESH
               </button>
-              <div className={`h-6 w-px mx-2 ${zenMode ? 'bg-zinc-800' : 'bg-zinc-800'}`}></div>
               
-              {[
-                  { id: 'uptime', icon: Clock, label: 'UPTIME' },
-                  { id: 'storage', icon: Database, label: 'STORAGE' },
-                  { id: 'version', icon: Server, label: 'VERSION' },
-                  { id: 'health', icon: HeartPulse, label: 'HEALTH' } 
-              ].map((opt) => (
-                  <button key={opt.id} onClick={() => { if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); else setSortBy(opt.id as any); }} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${sortBy === opt.id ? (zenMode ? 'bg-zinc-800 border-zinc-600 text-zinc-200' : 'bg-blue-500/10 border-blue-500/50 text-blue-400') : (zenMode ? 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800')}`}>
-                      <opt.icon size={14} /> {opt.label}
-                      {sortBy === opt.id && (sortOrder === 'asc' ? <ArrowUp size={12} className="ml-1" /> : <ArrowDown size={12} className="ml-1" />)}
-                  </button>
-              ))}
+              <div className="flex gap-2">
+                {[
+                    { id: 'uptime', icon: Clock, label: 'UPTIME' },
+                    { id: 'storage', icon: Database, label: 'STORAGE' },
+                    { id: 'version', icon: Server, label: 'VERSION' },
+                    { id: 'health', icon: HeartPulse, label: 'HEALTH' } 
+                ].map((opt) => (
+                    <button key={opt.id} onClick={() => { if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); else setSortBy(opt.id as any); }} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${sortBy === opt.id ? (zenMode ? 'bg-zinc-800 border-zinc-600 text-zinc-200' : 'bg-blue-500/10 border-blue-500/50 text-blue-400') : (zenMode ? 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800')}`}>
+                        <opt.icon size={14} /> {opt.label}
+                        {sortBy === opt.id && (sortOrder === 'asc' ? <ArrowUp size={12} className="ml-1" /> : <ArrowDown size={12} className="ml-1" />)}
+                    </button>
+                ))}
+              </div>
           </div>
       </header>
 
@@ -858,9 +855,8 @@ export default function Home() {
                     <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Network Capacity</div>
                     <div className="text-2xl md:text-3xl font-bold text-white mt-1">{formatBytes(totalStorageCommitted)}</div>
                 </div>
-                <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm relative overflow-hidden">
-                    {/* EKG SCANNING LINE */}
-                    <div className="absolute inset-0 z-0 opacity-20"><div className="ekg-line"></div></div>
+                <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group">
+                    <div className="absolute inset-0 opacity-10 pointer-events-none"><div className="ekg-line"></div></div>
                     <div className="relative z-10">
                         <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1"><HeartPulse size={12} className="text-green-500" /> Network Vitals</div>
                         <div className="space-y-1 mt-1">
@@ -869,6 +865,10 @@ export default function Home() {
                             <div className="flex justify-between text-xs"><span className="text-zinc-400">Consensus</span><span className="font-mono font-bold text-blue-400">{networkConsensus.toFixed(1)}%</span></div>
                         </div>
                     </div>
+                    <style jsx>{`
+                        @keyframes ekg { 0% { left: -100%; } 100% { left: 100%; } }
+                        .ekg-line { position: absolute; top: 0; bottom: 0; width: 100%; background: linear-gradient(90deg, transparent 0%, rgba(34, 197, 94, 0.2) 50%, transparent 100%); animation: ekg 2s linear infinite; }
+                    `}</style>
                 </div>
                 <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
                     <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Consensus Ver</div>
@@ -881,7 +881,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* SYNC INDICATOR */}
+          {/* ERROR DISPLAY (REPLACED WITH SYNC INDICATOR) */}
           {error && (
             <div className="mb-8 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center gap-2 text-blue-400 animate-pulse">
               <RefreshCw size={14} className="animate-spin" />
@@ -919,7 +919,7 @@ export default function Home() {
                   <div className={`p-6 border-b flex justify-between items-start ${zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
                       <div className="flex items-center gap-4">
                           <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-lg border border-white/10 ${zenMode ? 'bg-zinc-900 text-white border-zinc-700' : 'bg-gradient-to-br from-blue-600 to-purple-600 text-white'}`}>
-                              {(selectedNode.pubkey || 'UN').slice(0, 2)}
+                              {selectedNode.pubkey.slice(0, 2)}
                           </div>
                           <div>
                               <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-2 mb-1">
@@ -929,8 +929,8 @@ export default function Home() {
                                   </span>
                               </div>
                               <h2 className={`text-lg md:text-xl font-mono truncate w-64 md:w-96 flex items-center gap-2 ${zenMode ? 'text-zinc-200' : 'text-white'}`}>
-                                  {selectedNode.pubkey || 'Unknown Public Key'}
-                                  <Copy size={14} className="text-zinc-600 hover:text-white cursor-pointer" onClick={() => copyToClipboard(selectedNode.pubkey || '', 'pubkey')} />
+                                  {selectedNode.pubkey}
+                                  <Copy size={14} className="text-zinc-600 hover:text-white cursor-pointer" onClick={() => copyToClipboard(selectedNode.pubkey, 'pubkey')} />
                               </h2>
                           </div>
                       </div>
@@ -967,7 +967,7 @@ export default function Home() {
                                                 onChange={(e) => setCompareTarget(nodes.find(n => n.pubkey === e.target.value) || null)}
                                               >
                                                   <option value="">Select a node...</option>
-                                                  {nodes.slice(0, 50).map(n => <option key={n.pubkey} value={n.pubkey}>{n.address} ({n.rank ? `#${n.rank}` : 'Unranked'})</option>)}
+                                                  {nodes.slice(0, 50).map(n => <option key={n.pubkey} value={n.pubkey}>{(n.address || '0.0.0.0').split(':')[0]} ({n.rank ? `#${n.rank}` : 'Unranked'})</option>)}
                                               </select>
                                           </div>
                                       ) : (
