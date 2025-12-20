@@ -3,9 +3,8 @@ import Head from 'next/head';
 import axios from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Trophy, Medal, ArrowLeft, Search, Wallet, X, ChevronRight, Activity, Users, BarChart3, HelpCircle, Star, Calculator, TrendingUp, Zap, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trophy, Medal, ArrowLeft, Search, Wallet, X, ChevronRight, Activity, Users, BarChart3, HelpCircle, Star, Calculator, TrendingUp, Zap, Info, ChevronDown, ChevronUp, PlayCircle, RefreshCw } from 'lucide-react';
 
-// --- TYPES ---
 interface RankedNode {
   rank: number;
   pubkey: string;
@@ -13,7 +12,7 @@ interface RankedNode {
   address?: string;
 }
 
-// --- BOOST FACTOR CONSTANTS ---
+// Boost Constants
 const ERA_BOOSTS = {
     'DeepSouth': 16,
     'South': 10,
@@ -41,16 +40,20 @@ export default function Leaderboard() {
   
   // --- SIMULATOR STATE ---
   const [showSim, setShowSim] = useState(false);
+  const [showHardwareCalc, setShowHardwareCalc] = useState(false); // Toggle for the "Calculate from Specs" section
   
-  // Inputs
+  // The Core Input
+  const [baseCreditsInput, setBaseCreditsInput] = useState<number>(0);
+  
+  // Hardware Calculator Inputs
   const [simNodes, setSimNodes] = useState<number>(1);
-  const [simStorageVal, setSimStorageVal] = useState<number>(1); // The raw number user types
-  const [simStorageUnit, setSimStorageUnit] = useState<'MB' | 'GB' | 'TB' | 'PB'>('TB'); // Unit
+  const [simStorageVal, setSimStorageVal] = useState<number>(1);
+  const [simStorageUnit, setSimStorageUnit] = useState<'MB' | 'GB' | 'TB' | 'PB'>('TB');
   const [simStake, setSimStake] = useState<number>(1000); 
   const [simPerf, setSimPerf] = useState(0.95);
-  const [simBoosts, setSimBoosts] = useState<number[]>([]); 
   
-  // Tooltip State
+  // Boosts
+  const [simBoosts, setSimBoosts] = useState<number[]>([]); 
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
   useEffect(() => {
@@ -102,6 +105,9 @@ export default function Leaderboard() {
         }
 
         setRanking(parsedList);
+        
+        // Auto-fill top node for demo if input is empty
+        if (parsedList.length > 0 && baseCreditsInput === 0) setBaseCreditsInput(parsedList[0].credits);
 
         const saved = localStorage.getItem('xandeum_favorites');
         if (saved) setFavorites(JSON.parse(saved));
@@ -116,51 +122,45 @@ export default function Leaderboard() {
     fetchData();
   }, []);
 
+  // Update Base Credits when Hardware Inputs Change (If Hardware Calc is Open)
+  useEffect(() => {
+      if (showHardwareCalc) {
+          let storageInGB = simStorageVal;
+          if (simStorageUnit === 'MB') storageInGB = simStorageVal / 1000;
+          if (simStorageUnit === 'TB') storageInGB = simStorageVal * 1000;
+          if (simStorageUnit === 'PB') storageInGB = simStorageVal * 1000000;
+          
+          const calculated = simNodes * storageInGB * simPerf * simStake;
+          setBaseCreditsInput(calculated);
+      }
+  }, [simNodes, simStorageVal, simStorageUnit, simStake, simPerf, showHardwareCalc]);
+
   const filtered = ranking.filter(n => 
     n.pubkey.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleRowClick = (pubkey: string) => {
-    router.push(`/?open=${pubkey}`);
+  const handleSimulate = (credit: number) => {
+      setBaseCreditsInput(credit);
+      setShowSim(true);
+      setShowHardwareCalc(false); // Close hardware calc if using a real node
+      window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // --- CALCULATOR ENGINE ---
-  const calculateSTOINC = () => {
-      // 1. Normalize Storage to GB for the formula
-      let storageInGB = simStorageVal;
-      if (simStorageUnit === 'MB') storageInGB = simStorageVal / 1000;
-      if (simStorageUnit === 'TB') storageInGB = simStorageVal * 1000;
-      if (simStorageUnit === 'PB') storageInGB = simStorageVal * 1000000;
-
-      // 2. Base Credits Formula: Nodes * Storage(GB) * Perf * Stake
-      // (As per official docs)
-      const baseCredits = simNodes * storageInGB * simPerf * simStake;
-
-      // 3. Boost Calculation (Geometric Mean)
-      // Formula: (product of boosts) ^ (1 / nodes)
-      // Logic: If I have 10 nodes and 1 Titan NFT, does it apply to all? 
-      // The simulator assumes the selected boosts apply to the *average* node configuration.
+  const calculateFinal = () => {
       let multiplier = 1;
-      
       if (simBoosts.length > 0) {
-          // If we have selected boosts, we multiply them
-          // Example: DeepSouth (16x) + Titan (11x) = 176x total boost per node.
           const totalBoostProduct = simBoosts.reduce((a, b) => a * b, 1);
-          
-          // Geometric Mean only applies if we are averaging different boosts across different nodes.
-          // If every node in the fleet has these boosts, the multiplier is just the product.
-          // We will assume "Uniform Fleet" for this simulator (e.g. All nodes are Deep South).
-          multiplier = totalBoostProduct;
+          // Geometric mean logic: (Product)^(1/Nodes). 
+          // For simplicity in this "Estimate" tool, we treat selected boosts as the fleet average.
+          multiplier = totalBoostProduct; 
       }
-
       return { 
-          base: baseCredits, 
-          boosted: baseCredits * multiplier, 
+          boosted: baseCreditsInput * multiplier, 
           multiplier 
       };
   };
 
-  const simResult = calculateSTOINC();
+  const simResult = calculateFinal();
   
   const toggleBoost = (val: number) => {
       if (simBoosts.includes(val)) setSimBoosts(simBoosts.filter(b => b !== val));
@@ -174,7 +174,7 @@ export default function Leaderboard() {
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-4 md:p-8 selection:bg-yellow-500/30">
       <Head>
-        <title>Xandeum Pulse - Reputation & STOINC</title>
+        <title>Xandeum Pulse - Reputation & Earnings</title>
       </Head>
 
       {/* HEADER */}
@@ -186,12 +186,12 @@ export default function Leaderboard() {
           <h1 className="text-3xl font-extrabold flex items-center gap-3 text-yellow-500 justify-center">
             <Trophy size={32} /> REPUTATION LEDGER
           </h1>
-          <p className="text-xs text-zinc-600 mt-1 font-mono tracking-wide">ECONOMIC RANKING & STOINC CALCULATOR</p>
+          <p className="text-xs text-zinc-600 mt-1 font-mono tracking-wide">OFFICIAL RANKING & EARNINGS FORECASTER</p>
         </div>
         <div className="w-32 hidden md:block"></div>
       </div>
 
-      {/* --- STOINC SIMULATOR WIDGET --- */}
+      {/* --- EARNINGS FORECASTER --- */}
       <div className="max-w-5xl mx-auto mb-10 bg-gradient-to-b from-zinc-900 to-black border border-yellow-500/30 rounded-2xl overflow-hidden shadow-2xl">
           <div 
             className="p-4 bg-yellow-500/10 border-b border-yellow-500/20 flex justify-between items-center cursor-pointer hover:bg-yellow-500/20 transition"
@@ -200,8 +200,8 @@ export default function Leaderboard() {
               <div className="flex items-center gap-3">
                   <div className="p-2 bg-yellow-500 text-black rounded-lg"><Calculator size={20} /></div>
                   <div>
-                      <h2 className="font-bold text-yellow-500 text-sm uppercase tracking-widest">STOINC Revenue Simulator</h2>
-                      <p className="text-[10px] text-zinc-400">Estimate earnings based on the official Xandeum formula</p>
+                      <h2 className="font-bold text-yellow-500 text-sm uppercase tracking-widest">Earnings Forecaster</h2>
+                      <p className="text-[10px] text-zinc-400">Estimate potential rewards using hypothetical or real data</p>
                   </div>
               </div>
               {showSim ? <ChevronUp size={20} className="text-yellow-500" /> : <ChevronDown size={20} className="text-zinc-500" />}
@@ -210,84 +210,75 @@ export default function Leaderboard() {
           {showSim && (
               <div className="p-6 md:p-8 animate-in slide-in-from-top-4 duration-500">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                      {/* INPUTS */}
+                      
+                      {/* LEFT: INPUTS */}
                       <div className="space-y-8">
                           
-                          {/* 1. FLEET SIZE */}
+                          {/* BASE CREDIT INPUT */}
                           <div className="relative">
-                              <div className="flex items-center gap-2 mb-2 text-zinc-400">
-                                  <span className="text-xs font-bold uppercase tracking-wider">My Fleet Size</span>
-                                  <HelpCircle size={12} className="cursor-help hover:text-white" onClick={() => toggleTooltip('fleet')} />
-                              </div>
-                              {activeTooltip === 'fleet' && <div className="absolute z-10 bg-zinc-800 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 w-64 -top-8 left-0">The total number of pNodes you own and operate. More nodes = higher multiplier.</div>}
-                              <div className="flex items-center bg-zinc-900 border border-zinc-700 rounded-lg overflow-hidden focus-within:border-yellow-500 transition">
-                                  <input 
-                                    type="number" 
-                                    min="1" 
-                                    value={simNodes} 
-                                    onChange={(e) => setSimNodes(Math.max(1, Number(e.target.value)))} 
-                                    className="w-full bg-transparent p-3 text-white text-sm outline-none font-mono"
-                                  />
-                                  <span className="pr-4 text-xs font-bold text-zinc-500">NODES</span>
-                              </div>
-                          </div>
-                          
-                          {/* 2. TOTAL STORAGE */}
-                          <div className="relative">
-                              <div className="flex items-center gap-2 mb-2 text-zinc-400">
-                                  <span className="text-xs font-bold uppercase tracking-wider">Total Storage</span>
-                                  <HelpCircle size={12} className="cursor-help hover:text-white" onClick={() => toggleTooltip('storage')} />
-                              </div>
-                              {activeTooltip === 'storage' && <div className="absolute z-10 bg-zinc-800 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 w-64 -top-8 left-0">Combined capacity committed across your fleet. Formula uses GB as the base unit.</div>}
-                              <div className="flex gap-2">
-                                  <div className="flex-grow flex items-center bg-zinc-900 border border-zinc-700 rounded-lg overflow-hidden focus-within:border-blue-500 transition">
-                                      <input 
-                                        type="number" 
-                                        min="1" 
-                                        value={simStorageVal} 
-                                        onChange={(e) => setSimStorageVal(Math.max(0, Number(e.target.value)))} 
-                                        className="w-full bg-transparent p-3 text-white text-sm outline-none font-mono"
-                                      />
+                              <div className="flex justify-between items-end mb-2">
+                                  <div className="flex items-center gap-2 text-zinc-400">
+                                      <span className="text-xs font-bold uppercase tracking-wider text-white">Base Reputation Credits</span>
+                                      <HelpCircle size={12} className="cursor-help hover:text-white" onClick={() => toggleTooltip('base_input')} />
                                   </div>
-                                  <select 
-                                    value={simStorageUnit} 
-                                    onChange={(e) => setSimStorageUnit(e.target.value as any)}
-                                    className="bg-zinc-900 border border-zinc-700 rounded-lg text-xs font-bold text-zinc-300 px-3 outline-none focus:border-blue-500"
+                                  <button 
+                                    onClick={() => setShowHardwareCalc(!showHardwareCalc)}
+                                    className="text-[10px] text-blue-400 hover:text-blue-300 underline underline-offset-2 flex items-center gap-1"
                                   >
-                                      <option value="MB">MB</option>
-                                      <option value="GB">GB</option>
-                                      <option value="TB">TB</option>
-                                      <option value="PB">PB</option>
-                                  </select>
+                                      {showHardwareCalc ? "Hide Calculator" : "Don't know? Calculate from Hardware"}
+                                  </button>
                               </div>
-                          </div>
-
-                          {/* 3. XAND STAKE */}
-                          <div className="relative">
-                              <div className="flex items-center gap-2 mb-2 text-zinc-400">
-                                  <span className="text-xs font-bold uppercase tracking-wider">XAND Stake</span>
-                                  <HelpCircle size={12} className="cursor-help hover:text-white" onClick={() => toggleTooltip('stake')} />
-                              </div>
-                              {activeTooltip === 'stake' && <div className="absolute z-10 bg-zinc-800 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 w-64 -top-8 left-0">Amount of XAND tokens staked to boost your node's reputation.</div>}
-                              <div className="flex items-center bg-zinc-900 border border-zinc-700 rounded-lg overflow-hidden focus-within:border-green-500 transition">
+                              {activeTooltip === 'base_input' && <div className="absolute z-10 bg-zinc-800 border border-zinc-700 p-3 rounded text-[10px] text-zinc-300 w-full -top-12 left-0 shadow-xl">The raw score derived from (Nodes × Storage × Stake). Select a node below to auto-fill, or type a hypothetical value.</div>}
+                              
+                              <div className={`flex items-center bg-zinc-900 border rounded-xl overflow-hidden transition-all ${showHardwareCalc ? 'border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.1)]' : 'border-zinc-700 focus-within:border-yellow-500'}`}>
                                   <input 
                                     type="number" 
                                     min="0" 
-                                    value={simStake} 
-                                    onChange={(e) => setSimStake(Math.max(0, Number(e.target.value)))} 
-                                    className="w-full bg-transparent p-3 text-white text-sm outline-none font-mono"
+                                    value={baseCreditsInput} 
+                                    onChange={(e) => {
+                                        setBaseCreditsInput(Number(e.target.value));
+                                        setShowHardwareCalc(false); // Disable hardware sync if user types manually
+                                    }}
+                                    className="w-full bg-transparent p-4 text-white text-2xl font-mono font-bold outline-none"
+                                    placeholder="0"
                                   />
-                                  <span className="pr-4 text-xs font-bold text-zinc-500">XAND</span>
+                                  <span className="pr-6 text-xs font-bold text-zinc-600">CREDITS</span>
                               </div>
                           </div>
 
-                          {/* 4. BOOSTS */}
-                          <div className="relative">
+                          {/* HARDWARE CALCULATOR (COLLAPSIBLE) */}
+                          {showHardwareCalc && (
+                              <div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-top-2">
+                                  <div className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-2">Hardware Specs Calculator</div>
+                                  
+                                  <div className="grid grid-cols-2 gap-4">
+                                      <div>
+                                          <label className="text-[9px] text-zinc-500 uppercase font-bold block mb-1">Fleet Size</label>
+                                          <input type="number" min="1" value={simNodes} onChange={(e) => setSimNodes(Math.max(1, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-white text-xs font-mono outline-none focus:border-blue-500"/>
+                                      </div>
+                                      <div>
+                                          <label className="text-[9px] text-zinc-500 uppercase font-bold block mb-1">XAND Stake</label>
+                                          <input type="number" min="0" value={simStake} onChange={(e) => setSimStake(Math.max(0, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-white text-xs font-mono outline-none focus:border-blue-500"/>
+                                      </div>
+                                  </div>
+                                  
+                                  <div>
+                                      <label className="text-[9px] text-zinc-500 uppercase font-bold block mb-1">Total Storage</label>
+                                      <div className="flex gap-2">
+                                          <input type="number" min="1" value={simStorageVal} onChange={(e) => setSimStorageVal(Math.max(0, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-white text-xs font-mono outline-none focus:border-blue-500"/>
+                                          <select value={simStorageUnit} onChange={(e) => setSimStorageUnit(e.target.value as any)} className="bg-zinc-900 border border-zinc-700 rounded p-2 text-zinc-300 text-xs font-bold outline-none"><option>MB</option><option>GB</option><option>TB</option><option>PB</option></select>
+                                      </div>
+                                  </div>
+                              </div>
+                          )}
+
+                          {/* BOOSTS */}
+                          <div className="relative pt-4 border-t border-zinc-800">
                               <div className="flex items-center gap-2 mb-3 text-zinc-400">
-                                  <span className="text-xs font-bold uppercase tracking-wider">Active Boosts</span>
+                                  <span className="text-xs font-bold uppercase tracking-wider">Apply Boosts (NFTs / Eras)</span>
                                   <HelpCircle size={12} className="cursor-help hover:text-white" onClick={() => toggleTooltip('boost')} />
                               </div>
-                              {activeTooltip === 'boost' && <div className="absolute z-10 bg-zinc-800 border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 w-64 -top-8 left-0">Multipliers from NFTs and pNode Eras. Stacks geometrically (Product of boosts).</div>}
+                              {activeTooltip === 'boost' && <div className="absolute z-10 bg-zinc-800 border border-zinc-700 p-3 rounded text-[10px] text-zinc-300 w-64 -top-12 left-0 shadow-xl">Multipliers from NFTs and pNode Eras. These stack geometrically to massively increase your share.</div>}
                               <div className="flex flex-wrap gap-2">
                                   {Object.entries({...ERA_BOOSTS, ...NFT_BOOSTS}).map(([name, val]) => (
                                       <button 
@@ -302,7 +293,7 @@ export default function Leaderboard() {
                           </div>
                       </div>
 
-                      {/* OUTPUTS */}
+                      {/* RIGHT: OUTPUTS */}
                       <div className="bg-zinc-900 rounded-xl p-6 border border-zinc-800 flex flex-col justify-center space-y-6 relative">
                           
                           <div className="text-center relative">
@@ -313,35 +304,29 @@ export default function Leaderboard() {
                               {activeTooltip === 'factor' && <div className="absolute z-10 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 w-full top-8 left-0">Cumulative multiplier applied to your base credits.</div>}
                               <div className="text-4xl font-extrabold text-white flex items-center justify-center gap-2">
                                   <Zap size={24} className={simResult.multiplier > 1 ? "text-yellow-500 fill-yellow-500" : "text-zinc-700"} />
-                                  {simResult.multiplier.toLocaleString(undefined, { maximumFractionDigits: 2 })}x
+                                  {simResult.multiplier.toLocaleString(undefined, { maximumFractionDigits: 4 })}x
                               </div>
                           </div>
 
                           <div className="space-y-4">
-                              <div className="flex justify-between items-center border-b border-zinc-800 pb-3 relative">
+                              <div className="flex justify-between items-center border-b border-zinc-800 pb-4 relative">
                                   <span className="text-xs text-zinc-400 flex items-center gap-1">
-                                      Base Credits <HelpCircle size={10} onClick={() => toggleTooltip('base')} className="cursor-help"/>
+                                      Projected Credits <HelpCircle size={10} onClick={() => toggleTooltip('boosted')} className="cursor-help"/>
                                   </span>
-                                  {activeTooltip === 'base' && <div className="absolute z-10 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 right-0 top-6 w-48">Raw score derived from infrastructure + stake (Nodes × Storage × Stake).</div>}
-                                  <span className="font-mono font-bold text-zinc-300">{simResult.base.toLocaleString(undefined, { notation: "compact" })}</span>
-                              </div>
-                              
-                              <div className="flex justify-between items-center border-b border-zinc-800 pb-3 relative">
-                                  <span className="text-xs text-zinc-400 flex items-center gap-1">
-                                      Boosted Credits <HelpCircle size={10} onClick={() => toggleTooltip('boosted')} className="cursor-help"/>
+                                  {activeTooltip === 'boosted' && <div className="absolute z-10 bg-black border border-zinc-700 p-3 rounded text-[10px] text-zinc-300 right-0 top-8 w-64 shadow-xl z-20">The final 'BoostedCredits' score used by the network to calculate your slice of the STOINC pie.</div>}
+                                  <span className="font-mono text-2xl font-bold text-yellow-500 text-shadow-glow">
+                                      {simResult.boosted.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                   </span>
-                                  {activeTooltip === 'boosted' && <div className="absolute z-10 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 right-0 top-6 w-48">Final score used for reward distribution (Base × Boost Factor).</div>}
-                                  <span className="font-mono font-bold text-yellow-500">{simResult.boosted.toLocaleString(undefined, { notation: "compact" })}</span>
                               </div>
 
                               <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl text-center relative">
                                   <div className="text-[10px] text-blue-400 font-bold uppercase mb-1 flex items-center justify-center gap-1">
                                       Est. Network Share <HelpCircle size={10} onClick={() => toggleTooltip('share')} className="cursor-help"/>
                                   </div>
-                                  {activeTooltip === 'share' && <div className="absolute z-10 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 w-full bottom-full mb-2 left-0">Your percentage of the total STOINC emission pool based on current network data.</div>}
+                                  {activeTooltip === 'share' && <div className="absolute z-10 bg-black border border-zinc-700 p-3 rounded text-[10px] text-zinc-300 w-full bottom-full mb-2 left-0 shadow-xl">Your theoretical percentage of the total reward pool, assuming current network conditions.</div>}
                                   <div className="text-2xl font-bold text-white">
                                       {ranking.length > 0 
-                                        ? ((simResult.boosted / (ranking.reduce((a,b)=>a+b.credits, 0) + simResult.boosted)) * 100).toFixed(6) 
+                                        ? ((simResult.boosted / (ranking.reduce((a,b)=>a+b.credits, 0) + simResult.boosted)) * 100).toFixed(8) 
                                         : '0.00'}%
                                   </div>
                                   <div className="text-[9px] text-blue-300/50 mt-1">of Total Epoch Rewards</div>
@@ -389,31 +374,39 @@ export default function Leaderboard() {
       )}
 
       {/* SEARCH */}
-      <div className="max-w-5xl mx-auto mb-6 relative">
-        <Search className="absolute left-4 top-3.5 text-zinc-500" size={20} />
-        <input 
-          type="text" 
-          placeholder="Find node by public key..." 
-          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-12 pr-10 text-white focus:border-yellow-500 outline-none transition placeholder-zinc-600"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-        {searchQuery && (
-          <button 
-            onClick={() => setSearchQuery('')}
-            className="absolute right-4 top-3.5 text-zinc-500 hover:text-white"
-          >
-            <X size={20} />
-          </button>
-        )}
+      <div className="max-w-5xl mx-auto mb-6 relative space-y-2">
+        <div className="relative">
+            <Search className="absolute left-4 top-3.5 text-zinc-500" size={20} />
+            <input 
+            type="text" 
+            placeholder="Find node by public key..." 
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-12 pr-10 text-white focus:border-yellow-500 outline-none transition placeholder-zinc-600"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+            <button 
+                onClick={() => setSearchQuery('')}
+                className="absolute right-4 top-3.5 text-zinc-500 hover:text-white"
+            >
+                <X size={20} />
+            </button>
+            )}
+        </div>
+        
+        {/* DISCLAIMER / UPDATE FREQUENCY */}
+        <div className="flex items-center gap-2 text-[10px] text-zinc-500 px-2">
+            <RefreshCw size={10} />
+            <span>Credits & Rank update per <strong>Epoch (~2 days)</strong>. Liveness updates in real-time.</span>
+        </div>
       </div>
 
       {/* TABLE */}
       <div className="max-w-5xl mx-auto bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-visible backdrop-blur-sm relative min-h-[400px]">
         <div className="grid grid-cols-12 gap-4 p-4 border-b border-zinc-800 text-xs font-bold text-zinc-500 uppercase tracking-widest sticky top-0 bg-zinc-900/95 backdrop-blur-sm z-10 rounded-t-2xl">
           <div className="col-span-2 md:col-span-1 text-center">Rank</div>
-          <div className="col-span-7 md:col-span-8">Node Public Key</div>
-          <div className="col-span-3 text-right">Credits</div>
+          <div className="col-span-6 md:col-span-7">Node Public Key</div>
+          <div className="col-span-4 text-right">Credits</div>
         </div>
 
         {loading ? (
@@ -439,7 +432,6 @@ export default function Leaderboard() {
                   className={`grid grid-cols-12 gap-4 p-4 hover:bg-white/5 transition items-center group relative cursor-pointer ${
                     isMyNode ? 'bg-yellow-500/5 border-l-4 border-yellow-500' : 'border-l-4 border-transparent'
                   }`}
-                  onClick={() => handleRowClick(node.pubkey)}
                 >
                   
                   {/* RANK BADGE */}
@@ -452,22 +444,23 @@ export default function Leaderboard() {
                   </div>
 
                   {/* PUBLIC KEY */}
-                  <div className="col-span-7 md:col-span-8 font-mono text-sm text-zinc-300 truncate group-hover:text-white transition flex items-center justify-between">
+                  <div className="col-span-6 md:col-span-7 font-mono text-sm text-zinc-300 truncate group-hover:text-white transition flex items-center justify-between">
                     {node.pubkey}
                     
-                    {/* MOBILE CHEVRON (Always Visible) */}
-                    <div className="md:hidden text-zinc-600">
-                        <ChevronRight size={14} />
-                    </div>
-
-                    {/* DESKTOP HOVER VIEW */}
-                    <div className="hidden md:flex opacity-0 group-hover:opacity-100 transition text-[10px] text-blue-400 font-bold items-center gap-1">
-                        VIEW <ChevronRight size={10} />
-                    </div>
+                    {/* SIMULATE BUTTON */}
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleSimulate(node.credits);
+                        }}
+                        className="hidden md:flex opacity-0 group-hover:opacity-100 transition items-center gap-1 bg-yellow-500/10 text-yellow-500 text-[9px] font-bold px-2 py-1 rounded border border-yellow-500/20 hover:bg-yellow-500/20"
+                    >
+                        <PlayCircle size={10} /> USE IN FORECAST
+                    </button>
                   </div>
 
                   {/* CREDITS */}
-                  <div className="col-span-3 text-right font-bold font-mono text-yellow-500 flex items-center justify-end gap-2">
+                  <div className="col-span-4 text-right font-bold font-mono text-yellow-500 flex items-center justify-end gap-2">
                     {node.credits.toLocaleString()}
                     <Wallet size={14} className="text-zinc-600 group-hover:text-yellow-500 transition hidden md:block" />
                   </div>
@@ -478,7 +471,7 @@ export default function Leaderboard() {
         )}
       </div>
 
-      {/* FOOTER NOTE - FIXED */}
+      {/* FOOTER NOTE */}
       {!loading && (
         <div className="max-w-5xl mx-auto mt-6 text-center text-xs text-zinc-600 flex flex-col md:flex-row items-center justify-center gap-2">
           <div className="flex items-center gap-2">
