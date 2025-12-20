@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { useRouter } from 'next/router'; // IMPORT ROUTER
+import { useRouter } from 'next/router';
 import axios from 'axios';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleSqrt } from 'd3-scale';
@@ -13,7 +13,7 @@ interface LocationData {
   name: string; country: string; lat: number; lon: number; count: number;
   totalStorage: number; totalCredits: number; avgHealth: number;
   stableCount?: number; criticalCount?: number;
-  ips?: string[]; // Added IPs to interface
+  ips?: string[];
 }
 
 interface MapStats {
@@ -22,16 +22,15 @@ interface MapStats {
 
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
-// MAP LEGEND COLORS (The Data Tiers)
-// Gold, Pink, Purple, Blue, Cyan
-const TIER_COLORS = ["#f59e0b", "#ec4899", "#a855f7", "#3b82f6", "#22d3ee"]; 
-
-// UI BRANDING COLORS (The Interface Modes)
+// UI BRANDING COLORS
 const MODE_COLORS = {
     STORAGE: { hex: '#6366f1', tailwind: 'text-indigo-500', bg: 'bg-indigo-600', border: 'border-indigo-500/50' },
     HEALTH:  { hex: '#10b981', tailwind: 'text-emerald-500', bg: 'bg-emerald-600', border: 'border-emerald-500/50' },
     CREDITS: { hex: '#f97316', tailwind: 'text-orange-500', bg: 'bg-orange-600', border: 'border-orange-500/50' }
 };
+
+// MAP LEGEND COLORS
+const TIER_COLORS = ["#f59e0b", "#ec4899", "#a855f7", "#3b82f6", "#22d3ee"]; 
 
 const TIER_LABELS = {
     STORAGE: ['Massive Hub', 'Major Zone', 'Standard', 'Entry Level', 'Micro Node'],
@@ -42,7 +41,7 @@ const TIER_LABELS = {
 const HEALTH_THRESHOLDS = [90, 75, 60, 40];
 
 export default function MapPage() {
-  const router = useRouter(); // Initialize Router
+  const router = useRouter();
   const [locations, setLocations] = useState<LocationData[]>([]);
   const [stats, setStats] = useState<MapStats>({ totalNodes: 0, countries: 0, topRegion: 'Scanning...', topRegionMetric: 0 });
   const [loading, setLoading] = useState(true);
@@ -55,8 +54,10 @@ export default function MapPage() {
   const [position, setPosition] = useState({ coordinates: [10, 20], zoom: 1.2 });
   const [copiedCoords, setCopiedCoords] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  
+  // FIX 1: Ref to track if we have already handled the ?focus param
+  const hasDeepLinked = useRef(false);
 
-  // Dynamic Thresholds for Percentile Calculation
   const [dynamicThresholds, setDynamicThresholds] = useState<number[]>([0, 0, 0, 0]);
 
   // --- FETCH DATA & HANDLE DEEP LINK ---
@@ -68,14 +69,14 @@ export default function MapPage() {
           setLocations(res.data.locations || []);
           setStats(res.data.stats || { totalNodes: 0, countries: 0, topRegion: 'Unknown', topRegionMetric: 0 });
           
-          // DEEP LINK LOGIC: Check if URL has ?focus=IP
-          if (router.query.focus && res.data.locations) {
+          // FIX 1: DEEP LINK LOGIC (ONE-SHOT)
+          // Only run if we haven't done it yet AND the router is ready AND we have data
+          if (router.isReady && router.query.focus && !hasDeepLinked.current && res.data.locations) {
               const targetIP = router.query.focus as string;
-              // Find the region containing this IP
               const targetLoc = res.data.locations.find((l: LocationData) => l.ips && l.ips.includes(targetIP));
               
               if (targetLoc) {
-                  // Wait a tick for state to settle, then lock target
+                  hasDeepLinked.current = true; // Mark as handled immediately
                   setTimeout(() => {
                       lockTarget(targetLoc.name, targetLoc.lat, targetLoc.lon);
                   }, 500);
@@ -85,15 +86,15 @@ export default function MapPage() {
       } catch (err) { console.error(err); } finally { setLoading(false); }
     };
     
-    if (router.isReady) {
-        fetchGeo();
-    }
+    // Initial Fetch
+    fetchGeo();
     
+    // Poll every 10s
     const interval = setInterval(fetchGeo, 10000);
     return () => clearInterval(interval);
-  }, [router.isReady, router.query.focus]); // Depend on router params
+  }, [router.isReady, router.query.focus]); 
 
-  // Recalculate percentiles
+  // --- TIER CALCULATIONS ---
   useEffect(() => {
       if (locations.length === 0) return;
 
@@ -132,11 +133,11 @@ export default function MapPage() {
     else if (viewMode === 'CREDITS') val = loc.totalCredits;
     else val = loc.avgHealth;
 
-    if (val >= dynamicThresholds[0]) return 0; // Gold
-    if (val >= dynamicThresholds[1]) return 1; // Pink
-    if (val >= dynamicThresholds[2]) return 2; // Purple
-    if (val >= dynamicThresholds[3]) return 3; // Blue
-    return 4; // Cyan
+    if (val >= dynamicThresholds[0]) return 0;
+    if (val >= dynamicThresholds[1]) return 1;
+    if (val >= dynamicThresholds[2]) return 2;
+    if (val >= dynamicThresholds[3]) return 3;
+    return 4;
   };
 
   const formatStorage = (gb: number) => {
@@ -163,17 +164,20 @@ export default function MapPage() {
   };
 
   const lockTarget = (name: string, lat: number, lon: number) => {
-    // If we're deep linking, we force the update even if activeLocation matches
+    if (activeLocation === name) {
+        resetView();
+        return;
+    }
     setActiveLocation(name);
     setExpandedLocation(name); 
     setPosition({ coordinates: [lon, lat], zoom: 3 });
-    setIsSplitView(true); // Always open drawer
+    setIsSplitView(true);
     
     if (listRef.current) {
          setTimeout(() => {
              const item = document.getElementById(`list-item-${name}`);
              if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-         }, 500); // Slight delay for smoother entry
+         }, 500);
     }
   };
 
@@ -189,6 +193,12 @@ export default function MapPage() {
     setActiveLocation(null);
     setExpandedLocation(null);
     setPosition({ coordinates: [10, 20], zoom: 1.2 });
+  };
+
+  // FIX 2: Close Drawer AND Reset Map
+  const handleCloseDrawer = () => {
+      setIsSplitView(false);
+      resetView();
   };
 
   const handleCopyCoords = (lat: number, lon: number, name: string) => {
@@ -215,11 +225,8 @@ export default function MapPage() {
     }
   };
 
-  // --- X-RAY STATS (With Precise Percentiles) ---
   const getXRayStats = (loc: LocationData, index: number) => {
       const globalShare = ((loc.count / stats.totalNodes) * 100).toFixed(1);
-      
-      // Precise Percentile Logic
       const rawPercentile = ((locations.length - index) / locations.length) * 100;
       const topPercent = 100 - rawPercentile;
       let rankText = `Top ${topPercent.toFixed(2)}%`;
@@ -249,7 +256,6 @@ export default function MapPage() {
               icon: Zap
           };
       }
-      // Health Mode
       const stable = loc.stableCount ?? 0;
       const critical = loc.criticalCount ?? 0;
       return {
@@ -277,7 +283,7 @@ export default function MapPage() {
     if (loading) return "Calibrating Global Sensors...";
     if (!leadingRegion) return "Waiting for Node Telemetry...";
     const { country } = leadingRegion;
-    const colorClass = MODE_COLORS[viewMode].tailwind; // Unified Header Color
+    const colorClass = MODE_COLORS[viewMode].tailwind; 
 
     switch (viewMode) {
         case 'STORAGE': return <><span className={colorClass}>{country}</span> Leads Storage Capacity</>;
@@ -351,7 +357,6 @@ export default function MapPage() {
                 <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-300">Dashboard</span>
             </Link>
             <div className="flex items-center gap-2">
-                {/* Unified Indicator Color */}
                 <div className={`w-1.5 h-1.5 rounded-full animate-pulse`} style={{ backgroundColor: MODE_COLORS[viewMode].hex }}></div>
                 <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{viewMode} Mode</span>
             </div>
@@ -423,7 +428,8 @@ export default function MapPage() {
             <div className={`flex flex-col h-full overflow-hidden ${isSplitView ? 'flex' : 'hidden'}`}>
                  <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-zinc-800/30 bg-[#09090b]">
                     <div className="flex items-center gap-3"><h2 className="text-sm font-bold text-white flex items-center gap-2"><Activity size={14} className="text-green-500" /> Live Data</h2><div className="hidden md:block scale-90 origin-left"><ViewToggles /></div></div>
-                    <div className="flex items-center gap-2"><div className="md:hidden scale-75 origin-right"><ViewToggles /></div><button onClick={() => setIsSplitView(false)} className="p-1.5 bg-zinc-800/50 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"><X size={14} /></button></div>
+                    {/* FIX 2: Updated X button to call handleCloseDrawer */}
+                    <div className="flex items-center gap-2"><div className="md:hidden scale-75 origin-right"><ViewToggles /></div><button onClick={handleCloseDrawer} className="p-1.5 bg-zinc-800/50 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"><X size={14} /></button></div>
                  </div>
 
                  <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar bg-[#09090b]">
