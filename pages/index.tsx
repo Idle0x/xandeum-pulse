@@ -36,8 +36,7 @@ interface Node {
   };
 }
 
-// --- SUB-COMPONENTS (Defined Outside Home to keep it clean) ---
-
+// --- SUB-COMPONENTS ---
 const PhysicalLocationBadge = ({ node, zenMode }: { node: Node, zenMode: boolean }) => {
     const ip = node.address ? node.address.split(':')[0] : 'Unknown';
     const country = node.location?.countryName || 'Unknown Location';
@@ -122,6 +121,7 @@ export default function Home() {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null); 
   const [scrolled, setScrolled] = useState(false); 
   
+  // 9-SECOND ROTATING TIPS
   const searchTips = [
     "You can search by node IP, public key, version or country",
     "You can click on any node for detailed insights",
@@ -148,7 +148,6 @@ export default function Home() {
   const [zenMode, setZenMode] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // NETWORK DATA
   const [networkHealth, setNetworkHealth] = useState('0.00');
   const [avgNetworkHealth, setAvgNetworkHealth] = useState(0); 
   const [networkConsensus, setNetworkConsensus] = useState(0); 
@@ -169,7 +168,11 @@ export default function Home() {
     const tipInterval = setInterval(() => { if (!isSearchFocused) setSearchTipIndex(prev => (prev + 1) % searchTips.length); }, 9000);
     const dataInterval = setInterval(fetchData, 30000);
     
-    const handleScroll = () => setScrolled(window.scrollY > 20);
+    // SCROLL LISTENER
+    const handleScroll = () => {
+        // Adjust this threshold based on your actual header height (approx 100-150px)
+        setScrolled(window.scrollY > 120); 
+    };
     window.addEventListener('scroll', handleScroll);
     
     const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') { closeModal(); } };
@@ -313,33 +316,48 @@ export default function Home() {
               <div className="flex items-center gap-4"><button onClick={() => setIsMenuOpen(true)} className={`p-3.5 rounded-xl transition ${zenMode ? 'text-zinc-400 border border-zinc-800' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white hover:bg-zinc-800'}`}><Menu size={28}/></button><div className="hidden md:flex flex-col"><h1 className={`text-xl font-extrabold tracking-tight flex items-center gap-2 ${zenMode ? 'text-white' : 'text-white'}`}><Activity className={zenMode ? 'text-zinc-500' : 'text-blue-500'} /> PULSE</h1></div></div>
               <div className="flex-1 max-w-xl mx-4 relative overflow-hidden group">
                   <Search className={`absolute left-3 top-2.5 size-4 z-10 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
-                  {!searchQuery && !isSearchFocused && (<div className="absolute inset-0 flex items-center pointer-events-none pl-10 pr-4 overflow-hidden z-0"><div className="whitespace-nowrap animate-marquee text-sm text-zinc-600 font-mono opacity-80">Search nodes by Version, IP Address, Country, or Public Key...  &nbsp;&nbsp;&nbsp;  Search nodes by Version, IP Address, Country, or Public Key...</div></div>)}
-                  <input type="text" placeholder="" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full rounded-lg py-2 pl-10 pr-4 text-sm outline-none shadow-inner transition-all relative z-10 bg-transparent ${zenMode ? 'border border-zinc-800 text-zinc-300 focus:border-zinc-600' : 'border border-zinc-800 text-white focus:border-blue-500'}`} onFocus={() => setIsSearchFocused(true)} onBlur={() => setIsSearchFocused(false)} />
-                  {/* ROTATING TOOLTIPS (FIXED: 9s INTERVAL) */}
+                  {!searchQuery && !isSearchFocused && (<div className="absolute inset-0 flex items-center pointer-events-none pl-10 pr-4 overflow-hidden z-0"><div className="whitespace-nowrap animate-marquee text-sm text-zinc-600 font-mono opacity-80">Search nodes by Version, IP Address, Country, or Public Key...  &nbsp;&nbsp;&nbsp;  Search nodes by Version, IP Address, Country, or Public Key...</div></div>)}<input type="text" placeholder="" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full rounded-lg py-2 pl-10 pr-4 text-sm outline-none shadow-inner transition-all relative z-10 bg-transparent ${zenMode ? 'border border-zinc-800 text-zinc-300 focus:border-zinc-600' : 'border border-zinc-800 text-white focus:border-blue-500'}`} onFocus={() => setIsSearchFocused(true)} onBlur={() => setIsSearchFocused(false)} />
+                  
+                  {/* --- ROTATING TOOLTIPS (FIXED POSITION & INTERVAL) --- */}
                   {!zenMode && (<div className="absolute top-full left-0 right-0 mt-2 flex justify-center pointer-events-none"><p className="text-[10px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 key={searchTipIndex} bg-black/80 px-2 py-1 rounded border border-zinc-800 backdrop-blur-sm shadow-xl"><Info size={12} className="text-blue-500" />{isSearchFocused ? "Type to filter nodes instantly" : searchTips[searchTipIndex]}</p></div>)}
-                  <style jsx>{`@keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } } .animate-marquee { animation: marquee 15s linear infinite; }`}</style>
-              </div>
+                  
+                  <style jsx>{`@keyframes marquee { 0% { transform: translateY(0); } 100% { transform: translateX(-100%); } } .animate-marquee { animation: marquee 15s linear infinite; }`}</style></div>
               <button onClick={() => setZenMode(!zenMode)} className={`p-2 rounded-lg transition flex items-center gap-2 group ${zenMode ? 'bg-zinc-800 border border-zinc-700 text-zinc-400' : 'bg-red-900/10 border border-red-500/20 text-red-500 hover:bg-red-900/30'}`} title={zenMode ? "Exit Zen Mode" : "Enter Zen Mode"}><Monitor size={18} /> <span className="hidden md:inline text-xs font-bold">{zenMode ? 'EXIT ZEN' : 'ZEN MODE'}</span></button>
           </div>
           <div className="flex items-center justify-between gap-4 overflow-x-auto pb-2 scrollbar-hide w-full mt-6 border-t border-zinc-800/50 pt-4"><button onClick={fetchData} disabled={loading} className={`flex items-center gap-2 px-6 h-12 rounded-xl transition font-bold text-xs ${loading ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'}`}><RefreshCw size={18} className={loading ? "animate-spin" : ""} /> {loading ? 'SYNCING...' : 'REFRESH'}</button><div className="flex gap-2">{[{ id: 'uptime', icon: Clock, label: 'UPTIME' }, { id: 'storage', icon: Database, label: 'STORAGE' }, { id: 'version', icon: Server, label: 'VERSION' }, { id: 'health', icon: HeartPulse, label: 'HEALTH' }].map((opt) => (<button key={opt.id} onClick={() => { if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); else setSortBy(opt.id as any); }} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${sortBy === opt.id ? (zenMode ? 'bg-zinc-800 border-zinc-600 text-zinc-200' : 'bg-blue-500/10 border-blue-500/50 text-blue-400') : (zenMode ? 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800')}`}><opt.icon size={14} /> {opt.label}{sortBy === opt.id && (sortOrder === 'asc' ? <ArrowUp size={12} className="ml-1" /> : <ArrowDown size={12} className="ml-1" />)}</button>))}</div></div>
       </header>
 
-      {/* --- STATUS BAR 1: SORT HEADER (STICKY MERGE) --- */}
-      <div className={`sticky top-[8rem] md:top-[9rem] z-30 transition-all duration-300 w-full backdrop-blur-md border-b border-zinc-800/50 py-3 px-6 flex items-center justify-center ${scrolled ? 'bg-black/90 border-b-zinc-800' : 'bg-[#09090b]/80'}`}>
-          <div className="text-sm md:text-base font-bold font-mono text-zinc-400 uppercase tracking-widest flex items-center gap-2"><Activity size={16} className={scrolled ? "text-blue-500" : "text-zinc-600"}/>Nodes distributed by <span className="text-white">{sortBy.toUpperCase()}</span> ({sortOrder === 'desc' ? 'Highest to Lowest' : 'Lowest to Highest'})</div>
-      </div>
-
-      {/* --- STATUS BAR 2: SEARCH RESULTS (CONDITIONAL) --- */}
-      {searchQuery && (<div className="w-full bg-blue-900/10 border-b border-blue-500/20 py-3 px-6 text-center animate-in fade-in slide-in-from-top-2"><div className="text-sm font-mono text-blue-200">Results for <span className="font-bold text-white">"{searchQuery}"</span> — <span className="text-blue-400 font-bold">{filteredNodes.length}</span> nodes found</div></div>)}
-
       <main className={`p-4 md:p-8 ${zenMode ? 'max-w-full' : 'max-w-7xl 2xl:max-w-[1800px] mx-auto'} transition-all duration-500`}>
           {!zenMode && !loading && (<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"><div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Network Capacity</div><div className="text-2xl md:text-3xl font-bold text-white mt-1">{formatBytes(totalStorageCommitted)}</div></div><div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer active:scale-95 transition-transform"><div className="absolute inset-0 opacity-20 pointer-events-none"><div className="ekg-line"></div></div><div className="relative z-10"><div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1"><HeartPulse size={12} className="text-green-500 animate-pulse" /> Network Vitals</div><div className="space-y-1 mt-1"><div className="flex justify-between text-xs"><span className="text-zinc-400">Stability</span><span className="font-mono font-bold text-white">{networkHealth}%</span></div><div className="flex justify-between text-xs"><span className="text-zinc-400">Avg Health</span><span className="font-mono font-bold text-green-400">{avgNetworkHealth}/100</span></div><div className="flex justify-between text-xs"><span className="text-zinc-400">Consensus</span><span className="font-mono font-bold text-blue-400">{networkConsensus.toFixed(1)}%</span></div></div></div><style jsx>{`@keyframes ekg { 0% { left: -100%; opacity: 0; } 50% { opacity: 1; } 100% { left: 100%; opacity: 0; } } .ekg-line { position: absolute; top: 0; bottom: 0; width: 50%; background: linear-gradient(90deg, transparent 0%, rgba(34, 197, 94, 0.5) 50%, transparent 100%); animation: ekg 2s linear infinite; }`}</style></div><div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Consensus Ver</div><div className="text-2xl md:text-3xl font-bold text-blue-400 mt-1">{mostCommonVersion}</div></div><div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Active Nodes</div><div className="text-2xl md:text-3xl font-bold text-white mt-1">{nodes.length}</div></div></div>)}
           {error && (<div className="mb-8 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center gap-2 text-blue-400 animate-pulse"><RefreshCw size={14} className="animate-spin" /><span className="text-xs font-bold">{error}</span></div>)}
           {!zenMode && favorites.length > 0 && (<div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500"><div className="flex items-center gap-2 mb-4"><Star className="text-yellow-500" fill="currentColor" size={20} /><h3 className="text-lg font-bold text-white tracking-widest uppercase">Your Watchlist</h3></div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 border-b border-zinc-800 pb-10">{watchListNodes.map((node, i) => renderNodeCard(node, i))}</div></div>)}
+          
+          {/* --- FIXED: STATUS BARS (ORANGE CIRCLE AREA) --- */}
+          {!loading && (
+             <div className={`transition-all duration-300 z-30 mb-6 border-b border-zinc-800/50 ${scrolled ? 'sticky top-[80px] bg-black/90 backdrop-blur-md py-4 shadow-lg border-t border-zinc-800' : 'relative bg-transparent py-2'}`}>
+                  {/* BAR 1: MAIN FILTER TITLE */}
+                  <div className="flex items-center justify-center px-4">
+                      <div className="text-sm md:text-base font-bold font-mono text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                          <Activity size={16} className={scrolled ? "text-blue-500" : "text-zinc-600"}/>
+                          Nodes distributed by <span className="text-white">{sortBy.toUpperCase()}</span> ({sortOrder === 'desc' ? 'Highest to Lowest' : 'Lowest to Highest'})
+                      </div>
+                  </div>
+
+                  {/* BAR 2: SEARCH RESULTS (SUBTITLE) */}
+                  {searchQuery && (
+                      <div className="mt-2 w-full bg-blue-900/20 border-y border-blue-500/20 py-2 px-6 text-center animate-in fade-in slide-in-from-top-1">
+                          <div className="text-xs md:text-sm font-mono text-blue-200">
+                              Results for <span className="font-bold text-white">"{searchQuery}"</span> — <span className="text-blue-400 font-bold">{filteredNodes.length}</span> nodes found
+                          </div>
+                      </div>
+                  )}
+             </div>
+          )}
+
           {loading && nodes.length === 0 ? <PulseGraphLoader /> : (<div className={`grid gap-4 ${zenMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:gap-8'} pb-20`}>{filteredNodes.map((node, i) => { if (zenMode) return renderZenCard(node); return renderNodeCard(node, i); })}</div>)}
       </main>
 
-      {/* --- THE ULTRA MODAL --- */}
+      {/* ... [MODAL COMPONENT & FOOTER REMAIN IDENTICAL - PLEASE PASTE FROM PREVIOUS RESPONSE] ... */}
       {selectedNode && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={closeModal}>
               <div className={`border w-full max-w-4xl 2xl:max-w-6xl rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300 ${zenMode ? 'bg-black border-zinc-800 shadow-none' : 'bg-[#09090b] border-zinc-800'}`} onClick={(e) => e.stopPropagation()}>
