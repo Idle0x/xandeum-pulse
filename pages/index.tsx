@@ -196,7 +196,7 @@ const RadialProgress = ({ score, size = 160, stroke = 12 }: { score: number, siz
             </svg>
             <div className="absolute flex flex-col items-center">
                 <span className="text-4xl font-extrabold text-white tracking-tighter">{score}</span>
-                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mt-1">Health</span>
+                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mt-1">Vitality</span>
             </div>
         </div>
     );
@@ -840,7 +840,6 @@ export default function Home() {
       const nodeWidth = (nodeCap / maxScale) * 100;
       const medianWidth = (median / maxScale) * 100;
       
-      // Tank Fill Logic
       const tankFill = isPos ? 100 : Math.max(10, (nodeCap / median) * 100); 
 
       return (
@@ -1126,22 +1125,9 @@ export default function Home() {
                               {selectedNode.pubkey?.slice(0, 2) || '??'}
                           </div>
                           <div>
-                              <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-2 mb-1">
-                                  NODE INSPECTOR 
-                                  <HelpCircle size={12} className="cursor-help hover:text-white transition" onClick={(e) => toggleTooltip(e, 'modal_header')} />
-                                  <span className={`px-2 py-0.5 rounded text-[9px] ${selectedNode.is_public ? 'bg-green-500/10 text-green-500' : 'bg-orange-500/10 text-orange-500'}`}>
-                                      {selectedNode.is_public ? 'POLICY: OPEN' : 'POLICY: RESTRICTED'}
-                                  </span>
-                              </div>
-                              {activeTooltip === 'modal_header' && (
-                                  <div className="absolute z-50 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 mt-1 animate-in fade-in shadow-xl w-64">
-                                      Use the buttons below to interact with this node. 'Open Policy' means the node accepts public storage deals.
-                                  </div>
-                              )}
-                              <h2 className={`text-lg md:text-xl font-mono truncate w-64 md:w-96 flex items-center gap-2 ${zenMode ? 'text-zinc-200' : 'text-white'}`}>
-                                  {selectedNode.pubkey || 'Unknown Pubkey'}
-                                  <Copy size={14} className="text-zinc-600 hover:text-white cursor-pointer" onClick={() => copyToClipboard(selectedNode.pubkey || '', 'pubkey')} />
-                              </h2>
+                              <h2 className="text-2xl font-black font-sans tracking-tight text-white mb-0.5">NODE INSPECTOR</h2>
+                              <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono"><span className="text-zinc-400">{selectedNode.pubkey ? `${selectedNode.pubkey.slice(0, 12)}...` : 'Unknown'}</span><Copy size={10} className="cursor-pointer hover:text-white" onClick={() => copyToClipboard(selectedNode.pubkey || '', 'pubkey')} /></div>
+                              <div className="mt-1"><span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${selectedNode.is_public ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-orange-500/10 border-orange-500/30 text-orange-400'}`}>STORAGE MODE: {selectedNode.is_public ? 'ACCEPTING DEALS' : 'RESTRICTED'}</span></div>
                           </div>
                       </div>
                       <button onClick={closeModal} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition"><X size={20} /></button>
@@ -1152,52 +1138,9 @@ export default function Home() {
                       
                       {compareMode ? (
                           <div className="animate-in fade-in slide-in-from-right-4 duration-300 h-full flex flex-col">
-                              <div className="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
-                                  <button onClick={() => setCompareMode(false)} className="text-xs font-bold text-zinc-500 hover:text-white flex items-center gap-1 transition"><ArrowLeftRight size={14}/> BACK TO DETAILS</button>
-                                  <h3 className="text-lg font-bold text-white flex items-center gap-2"><Swords className="text-red-500" /> VERSUS MODE</h3>
-                              </div>
-                              
-                              <div className="grid grid-cols-2 gap-4 mb-6">
-                                  {/* LEFT: CURRENT */}
-                                  <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl text-center">
-                                      <div className="text-xs text-blue-400 font-bold mb-1">CHAMPION</div>
-                                      <div className="font-mono text-sm text-white truncate">{getSafeIp(selectedNode)}</div>
-                                  </div>
-                                  
-                                  {/* RIGHT: RIVAL (Selector) */}
-                                  <div className="relative">
-                                      {!compareTarget ? (
-                                          <div className="h-full flex items-center justify-center p-4 bg-zinc-900 border border-zinc-800 border-dashed rounded-xl text-zinc-500 hover:border-zinc-600 cursor-pointer group relative">
-                                              <span className="text-xs font-bold group-hover:text-white flex items-center gap-2 pointer-events-none">
-                                                  <Search size={14}/> SELECT RIVAL
-                                              </span>
-                                              <select 
-                                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                                                onChange={(e) => setCompareTarget(nodes.find(n => n.pubkey === e.target.value) || null)}
-                                              >
-                                                  <option value="">Select a node...</option>
-                                                  {nodes.slice(0, 50).map(n => <option key={n.pubkey} value={n.pubkey}>{getSafeIp(n)} ({n.rank ? `#${n.rank}` : 'Unranked'})</option>)}
-                                              </select>
-                                          </div>
-                                      ) : (
-                                          <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-xl text-center relative group">
-                                              <button onClick={() => setCompareTarget(null)} className="absolute top-2 right-2 text-zinc-600 hover:text-red-500 bg-black/50 rounded-full p-1"><X size={12}/></button>
-                                              <div className="text-xs text-red-400 font-bold mb-1">CHALLENGER</div>
-                                              <div className="font-mono text-sm text-white truncate">{getSafeIp(compareTarget)}</div>
-                                          </div>
-                                      )}
-                                  </div>
-                              </div>
-
-                              {compareTarget && (
-                                  <div className="space-y-1 bg-black/20 p-6 rounded-2xl border border-zinc-800">
-                                      {renderComparisonRow('Health Score', getHealthScore(selectedNode, mostCommonVersion, medianCredits), getHealthScore(compareTarget, mostCommonVersion, medianCredits), (v)=>v.toString(), 'HIGH')}
-                                      {renderComparisonRow('Storage', selectedNode.storage_committed, compareTarget.storage_committed, formatBytes, 'HIGH')}
-                                      {renderComparisonRow('Credits', selectedNode.credits || 0, compareTarget.credits || 0, (v)=>v.toLocaleString(), 'HIGH')}
-                                      {renderComparisonRow('Uptime', selectedNode.uptime, compareTarget.uptime, formatUptime, 'HIGH')}
-                                      {renderComparisonRow('Rank', selectedNode.rank || 9999, compareTarget.rank || 9999, (v)=>`#${v}`, 'LOW')}
-                                  </div>
-                              )}
+                              <div className="flex justify-between items-center mb-6 border-b border-white/5 pb-4"><button onClick={() => setCompareMode(false)} className="text-xs font-bold text-zinc-500 hover:text-white flex items-center gap-1 transition"><ArrowLeftRight size={14}/> BACK TO DETAILS</button><h3 className="text-lg font-bold text-white flex items-center gap-2"><Swords className="text-red-500" /> VERSUS MODE</h3></div>
+                              <div className="grid grid-cols-2 gap-4 mb-6"><div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl text-center"><div className="text-xs text-blue-400 font-bold mb-1">CHAMPION</div><div className="font-mono text-sm text-white truncate">{getSafeIp(selectedNode)}</div></div><div className="relative">{!compareTarget ? (<div className="h-full flex items-center justify-center p-4 bg-zinc-900 border border-zinc-800 border-dashed rounded-xl text-zinc-500 hover:border-zinc-600 cursor-pointer group relative"><span className="text-xs font-bold group-hover:text-white flex items-center gap-2 pointer-events-none"><Search size={14}/> SELECT RIVAL</span><select className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={(e) => setCompareTarget(nodes.find(n => n.pubkey === e.target.value) || null)}><option value="">Select a node...</option>{nodes.slice(0, 50).map(n => (<option key={n.pubkey} value={n.pubkey}>{getSafeIp(n)} ({n.rank ? `#${n.rank}` : 'Unranked'})</option>))}</select></div>) : (<div className="p-4 bg-red-500/5 border border-red-500/20 rounded-xl text-center relative group"><button onClick={() => setCompareTarget(null)} className="absolute top-2 right-2 text-zinc-600 hover:text-red-500 bg-black/50 rounded-full p-1"><X size={12}/></button><div className="text-xs text-red-400 font-bold mb-1">CHALLENGER</div><div className="font-mono text-sm text-white truncate">{getSafeIp(compareTarget)}</div></div>)}</div></div>
+                              {compareTarget && (<div className="space-y-1 bg-black/20 p-6 rounded-2xl border border-zinc-800">{renderComparisonRow('Health Score', getHealthScore(selectedNode, mostCommonVersion, medianCredits), getHealthScore(compareTarget, mostCommonVersion, medianCredits), (v)=>v.toString(), 'HIGH')}{renderComparisonRow('Storage', selectedNode.storage_committed, compareTarget.storage_committed, formatBytes, 'HIGH')}{renderComparisonRow('Credits', selectedNode.credits || 0, compareTarget.credits || 0, (v)=>v.toLocaleString(), 'HIGH')}{renderComparisonRow('Uptime', selectedNode.uptime, compareTarget.uptime, formatUptime, 'HIGH')}{renderComparisonRow('Rank', selectedNode.rank || 9999, compareTarget.rank || 9999, (v)=>`#${v}`, 'LOW')}</div>)}
                           </div>
                       ) : shareMode ? (
                           /* VIEW 2: SHARE CARD MODE */
@@ -1205,38 +1148,28 @@ export default function Home() {
                               <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl shadow-2xl max-w-sm w-full relative overflow-hidden group">
                                   <div className="absolute top-0 right-0 p-32 bg-blue-500/10 blur-[80px] rounded-full pointer-events-none group-hover:bg-blue-500/20 transition duration-1000"></div>
                                   <div className="relative z-10 text-center">
-                                      <div className="inline-block p-4 bg-zinc-900 rounded-2xl mb-6 shadow-lg border border-zinc-800">
-                                          <Activity size={40} className="text-blue-500" />
-                                      </div>
-                                      <h2 className="text-2xl font-extrabold text-white mb-2 tracking-tight">NODE REPORT</h2>
+                                      <div className="inline-block p-4 bg-zinc-900 rounded-2xl mb-6 shadow-lg border border-zinc-800"><Activity size={40} className="text-blue-500" /></div>
+                                      <h2 className="text-2xl font-extrabold text-white mb-2 tracking-tight">PROOF OF PULSE</h2>
                                       <p className="font-mono text-xs text-zinc-500 mb-8 bg-zinc-900 px-3 py-1 rounded-full inline-block border border-zinc-800">{getSafeIp(selectedNode)}</p>
-                                      
-                                      <div className="grid grid-cols-2 gap-4 mb-8">
-                                          <div className="bg-zinc-900/80 p-4 rounded-xl border border-zinc-800">
-                                              <div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Health Score</div>
-                                              <div className="text-3xl font-extrabold text-green-400">{getHealthScore(selectedNode, mostCommonVersion, medianCredits)}</div>
-                                          </div>
-                                          <div className="bg-zinc-900/80 p-4 rounded-xl border border-zinc-800">
-                                              <div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Global Rank</div>
-                                              <div className="text-3xl font-extrabold text-yellow-500">#{selectedNode.rank || '-'}</div>
-                                          </div>
+                                      <div className="grid grid-cols-2 gap-4 mb-4">
+                                          <div className="bg-zinc-900/80 p-4 rounded-xl border border-zinc-800"><div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Health</div><div className="text-2xl font-extrabold text-green-400">{getHealthScore(selectedNode, mostCommonVersion, medianCredits)}</div></div>
+                                          <div className="bg-zinc-900/80 p-4 rounded-xl border border-zinc-800"><div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Storage</div><div className="text-xl font-extrabold text-purple-400">{formatBytes(selectedNode.storage_committed)}</div></div>
+                                          <div className="bg-zinc-900/80 p-4 rounded-xl border border-zinc-800"><div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Credits</div><div className="text-xl font-extrabold text-yellow-500">{selectedNode.credits?.toLocaleString() || '0'}</div></div>
+                                          <div className="bg-zinc-900/80 p-4 rounded-xl border border-zinc-800"><div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Version</div><div className="text-lg font-mono text-white">{getSafeVersion(selectedNode)}</div></div>
                                       </div>
-                                      
-                                      <div className="text-[10px] text-zinc-600 font-mono flex items-center justify-center gap-2">
-                                          <Server size={10} /> VERIFIED BY XANDEUM PULSE
+                                      <div className="text-[10px] text-zinc-600 font-mono flex items-center justify-center gap-2 mb-6"><Server size={10} /> VERIFIED BY XANDEUM PULSE</div>
+                                      <div className="grid grid-cols-3 gap-2 border-t border-zinc-800 pt-4">
+                                        <button onClick={() => copyStatusReport(selectedNode)} className="flex flex-col items-center gap-1 text-[9px] text-zinc-500 hover:text-white"><ClipboardCopy size={14}/><span>Copy Report</span></button>
+                                        <button onClick={() => shareToTwitter(selectedNode)} className="flex flex-col items-center gap-1 text-[9px] text-zinc-500 hover:text-white"><Share2 size={14}/><span>Share X</span></button>
+                                        <button onClick={() => copyRawJson(selectedNode)} className="flex flex-col items-center gap-1 text-[9px] text-zinc-500 hover:text-white"><FileJson size={14}/><span>JSON</span></button>
                                       </div>
                                   </div>
                               </div>
-                              <div className="mt-8 flex gap-4">
-                                  <button onClick={() => setShareMode(false)} className="px-6 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white text-xs font-bold transition border border-zinc-800">Close</button>
-                                  <button className="px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-blue-500/20"><Camera size={14}/> Screenshot This</button>
-                              </div>
+                              <div className="mt-8 flex gap-4"><button onClick={() => setShareMode(false)} className="px-6 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white text-xs font-bold transition border border-zinc-800">Close</button><button className="px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-blue-500/20"><Download size={14}/> DOWNLOAD PROOF</button></div>
                           </div>
                       ) : (
                           /* VIEW 3: STANDARD DASHBOARD (Expanded) */
-                          <div className="flex flex-col gap-4 h-full"> 
-                              
-                              {/* --- EXPANDED MODE (MASTER-DETAIL) --- */}
+                          <div className="flex flex-col gap-4 h-full">
                               {modalView !== 'overview' ? (
                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
                                       {/* ACTIVE CARD (Left Column) */}
@@ -1281,7 +1214,7 @@ export default function Home() {
                                       </div>
                                   </div>
                               ) : (
-                                  // --- OVERVIEW MODE (2 ROWS LAYOUT) ---
+                                  /* OVERVIEW MODE (2 ROWS LAYOUT) */
                                   <>
                                       {/* Row 1: 3 Columns Vertical (Health, Storage, Identity) */}
                                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1337,87 +1270,15 @@ export default function Home() {
                           </div>
                       )}
                   </div>
-
-                  {/* MODAL FOOTER */}
+                  
                   <div className={`p-6 border-t flex flex-col gap-4 ${zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/30 border-zinc-800'}`}>
-                      {!compareMode && !shareMode && (
-                          <>
-                              {/* TIMESTAMP CENTERED */}
-                              <div className="flex justify-center -mt-2">
-                                  <div className="text-[10px] text-zinc-500 flex items-center gap-1.5 bg-black/40 px-3 py-1 rounded-full border border-zinc-800/50">
-                                      <Clock size={10} /> 
-                                      Last Seen: <span className="text-zinc-300 font-mono">{timeAgo}</span> <span className="text-zinc-600">({formatDetailedTimestamp(selectedNode.last_seen_timestamp)})</span>
-                                  </div>
-                              </div>
-
-                              {/* UTILITY ROW - SPLIT 3 EVEN SIZES */}
-                              <div className="grid grid-cols-3 gap-3">
-                                  <button onClick={() => copyStatusReport(selectedNode)} className="flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition text-xs font-bold" title="Copy Report">
-                                      {copiedField === 'report' ? <Check size={14} className="text-green-500"/> : <ClipboardCopy size={14} />} REPORT
-                                  </button>
-                                  
-                                  <button onClick={() => shareToTwitter(selectedNode)} className="flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition text-xs font-bold" title="Share on X">
-                                      {/* Custom X Icon SVG */}
-                                      <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                                        <path d="M4 4l11.733 16h4.267l-11.733 -16z" />
-                                        <path d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772" />
-                                      </svg>
-                                      SHARE ON X
-                                  </button>
-                                  
-                                  <button onClick={() => copyRawJson(selectedNode)} className="flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition text-xs font-bold" title="Copy JSON">
-                                      {copiedField === 'json' ? <Check size={14} className="text-green-500"/> : <FileJson size={14} />} DIAGNOSTICS
-                                  </button>
-                              </div>
-
-                              {/* Compare & Proof Buttons */}
-                              <div className="flex gap-4 mt-1">
-                                  <button 
-                                    onClick={() => setCompareMode(true)}
-                                    className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] border border-zinc-700"
-                                  >
-                                      <Swords size={16} className="text-red-400" /> COMPARE NODES
-                                  </button>
-                                  <button 
-                                    onClick={() => setShareMode(true)}
-                                    className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] shadow-lg shadow-blue-900/20"
-                                  >
-                                      <Camera size={16} /> PROOF OF PULSE
-                                  </button>
-                              </div>
-                          </>
-                      )}
+                      {!compareMode && !shareMode && (<><div className="flex justify-center -mt-2"><div className="text-[10px] text-zinc-500 flex items-center gap-1.5 bg-black/40 px-3 py-1 rounded-full border border-zinc-800/50"><Clock size={10} /> Last Seen: <span className="text-zinc-300 font-mono">{timeAgo}</span> <span className="text-zinc-600">({formatDetailedTimestamp(selectedNode.last_seen_timestamp)})</span></div></div><div className="grid grid-cols-3 gap-3"><button onClick={() => copyStatusReport(selectedNode)} className="flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition text-xs font-bold" title="Copy Report">{copiedField === 'report' ? <Check size={14} className="text-green-500"/> : <ClipboardCopy size={14} />} REPORT</button><button onClick={() => shareToTwitter(selectedNode)} className="flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition text-xs font-bold" title="Share on X"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M4 4l11.733 16h4.267l-11.733 -16z" /><path d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772" /></svg> SHARE ON X</button><button onClick={() => copyRawJson(selectedNode)} className="flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition text-xs font-bold" title="Copy JSON">{copiedField === 'json' ? <Check size={14} className="text-green-500"/> : <FileJson size={14} />} DIAGNOSTICS</button></div><div className="flex gap-4 mt-1"><button onClick={() => setCompareMode(true)} className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] border border-zinc-700"><Swords size={16} className="text-red-400" /> COMPARE NODES</button><button onClick={() => setShareMode(true)} className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] shadow-lg shadow-blue-900/20"><Camera size={16} /> PROOF OF PULSE</button></div></>)}
                   </div>
               </div>
           </div>
       )}
       
-      {/* FOOTER - Hidden in Zen Mode */}
-      {!zenMode && (
-        <footer className="border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto text-center">
-            <h3 className="text-white font-bold mb-2">XANDEUM PULSE MONITOR</h3>
-            <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">
-              Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.
-            </p>
-            <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-600 mb-4">
-                <span className="opacity-50">pRPC Powered</span>
-                <span className="text-zinc-800">|</span>
-                <div className="flex items-center gap-1">
-                  <span>Built by</span>
-                  <a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-blue-400 transition font-bold flex items-center gap-1">
-                    riot <Twitter size={10} />
-                  </a>
-                </div>
-                <span className="text-zinc-800">|</span>
-                <a href="https://github.com/Idle0x/xandeum-pulse" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition flex items-center gap-1">
-                  Open Source <ExternalLink size={10} />
-                </a>
-            </div>
-            <Link href="/docs" className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-4 decoration-zinc-700 flex items-center justify-center gap-1 mt-4">
-              <BookOpen size={10} /> System Architecture & Docs
-            </Link>
-        </footer>
-      )}
+      {!zenMode && (<footer className="border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto text-center"><h3 className="text-white font-bold mb-2">XANDEUM PULSE MONITOR</h3><p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.</p><div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-600 mb-4"><span className="opacity-50">pRPC Powered</span><span className="text-zinc-800">|</span><div className="flex items-center gap-1"><span>Built by</span><a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-blue-400 transition font-bold flex items-center gap-1">riot' <Twitter size={10} /></a></div><span className="text-zinc-800">|</span><a href="https://github.com/Idle0x/xandeum-pulse" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition flex items-center gap-1">Open Source <ExternalLink size={10} /></a></div><Link href="/docs" className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-4 decoration-zinc-700 flex items-center justify-center gap-1 mt-4"><BookOpen size={10} /> System Architecture & Docs</Link></footer>)}
     </div>
   );
 }
