@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { 
   Search, Download, Server, Activity, Database, X, Shield, Clock, Zap, Trophy, 
   HardDrive, Star, Copy, Check, CheckCircle, Globe, AlertTriangle, ArrowUp, 
-  ArrowDown, Wallet, Medal, Twitter, Code, Info, ExternalLink, HelpCircle, 
+  ArrowDown, Wallet, Medal, Code, Info, ExternalLink, HelpCircle, 
   ChevronRight, Maximize2, Map as MapIcon, BookOpen, Menu, LayoutDashboard, 
   HeartPulse, Swords, Share2, Monitor, ArrowLeftRight, Camera, BarChart2, 
   ChevronLeft, FileJson, ClipboardCopy, RefreshCw 
@@ -14,7 +14,7 @@ import {
 
 // --- TYPES ---
 interface Node {
-  address?: string; // Made optional to handle bad data
+  address?: string;
   pubkey?: string;
   version?: string;
   uptime?: number;
@@ -39,6 +39,7 @@ const getSafeVersion = (node: Node | null) => {
     return node.version;
 };
 
+// --- HELPER FUNCTIONS ---
 const formatBytes = (bytes: number | undefined) => {
   if (!bytes || bytes === 0 || isNaN(bytes)) return '0.00 B';
   const k = 1024;
@@ -110,8 +111,13 @@ const calculateVitalityMetrics = (node: Node | null, consensusVersion: string, m
   let versionScore = 100;
   const nodeVer = getSafeVersion(node);
   if (consensusVersion !== 'N/A' && compareVersions(nodeVer, consensusVersion) < 0) {
-      // Simplified penalization for stability
-      versionScore = 50; 
+      const parts1 = nodeVer.split('.').map(Number);
+      const parts2 = consensusVersion.split('.').map(Number);
+      const majorDiff = (parts2[0] || 0) - (parts1[0] || 0);
+      const minorDiff = (parts2[1] || 0) - (parts1[1] || 0);
+      if (majorDiff > 0) versionScore = 30; 
+      else if (minorDiff > 2) versionScore = 60; 
+      else versionScore = 80; 
   }
 
   // 3. Reputation Scoring
@@ -119,7 +125,8 @@ const calculateVitalityMetrics = (node: Node | null, consensusVersion: string, m
   const credits = node.credits || 0;
   if (medianCredits > 0 && credits > 0) {
       const ratio = credits / medianCredits;
-      reputationScore = Math.min(100, ratio * 75);
+      // Cap at 100, scale nicely
+      reputationScore = Math.min(100, 50 + (ratio * 25));
   } else if (credits === 0) {
       reputationScore = 0; 
   }
@@ -520,7 +527,7 @@ export default function Home() {
       setCompareMode(false);
       setShareMode(false);
       setCompareTarget(null);
-      setModalView('overview'); // Reset view on new open
+      setModalView('overview'); 
   };
 
   const renderNodeCard = (node: Node, i: number) => {
@@ -579,7 +586,7 @@ export default function Home() {
           <div 
             key={node.address || node.pubkey} 
             onClick={() => handleNodeClick(node)}
-            className="group relative border border-zinc-800 bg-black hover:border-zinc-600 p-4 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-lg flex flex-col justify-between"
+            className="group relative border border-zinc-800 bg-black/50 hover:border-zinc-600 p-4 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-lg flex flex-col justify-between"
           >
               {/* HEADER */}
               <div className="flex justify-between items-start mb-4 border-b border-zinc-800 pb-3">
@@ -636,6 +643,7 @@ export default function Home() {
   
   const renderHealthBreakdown = () => {
       const stats = calculateVitalityMetrics(selectedNode, mostCommonVersion, medianCredits);
+      // Mock percentile calculation for visual (in real app, sort `nodes` and find index)
       const healthPercentile = Math.round((stats.total / 100) * 100); 
       
       return (
@@ -835,7 +843,7 @@ export default function Home() {
           </div>
       </header>
 
-      <main className={`p-4 md:p-8 ${zenMode ? 'max-w-full' : 'max-w-7xl mx-auto'}`}>
+      <main className={`p-4 md:p-8 ${zenMode ? 'max-w-full' : 'max-w-7xl 2xl:max-w-[1800px] mx-auto'} transition-all duration-500`}>
           
           {/* NETWORK VITALS (Hidden in Zen Mode) */}
           {!zenMode && !loading && (
@@ -888,7 +896,7 @@ export default function Home() {
 
           {/* NODE GRID - UNCAPPED */}
           {loading && nodes.length === 0 ? <PulseGraphLoader /> : (
-              <div className={`grid gap-4 ${zenMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'} pb-20`}>
+              <div className={`grid gap-4 ${zenMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:gap-8'} pb-20`}>
                   {filteredNodes.map((node, i) => { // REMOVED SLICE LIMIT
                       if (zenMode) return renderZenCard(node);
                       return renderNodeCard(node, i);
@@ -901,7 +909,7 @@ export default function Home() {
       {selectedNode && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={closeModal}>
               <div 
-                className={`border w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300 ${zenMode ? 'bg-black border-zinc-800 shadow-none' : 'bg-[#09090b] border-zinc-800'}`}
+                className={`border w-full max-w-4xl 2xl:max-w-6xl rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300 ${zenMode ? 'bg-black border-zinc-800 shadow-none' : 'bg-[#09090b] border-zinc-800'}`}
                 onClick={(e) => e.stopPropagation()}
               >
                   {/* MODAL HEADER */}
@@ -1021,89 +1029,158 @@ export default function Home() {
                       ) : (
                           /* VIEW 3: STANDARD DASHBOARD (Expanded) */
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                              {/* LEFT COL: VITALITY (Interactive) */}
+                              
+                              {/* LEFT COL: HEALTH CARD (Interactive Toggle) */}
                               <div 
-                                className={`md:col-span-1 rounded-3xl p-8 border flex flex-col items-center justify-center relative overflow-hidden shadow-inner cursor-pointer transition group ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/30 border-zinc-800 hover:border-blue-500/30'}`}
-                                onClick={() => setModalView('health')}
+                                className={`md:col-span-1 rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group ${
+                                    modalView === 'health' 
+                                        ? (zenMode ? 'bg-green-900/20 border-green-500 ring-1 ring-green-500' : 'bg-blue-500/10 border-blue-500 ring-1 ring-blue-500') 
+                                        : (zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/30 border-zinc-800 hover:border-blue-500/30')
+                                }`}
+                                onClick={() => setModalView(modalView === 'health' ? 'overview' : 'health')}
                               >
-                                  <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none"></div>
-                                  <RadialProgress score={getHealthScore(selectedNode, mostCommonVersion, medianCredits)} size={180} />
-                                  <div className="mt-8 text-center w-full">
-                                      <div className="text-[10px] text-zinc-500 font-bold uppercase mb-2 tracking-wider group-hover:text-blue-400 transition">Click for Breakdown</div>
-                                      <div className={`py-2 px-4 rounded-xl border text-xs font-bold inline-block ${(selectedNode.uptime || 0) > 86400 ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
-                                          <span className="group relative">
-                                              {(selectedNode.uptime || 0) > 86400 ? 'ONLINE & STABLE' : 'UNSTABLE / SYNCING'}
-                                              <span className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-black px-2 py-1 rounded border border-zinc-700 text-[9px] text-zinc-300 whitespace-nowrap">
-                                                  Last seen {formatDetailedTimestamp(selectedNode.last_seen_timestamp)}
-                                              </span>
-                                          </span>
+                                  {/* Background Gradient */}
+                                  <div className={`absolute inset-0 bg-gradient-to-b from-transparent pointer-events-none ${zenMode ? 'to-green-900/10' : 'to-blue-900/10'}`}></div>
+                                  
+                                  {/* Header */}
+                                  <div className="w-full flex justify-between items-start z-10 mb-4">
+                                      <div className="flex flex-col">
+                                          <h3 className={`text-xs font-bold tracking-widest ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>HEALTH SCORE</h3>
+                                          <div className={`text-[10px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit ${
+                                              getHealthScore(selectedNode, mostCommonVersion, medianCredits) >= avgNetworkHealth 
+                                              ? 'bg-green-500/20 text-green-400' 
+                                              : 'bg-red-500/20 text-red-400'
+                                          }`}>
+                                              {getHealthScore(selectedNode, mostCommonVersion, medianCredits) >= avgNetworkHealth ? '▲ Above Avg' : '▼ Below Avg'}
+                                          </div>
                                       </div>
+                                      <HelpCircle size={14} className={`z-20 hover:text-white transition ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} onClick={(e) => toggleTooltip(e, 'health_card')} />
+                                  </div>
+                                  
+                                  {activeTooltip === 'health_card' && (
+                                      <div className="absolute top-12 left-4 right-4 z-50 bg-black border border-zinc-700 p-3 rounded-xl text-[10px] text-zinc-300 shadow-xl animate-in fade-in zoom-in-95">
+                                          Combined score of Uptime, Version, Reputation, and Storage. Click card for detailed breakdown.
+                                      </div>
+                                  )}
+
+                                  {/* Radial */}
+                                  <div className="relative z-10 scale-110">
+                                      <RadialProgress score={getHealthScore(selectedNode, mostCommonVersion, medianCredits)} size={160} />
+                                  </div>
+
+                                  {/* Footer Instruction */}
+                                  <div className="mt-6 text-center w-full z-10">
+                                      <p className={`text-[9px] font-bold uppercase tracking-widest transition-colors ${modalView === 'health' ? (zenMode ? 'text-green-400' : 'text-blue-400') : 'text-zinc-600 group-hover:text-zinc-400'}`}>
+                                          {modalView === 'health' ? 'CLICK TO COLLAPSE' : 'CLICK FOR BREAKDOWN'}
+                                      </p>
                                   </div>
                               </div>
 
-                              {/* CENTER COL: DYNAMIC VIEW AREA */}
-                              <div className="md:col-span-2">
+                              {/* CENTER/RIGHT COL: DYNAMIC VIEW AREA */}
+                              <div className="md:col-span-2 h-full">
                                   {modalView === 'health' ? renderHealthBreakdown() : 
                                    modalView === 'storage' ? renderStorageAnalysis() : (
-                                      <div className="grid grid-cols-2 gap-4 h-full">
-                                          {/* STORAGE CARD (Interactive) */}
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+                                          
+                                          {/* STORAGE CARD (Interactive Toggle) */}
                                           <div 
                                             className={`p-5 rounded-2xl border flex flex-col justify-between cursor-pointer transition group relative ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'}`}
                                             onClick={() => setModalView('storage')}
                                           >
-                                              <div className="flex items-center justify-between text-zinc-500 text-xs font-bold uppercase group-hover:text-blue-400 mb-2">
-                                                  <span className="flex items-center gap-2"><Database size={14}/> Storage</span>
-                                                  <HelpCircle size={10} className="cursor-help hover:text-white" onClick={(e) => toggleTooltip(e, 'card_storage')} />
+                                              <div className="flex justify-between items-start mb-2">
+                                                  <div className="flex items-center gap-2">
+                                                      <div className={`p-2 rounded-lg ${zenMode ? 'bg-green-900/20 text-green-500' : 'bg-blue-500/10 text-blue-500'}`}><Database size={18}/></div>
+                                                      <div>
+                                                          <div className={`text-xs font-bold uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>STORAGE</div>
+                                                          <div className="text-[10px] text-zinc-500 font-mono">
+                                                              {(selectedNode.storage_usage_raw || 0).toFixed(1)}% Utilized
+                                                          </div>
+                                                      </div>
+                                                  </div>
+                                                  <HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" onClick={(e) => toggleTooltip(e, 'card_storage')} />
                                               </div>
-                                              {activeTooltip === 'card_storage' && <div className="absolute z-10 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-10 left-4 w-40 animate-in fade-in">Click to compare your storage vs the network median.</div>}
                                               
-                                              <div>
-                                                  <div className={`text-2xl font-mono tracking-tight ${zenMode ? 'text-white' : 'text-white'}`}>{formatBytes(selectedNode.storage_used)}</div>
-                                                  <div className="h-1.5 bg-zinc-800 mt-3 rounded-full overflow-hidden"><div className={`h-full ${zenMode ? 'bg-zinc-500' : 'bg-blue-500'}`} style={{ width: selectedNode.storage_usage_percentage }}></div></div>
+                                              {activeTooltip === 'card_storage' && <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-12 left-4 right-4 animate-in fade-in">Click to compare your capacity against the network median.</div>}
+                                              
+                                              <div className="mt-auto">
+                                                  <div className="flex justify-between items-end mb-1">
+                                                      <span className={`text-2xl font-mono tracking-tight font-bold ${zenMode ? 'text-white' : 'text-white'}`}>
+                                                          {formatBytes(selectedNode.storage_used)}
+                                                      </span>
+                                                      <span className="text-[10px] text-zinc-500 mb-1 font-mono">/ {formatBytes(selectedNode.storage_committed)}</span>
+                                                  </div>
+                                                  <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                                                      <div className={`h-full transition-all duration-1000 ${zenMode ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: selectedNode.storage_usage_percentage }}></div>
+                                                  </div>
+                                                  <div className="mt-3 text-center">
+                                                      <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-wider group-hover:text-zinc-400 transition">CLICK FOR ANALYSIS</span>
+                                                  </div>
                                               </div>
                                           </div>
                                           
                                           {/* RANK CARD (Interactive) */}
                                           <Link href="/leaderboard">
-                                              <div className={`h-full p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden animate-[pulse_4s_infinite] ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.1)]'}`}>
-                                                  <div className="absolute top-0 right-0 p-8 bg-yellow-500/5 blur-xl rounded-full group-hover:bg-yellow-500/10 transition"></div>
-                                                  <div className="flex items-center justify-between text-zinc-500 text-xs font-bold uppercase mb-2">
-                                                      <span className="flex items-center gap-2"><Trophy size={14}/> Rank</span>
-                                                      <HelpCircle size={10} className="cursor-help hover:text-white z-20" onClick={(e) => toggleTooltip(e, 'card_rank')} />
-                                                  </div>
-                                                  {activeTooltip === 'card_rank' && <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-10 left-4 w-40 animate-in fade-in">Your rank is based on reputation credits earned.</div>}
+                                              <div className={`h-full p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-yellow-500/30'}`}>
+                                                  <div className="absolute top-0 right-0 p-12 bg-yellow-500/5 blur-2xl rounded-full group-hover:bg-yellow-500/10 transition"></div>
                                                   
-                                                  <div className={`text-3xl font-mono font-bold ${zenMode ? 'text-yellow-600' : 'text-yellow-500'}`}>#{selectedNode.rank || 'N/A'}</div>
-                                                  <div className="text-xs text-zinc-400 font-mono mt-1">{selectedNode.credits ? `${(selectedNode.credits / 1000).toFixed(1)}k Credits` : '0 Credits'}</div>
-                                                  <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-0 translate-x-2 text-yellow-500"><ChevronRight size={16}/></div>
+                                                  <div className="flex justify-between items-start mb-2 relative z-10">
+                                                      <div className="flex items-center gap-2">
+                                                          <div className={`p-2 rounded-lg ${zenMode ? 'bg-yellow-900/20 text-yellow-600' : 'bg-yellow-500/10 text-yellow-500'}`}><Trophy size={18}/></div>
+                                                          <div className={`text-xs font-bold uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>GLOBAL RANK</div>
+                                                      </div>
+                                                      <HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" onClick={(e) => toggleTooltip(e, 'card_rank')} />
+                                                  </div>
+                                                  
+                                                  {activeTooltip === 'card_rank' && <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-12 left-4 right-4 animate-in fade-in">Rank is determined by total reputation credits.</div>}
+                                                  
+                                                  <div className="mt-auto relative z-10">
+                                                      <div className={`text-3xl font-mono font-bold ${zenMode ? 'text-yellow-600' : 'text-yellow-500'}`}>#{selectedNode.rank || '-'}</div>
+                                                      <div className="flex items-center gap-1.5 mt-1 text-zinc-400 font-mono text-xs">
+                                                          <Wallet size={10} className="text-zinc-600"/>
+                                                          {selectedNode.credits ? selectedNode.credits.toLocaleString() : '0'} Credits
+                                                      </div>
+                                                  </div>
+                                                  <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-0 translate-x-2 text-yellow-500"><ChevronRight size={16}/></div>
                                               </div>
                                           </Link>
 
                                           {/* LOCATION CARD (Interactive) */}
                                           <Link href={`/map?focus=${getSafeIp(selectedNode)}`}>
-                                              <div className={`h-full p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden animate-[pulse_5s_infinite] ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]'}`}>
-                                                  <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition"></div>
-                                                  <div className="flex items-center justify-between text-zinc-500 text-xs font-bold uppercase mb-2">
-                                                      <span className="flex items-center gap-2"><Globe size={14}/> Location</span>
-                                                      <HelpCircle size={10} className="cursor-help hover:text-white z-20" onClick={(e) => toggleTooltip(e, 'card_loc')} />
-                                                  </div>
-                                                  {activeTooltip === 'card_loc' && <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-10 left-4 w-40 animate-in fade-in">Approximate physical location based on IP triangulation.</div>}
+                                              <div className={`h-full p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'}`}>
+                                                  <div className="absolute top-0 right-0 p-12 bg-blue-500/5 blur-2xl rounded-full group-hover:bg-blue-500/10 transition"></div>
                                                   
-                                                  <div className={`text-lg font-mono truncate opacity-80 ${zenMode ? 'text-zinc-300' : 'text-white'}`}>{getSafeIp(selectedNode)}</div>
-                                                  <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-0 translate-x-2 text-blue-400"><MapIcon size={16}/></div>
+                                                  <div className="flex justify-between items-start mb-2 relative z-10">
+                                                      <div className="flex items-center gap-2">
+                                                          <div className={`p-2 rounded-lg ${zenMode ? 'bg-blue-900/20 text-blue-600' : 'bg-blue-500/10 text-blue-500'}`}><Globe size={18}/></div>
+                                                          <div className={`text-xs font-bold uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>LOCATION</div>
+                                                      </div>
+                                                      <HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" onClick={(e) => toggleTooltip(e, 'card_loc')} />
+                                                  </div>
+                                                  {activeTooltip === 'card_loc' && <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-12 left-4 right-4 animate-in fade-in">Approximate physical location based on IP triangulation.</div>}
+                                                  
+                                                  <div className="mt-auto relative z-10">
+                                                      <div className={`text-lg font-mono truncate ${zenMode ? 'text-zinc-300' : 'text-white'}`}>{getSafeIp(selectedNode)}</div>
+                                                      <div className="text-[10px] text-zinc-500 mt-1">Click to visualize on Map</div>
+                                                  </div>
+                                                  <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-0 translate-x-2 text-blue-400"><MapIcon size={16}/></div>
                                               </div>
                                           </Link>
 
                                           {/* VERSION CARD */}
-                                          <div className={`p-5 rounded-2xl border relative ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
-                                              <div className="flex items-center justify-between text-zinc-500 text-xs font-bold uppercase mb-2">
-                                                  <span className="flex items-center gap-2"><Server size={14}/> Version</span>
-                                                  <HelpCircle size={10} className="cursor-help hover:text-white" onClick={(e) => toggleTooltip(e, 'card_ver')} />
+                                          <div className={`p-5 rounded-2xl border flex flex-col justify-between relative overflow-hidden ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
+                                              <div className="flex justify-between items-start mb-2 relative z-10">
+                                                  <div className="flex items-center gap-2">
+                                                      <div className={`p-2 rounded-lg ${zenMode ? 'bg-zinc-800 text-zinc-400' : 'bg-zinc-800 text-zinc-400'}`}><Server size={18}/></div>
+                                                      <div className={`text-xs font-bold uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>VERSION</div>
+                                                  </div>
+                                                  <HelpCircle size={12} className="text-zinc-600 hover:text-white z-20 cursor-help" onClick={(e) => toggleTooltip(e, 'card_ver')} />
                                               </div>
-                                              {activeTooltip === 'card_ver' && <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-10 left-4 w-40 animate-in fade-in">Ensure your node runs the latest software to maximize rewards.</div>}
-                                              
-                                              <div className={`text-xl font-mono ${zenMode ? 'text-white' : 'text-white'}`}>{getSafeVersion(selectedNode)}</div>
-                                              <div className="text-[10px] text-green-500 mt-1 font-bold bg-green-500/10 inline-block px-2 py-0.5 rounded">LATEST</div>
+                                              {activeTooltip === 'card_ver' && <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-12 left-4 right-4 animate-in fade-in">Ensure your node runs the latest software to maximize rewards.</div>}
+
+                                              <div className="mt-auto relative z-10">
+                                                  <div className={`text-xl font-mono ${zenMode ? 'text-white' : 'text-white'}`}>{getSafeVersion(selectedNode)}</div>
+                                                  <div className="text-[10px] text-green-500 mt-1 font-bold bg-green-500/10 inline-block px-2 py-0.5 rounded">LATEST</div>
+                                              </div>
                                           </div>
                                       </div>
                                   )}
@@ -1112,24 +1189,37 @@ export default function Home() {
                       )}
                   </div>
 
-                  {/* MODAL FOOTER (ACTION BAR) */}
+                  {/* MODAL FOOTER - Updated Layout */}
                   <div className={`p-6 border-t flex flex-col gap-4 ${zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/30 border-zinc-800'}`}>
                       {!compareMode && !shareMode && (
                           <>
-                              {/* UTILITY ROW */}
-                              <div className="flex gap-2 justify-center pb-2">
-                                  <button onClick={() => shareToTwitter(selectedNode)} className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 text-blue-400 transition" title="Share on X">
-                                      <Twitter size={14} />
+                              {/* TIMESTAMP CENTERED */}
+                              <div className="flex justify-center -mt-2">
+                                  <div className="text-[10px] text-zinc-500 flex items-center gap-1.5 bg-black/40 px-3 py-1 rounded-full border border-zinc-800/50">
+                                      <Clock size={10} /> 
+                                      Last Seen: <span className="text-zinc-300 font-mono">{formatDetailedTimestamp(selectedNode.last_seen_timestamp)}</span>
+                                  </div>
+                              </div>
+
+                              {/* UTILITY ROW - SPLIT 3 EVEN SIZES */}
+                              <div className="grid grid-cols-3 gap-3">
+                                  <button onClick={() => copyStatusReport(selectedNode)} className="flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition text-xs font-bold" title="Copy Report">
+                                      {copiedField === 'report' ? <Check size={14} className="text-green-500"/> : <ClipboardCopy size={14} />} REPORT
                                   </button>
-                                  <button onClick={() => copyStatusReport(selectedNode)} className="p-2 rounded-lg bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition" title="Copy Report">
-                                      {copiedField === 'report' ? <Check size={14} className="text-green-500"/> : <ClipboardCopy size={14} />}
+                                  
+                                  <button onClick={() => shareToTwitter(selectedNode)} className="flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition text-xs font-bold" title="Share on X">
+                                      {/* Custom X Icon SVG */}
+                                      <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M4 4l11.733 16h4.267l-11.733 -16z" /><path d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772" /></svg>
+                                      SHARE ON X
                                   </button>
-                                  <button onClick={() => copyRawJson(selectedNode)} className="p-2 rounded-lg bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition" title="Copy JSON">
-                                      {copiedField === 'json' ? <Check size={14} className="text-green-500"/> : <FileJson size={14} />}
+                                  
+                                  <button onClick={() => copyRawJson(selectedNode)} className="flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition text-xs font-bold" title="Copy JSON">
+                                      {copiedField === 'json' ? <Check size={14} className="text-green-500"/> : <FileJson size={14} />} DIAGNOSTICS
                                   </button>
                               </div>
 
-                              <div className="flex gap-4">
+                              {/* Compare & Proof Buttons */}
+                              <div className="flex gap-4 mt-1">
                                   <button 
                                     onClick={() => setCompareMode(true)}
                                     className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] border border-zinc-700"
