@@ -12,7 +12,9 @@ const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
 interface LocationData {
   name: string; country: string; lat: number; lon: number; count: number;
   totalStorage: number; totalCredits: number; avgHealth: number;
-  stableCount?: number; criticalCount?: number;
+  // NEW: Real Health Metrics
+  avgUptime: number;
+  publicRatio: number; // 0-100
   ips?: string[];
   countryCode?: string;
   topPks?: {
@@ -170,6 +172,13 @@ export default function MapPage() {
       return cr.toString();
   };
 
+  // NEW: Uptime Formatter for Map
+  const formatUptime = (seconds: number) => {
+      const d = Math.floor(seconds / 86400);
+      const h = Math.floor((seconds % 86400) / 3600);
+      return d > 0 ? `${d}d ${h}h` : `${h}h`;
+  };
+
   const getLegendLabels = () => {
       if (viewMode === 'HEALTH') return ['> 90%', '75-90%', '60-75%', '40-60%', '< 40%'];
       const format = (v: number) => viewMode === 'STORAGE' ? formatStorage(v) : formatCredits(v);
@@ -256,7 +265,7 @@ export default function MapPage() {
     }
   };
 
-  // --- UPDATED X-RAY STATS: COLORS & PHRASING ---
+  // --- UPDATED X-RAY STATS: HEALTH FIX & COLORS ---
   const getXRayStats = (loc: LocationData, index: number, tierColor: string) => {
       const globalShare = ((loc.count / stats.totalNodes) * 100).toFixed(1);
       const rawPercentile = ((locations.length - index) / locations.length) * 100;
@@ -268,7 +277,6 @@ export default function MapPage() {
           const avgPerNode = loc.totalStorage / loc.count;
           return {
               labelA: 'Avg Density',
-              // Use Purple for Storage value
               valA: <span className="text-indigo-400">{formatStorage(avgPerNode)} per Node</span>,
               descA: "Average committed storage per node in this region.",
               
@@ -277,7 +285,6 @@ export default function MapPage() {
               descB: "Percentage of total network nodes located here.",
               
               labelC: 'Tier Rank',
-              // Dynamic Color for Percentile
               valC: <span style={{ color: tierColor }}>{rankText}</span>,
               descC: "Performance tier relative to other regions."
           };
@@ -286,7 +293,6 @@ export default function MapPage() {
           const avgCred = Math.round(loc.totalCredits / loc.count);
           return {
               labelA: 'Avg Earnings',
-              // Use Yellow for Credits value
               valA: <span className="text-yellow-500">{avgCred.toLocaleString()} Cr per Node</span>,
               descA: "Average reputation credits earned per node here.",
               
@@ -299,12 +305,13 @@ export default function MapPage() {
               descC: "Earning power tier relative to other regions."
           };
       }
-      const stable = loc.stableCount ?? 0;
-      const critical = loc.criticalCount ?? 0;
+      
+      // --- FIXED HEALTH STATS ---
+      // Replaced "Stable/Critical" with Uptime & Public Ratio
       return {
-          labelA: 'Status Breakdown',
-          valA: <span className="text-green-400">{stable} Stable</span>, // Just show stable for clarity
-          descA: "Nodes with >75/100 health score.",
+          labelA: 'Reliability & Access',
+          valA: <span className="text-green-400">{formatUptime(loc.avgUptime)} Up • {loc.publicRatio.toFixed(0)}% Public</span>,
+          descA: "Avg continuous uptime & percentage of nodes indexing data.",
           
           labelB: 'Node Count',
           valB: `${globalShare}% of Network`,
@@ -534,7 +541,6 @@ export default function MapPage() {
                         const tier = getTierIndex(loc);
                         const tierColor = TIER_COLORS[tier];
                         const isExpanded = expandedLocation === loc.name;
-                        // PASS TIER COLOR TO GET STYLED STATS
                         const xray = getXRayStats(loc, i, tierColor);
                         const sampleIp = loc.ips && loc.ips.length > 0 ? loc.ips[0] : null;
                         const topPk = loc.topPks ? loc.topPks[viewMode] : null;
@@ -550,6 +556,7 @@ export default function MapPage() {
                                     <div className="flex items-center gap-3">
                                         <div className={`flex items-center justify-center w-8 h-8 rounded-full font-mono text-xs font-bold ${activeLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'}`}>{i + 1}</div>
                                         <div className="flex flex-col">
+                                            {/* --- FLAG IN LIST --- */}
                                             <span className="text-sm font-bold text-zinc-200 group-hover:text-white flex items-center gap-2">
                                                 {loc.countryCode && <img src={`https://flagcdn.com/w20/${loc.countryCode.toLowerCase()}.png`} className="w-4 h-auto rounded-sm" />}
                                                 {loc.name}, {loc.country}
