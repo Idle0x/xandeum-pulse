@@ -328,10 +328,12 @@ export default function MapPage() {
       }
   }
 
+  // --- SORTING FOR RENDER ORDER (Active Last = On Top) ---
   const locationsForMap = useMemo(() => {
     if (!activeLocation) return locations;
     const others = locations.filter(l => l.name !== activeLocation);
     const active = locations.find(l => l.name === activeLocation);
+    // Active MUST be last to be rendered on top (Z-Index in SVG relies on DOM order)
     return active ? [...others, active] : others;
   }, [locations, activeLocation]);
 
@@ -444,17 +446,36 @@ export default function MapPage() {
                     const isActive = activeLocation === loc.name;
                     const tier = getTierIndex(loc);
                     const baseColor = TIER_COLORS[tier];
+                    
+                    // STRATEGY 1: "CINEMA MODE" - Dim others when one is active
+                    const opacity = activeLocation && !isActive ? 0.3 : 1;
 
                     return (
                         <Marker key={loc.name} coordinates={[loc.lon, loc.lat]} onClick={() => lockTarget(loc.name, loc.lat, loc.lon)}>
-                        <g className="group cursor-pointer transition-all duration-500">
+                        <g className="group cursor-pointer transition-all duration-500" style={{ opacity }}>
+                            {/* Pulse Effect */}
                             <circle r={size * 2.5} fill={isActive ? '#22c55e' : baseColor} className="animate-ping opacity-20" style={{ animationDuration: isActive ? '1s' : '3s' }} />
+                            
+                            {/* Main Marker Shape */}
                             {isActive ? (
-                                <polygon points="0,-12 3,-4 11,-4 5,1 7,9 0,5 -7,9 -5,1 -11,-4 -3,-4" transform={`scale(${size/6})`} fill="#52525b" stroke="#22c55e" strokeWidth={1.5} className="drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
+                                <polygon points="0,-12 3,-4 11,-4 5,1 7,9 0,5 -7,9 -5,1 -11,-4 -3,-4" transform={`scale(${size/6})`} fill="#52525b" stroke="#22c55e" strokeWidth={1.5} className="drop-shadow-[0_0_15px_rgba(34,197,94,1)]" />
                             ) : (
                                 <>{viewMode === 'STORAGE' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} />}{viewMode === 'CREDITS' && <circle r={size} fill={baseColor} stroke="#fff" strokeWidth={1} />}{viewMode === 'HEALTH' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} className="rotate-45" />}</>
                             )}
-                            {isActive && <text y={-size - 15} textAnchor="middle" className="font-mono text-[8px] fill-white font-bold uppercase tracking-widest pointer-events-none drop-shadow-md z-50">{loc.name}</text>}
+                            
+                            {/* STRATEGY 2: THE "ELEVATED CALLOUT" (DIALOGUE BOX) */}
+                            {isActive && (
+                                <g transform={`translate(0, ${-size - 18})`}>
+                                    {/* The Shadow/Glow */}
+                                    <rect x="-60" y="-20" width="120" height="24" rx="4" fill="black" fillOpacity="0.8" stroke="#22c55e" strokeWidth="1" className="drop-shadow-lg" />
+                                    {/* The Text */}
+                                    <text y="-4" textAnchor="middle" className="font-mono text-[10px] fill-white font-bold uppercase tracking-widest pointer-events-none dominant-baseline-central">
+                                        {loc.name}
+                                    </text>
+                                    {/* The Arrow/Pointer */}
+                                    <path d="M -5 4 L 0 9 L 5 4" fill="black" stroke="#22c55e" strokeWidth="1" strokeDasharray="0,14,3" /> 
+                                </g>
+                            )}
                         </g>
                         </Marker>
                     );
