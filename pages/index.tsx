@@ -1,4 +1,3 @@
-identifier="xandeum-pulse-final" type="application/vnd.ant.code" language="typescript" title="Xandeum Pulse: Storage First Edition"
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
