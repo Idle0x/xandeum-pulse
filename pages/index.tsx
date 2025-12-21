@@ -296,7 +296,7 @@ export default function Home() {
   const [medianCommitted, setMedianCommitted] = useState(0);
   const [medianCredits, setMedianCredits] = useState(0);
 
-  // --- TIME AGO HOOK ---
+  // --- HOOKS ---
   const timeAgo = useTimeAgo(selectedNode?.last_seen_timestamp);
 
   useEffect(() => {
@@ -490,7 +490,7 @@ export default function Home() {
             let consensusCount = 0;
 
             mergedList.forEach(n => {
-                const stats = calculateVitalityMetrics(n, topVersion, medianCredits);
+                const stats = calculateVitalityMetrics(n, topVersion, medianCredits); // Fixed typo: medCreds -> medianCredits
                 sumHealth += stats.total;
                 sumUptime += stats.breakdown.uptime;
                 sumCap += stats.breakdown.capacity;
@@ -498,6 +498,8 @@ export default function Home() {
                 sumVer += stats.breakdown.version;
                 if (getSafeVersion(n) === topVersion) consensusCount++;
             });
+
+            const medCreds = medianCredits; // Handled by state
 
             setAvgNetworkHealth(Math.round(sumHealth / mergedList.length));
             setNetworkConsensus((consensusCount / mergedList.length) * 100);
@@ -809,6 +811,7 @@ export default function Home() {
 
                               <div className="h-2 bg-zinc-800 rounded-full overflow-hidden relative">
                                   <div className={`h-full transition-all duration-1000 ${barColor}`} style={{ width: `${m.val}%` }}></div>
+                                  {/* Network Avg Marker */}
                                   <div className="absolute top-0 bottom-0 w-0.5 bg-white/50 z-10" style={{ left: `${m.avg}%` }} title={`Network Avg: ${m.avg}`}></div>
                               </div>
                           </div>
