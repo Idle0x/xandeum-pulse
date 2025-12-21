@@ -10,7 +10,7 @@ const BACKUP_NODES = [
 ];
 const TIMEOUT_PRIMARY = 4000;
 const TIMEOUT_BACKUP = 6000;
-const TIMEOUT_CREDITS = 2000; // NEW: Strict timeout for credits
+const TIMEOUT_CREDITS = 2000; 
 
 // --- IN-MEMORY CACHE ---
 const geoCache = new Map<string, { lat: number; lon: number; country: string; countryCode: string; city: string }>();
@@ -27,6 +27,13 @@ export interface EnrichedNode {
   storage_committed: number; 
   credits: number;
   health: number;
+  // NEW: DETAILED BREAKDOWN
+  healthBreakdown: {
+      uptime: number;
+      version: number;
+      reputation: number;
+      capacity: number;
+  };
   location: {
     lat: number;
     lon: number;
@@ -80,7 +87,17 @@ const calculateVitalityScore = (storageBytes: number, uptime: number, version: s
   // 4. Capacity
   let capacityScore = Math.min(100, (storageGB / 1000) * 100); 
 
-  return Math.round((uptimeScore * 0.3) + (versionScore * 0.2) + (reputationScore * 0.25) + (capacityScore * 0.25));
+  const total = Math.round((uptimeScore * 0.3) + (versionScore * 0.2) + (reputationScore * 0.25) + (capacityScore * 0.25));
+  
+  return {
+      total: Math.max(0, Math.min(100, total)),
+      breakdown: {
+          uptime: Math.round(uptimeScore),
+          version: Math.round(versionScore),
+          reputation: Math.round(reputationScore),
+          capacity: Math.round(capacityScore)
+      }
+  };
 };
 
 // --- CORE: Fetch RPC ---
@@ -117,7 +134,6 @@ async function resolveLocations(ips: string[]) {
   const missing = ips.filter(ip => !geoCache.has(ip));
   
   if (missing.length > 0) {
-    // A. Batch API
     try {
       for (let i = 0; i < missing.length; i += 100) {
         const chunk = missing.slice(i, i + 100);
@@ -133,7 +149,6 @@ async function resolveLocations(ips: string[]) {
       }
     } catch (e) { /* API Fail */ }
 
-    // B. Fallback Local DB
     missing.forEach(ip => {
       if (!geoCache.has(ip)) {
         const geo = geoip.lookup(ip);
@@ -155,7 +170,6 @@ async function resolveLocations(ips: string[]) {
 
 // --- MAIN EXPORT ---
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  // 1. Parallel Fetch (With Fail-Safes)
   const [rawPods, creditsData] = await Promise.all([
     fetchRawData(),
     fetchCredits()
@@ -163,7 +177,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
 
   if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable");
 
-  // 2. ROBUST CREDITS PARSING
   const creditsMap = new Map<string, number>();
   const creditsArray: number[] = [];
   
@@ -171,7 +184,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   
   if (Array.isArray(rawCredits)) {
       rawCredits.forEach((c: any) => {
-        // Force parse, default to 0 if NaN
         const val = parseFloat(c.credits || c.amount || '0');
         const key = c.pod_id || c.pubkey || c.node;
         if (key && !isNaN(val)) {
@@ -184,7 +196,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   creditsArray.sort((a, b) => a - b);
   const medianCredits = creditsArray.length ? creditsArray[Math.floor(creditsArray.length / 2)] : 0;
 
-  // 3. Version Stats
   const versionCounts: Record<string, number> = {};
   rawPods.forEach((p: any) => {
       const v = p.version || '0.0.0';
@@ -192,29 +203,28 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   });
   const consensusVersion = Object.keys(versionCounts).sort((a, b) => versionCounts[b] - versionCounts[a])[0] || '0.0.0';
 
-  // 4. Resolve Locations
   const uniqueIps = [...new Set(rawPods.map((p: any) => p.address.split(':')[0]))] as string[];
   await resolveLocations(uniqueIps);
 
-  // 5. Enrich & Merge
   const enrichedNodes: EnrichedNode[] = rawPods.map((pod: any) => {
     const ip = pod.address.split(':')[0];
     const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
     
-    // SAFETY FORCE CASTING - Prevents "0" strings from breaking math
     const storageCommitted = Number(pod.storage_committed) || 0;
     const storageUsed = Number(pod.storage_used) || 0;
     const credits = creditsMap.get(pod.pubkey) || 0;
     const uptime = Number(pod.uptime) || 0;
     
-    const health = calculateVitalityScore(storageCommitted, uptime, pod.version, consensusVersion, medianCredits, credits);
+    // CALCULATE BREAKDOWN
+    const vitality = calculateVitalityScore(storageCommitted, uptime, pod.version, consensusVersion, medianCredits, credits);
 
     return {
       ...pod,
       storage_committed: storageCommitted, 
       storage_used: storageUsed,           
       credits,
-      health,
+      health: vitality.total,
+      healthBreakdown: vitality.breakdown, // EXPORT THIS
       location: {
         lat: loc.lat,
         lon: loc.lon,
@@ -225,7 +235,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
     };
   });
 
-  // 6. Ranking
   enrichedNodes.sort((a, b) => b.credits - a.credits);
   let currentRank = 1;
   enrichedNodes.forEach((node, i) => {
