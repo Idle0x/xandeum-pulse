@@ -9,7 +9,7 @@ import {
   ArrowDown, Wallet, Medal, Twitter, Info, ExternalLink, HelpCircle, 
   ChevronRight, Maximize2, Map as MapIcon, BookOpen, Menu, LayoutDashboard, 
   HeartPulse, Swords, Monitor, ArrowLeftRight, Camera, 
-  ChevronLeft, FileJson, ClipboardCopy, RefreshCw, Share2
+  ChevronLeft, FileJson, ClipboardCopy, RefreshCw, Share2, MapPin
 } from 'lucide-react';
 
 // --- TYPES ---
@@ -64,14 +64,11 @@ const getSafeVersion = (node: Node | null) => {
     return node.version;
 };
 
-const getCountryFromIp = (ip: string) => {
-    // Mock mapping for demo purposes. In production, use a GeoIP library or API.
-    const lastOctet = parseInt(ip.split('.').pop() || '0');
-    if (lastOctet < 50) return 'United States';
-    if (lastOctet < 100) return 'Germany';
-    if (lastOctet < 150) return 'Singapore';
-    if (lastOctet < 200) return 'Finland';
-    return 'United Kingdom';
+// Mock Country Logic (In production, replace with GeoIP)
+const getCountryName = (ip: string) => {
+    const sum = ip.split('.').reduce((a, b) => a + parseInt(b || '0'), 0);
+    const countries = ['United States', 'Germany', 'Finland', 'Singapore', 'United Kingdom', 'France', 'Japan', 'Canada', 'Netherlands'];
+    return countries[sum % countries.length];
 };
 
 const formatBytes = (bytes: number | undefined) => {
@@ -284,9 +281,9 @@ export default function Home() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const [compareTarget, setCompareTarget] = useState<Node | null>(null);
+  const [compareSearch, setCompareSearch] = useState(''); // NEW SEARCH STATE
   const [shareMode, setShareMode] = useState(false);
   const [modalView, setModalView] = useState<'overview' | 'health' | 'storage' | 'identity'>('overview'); 
-  const [compareSearch, setCompareSearch] = useState(''); // NEW: Search state for comparison list
   
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null); 
@@ -501,7 +498,7 @@ export default function Home() {
             let consensusCount = 0;
 
             mergedList.forEach(n => {
-                const stats = calculateVitalityMetrics(n, topVersion, medianCredits);
+                const stats = calculateVitalityMetrics(n, topVersion, medianCredits); // Fixed typo: medCreds -> medianCredits
                 sumHealth += stats.total;
                 sumUptime += stats.breakdown.uptime;
                 sumCap += stats.breakdown.capacity;
@@ -509,6 +506,8 @@ export default function Home() {
                 sumVer += stats.breakdown.version;
                 if (getSafeVersion(n) === topVersion) consensusCount++;
             });
+
+            const medCreds = medianCredits; // Handled by state
 
             setAvgNetworkHealth(Math.round(sumHealth / mergedList.length));
             setNetworkConsensus((consensusCount / mergedList.length) * 100);
@@ -1037,7 +1036,6 @@ export default function Home() {
 
       <main className={`p-4 md:p-8 ${zenMode ? 'max-w-full' : 'max-w-7xl 2xl:max-w-[1800px] mx-auto'} transition-all duration-500`}>
           
-          {/* NETWORK VITALS (Hidden in Zen Mode) */}
           {!zenMode && !loading && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
@@ -1088,7 +1086,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* ERROR DISPLAY (REPLACED WITH SYNC INDICATOR) */}
           {error && (
             <div className="mb-8 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center gap-2 text-blue-400 animate-pulse">
               <RefreshCw size={14} className="animate-spin" />
@@ -1096,7 +1093,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* WATCHLIST */}
           {!zenMode && favorites.length > 0 && (
             <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
                <div className="flex items-center gap-2 mb-4"><Star className="text-yellow-500" fill="currentColor" size={20} /><h3 className="text-lg font-bold text-white tracking-widest uppercase">Your Watchlist</h3></div>
@@ -1104,10 +1100,9 @@ export default function Home() {
             </div>
           )}
 
-          {/* NODE GRID - UNCAPPED */}
           {loading && nodes.length === 0 ? <PulseGraphLoader /> : (
               <div className={`grid gap-4 ${zenMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:gap-8'} pb-20`}>
-                  {filteredNodes.map((node, i) => { // REMOVED SLICE LIMIT
+                  {filteredNodes.map((node, i) => {
                       if (zenMode) return renderZenCard(node);
                       return renderNodeCard(node, i);
                   })}
@@ -1131,10 +1126,20 @@ export default function Home() {
                           <div>
                               <h2 className="text-2xl font-black font-sans tracking-tight text-white mb-0.5">NODE INSPECTOR</h2>
                               <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono"><span className="text-zinc-400">{selectedNode.pubkey ? `${selectedNode.pubkey.slice(0, 12)}...` : 'Unknown'}</span><Copy size={10} className="cursor-pointer hover:text-white" onClick={() => copyToClipboard(selectedNode.pubkey || '', 'pubkey')} /></div>
-                              <div className="mt-1"><span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${selectedNode.is_public ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-orange-500/10 border-orange-500/30 text-orange-400'}`}>STORAGE MODE: {selectedNode.is_public ? 'ACCEPTING DEALS' : 'RESTRICTED'}</span></div>
+                              <div className="mt-1">
+                                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${selectedNode.is_public ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-orange-500/10 border-orange-500/30 text-orange-400'}`}>
+                                      {selectedNode.is_public ? 'STORAGE LAYER FULLY INDEXED' : 'STORAGE LAYER NOT INDEXED'}
+                                  </span>
+                              </div>
                           </div>
                       </div>
-                      <button onClick={closeModal} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition"><X size={20} /></button>
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="flex items-center gap-1.5 bg-zinc-900 px-3 py-1 rounded-full border border-zinc-800">
+                           <Globe size={12} className="text-blue-500" />
+                           <span className="text-xs font-bold text-zinc-300">{getCountryName(getSafeIp(selectedNode))}</span>
+                        </div>
+                        <button onClick={closeModal} className="p-2 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition group"><X size={20} className="group-hover:scale-110 transition-transform"/></button>
+                      </div>
                   </div>
 
                   {/* MODAL BODY */}
@@ -1143,11 +1148,45 @@ export default function Home() {
                       {compareMode ? (
                           <div className="animate-in fade-in slide-in-from-right-4 duration-300 h-full flex flex-col">
                               <div className="flex justify-between items-center mb-6 border-b border-white/5 pb-4"><button onClick={() => setCompareMode(false)} className="text-xs font-bold text-zinc-500 hover:text-white flex items-center gap-1 transition"><ArrowLeftRight size={14}/> BACK TO DETAILS</button><h3 className="text-lg font-bold text-white flex items-center gap-2"><Swords className="text-red-500" /> VERSUS MODE</h3></div>
-                              <div className="grid grid-cols-2 gap-4 mb-6"><div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl text-center"><div className="text-xs text-blue-400 font-bold mb-1">CHAMPION</div><div className="font-mono text-sm text-white truncate">{getSafeIp(selectedNode)}</div></div><div className="relative">{!compareTarget ? (<div className="h-full flex items-center justify-center p-4 bg-zinc-900 border border-zinc-800 border-dashed rounded-xl text-zinc-500 hover:border-zinc-600 cursor-pointer group relative"><span className="text-xs font-bold group-hover:text-white flex items-center gap-2 pointer-events-none"><Search size={14}/> SELECT RIVAL</span><select className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={(e) => setCompareTarget(nodes.find(n => n.pubkey === e.target.value) || null)}><option value="">Select a node...</option>{nodes.slice(0, 50).map(n => (<option key={n.pubkey} value={n.pubkey}>{getSafeIp(n)} ({n.rank ? `#${n.rank}` : 'Unranked'})</option>))}</select></div>) : (<div className="p-4 bg-red-500/5 border border-red-500/20 rounded-xl text-center relative group"><button onClick={() => setCompareTarget(null)} className="absolute top-2 right-2 text-zinc-600 hover:text-red-500 bg-black/50 rounded-full p-1"><X size={12}/></button><div className="text-xs text-red-400 font-bold mb-1">CHALLENGER</div><div className="font-mono text-sm text-white truncate">{getSafeIp(compareTarget)}</div></div>)}</div></div>
+                              
+                              {/* Search & Selector */}
+                              <div className="grid grid-cols-2 gap-4 mb-6">
+                                  <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl text-center"><div className="text-xs text-blue-400 font-bold mb-1">CHAMPION</div><div className="font-mono text-sm text-white truncate">{getSafeIp(selectedNode)}</div></div>
+                                  
+                                  <div className="relative h-full">
+                                      <div className="absolute inset-0 bg-zinc-900 border border-zinc-800 border-dashed rounded-xl flex flex-col p-2 group-hover:border-zinc-600 transition">
+                                          <div className="flex items-center gap-2 px-2 pb-2 border-b border-zinc-800/50 mb-1">
+                                              <Search size={12} className="text-zinc-500"/>
+                                              <input 
+                                                  type="text" 
+                                                  placeholder="Search PubKey or Country..." 
+                                                  className="bg-transparent text-xs text-white outline-none w-full placeholder:text-zinc-600"
+                                                  value={compareSearch}
+                                                  onChange={(e) => setCompareSearch(e.target.value)}
+                                              />
+                                          </div>
+                                          <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                              {nodes
+                                                .filter(n => (n.pubkey || '').toLowerCase().includes(compareSearch.toLowerCase()) || getCountryName(getSafeIp(n)).toLowerCase().includes(compareSearch.toLowerCase()))
+                                                .map(n => (
+                                                  <div 
+                                                    key={n.pubkey} 
+                                                    onClick={() => setCompareTarget(n)}
+                                                    className={`text-[10px] p-1.5 rounded cursor-pointer truncate font-mono hover:bg-zinc-800 flex justify-between ${compareTarget?.pubkey === n.pubkey ? 'bg-blue-500/20 text-blue-400' : 'text-zinc-400'}`}
+                                                  >
+                                                      <span>{n.pubkey?.slice(0, 8)}...</span>
+                                                      <span className="text-zinc-600">{getCountryName(getSafeIp(n))}</span>
+                                                  </div>
+                                              ))}
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+
                               {compareTarget && (<div className="space-y-1 bg-black/20 p-6 rounded-2xl border border-zinc-800">{renderComparisonRow('Health Score', getHealthScore(selectedNode, mostCommonVersion, medianCredits), getHealthScore(compareTarget, mostCommonVersion, medianCredits), (v)=>v.toString(), 'HIGH')}{renderComparisonRow('Storage', selectedNode.storage_committed, compareTarget.storage_committed, formatBytes, 'HIGH')}{renderComparisonRow('Credits', selectedNode.credits || 0, compareTarget.credits || 0, (v)=>v.toLocaleString(), 'HIGH')}{renderComparisonRow('Uptime', selectedNode.uptime, compareTarget.uptime, formatUptime, 'HIGH')}{renderComparisonRow('Rank', selectedNode.rank || 9999, compareTarget.rank || 9999, (v)=>`#${v}`, 'LOW')}</div>)}
                           </div>
                       ) : shareMode ? (
-                          // ... (Proof of Pulse)
+                          /* VIEW 2: SHARE CARD MODE */
                           <div className="flex flex-col items-center justify-center h-full animate-in zoom-in-95 duration-300 py-10">
                               <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl shadow-2xl max-w-sm w-full relative overflow-hidden group">
                                   <div className="absolute top-0 right-0 p-32 bg-blue-500/10 blur-[80px] rounded-full pointer-events-none group-hover:bg-blue-500/20 transition duration-1000"></div>
@@ -1155,6 +1194,7 @@ export default function Home() {
                                       <div className="inline-block p-4 bg-zinc-900 rounded-2xl mb-6 shadow-lg border border-zinc-800"><Activity size={40} className="text-blue-500" /></div>
                                       <h2 className="text-2xl font-extrabold text-white mb-2 tracking-tight">PROOF OF PULSE</h2>
                                       <p className="font-mono text-xs text-zinc-500 mb-8 bg-zinc-900 px-3 py-1 rounded-full inline-block border border-zinc-800">{getSafeIp(selectedNode)}</p>
+                                      
                                       <div className="grid grid-cols-2 gap-4 mb-4">
                                           <div className="bg-zinc-900/80 p-4 rounded-xl border border-zinc-800"><div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Health</div><div className="text-2xl font-extrabold text-green-400">{getHealthScore(selectedNode, mostCommonVersion, medianCredits)}</div></div>
                                           <div className="bg-zinc-900/80 p-4 rounded-xl border border-zinc-800"><div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Storage</div><div className="text-xl font-extrabold text-purple-400">{formatBytes(selectedNode.storage_committed)}</div></div>
@@ -1163,19 +1203,22 @@ export default function Home() {
                                       </div>
                                       <div className="text-[10px] text-zinc-600 font-mono flex items-center justify-center gap-2 mb-6"><Server size={10} /> VERIFIED BY XANDEUM PULSE</div>
                                       
+                                      {/* Integrated Share Actions */}
                                       <div className="grid grid-cols-3 gap-2 border-t border-zinc-800 pt-4">
-                                        <button onClick={() => copyStatusReport(selectedNode)} className="flex flex-col items-center gap-1 text-[9px] text-zinc-500 hover:text-white"><ClipboardCopy size={14}/><span>Copy Report</span></button>
-                                        <button onClick={() => shareToTwitter(selectedNode)} className="flex flex-col items-center gap-1 text-[9px] text-zinc-500 hover:text-white"><Share2 size={14}/><span>Share X</span></button>
-                                        <button onClick={() => copyRawJson(selectedNode)} className="flex flex-col items-center gap-1 text-[9px] text-zinc-500 hover:text-white"><FileJson size={14}/><span>JSON</span></button>
+                                        <button onClick={() => copyStatusReport(selectedNode)} className="flex flex-col items-center gap-1 text-[9px] text-zinc-500 hover:text-white hover:bg-white/5 p-2 rounded transition"><ClipboardCopy size={14}/><span>Copy Report</span></button>
+                                        <button onClick={() => shareToTwitter(selectedNode)} className="flex flex-col items-center gap-1 text-[9px] text-zinc-500 hover:text-white hover:bg-white/5 p-2 rounded transition"><Share2 size={14}/><span>Share X</span></button>
+                                        <button onClick={() => copyRawJson(selectedNode)} className="flex flex-col items-center gap-1 text-[9px] text-zinc-500 hover:text-white hover:bg-white/5 p-2 rounded transition"><FileJson size={14}/><span>JSON</span></button>
                                       </div>
                                   </div>
                               </div>
-                              <div className="mt-8 flex gap-4"><button onClick={() => setShareMode(false)} className="px-6 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white text-xs font-bold transition border border-zinc-800">Close</button><button className="px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-blue-500/20"><Download size={14}/> DOWNLOAD PROOF</button></div>
+                              <div className="mt-8 flex gap-4">
+                                  <button onClick={() => setShareMode(false)} className="px-6 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white text-xs font-bold transition border border-zinc-800">Close</button>
+                                  <button className="px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-blue-500/20"><Download size={14}/> DOWNLOAD PROOF</button>
+                              </div>
                           </div>
                       ) : (
                           /* VIEW 3: STANDARD DASHBOARD (Expanded) */
-                          <div className="flex flex-col gap-4 h-full"> 
-                              
+                          <div className="flex flex-col gap-4 h-full">
                               {/* --- EXPANDED MODE (MASTER-DETAIL) --- */}
                               {modalView !== 'overview' ? (
                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
