@@ -191,6 +191,7 @@ export default function MapPage() {
 
   const lockTarget = (name: string, lat: number, lon: number) => {
     if (activeLocation === name) {
+        // Just recenter
     } else {
         setActiveLocation(name);
         setExpandedLocation(name); 
@@ -262,6 +263,7 @@ export default function MapPage() {
     }
   };
 
+  // --- UPDATED X-RAY STATS: REMOVED PUBLIC RATIO ---
   const getXRayStats = (loc: LocationData, index: number, tierColor: string) => {
       const globalShare = ((loc.count / stats.totalNodes) * 100).toFixed(1);
       const rawPercentile = ((locations.length - index) / locations.length) * 100;
@@ -301,11 +303,14 @@ export default function MapPage() {
       // FIXED HEALTH STATS - Removed "Public Ratio"
       return {
           labelA: 'Reliability',
+          // ONLY UPTIME IS SHOWN NOW
           valA: <span className="text-green-400">{formatUptime(loc.avgUptime)} Avg Uptime</span>,
           descA: "Average continuous uptime of nodes in this region.",
+          
           labelB: 'Node Count',
           valB: `${globalShare}% of Network`,
           descB: "Share of active physical nodes.",
+          
           labelC: 'Tier Rank',
           valC: <span style={{ color: tierColor }}>{rankText}</span>,
           descC: "Stability tier relative to other regions."
