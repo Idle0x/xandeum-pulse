@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import axios from 'axios';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleSqrt } from 'd3-scale';
-import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Info, X, Server, Layers, TrendingUp, BarChart3, AlertCircle, Eye, EyeOff, HelpCircle, Share2, Check } from 'lucide-react';
+import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Info, X, Server, Layers, TrendingUp, BarChart3, AlertCircle, Eye, EyeOff, HelpCircle, Share2, Check, ArrowRight, ExternalLink } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -14,6 +14,12 @@ interface LocationData {
   totalStorage: number; totalCredits: number; avgHealth: number;
   stableCount?: number; criticalCount?: number;
   ips?: string[];
+  // NEW: The "King" PubKeys from API
+  topPks?: {
+      STORAGE: string;
+      CREDITS: string;
+      HEALTH: string;
+  };
 }
 
 interface MapStats {
@@ -53,8 +59,6 @@ export default function MapPage() {
 
   const [position, setPosition] = useState({ coordinates: [10, 20], zoom: 1.2 });
   const [copiedCoords, setCopiedCoords] = useState<string | null>(null);
-  
-  // NEW: Share Link State
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
   const listRef = useRef<HTMLDivElement>(null);
@@ -370,7 +374,6 @@ export default function MapPage() {
         <style>{`@supports (padding: max(0px)) { .pb-safe { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); } }`}</style>
       </Head>
 
-      {/* TOAST NOTIFICATION */}
       {toast && (
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100] animate-in zoom-in-95 duration-300 w-[90%] max-w-sm pointer-events-none">
               <div className={`flex items-start gap-3 px-5 py-4 rounded-2xl border shadow-2xl backdrop-blur-xl ${
@@ -479,7 +482,6 @@ export default function MapPage() {
       </div>
 
       <div className={`shrink-0 bg-[#09090b] relative z-50 flex flex-col ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
-            
             <div className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4 ${isSplitView ? 'hidden' : 'flex'}`}>
                 <div className="w-full md:w-auto flex justify-center md:justify-start"><ViewToggles /></div>
                 <div className="w-full md:w-auto bg-zinc-900/30 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3">
@@ -497,15 +499,9 @@ export default function MapPage() {
             <div className={`flex flex-col h-full overflow-hidden ${isSplitView ? 'flex' : 'hidden'}`}>
                  <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-zinc-800/30 bg-[#09090b]">
                     <div className="flex items-center gap-3"><h2 className="text-sm font-bold text-white flex items-center gap-2"><Activity size={14} className="text-green-500" /> Live Data</h2><div className="hidden md:block scale-90 origin-left"><ViewToggles /></div></div>
-                    
                     <div className="flex items-center gap-2">
                         <div className="md:hidden scale-75 origin-right"><ViewToggles /></div>
-                        <button 
-                            onClick={handleCloseDrawer} 
-                            className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg"
-                        >
-                            <X size={20} />
-                        </button>
+                        <button onClick={handleCloseDrawer} className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg"><X size={20} /></button>
                     </div>
                  </div>
 
@@ -516,15 +512,14 @@ export default function MapPage() {
                         const isExpanded = expandedLocation === loc.name;
                         const xray = getXRayStats(loc, i);
                         const sampleIp = loc.ips && loc.ips.length > 0 ? loc.ips[0] : null;
+                        const topPk = loc.topPks ? loc.topPks[viewMode] : null;
 
                         return (
                             <div 
                                 id={`list-item-${loc.name}`}
                                 key={loc.name} 
                                 onClick={(e) => { e.stopPropagation(); toggleExpansion(loc.name, loc.lat, loc.lon); }}
-                                className={`group rounded-2xl border transition-all cursor-pointer overflow-hidden ${
-                                    activeLocation === loc.name ? 'bg-zinc-800 border-green-500/50' : 'bg-zinc-900/50 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800'
-                                }`}
+                                className={`group rounded-2xl border transition-all cursor-pointer overflow-hidden ${activeLocation === loc.name ? 'bg-zinc-800 border-green-500/50' : 'bg-zinc-900/50 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800'}`}
                             >
                                 <div className="p-3 flex items-center justify-between">
                                     <div className="flex items-center gap-3">
@@ -543,38 +538,44 @@ export default function MapPage() {
                                 {isExpanded && (
                                     <div className="bg-black/30 border-t border-white/5 p-4 animate-in slide-in-from-top-2 duration-300">
                                         <div className="flex justify-between items-center mb-4">
-                                            <div className="text-[10px] md:text-sm font-bold uppercase tracking-widest px-3 py-1 rounded border bg-black/50" style={{ color: tierColor, borderColor: `${tierColor}40` }}>
-                                                {TIER_LABELS[viewMode][tier]} TIER
-                                            </div>
+                                            <div className="text-[10px] md:text-sm font-bold uppercase tracking-widest px-3 py-1 rounded border bg-black/50" style={{ color: tierColor, borderColor: `${tierColor}40` }}>{TIER_LABELS[viewMode][tier]} TIER</div>
                                             
-                                            {/* NEW: SHARE BUTTON */}
-                                            {sampleIp && (
-                                                <button 
-                                                    onClick={(e) => handleShareLink(e, sampleIp, loc.name)}
-                                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold hover:bg-blue-500/20 transition"
-                                                >
-                                                    {copiedLink === loc.name ? <Check size={12} /> : <Share2 size={12} />}
-                                                    {copiedLink === loc.name ? 'Link Copied' : 'Share Location'}
-                                                </button>
-                                            )}
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-2 text-xs md:text-sm text-center">
-                                            <div className="flex flex-col items-center">
-                                                <div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1">{xray.labelA}</div>
-                                                <div className="text-white font-mono font-bold">{xray.valA}</div>
-                                            </div>
-                                            <div className="flex flex-col items-center border-l border-zinc-800/50">
-                                                <div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1">{xray.labelB}</div>
-                                                <div className="text-white font-mono font-bold">{xray.valB}</div>
-                                            </div>
-                                            <div className="flex flex-col items-center border-l border-zinc-800/50">
-                                                <div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1">{xray.labelC}</div>
-                                                <div className="text-white font-mono font-bold">{xray.valC}</div>
+                                            <div className="flex gap-2">
+                                                {sampleIp && (
+                                                    <button onClick={(e) => handleShareLink(e, sampleIp, loc.name)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold hover:bg-blue-500/20 transition">
+                                                        {copiedLink === loc.name ? <Check size={12} /> : <Share2 size={12} />}
+                                                        {copiedLink === loc.name ? 'Link Copied' : 'Share Region'}
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
-                                        <div className="w-full h-1 bg-zinc-800 rounded-full mt-4 overflow-hidden">
-                                            <div className="h-full bg-white/20" style={{ width: `${(loc.count / stats.totalNodes) * 100}%` }}></div>
+                                        <div className="grid grid-cols-3 gap-2 text-xs md:text-sm text-center mb-4">
+                                            <div className="flex flex-col items-center"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1">{xray.labelA}</div><div className="text-white font-mono font-bold">{xray.valA}</div></div>
+                                            <div className="flex flex-col items-center border-l border-zinc-800/50"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1">{xray.labelB}</div><div className="text-white font-mono font-bold">{xray.valB}</div></div>
+                                            <div className="flex flex-col items-center border-l border-zinc-800/50"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1">{xray.labelC}</div><div className="text-white font-mono font-bold">{xray.valC}</div></div>
                                         </div>
+                                        
+                                        {/* NEW: TOP PERFORMER CARD */}
+                                        {topPk && (
+                                            <Link href={viewMode === 'CREDITS' ? `/leaderboard?highlight=${topPk}` : `/?open=${topPk}`}>
+                                                <div className="w-full bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl p-3 flex items-center justify-between cursor-pointer group/card transition-all">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`p-2 rounded-lg ${MODE_COLORS[viewMode].bg} text-white`}>
+                                                            {viewMode === 'STORAGE' ? <Database size={14} /> : viewMode === 'CREDITS' ? <Zap size={14} /> : <Activity size={14} />}
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Region's Top Performer</div>
+                                                            <div className="text-xs font-mono text-white truncate w-32">{topPk.slice(0, 16)}...</div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 text-[10px] font-bold text-blue-400 group-hover/card:translate-x-1 transition-transform">
+                                                        VIEW DETAILS <ArrowRight size={12} />
+                                                    </div>
+                                                </div>
+                                            </Link>
+                                        )}
+                                        
+                                        <div className="w-full h-1 bg-zinc-800 rounded-full mt-4 overflow-hidden"><div className="h-full bg-white/20" style={{ width: `${(loc.count / stats.totalNodes) * 100}%` }}></div></div>
                                     </div>
                                 )}
                             </div>
@@ -585,16 +586,7 @@ export default function MapPage() {
 
             {!isSplitView && (
                 <div className="shrink-0 p-3 md:px-6 md:py-4 bg-[#09090b] border-t border-zinc-800/30 z-50">
-                    <button 
-                        onClick={() => setIsSplitView(true)}
-                        className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 px-6 py-3 bg-zinc-900/80 hover:bg-zinc-800 border border-blue-500/30 hover:border-blue-500/60 rounded-xl transition-all group shadow-[0_0_20px_rgba(59,130,246,0.15)] hover:shadow-[0_0_30px_rgba(59,130,246,0.3)] animate-[pulse_3s_infinite]"
-                    >
-                        <Activity size={16} className="text-blue-400 group-hover:scale-110 transition-transform animate-pulse" />
-                        <span className="text-xs md:text-sm font-bold uppercase tracking-widest text-blue-100 group-hover:text-white">
-                            Open Live Stats
-                        </span>
-                        <ChevronUp size={16} className="text-blue-500/50 group-hover:-translate-y-1 transition-transform" />
-                    </button>
+                    <button onClick={() => setIsSplitView(true)} className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 px-6 py-3 bg-zinc-900/80 hover:bg-zinc-800 border border-blue-500/30 hover:border-blue-500/60 rounded-xl transition-all group shadow-[0_0_20px_rgba(59,130,246,0.15)] hover:shadow-[0_0_30px_rgba(59,130,246,0.3)] animate-[pulse_3s_infinite]"><Activity size={16} className="text-blue-400 group-hover:scale-110 transition-transform animate-pulse" /><span className="text-xs md:text-sm font-bold uppercase tracking-widest text-blue-100 group-hover:text-white">Open Live Stats</span><ChevronUp size={16} className="text-blue-500/50 group-hover:-translate-y-1 transition-transform" /></button>
                 </div>
             )}
       </div>
