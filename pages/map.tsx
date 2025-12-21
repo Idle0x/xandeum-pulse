@@ -14,7 +14,8 @@ interface LocationData {
   totalStorage: number; totalCredits: number; avgHealth: number;
   stableCount?: number; criticalCount?: number;
   ips?: string[];
-  // NEW: The "King" PubKeys from API
+  // NEW: Country Code for Flag
+  countryCode?: string;
   topPks?: {
       STORAGE: string;
       CREDITS: string;
@@ -374,6 +375,7 @@ export default function MapPage() {
         <style>{`@supports (padding: max(0px)) { .pb-safe { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); } }`}</style>
       </Head>
 
+      {/* TOAST NOTIFICATION */}
       {toast && (
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100] animate-in zoom-in-95 duration-300 w-[90%] max-w-sm pointer-events-none">
               <div className={`flex items-start gap-3 px-5 py-4 rounded-2xl border shadow-2xl backdrop-blur-xl ${
@@ -448,6 +450,8 @@ export default function MapPage() {
                     const isActive = activeLocation === loc.name;
                     const tier = getTierIndex(loc);
                     const baseColor = TIER_COLORS[tier];
+                    
+                    // STRATEGY 1: "CINEMA MODE"
                     const opacity = activeLocation && !isActive ? 0.3 : 1;
 
                     return (
@@ -460,10 +464,13 @@ export default function MapPage() {
                                 <>{viewMode === 'STORAGE' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} />}{viewMode === 'CREDITS' && <circle r={size} fill={baseColor} stroke="#fff" strokeWidth={1} />}{viewMode === 'HEALTH' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} className="rotate-45" />}</>
                             )}
                             
+                            {/* STRATEGY 2: THE "ELEVATED CALLOUT" */}
                             {isActive && (
                                 <g transform={`translate(0, ${-size - 18})`}>
                                     <rect x="-60" y="-20" width="120" height="24" rx="4" fill="black" fillOpacity="0.8" stroke="#22c55e" strokeWidth="1" className="drop-shadow-lg" />
-                                    <text y="-4" textAnchor="middle" className="font-mono text-[10px] fill-white font-bold uppercase tracking-widest pointer-events-none dominant-baseline-central">{loc.name}</text>
+                                    <text y="-4" textAnchor="middle" className="font-mono text-[10px] fill-white font-bold uppercase tracking-widest pointer-events-none dominant-baseline-central">
+                                        {loc.name}
+                                    </text>
                                     <path d="M -5 4 L 0 9 L 5 4" fill="black" stroke="#22c55e" strokeWidth="1" strokeDasharray="0,14,3" /> 
                                 </g>
                             )}
@@ -511,7 +518,6 @@ export default function MapPage() {
                         const tierColor = TIER_COLORS[tier];
                         const isExpanded = expandedLocation === loc.name;
                         const xray = getXRayStats(loc, i);
-                        const sampleIp = loc.ips && loc.ips.length > 0 ? loc.ips[0] : null;
                         const topPk = loc.topPks ? loc.topPks[viewMode] : null;
 
                         return (
@@ -525,7 +531,12 @@ export default function MapPage() {
                                     <div className="flex items-center gap-3">
                                         <div className={`flex items-center justify-center w-8 h-8 rounded-full font-mono text-xs font-bold ${activeLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'}`}>{i + 1}</div>
                                         <div className="flex flex-col">
-                                            <span className="text-sm font-bold text-zinc-200 group-hover:text-white">{loc.name}, {loc.country}</span>
+                                            {/* --- FLAG IN LIST --- */}
+                                            <span className="text-sm font-bold text-zinc-200 group-hover:text-white flex items-center gap-2">
+                                                {loc.countryCode && <img src={`https://flagcdn.com/w20/${loc.countryCode.toLowerCase()}.png`} className="w-4 h-auto rounded-sm" />}
+                                                {loc.name}, {loc.country}
+                                            </span>
+                                            
                                             <span onClick={(e) => { e.stopPropagation(); handleCopyCoords(loc.lat, loc.lon, loc.name); }} className="text-[10px] text-zinc-500 flex items-center gap-1 hover:text-blue-400 cursor-copy transition-colors"><MapPin size={10} /> {copiedCoords === loc.name ? <span className="text-green-500 font-bold">Copied!</span> : `${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}`}</span>
                                         </div>
                                     </div>
@@ -541,12 +552,11 @@ export default function MapPage() {
                                             <div className="text-[10px] md:text-sm font-bold uppercase tracking-widest px-3 py-1 rounded border bg-black/50" style={{ color: tierColor, borderColor: `${tierColor}40` }}>{TIER_LABELS[viewMode][tier]} TIER</div>
                                             
                                             <div className="flex gap-2">
-                                                {sampleIp && (
-                                                    <button onClick={(e) => handleShareLink(e, sampleIp, loc.name)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold hover:bg-blue-500/20 transition">
-                                                        {copiedLink === loc.name ? <Check size={12} /> : <Share2 size={12} />}
-                                                        {copiedLink === loc.name ? 'Link Copied' : 'Share Region'}
-                                                    </button>
-                                                )}
+                                                {/* SHARE BUTTON */}
+                                                <button onClick={(e) => handleShareLink(e, loc.ips?.[0] || '1.1.1.1', loc.name)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold hover:bg-blue-500/20 transition">
+                                                    {copiedLink === loc.name ? <Check size={12} /> : <Share2 size={12} />}
+                                                    {copiedLink === loc.name ? 'Link Copied' : 'Share Region'}
+                                                </button>
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-3 gap-2 text-xs md:text-sm text-center mb-4">
@@ -554,8 +564,8 @@ export default function MapPage() {
                                             <div className="flex flex-col items-center border-l border-zinc-800/50"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1">{xray.labelB}</div><div className="text-white font-mono font-bold">{xray.valB}</div></div>
                                             <div className="flex flex-col items-center border-l border-zinc-800/50"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1">{xray.labelC}</div><div className="text-white font-mono font-bold">{xray.valC}</div></div>
                                         </div>
-                                        
-                                        {/* NEW: TOP PERFORMER CARD */}
+
+                                        {/* NEW: KING NODE CARD */}
                                         {topPk && (
                                             <Link href={viewMode === 'CREDITS' ? `/leaderboard?highlight=${topPk}` : `/?open=${topPk}`}>
                                                 <div className="w-full bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl p-3 flex items-center justify-between cursor-pointer group/card transition-all">
