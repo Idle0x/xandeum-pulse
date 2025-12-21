@@ -1,4 +1,3 @@
-identifier="xandeum-pulse-enhanced" type="application/vnd.ant.code" language="typescript" title="Fixed Xandeum Pulse Dashboard"
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
