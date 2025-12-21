@@ -1058,6 +1058,63 @@ export default function Home() {
                                       {modalView === 'identity' && renderIdentityDetails()}
                                   </div>
                               )}
+
+                              {/* 5. SECONDARY ROW - ONLY IN OVERVIEW */}
+                              {modalView === 'overview' && (
+                                <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* REPUTATION CARD */}
+                                    <Link href="/leaderboard">
+                                        <div className={`h-full p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-yellow-500/30'}`}>
+                                            <div className="absolute top-0 right-0 p-12 bg-yellow-500/5 blur-2xl rounded-full group-hover:bg-yellow-500/10 transition"></div>
+                                            <div className="flex justify-between items-start mb-2 relative z-10">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`p-2 rounded-lg ${zenMode ? 'bg-yellow-900/20 text-yellow-600' : 'bg-yellow-500/10 text-yellow-500'}`}><Trophy size={18}/></div>
+                                                    <div className={`text-xs font-bold uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>REPUTATION</div>
+                                                </div>
+                                                <HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" onClick={(e) => toggleTooltip(e, 'card_rank')} />
+                                            </div>
+                                            {activeTooltip === 'card_rank' && <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-12 left-4 right-4 animate-in fade-in">Global Rank based on total accumulated credits.</div>}
+                                            <div className="mt-auto relative z-10">
+                                                <div className={`text-3xl font-mono font-bold ${zenMode ? 'text-yellow-600' : 'text-yellow-500'}`}>#{selectedNode?.rank || '-'}</div>
+                                                {/* Drawer Effect for Credits */}
+                                                <div className="mt-2 bg-black/40 border-t border-white/5 rounded-lg p-2 flex items-center justify-between shadow-inner">
+                                                    <span className="text-[10px] text-zinc-500 font-bold uppercase">Total Credits</span>
+                                                    <div className="flex items-center gap-1.5 text-zinc-300 font-mono text-xs">
+                                                        <Wallet size={10} className="text-yellow-600"/>
+                                                        {selectedNode?.credits?.toLocaleString() || 0}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-0 translate-x-2 text-yellow-500"><ChevronRight size={16}/></div>
+                                        </div>
+                                    </Link>
+
+                                    {/* PHYSICAL LAYER CARD */}
+                                    <Link href={`/map?focus=${getSafeIp(selectedNode)}`}>
+                                        <div className={`h-full p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'}`}>
+                                            <div className="absolute top-0 right-0 p-8 bg-cyan-500/5 blur-xl rounded-full group-hover:bg-cyan-500/10 transition"></div>
+                                            <div className="flex justify-between items-start mb-2 relative z-10">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`p-2 rounded-lg ${zenMode ? 'bg-cyan-900/20 text-cyan-600' : 'bg-cyan-500/10 text-cyan-500'}`}><Globe size={18}/></div>
+                                                    <div className={`text-xs font-bold uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>PHYSICAL LAYER</div>
+                                                </div>
+                                                <HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" onClick={(e) => toggleTooltip(e, 'card_loc')} />
+                                            </div>
+                                            {activeTooltip === 'card_loc' && <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-12 left-4 right-4 animate-in fade-in">Physical location derived from node IP triangulation.</div>}
+                                            <div className="mt-auto relative z-10">
+                                                {/* Cyan Glass Pill */}
+                                                <div className={`mb-2 inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-mono shadow-[0_0_10px_rgba(6,182,212,0.1)] ${zenMode ? 'bg-cyan-900/20 border-cyan-700 text-cyan-400' : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'}`}>
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                                                    {getSafeIp(selectedNode)}
+                                                </div>
+                                                <div className="text-[10px] text-white font-bold flex items-center gap-1 group-hover:text-cyan-400 transition animate-pulse">
+                                                    Click to visualize on map <MapIcon size={10}/>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Link>
+                                </div>
+                              )}
                           </div>
                       )}
                   </div>
