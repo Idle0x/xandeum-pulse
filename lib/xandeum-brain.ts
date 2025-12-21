@@ -1,6 +1,6 @@
 // lib/xandeum-brain.ts
 import axios from 'axios';
-import geoip from 'geoip-lite'; // THE SAFETY NET
+import geoip from 'geoip-lite'; 
 
 // --- CONFIGURATION ---
 const PRIMARY_NODE = '173.212.203.145';
@@ -11,7 +11,7 @@ const BACKUP_NODES = [
 const TIMEOUT_PRIMARY = 4000;
 const TIMEOUT_BACKUP = 6000;
 
-// --- IN-MEMORY CACHE (Resets on server restart, but persists in warm lambda) ---
+// --- IN-MEMORY CACHE ---
 const geoCache = new Map<string, { lat: number; lon: number; country: string; countryCode: string; city: string }>();
 
 // --- TYPES ---
@@ -22,8 +22,8 @@ export interface EnrichedNode {
   uptime: number;
   last_seen_timestamp: number;
   is_public: boolean;
-  storage_used: number;
-  storage_committed: number;
+  storage_used: number;      // Forced Number
+  storage_committed: number; // Forced Number
   credits: number;
   health: number;
   location: {
@@ -52,12 +52,12 @@ const compareVersions = (v1: string, v2: string) => {
 };
 
 // --- HELPER: Vitality Score ---
-const calculateVitalityScore = (node: any, consensusVersion: string, medianCredits: number, credits: number) => {
-  const storageGB = (parseFloat(node.storage_committed || '0')) / (1024 ** 3);
+const calculateVitalityScore = (storageBytes: number, uptime: number, version: string, consensusVersion: string, medianCredits: number, credits: number) => {
+  const storageGB = storageBytes / (1024 ** 3);
   
   // 1. Uptime
   let uptimeScore = 0;
-  const days = (node.uptime || 0) / 86400;
+  const days = uptime / 86400;
   if (days >= 30) uptimeScore = 100;
   else if (days >= 7) uptimeScore = 70 + (days - 7) * (30 / 23);
   else if (days >= 1) uptimeScore = 40 + (days - 1) * (30 / 6);
@@ -65,7 +65,7 @@ const calculateVitalityScore = (node: any, consensusVersion: string, medianCredi
 
   // 2. Version
   let versionScore = 100;
-  if (consensusVersion !== '0.0.0' && compareVersions(node.version || '0.0.0', consensusVersion) < 0) {
+  if (consensusVersion !== '0.0.0' && compareVersions(version || '0.0.0', consensusVersion) < 0) {
       versionScore = 50;
   }
 
@@ -90,7 +90,7 @@ async function fetchRawData() {
   try {
     const res = await axios.post(`http://${PRIMARY_NODE}:6000/rpc`, payload, { timeout: TIMEOUT_PRIMARY });
     if (res.data?.result?.pods) return res.data.result.pods;
-  } catch (e) { console.warn("Primary Node Failed, switching to backup swarm."); }
+  } catch (e) { /* silent fail */ }
 
   // 2. Race Backups
   const shuffled = BACKUP_NODES.sort(() => 0.5 - Math.random()).slice(0, 3);
@@ -102,18 +102,16 @@ async function fetchRawData() {
   } catch (e) { return []; }
 }
 
-// --- CORE: The Uncrashable Geo Resolver ---
+// --- CORE: Geo Resolver ---
 async function resolveLocations(ips: string[]) {
   const missing = ips.filter(ip => !geoCache.has(ip));
   
   if (missing.length > 0) {
-    // STRATEGY A: Batch API (High Accuracy)
+    // A. Batch API
     try {
-      // Split into chunks of 100 to respect API limits
       for (let i = 0; i < missing.length; i += 100) {
         const chunk = missing.slice(i, i + 100);
-        const res = await axios.post('http://ip-api.com/batch', chunk.map(ip => ({ query: ip, fields: "lat,lon,country,countryCode,city,query" })));
-        
+        const res = await axios.post('http://ip-api.com/batch', chunk.map(ip => ({ query: ip, fields: "lat,lon,country,countryCode,city,query" })), { timeout: 3000 });
         res.data.forEach((d: any) => {
           if (d.lat && d.lon) {
             geoCache.set(d.query, { 
@@ -123,12 +121,9 @@ async function resolveLocations(ips: string[]) {
           }
         });
       }
-    } catch (e) {
-      console.warn("Live GeoAPI Failed (Rate Limit likely). Switching to Local Database Fallback.");
-    }
+    } catch (e) { /* API Fail */ }
 
-    // STRATEGY B: Local Database Fallback (Uncrashable)
-    // Run this for any IP that is STILL missing after the API attempt
+    // B. Fallback Local DB
     missing.forEach(ip => {
       if (!geoCache.has(ip)) {
         const geo = geoip.lookup(ip);
@@ -141,7 +136,6 @@ async function resolveLocations(ips: string[]) {
             city: geo.city || 'Unknown Node'
           });
         } else {
-          // Final Fallback for private IPs
           geoCache.set(ip, { lat: 0, lon: 0, country: 'Private Network', countryCode: 'XX', city: 'Hidden' });
         }
       }
@@ -151,26 +145,36 @@ async function resolveLocations(ips: string[]) {
 
 // --- MAIN EXPORT ---
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  // 1. Parallel Fetch (RPC + Credits)
+  // 1. Parallel Fetch
   const [rawPods, creditsRes] = await Promise.all([
     fetchRawData(),
-    axios.get('https://podcredits.xandeum.network/api/pods-credits').catch(() => ({ data: {} }))
+    axios.get('https://podcredits.xandeum.network/api/pods-credits').catch(() => ({ data: [] }))
   ]);
 
   if (!rawPods) throw new Error("Network Unreachable");
 
-  // 2. Process Credits & Version
+  // 2. ROBUST CREDITS PARSING (The Fix for Zero Credits)
   const creditsMap = new Map<string, number>();
   const creditsArray: number[] = [];
-  (creditsRes.data?.pods_credits || []).forEach((c: any) => {
-    const val = parseFloat(c.credits || '0');
-    creditsMap.set(c.pod_id, val);
-    creditsArray.push(val);
-  });
+  
+  // Handle both array format and object wrapper format
+  const rawCredits = Array.isArray(creditsRes.data) ? creditsRes.data : (creditsRes.data?.pods_credits || []);
+  
+  if (Array.isArray(rawCredits)) {
+      rawCredits.forEach((c: any) => {
+        const val = parseFloat(c.credits || c.amount || '0');
+        const key = c.pod_id || c.pubkey || c.node;
+        if (key) {
+            creditsMap.set(key, val);
+            creditsArray.push(val);
+        }
+      });
+  }
   
   creditsArray.sort((a, b) => a - b);
   const medianCredits = creditsArray.length ? creditsArray[Math.floor(creditsArray.length / 2)] : 0;
 
+  // 3. Version Stats
   const versionCounts: Record<string, number> = {};
   rawPods.forEach((p: any) => {
       const v = p.version || '0.0.0';
@@ -178,35 +182,40 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   });
   const consensusVersion = Object.keys(versionCounts).sort((a, b) => versionCounts[b] - versionCounts[a])[0] || '0.0.0';
 
-  // 3. Resolve Locations (The Heavy Lift)
+  // 4. Resolve Locations
   const uniqueIps = [...new Set(rawPods.map((p: any) => p.address.split(':')[0]))] as string[];
   await resolveLocations(uniqueIps);
 
-  // 4. Enrich & Merge
+  // 5. Enrich & Merge
   const enrichedNodes: EnrichedNode[] = rawPods.map((pod: any) => {
     const ip = pod.address.split(':')[0];
-    
-    // *** FIX: Updated fallback object keys to match cache structure (country vs countryName) ***
     const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
     
+    // TYPE CASTING (The Fix for Zero Storage)
+    const storageCommitted = parseFloat(pod.storage_committed || '0');
+    const storageUsed = parseFloat(pod.storage_used || '0');
     const credits = creditsMap.get(pod.pubkey) || 0;
-    const health = calculateVitalityScore(pod, consensusVersion, medianCredits, credits);
+    const uptime = pod.uptime || 0;
+    
+    const health = calculateVitalityScore(storageCommitted, uptime, pod.version, consensusVersion, medianCredits, credits);
 
     return {
       ...pod,
+      storage_committed: storageCommitted, // Sent as Number
+      storage_used: storageUsed,           // Sent as Number
       credits,
       health,
       location: {
         lat: loc.lat,
         lon: loc.lon,
-        countryName: loc.country, // Now 'loc.country' is guaranteed to exist
+        countryName: loc.country,
         countryCode: loc.countryCode,
         city: loc.city
       }
     };
   });
 
-  // 5. Calculate Ranks
+  // 6. Ranking
   enrichedNodes.sort((a, b) => b.credits - a.credits);
   let currentRank = 1;
   enrichedNodes.forEach((node, i) => {
