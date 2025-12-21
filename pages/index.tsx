@@ -28,6 +28,42 @@ interface Node {
   credits?: number;
 }
 
+// --- NEW HOOK: REAL GEOIP (For Modal Inspector) ---
+const useRealLocation = (ip: string | undefined) => {
+    const [country, setCountry] = useState<string>('Locating...');
+    
+    useEffect(() => {
+        if (!ip) return;
+        setCountry('Locating...');
+        
+        // Using ipapi.co (Free tier) - In production, proxy this via backend to avoid rate limits
+        axios.get(`https://ipapi.co/${ip}/json/`)
+            .then(res => {
+                if (res.data.error) {
+                    setCountry('Unknown Location'); 
+                } else {
+                    setCountry(res.data.country_name || 'Unknown Location');
+                }
+            })
+            .catch(() => setCountry('Unknown Location'));
+            
+    }, [ip]);
+
+    return country;
+};
+
+// --- SUB-COMPONENT: REAL LOCATION BADGE ---
+// We separate this to ensure the hook runs only when the Modal is open
+const ModalHeaderLocation = ({ ip }: { ip: string }) => {
+    const country = useRealLocation(ip);
+    return (
+        <div className="flex items-center gap-1.5 bg-zinc-900 px-3 py-1 rounded-full border border-zinc-800">
+           <Globe size={12} className="text-blue-500" />
+           <span className="text-xs font-bold text-zinc-300">{country}</span>
+        </div>
+    );
+};
+
 // --- HOOKS ---
 const useTimeAgo = (timestamp: number | undefined) => {
     const [timeAgo, setTimeAgo] = useState('Syncing...');
@@ -64,7 +100,7 @@ const getSafeVersion = (node: Node | null) => {
     return node.version;
 };
 
-// Mock Country Logic (In production, replace with GeoIP)
+// Mock Country Logic (Kept for the Main List View performance)
 const getCountryName = (ip: string) => {
     const sum = ip.split('.').reduce((a, b) => a + parseInt(b || '0'), 0);
     const countries = ['United States', 'Germany', 'Finland', 'Singapore', 'United Kingdom', 'France', 'Japan', 'Canada', 'Netherlands'];
@@ -182,7 +218,7 @@ const calculateMedian = (values: number[]) => {
   return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 };
 
-// --- COMPONENTS ---
+// --- VISUAL COMPONENTS ---
 
 const RadialProgress = ({ score, size = 160, stroke = 12 }: { score: number, size?: number, stroke?: number }) => {
     const radius = (size - stroke) / 2;
@@ -213,18 +249,6 @@ const LiveWireLoader = () => (
   <div className="w-full h-1 relative overflow-hidden bg-zinc-900 border-b border-zinc-800">
     <div className="absolute inset-0 bg-blue-500/20 blur-[2px]"></div>
     <div className="absolute h-full w-1/3 bg-gradient-to-r from-transparent via-blue-400 to-transparent animate-shimmer" style={{ animationDuration: '1.5s' }}></div>
-  </div>
-);
-
-const FavoritesEmptyState = () => (
-  <div className="mb-10 p-8 rounded-2xl border border-zinc-800 border-dashed bg-zinc-900/20 flex flex-col items-center justify-center text-center animate-in fade-in slide-in-from-top-4">
-      <div className="p-3 bg-zinc-900 rounded-full mb-3">
-          <Star size={24} className="text-zinc-600" />
-      </div>
-      <h3 className="text-sm font-bold text-zinc-400 mb-1">No Watchlist Nodes</h3>
-      <p className="text-xs text-zinc-600 max-w-xs">
-          Pin nodes by clicking the <Star size={10} className="inline text-zinc-500" /> icon on any card to track them here.
-      </p>
   </div>
 );
 
@@ -281,7 +305,7 @@ export default function Home() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const [compareTarget, setCompareTarget] = useState<Node | null>(null);
-  const [compareSearch, setCompareSearch] = useState(''); // NEW SEARCH STATE
+  const [compareSearch, setCompareSearch] = useState(''); 
   const [shareMode, setShareMode] = useState(false);
   const [modalView, setModalView] = useState<'overview' | 'health' | 'storage' | 'identity'>('overview'); 
   
@@ -428,6 +452,7 @@ export default function Home() {
   };
 
   const fetchData = async () => {
+    setLoading(true);
     try {
       const [statsRes, creditsRes] = await Promise.all([
         axios.get(`/api/stats?t=${Date.now()}`),
@@ -498,7 +523,7 @@ export default function Home() {
             let consensusCount = 0;
 
             mergedList.forEach(n => {
-                const stats = calculateVitalityMetrics(n, topVersion, medianCredits); // Fixed typo: medCreds -> medianCredits
+                const stats = calculateVitalityMetrics(n, topVersion, medianCredits);
                 sumHealth += stats.total;
                 sumUptime += stats.breakdown.uptime;
                 sumCap += stats.breakdown.capacity;
@@ -506,8 +531,6 @@ export default function Home() {
                 sumVer += stats.breakdown.version;
                 if (getSafeVersion(n) === topVersion) consensusCount++;
             });
-
-            const medCreds = medianCredits; // Handled by state
 
             setAvgNetworkHealth(Math.round(sumHealth / mergedList.length));
             setNetworkConsensus((consensusCount / mergedList.length) * 100);
@@ -529,14 +552,16 @@ export default function Home() {
     }
   };
 
-  // Filter Logic
+  // Filter Logic - UPDATED TO INCLUDE MOCK COUNTRY FOR MAIN LIST & VERSION
   const filteredNodes = nodes
     .filter(node => {
       const q = searchQuery.toLowerCase();
       const addr = getSafeIp(node).toLowerCase();
       const pub = (node.pubkey || '').toLowerCase();
       const ver = (node.version || '').toLowerCase();
-      return (addr.includes(q) || pub.includes(q) || ver.includes(q));
+      const country = getCountryName(getSafeIp(node)).toLowerCase(); // Mock lookup for list filtering
+
+      return (addr.includes(q) || pub.includes(q) || ver.includes(q) || country.includes(q));
     })
     .sort((a, b) => {
       let valA: any, valB: any;
@@ -712,7 +737,7 @@ export default function Home() {
       );
   };
 
-  // --- 3. IDENTITY EXPANSION (NEW) ---
+  // --- 3. IDENTITY EXPANSION ---
   const renderIdentityDetails = () => {
       const details = [
           { label: 'Public Key', val: selectedNode?.pubkey || 'Unknown' },
@@ -764,12 +789,11 @@ export default function Home() {
       );
   };
 
-  // --- 4. SYSTEM DIAGNOSTICS (RENAMED & REORDERED) ---
+  // --- 4. SYSTEM DIAGNOSTICS ---
   const renderHealthBreakdown = () => {
       const stats = calculateVitalityMetrics(selectedNode, mostCommonVersion, medianCredits);
       const healthPercentile = Math.round((stats.total / 100) * 100); 
       
-      // REORDERED METRICS: Capacity -> Reputation -> Uptime -> Version
       const metrics = [
           { label: 'Storage Capacity', val: stats.breakdown.capacity, avg: globalHealthBreakdown.capacity },
           { label: 'Reputation Score', val: stats.breakdown.reputation, avg: globalHealthBreakdown.reputation },
@@ -819,7 +843,6 @@ export default function Home() {
 
                               <div className="h-2 bg-zinc-800 rounded-full overflow-hidden relative">
                                   <div className={`h-full transition-all duration-1000 ${barColor}`} style={{ width: `${m.val}%` }}></div>
-                                  {/* Network Avg Marker */}
                                   <div className="absolute top-0 bottom-0 w-0.5 bg-white/50 z-10" style={{ left: `${m.avg}%` }} title={`Network Avg: ${m.avg}`}></div>
                               </div>
                           </div>
@@ -852,7 +875,6 @@ export default function Home() {
 
       return (
           <div className="animate-in fade-in slide-in-from-right-2 duration-200 h-full flex flex-col">
-              {/* Header */}
               <div className="flex justify-between items-center mb-4">
                   <h3 className={`text-xs font-bold tracking-widest uppercase flex items-center gap-2 ${zenMode ? 'text-zinc-200' : 'text-zinc-500'}`}>
                       <Database size={14} /> STORAGE ANALYTICS
@@ -863,7 +885,6 @@ export default function Home() {
               </div>
               
               <div className="flex-grow flex flex-col gap-4">
-                  {/* Insight Text */}
                   <div className={`p-4 rounded-2xl border text-center ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
                       <div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">NETWORK COMPARISON</div>
                       <div className="text-sm text-zinc-300">
@@ -871,20 +892,15 @@ export default function Home() {
                       </div>
                   </div>
 
-                  {/* THE GLASS TANK */}
                   <div className="flex-grow relative rounded-2xl border border-zinc-800 bg-black/50 overflow-hidden flex items-end justify-center group min-h-[160px]">
-                      {/* Glass Reflection */}
                       <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none z-20"></div>
                       
-                      {/* Fluid Body */}
                       <div 
                         className={`w-full transition-all duration-1000 relative z-10 ${isPos ? 'bg-purple-600/30' : 'bg-purple-900/20'}`} 
                         style={{ height: `${tankFill}%` }}
                       >
-                          {/* Liquid Surface Line */}
                           <div className={`absolute top-0 left-0 right-0 h-0.5 ${isPos ? 'bg-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.8)]' : 'bg-red-500/50'}`}></div>
                           
-                          {/* Overflow Animation (Green Rain) if Positive */}
                           {isPos && (
                               <div className="absolute inset-0 overflow-hidden opacity-50">
                                   <div className="absolute -top-10 left-1/4 w-0.5 h-full bg-green-400/40 animate-[rain_2s_infinite]"></div>
@@ -894,14 +910,12 @@ export default function Home() {
                           )}
                       </div>
 
-                      {/* Deficit Marker (Red Zone) if Negative */}
                       {!isPos && (
                           <div className="absolute top-0 left-0 right-0 bg-red-900/10 border-b border-red-500/30 pattern-diagonal-lines" style={{ height: `${100 - tankFill}%` }}>
                               <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-red-500 uppercase tracking-widest opacity-50">Deficit Gap</div>
                           </div>
                       )}
                       
-                      {/* Level Markers */}
                       <div className="absolute right-2 top-0 bottom-0 flex flex-col justify-between py-4 text-[9px] text-zinc-600 font-mono z-20 pointer-events-none">
                           <span>100%</span>
                           <span>50%</span>
@@ -909,23 +923,19 @@ export default function Home() {
                       </div>
                   </div>
 
-                  {/* COMPARISON BAR (The Gap) */}
                   <div className={`p-4 rounded-2xl border ${zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/30 border-zinc-800'}`}>
                       <div className="flex justify-between text-[10px] uppercase font-bold text-zinc-500 mb-2">
                           <span>Your Capacity</span>
                           <span className={isPos ? 'text-green-500' : 'text-red-500'}>{isPos ? 'ABOVE MAJORITY' : 'BELOW MAJORITY'}</span>
                       </div>
                       
-                      {/* Bar Container */}
                       <div className="h-3 w-full bg-zinc-900 rounded-full relative overflow-hidden">
-                          {/* Case A: Surplus (Bar + Green Extension) */}
                           {isPos ? (
                               <>
                                   <div className="absolute top-0 bottom-0 left-0 bg-purple-600 w-3/4"></div> 
                                   <div className="absolute top-0 bottom-0 left-3/4 bg-green-500/20 border-l border-green-500 w-1/4"></div> 
                               </>
                           ) : (
-                          /* Case B: Deficit (Bar + Red Ghost) */
                               <>
                                   <div className="absolute top-0 bottom-0 left-0 bg-purple-600" style={{ width: `${tankFill}%` }}></div>
                                   <div className="absolute top-0 bottom-0 right-0 bg-red-500/10 border-l border-red-500/50" style={{ width: `${100 - tankFill}%` }}></div>
@@ -987,7 +997,7 @@ export default function Home() {
                   <Search className={`absolute left-3 top-2.5 size-4 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
                   <input 
                       type="text" 
-                      placeholder="Search IP / PubKey..." 
+                      placeholder="Search IP, PubKey, Version, or Country..." // Updated Placeholder
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className={`w-full rounded-lg py-2 pl-10 pr-4 text-sm outline-none shadow-inner transition-all ${zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-300 focus:border-zinc-600' : 'bg-zinc-900 border border-zinc-800 text-white focus:border-blue-500'}`}
@@ -1014,8 +1024,19 @@ export default function Home() {
           </div>
 
           <div className="flex items-center justify-between gap-4 overflow-x-auto pb-2 scrollbar-hide w-full mt-6 border-t border-zinc-800/50 pt-4">
-              <button onClick={fetchData} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition font-bold text-xs ${zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800'}`}>
-                  <Zap size={16} className={loading ? "animate-spin" : ""} /> REFRESH
+              <button 
+                onClick={fetchData} 
+                disabled={loading}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition font-bold text-xs ${
+                    loading 
+                    ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait' 
+                    : zenMode 
+                        ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' 
+                        : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800'
+                }`}
+              >
+                  <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> 
+                  {loading ? 'SYNCING...' : 'REFRESH'}
               </button>
               
               <div className="flex gap-2">
@@ -1043,11 +1064,7 @@ export default function Home() {
                     <div className="text-2xl md:text-3xl font-bold text-white mt-1">{formatBytes(totalStorageCommitted)}</div>
                 </div>
                 
-                {/* RESTORED ECG PULSE CARD */}
-                <div 
-                    className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer active:scale-95 transition-transform"
-                    onClick={() => {/* Bounce effect trigger */}}
-                >
+                <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer active:scale-95 transition-transform">
                     <div className="absolute inset-0 opacity-20 pointer-events-none">
                         <div className="ekg-line"></div>
                     </div>
@@ -1134,10 +1151,9 @@ export default function Home() {
                           </div>
                       </div>
                       <div className="flex flex-col items-end gap-2">
-                        <div className="flex items-center gap-1.5 bg-zinc-900 px-3 py-1 rounded-full border border-zinc-800">
-                           <Globe size={12} className="text-blue-500" />
-                           <span className="text-xs font-bold text-zinc-300">{getCountryName(getSafeIp(selectedNode))}</span>
-                        </div>
+                        {/* REPLACED WITH NEW LOCATION COMPONENT (REAL GEOIP) */}
+                        <ModalHeaderLocation ip={getSafeIp(selectedNode)} />
+                        
                         <button onClick={closeModal} className="p-2 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition group"><X size={20} className="group-hover:scale-110 transition-transform"/></button>
                       </div>
                   </div>
@@ -1146,44 +1162,110 @@ export default function Home() {
                   <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
                       
                       {compareMode ? (
+                          /* --- UPDATED COMPARE MODE --- */
                           <div className="animate-in fade-in slide-in-from-right-4 duration-300 h-full flex flex-col">
-                              <div className="flex justify-between items-center mb-6 border-b border-white/5 pb-4"><button onClick={() => setCompareMode(false)} className="text-xs font-bold text-zinc-500 hover:text-white flex items-center gap-1 transition"><ArrowLeftRight size={14}/> BACK TO DETAILS</button><h3 className="text-lg font-bold text-white flex items-center gap-2"><Swords className="text-red-500" /> VERSUS MODE</h3></div>
+                              {/* Header */}
+                              <div className="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
+                                  <button onClick={() => setCompareMode(false)} className="text-xs font-bold text-zinc-500 hover:text-white flex items-center gap-1 transition">
+                                      <ArrowLeftRight size={14}/> BACK TO DETAILS
+                                  </button>
+                                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                      <Swords className="text-red-500" /> VERSUS MODE
+                                  </h3>
+                              </div>
                               
-                              {/* Search & Selector */}
-                              <div className="grid grid-cols-2 gap-4 mb-6">
-                                  <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl text-center"><div className="text-xs text-blue-400 font-bold mb-1">CHAMPION</div><div className="font-mono text-sm text-white truncate">{getSafeIp(selectedNode)}</div></div>
+                              {/* Comparison Grid */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full min-h-0">
                                   
-                                  <div className="relative h-full">
-                                      <div className="absolute inset-0 bg-zinc-900 border border-zinc-800 border-dashed rounded-xl flex flex-col p-2 group-hover:border-zinc-600 transition">
-                                          <div className="flex items-center gap-2 px-2 pb-2 border-b border-zinc-800/50 mb-1">
-                                              <Search size={12} className="text-zinc-500"/>
+                                  {/* LEFT: Champion (Selected Node) */}
+                                  <div className="flex flex-col gap-4">
+                                       <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl text-center">
+                                          <div className="text-xs text-blue-400 font-bold mb-1">CHAMPION</div>
+                                          <div className="font-mono text-sm text-white truncate">{getSafeIp(selectedNode)}</div>
+                                          <div className="text-[10px] text-zinc-500">{selectedNode.pubkey?.slice(0,12)}...</div>
+                                      </div>
+
+                                      {/* Stats Panel (Only shows if target selected) */}
+                                      {compareTarget ? (
+                                         <div className="space-y-1 bg-black/20 p-4 rounded-2xl border border-zinc-800 flex-grow">
+                                            {renderComparisonRow('Health Score', getHealthScore(selectedNode, mostCommonVersion, medianCredits), getHealthScore(compareTarget, mostCommonVersion, medianCredits), (v)=>v.toString(), 'HIGH')}
+                                            {renderComparisonRow('Storage', selectedNode.storage_committed, compareTarget.storage_committed, formatBytes, 'HIGH')}
+                                            {renderComparisonRow('Credits', selectedNode.credits || 0, compareTarget.credits || 0, (v)=>v.toLocaleString(), 'HIGH')}
+                                            {renderComparisonRow('Uptime', selectedNode.uptime, compareTarget.uptime, formatUptime, 'HIGH')}
+                                            {renderComparisonRow('Rank', selectedNode.rank || 9999, compareTarget.rank || 9999, (v)=>`#${v}`, 'LOW')}
+                                         </div>
+                                      ) : (
+                                          <div className="flex-grow flex items-center justify-center text-zinc-600 text-xs italic border border-dashed border-zinc-800 rounded-xl">
+                                              Select an opponent to begin analysis
+                                          </div>
+                                      )}
+                                  </div>
+                                  
+                                  {/* RIGHT: Opponent Selector (Search + List) */}
+                                  <div className="flex flex-col h-full min-h-0 bg-zinc-900/30 border border-zinc-800 rounded-xl overflow-hidden">
+                                      {/* Search Input */}
+                                      <div className="p-3 border-b border-zinc-800 bg-zinc-900/50">
+                                          <div className="flex items-center gap-2 bg-black/50 border border-zinc-800 rounded-lg px-3 py-2">
+                                              <Search size={14} className="text-zinc-500"/>
                                               <input 
                                                   type="text" 
-                                                  placeholder="Search PubKey or Country..." 
+                                                  placeholder="Search IP, Key, or Country..." 
                                                   className="bg-transparent text-xs text-white outline-none w-full placeholder:text-zinc-600"
                                                   value={compareSearch}
                                                   onChange={(e) => setCompareSearch(e.target.value)}
                                               />
+                                              {compareSearch && (
+                                                <button onClick={() => setCompareSearch('')}><X size={12} className="text-zinc-500 hover:text-white"/></button>
+                                              )}
                                           </div>
-                                          <div className="flex-1 overflow-y-auto custom-scrollbar">
-                                              {nodes
-                                                .filter(n => (n.pubkey || '').toLowerCase().includes(compareSearch.toLowerCase()) || getCountryName(getSafeIp(n)).toLowerCase().includes(compareSearch.toLowerCase()))
-                                                .map(n => (
-                                                  <div 
-                                                    key={n.pubkey} 
-                                                    onClick={() => setCompareTarget(n)}
-                                                    className={`text-[10px] p-1.5 rounded cursor-pointer truncate font-mono hover:bg-zinc-800 flex justify-between ${compareTarget?.pubkey === n.pubkey ? 'bg-blue-500/20 text-blue-400' : 'text-zinc-400'}`}
-                                                  >
-                                                      <span>{n.pubkey?.slice(0, 8)}...</span>
-                                                      <span className="text-zinc-600">{getCountryName(getSafeIp(n))}</span>
+                                      </div>
+
+                                      {/* Scrollable List */}
+                                      <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                                          {nodes
+                                            .filter(n => {
+                                                // Filter out the "Champion" node so you don't compare against self
+                                                if (n.pubkey === selectedNode.pubkey) return false;
+
+                                                const q = compareSearch.toLowerCase();
+                                                if (!q) return true; // SHOW ALL if search is empty
+                                                
+                                                // Search Logic
+                                                return (
+                                                    (n.pubkey || '').toLowerCase().includes(q) || 
+                                                    getSafeIp(n).toLowerCase().includes(q) ||
+                                                    getCountryName(getSafeIp(n)).toLowerCase().includes(q)
+                                                );
+                                            })
+                                            .map(n => (
+                                              <div 
+                                                key={n.pubkey} 
+                                                onClick={() => setCompareTarget(n)}
+                                                className={`p-3 rounded-lg cursor-pointer transition border flex justify-between items-center group
+                                                    ${compareTarget?.pubkey === n.pubkey 
+                                                        ? 'bg-red-500/10 border-red-500/30' 
+                                                        : 'bg-transparent border-transparent hover:bg-zinc-800 hover:border-zinc-700'
+                                                    }`}
+                                              >
+                                                  <div>
+                                                      <div className={`font-mono text-xs ${compareTarget?.pubkey === n.pubkey ? 'text-red-400' : 'text-zinc-300'}`}>
+                                                          {getSafeIp(n)}
+                                                      </div>
+                                                      <div className="text-[10px] text-zinc-500 flex gap-2">
+                                                          <span>{n.pubkey?.slice(0, 8)}...</span>
+                                                          <span className="text-zinc-600">| {getCountryName(getSafeIp(n))}</span>
+                                                      </div>
                                                   </div>
-                                              ))}
-                                          </div>
+                                                  {compareTarget?.pubkey === n.pubkey && <Swords size={14} className="text-red-500" />}
+                                              </div>
+                                          ))}
+                                          
+                                          {nodes.length > 0 && nodes.filter(n => n.pubkey !== selectedNode.pubkey).length === 0 && (
+                                              <div className="p-4 text-center text-zinc-500 text-xs">No other nodes available to compare.</div>
+                                          )}
                                       </div>
                                   </div>
                               </div>
-
-                              {compareTarget && (<div className="space-y-1 bg-black/20 p-6 rounded-2xl border border-zinc-800">{renderComparisonRow('Health Score', getHealthScore(selectedNode, mostCommonVersion, medianCredits), getHealthScore(compareTarget, mostCommonVersion, medianCredits), (v)=>v.toString(), 'HIGH')}{renderComparisonRow('Storage', selectedNode.storage_committed, compareTarget.storage_committed, formatBytes, 'HIGH')}{renderComparisonRow('Credits', selectedNode.credits || 0, compareTarget.credits || 0, (v)=>v.toLocaleString(), 'HIGH')}{renderComparisonRow('Uptime', selectedNode.uptime, compareTarget.uptime, formatUptime, 'HIGH')}{renderComparisonRow('Rank', selectedNode.rank || 9999, compareTarget.rank || 9999, (v)=>`#${v}`, 'LOW')}</div>)}
                           </div>
                       ) : shareMode ? (
                           /* VIEW 2: SHARE CARD MODE */
