@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { 
   Search, Download, Server, Activity, Database, X, Shield, Clock, Zap, Trophy, 
   HardDrive, Star, Copy, Check, CheckCircle, Globe, AlertTriangle, ArrowUp, 
-  ArrowDown, Wallet, Medal, Code, Info, ExternalLink, HelpCircle, 
+  ArrowDown, Wallet, Medal, Twitter, Code, Info, ExternalLink, HelpCircle, 
   ChevronRight, Maximize2, Map as MapIcon, BookOpen, Menu, LayoutDashboard, 
   HeartPulse, Swords, Share2, Monitor, ArrowLeftRight, Camera, BarChart2, 
   ChevronLeft, FileJson, ClipboardCopy, RefreshCw 
@@ -46,6 +46,10 @@ const formatBytes = (bytes: number | undefined) => {
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+const formatRawBytes = (bytes: number | undefined) => {
+  return bytes ? bytes.toLocaleString() : '0';
 };
 
 const formatUptime = (seconds: number | undefined) => {
@@ -98,7 +102,8 @@ const calculateVitalityMetrics = (node: Node | null, consensusVersion: string, m
   if (!node) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, capacity: 0 } };
 
   const storageGB = (node.storage_committed || 0) / (1024 ** 3);
-  
+  if (storageGB <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, capacity: 0 } };
+
   // 1. Tiered Uptime Scoring
   let uptimeScore = 0;
   const days = (node.uptime || 0) / 86400;
@@ -109,7 +114,7 @@ const calculateVitalityMetrics = (node: Node | null, consensusVersion: string, m
 
   // 2. Version Consensus Scoring
   let versionScore = 100;
-  const nodeVer = getSafeVersion(node);
+  const nodeVer = node.version || '0.0.0';
   if (consensusVersion !== 'N/A' && compareVersions(nodeVer, consensusVersion) < 0) {
       const parts1 = nodeVer.split('.').map(Number);
       const parts2 = consensusVersion.split('.').map(Number);
@@ -120,24 +125,33 @@ const calculateVitalityMetrics = (node: Node | null, consensusVersion: string, m
       else versionScore = 80; 
   }
 
-  // 3. Reputation Scoring
+  // 3. Reputation Scoring (Relative to Median)
   let reputationScore = 50; 
   const credits = node.credits || 0;
   if (medianCredits > 0 && credits > 0) {
       const ratio = credits / medianCredits;
-      // Cap at 100, scale nicely
-      reputationScore = Math.min(100, 50 + (ratio * 25));
+      if (ratio >= 2) reputationScore = 100;
+      else if (ratio >= 1) reputationScore = 75 + (ratio - 1) * 25;
+      else if (ratio >= 0.5) reputationScore = 50 + (ratio - 0.5) * 50;
+      else if (ratio >= 0.1) reputationScore = 25 + (ratio - 0.1) * 62.5;
+      else reputationScore = ratio * 250;
   } else if (credits === 0) {
       reputationScore = 0; 
+  } else if (medianCredits === 0 && credits > 0) {
+      reputationScore = 100; 
   }
 
   // 4. Capacity Scoring
-  let capacityScore = Math.min(100, (storageGB / 1000) * 100); 
+  let capacityScore = 0;
+  if (storageGB >= 1000) capacityScore = 100; 
+  else if (storageGB >= 100) capacityScore = 70 + (storageGB - 100) * (30 / 900);
+  else if (storageGB >= 10) capacityScore = 40 + (storageGB - 10) * (30 / 90);
+  else capacityScore = storageGB * 4;
 
-  const total = Math.round((uptimeScore * 0.3) + (versionScore * 0.2) + (reputationScore * 0.25) + (capacityScore * 0.25));
+  const finalScore = (uptimeScore * 0.30) + (versionScore * 0.20) + (reputationScore * 0.25) + (capacityScore * 0.25);
   
   return {
-      total: Math.max(0, Math.min(100, total)),
+      total: Math.round(Math.max(0, Math.min(100, finalScore))),
       breakdown: {
           uptime: Math.round(uptimeScore),
           version: Math.round(versionScore),
@@ -181,6 +195,7 @@ const RadialProgress = ({ score, size = 160, stroke = 12 }: { score: number, siz
                 <span className="text-4xl font-extrabold text-white tracking-tighter">{score}</span>
                 <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mt-1">Health</span>
             </div>
+            <div className="absolute inset-0 rounded-full border-4 border-white/5 opacity-0 group-hover:opacity-100 transition-opacity animate-ping pointer-events-none"></div>
         </div>
     );
 };
@@ -1147,7 +1162,7 @@ export default function Home() {
                                           {/* LOCATION CARD (Interactive) */}
                                           <Link href={`/map?focus=${getSafeIp(selectedNode)}`}>
                                               <div className={`h-full p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'}`}>
-                                                  <div className="absolute top-0 right-0 p-12 bg-blue-500/5 blur-2xl rounded-full group-hover:bg-blue-500/10 transition"></div>
+                                                  <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition"></div>
                                                   
                                                   <div className="flex justify-between items-start mb-2 relative z-10">
                                                       <div className="flex items-center gap-2">
@@ -1189,7 +1204,7 @@ export default function Home() {
                       )}
                   </div>
 
-                  {/* MODAL FOOTER - Updated Layout */}
+                  {/* MODAL FOOTER (ACTION BAR) */}
                   <div className={`p-6 border-t flex flex-col gap-4 ${zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/30 border-zinc-800'}`}>
                       {!compareMode && !shareMode && (
                           <>
