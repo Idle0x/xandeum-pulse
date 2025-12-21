@@ -185,7 +185,10 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   // 4. Enrich & Merge
   const enrichedNodes: EnrichedNode[] = rawPods.map((pod: any) => {
     const ip = pod.address.split(':')[0];
-    const loc = geoCache.get(ip) || { lat: 0, lon: 0, countryName: 'Unknown', countryCode: 'XX', city: 'Unknown' };
+    
+    // *** FIX: Updated fallback object keys to match cache structure (country vs countryName) ***
+    const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
+    
     const credits = creditsMap.get(pod.pubkey) || 0;
     const health = calculateVitalityScore(pod, consensusVersion, medianCredits, credits);
 
@@ -196,7 +199,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       location: {
         lat: loc.lat,
         lon: loc.lon,
-        countryName: loc.country,
+        countryName: loc.country, // Now 'loc.country' is guaranteed to exist
         countryCode: loc.countryCode,
         city: loc.city
       }
