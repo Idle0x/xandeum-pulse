@@ -21,9 +21,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         existing.totalStorage += storageGB;
         existing.totalCredits += node.credits;
         existing.healthSum += node.health;
+        // --- NEW: Aggregating Real Health Metrics ---
+        existing.totalUptime += (node.uptime || 0);
+        if (node.is_public) existing.publicCount++;
+        // --------------------------------------------
         existing.ips.push(node.address.split(':')[0]);
-        if (node.health >= 75) existing.stableCount++;
-        if (node.health < 50) existing.criticalCount++;
 
         // Track "King" nodes
         if (storageGB > existing.bestNodes.storageVal) {
@@ -43,14 +45,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         cityMap.set(key, {
           name: city,
           country: countryName,
-          countryCode: countryCode, // <--- ADDED THIS
+          countryCode: countryCode,
           lat, lon,
           count: 1,
           totalStorage: storageGB,
           totalCredits: node.credits,
           healthSum: node.health,
-          stableCount: node.health >= 75 ? 1 : 0,
-          criticalCount: node.health < 50 ? 1 : 0,
+          // --- NEW: Init Metrics ---
+          totalUptime: node.uptime || 0,
+          publicCount: node.is_public ? 1 : 0,
+          // -------------------------
           ips: [node.address.split(':')[0]],
           
           bestNodes: {
@@ -65,6 +69,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const locations = Array.from(cityMap.values()).map(l => ({
       ...l,
       avgHealth: Math.round(l.healthSum / l.count),
+      // --- NEW: Calculate Averages ---
+      avgUptime: l.totalUptime / l.count,
+      publicRatio: (l.publicCount / l.count) * 100,
+      // -------------------------------
       topPks: {
           STORAGE: l.bestNodes.storagePk,
           CREDITS: l.bestNodes.creditsPk,
