@@ -64,6 +64,16 @@ const getSafeVersion = (node: Node | null) => {
     return node.version;
 };
 
+const getCountryFromIp = (ip: string) => {
+    // Mock mapping for demo purposes. In production, use a GeoIP library or API.
+    const lastOctet = parseInt(ip.split('.').pop() || '0');
+    if (lastOctet < 50) return 'United States';
+    if (lastOctet < 100) return 'Germany';
+    if (lastOctet < 150) return 'Singapore';
+    if (lastOctet < 200) return 'Finland';
+    return 'United Kingdom';
+};
+
 const formatBytes = (bytes: number | undefined) => {
   if (!bytes || bytes === 0 || isNaN(bytes)) return '0.00 B';
   const k = 1024;
@@ -276,6 +286,7 @@ export default function Home() {
   const [compareTarget, setCompareTarget] = useState<Node | null>(null);
   const [shareMode, setShareMode] = useState(false);
   const [modalView, setModalView] = useState<'overview' | 'health' | 'storage' | 'identity'>('overview'); 
+  const [compareSearch, setCompareSearch] = useState(''); // NEW: Search state for comparison list
   
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null); 
@@ -490,7 +501,7 @@ export default function Home() {
             let consensusCount = 0;
 
             mergedList.forEach(n => {
-                const stats = calculateVitalityMetrics(n, topVersion, medianCredits); // Fixed typo: medCreds -> medianCredits
+                const stats = calculateVitalityMetrics(n, topVersion, medianCredits);
                 sumHealth += stats.total;
                 sumUptime += stats.breakdown.uptime;
                 sumCap += stats.breakdown.capacity;
@@ -498,8 +509,6 @@ export default function Home() {
                 sumVer += stats.breakdown.version;
                 if (getSafeVersion(n) === topVersion) consensusCount++;
             });
-
-            const medCreds = medianCredits; // Handled by state
 
             setAvgNetworkHealth(Math.round(sumHealth / mergedList.length));
             setNetworkConsensus((consensusCount / mergedList.length) * 100);
@@ -939,7 +948,7 @@ export default function Home() {
       
       {loading && <div className="fixed top-0 left-0 right-0 z-50"><LiveWireLoader /></div>}
 
-      {/* --- SIDE NAVIGATION (DRAWER) --- */}
+      {/* --- SIDE NAVIGATION --- */}
       <div className={`fixed inset-y-0 left-0 w-72 bg-[#09090b] border-r border-zinc-800 z-50 transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 flex flex-col h-full">
             <div className="flex justify-between items-center mb-8">
@@ -967,9 +976,7 @@ export default function Home() {
       {/* --- HEADER --- */}
       <header className={`sticky top-0 z-40 backdrop-blur-md border-b px-6 py-4 flex flex-col gap-6 ${zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'}`}>
           
-          {/* ROW 1: Logo - Search - Toggle */}
           <div className="flex justify-between items-center w-full">
-              {/* LEFT */}
               <div className="flex items-center gap-4">
                   <button onClick={() => setIsMenuOpen(true)} className={`p-3 rounded-xl transition ${zenMode ? 'text-zinc-400 border border-zinc-800' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white'}`}><Menu size={24}/></button>
                   <div className="hidden md:flex flex-col">
@@ -977,7 +984,6 @@ export default function Home() {
                   </div>
               </div>
 
-              {/* CENTER SEARCH */}
               <div className="flex-1 max-w-md mx-4 relative">
                   <Search className={`absolute left-3 top-2.5 size-4 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
                   <input 
@@ -999,7 +1005,6 @@ export default function Home() {
                   )}
               </div>
 
-              {/* RIGHT */}
               <button 
                   onClick={() => setZenMode(!zenMode)} 
                   className={`p-2 rounded-lg transition flex items-center gap-2 group ${zenMode ? 'bg-zinc-800 border border-zinc-700 text-zinc-400' : 'bg-red-900/10 border border-red-500/20 text-red-500 hover:bg-red-900/30'}`}
@@ -1009,7 +1014,6 @@ export default function Home() {
               </button>
           </div>
 
-          {/* ROW 2: Refresh & Filters (Scrollable on Mobile) - MOVED DOWN & JUSTIFIED */}
           <div className="flex items-center justify-between gap-4 overflow-x-auto pb-2 scrollbar-hide w-full mt-6 border-t border-zinc-800/50 pt-4">
               <button onClick={fetchData} className={`flex items-center gap-2 px-4 py-2 rounded-lg transition font-bold text-xs ${zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800'}`}>
                   <Zap size={16} className={loading ? "animate-spin" : ""} /> REFRESH
@@ -1143,7 +1147,7 @@ export default function Home() {
                               {compareTarget && (<div className="space-y-1 bg-black/20 p-6 rounded-2xl border border-zinc-800">{renderComparisonRow('Health Score', getHealthScore(selectedNode, mostCommonVersion, medianCredits), getHealthScore(compareTarget, mostCommonVersion, medianCredits), (v)=>v.toString(), 'HIGH')}{renderComparisonRow('Storage', selectedNode.storage_committed, compareTarget.storage_committed, formatBytes, 'HIGH')}{renderComparisonRow('Credits', selectedNode.credits || 0, compareTarget.credits || 0, (v)=>v.toLocaleString(), 'HIGH')}{renderComparisonRow('Uptime', selectedNode.uptime, compareTarget.uptime, formatUptime, 'HIGH')}{renderComparisonRow('Rank', selectedNode.rank || 9999, compareTarget.rank || 9999, (v)=>`#${v}`, 'LOW')}</div>)}
                           </div>
                       ) : shareMode ? (
-                          /* VIEW 2: SHARE CARD MODE */
+                          // ... (Proof of Pulse)
                           <div className="flex flex-col items-center justify-center h-full animate-in zoom-in-95 duration-300 py-10">
                               <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl shadow-2xl max-w-sm w-full relative overflow-hidden group">
                                   <div className="absolute top-0 right-0 p-32 bg-blue-500/10 blur-[80px] rounded-full pointer-events-none group-hover:bg-blue-500/20 transition duration-1000"></div>
@@ -1158,6 +1162,7 @@ export default function Home() {
                                           <div className="bg-zinc-900/80 p-4 rounded-xl border border-zinc-800"><div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">Version</div><div className="text-lg font-mono text-white">{getSafeVersion(selectedNode)}</div></div>
                                       </div>
                                       <div className="text-[10px] text-zinc-600 font-mono flex items-center justify-center gap-2 mb-6"><Server size={10} /> VERIFIED BY XANDEUM PULSE</div>
+                                      
                                       <div className="grid grid-cols-3 gap-2 border-t border-zinc-800 pt-4">
                                         <button onClick={() => copyStatusReport(selectedNode)} className="flex flex-col items-center gap-1 text-[9px] text-zinc-500 hover:text-white"><ClipboardCopy size={14}/><span>Copy Report</span></button>
                                         <button onClick={() => shareToTwitter(selectedNode)} className="flex flex-col items-center gap-1 text-[9px] text-zinc-500 hover:text-white"><Share2 size={14}/><span>Share X</span></button>
@@ -1169,7 +1174,9 @@ export default function Home() {
                           </div>
                       ) : (
                           /* VIEW 3: STANDARD DASHBOARD (Expanded) */
-                          <div className="flex flex-col gap-4 h-full">
+                          <div className="flex flex-col gap-4 h-full"> 
+                              
+                              {/* --- EXPANDED MODE (MASTER-DETAIL) --- */}
                               {modalView !== 'overview' ? (
                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
                                       {/* ACTIVE CARD (Left Column) */}
@@ -1272,7 +1279,7 @@ export default function Home() {
                   </div>
                   
                   <div className={`p-6 border-t flex flex-col gap-4 ${zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/30 border-zinc-800'}`}>
-                      {!compareMode && !shareMode && (<><div className="flex justify-center -mt-2"><div className="text-[10px] text-zinc-500 flex items-center gap-1.5 bg-black/40 px-3 py-1 rounded-full border border-zinc-800/50"><Clock size={10} /> Last Seen: <span className="text-zinc-300 font-mono">{timeAgo}</span> <span className="text-zinc-600">({formatDetailedTimestamp(selectedNode.last_seen_timestamp)})</span></div></div><div className="grid grid-cols-3 gap-3"><button onClick={() => copyStatusReport(selectedNode)} className="flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition text-xs font-bold" title="Copy Report">{copiedField === 'report' ? <Check size={14} className="text-green-500"/> : <ClipboardCopy size={14} />} REPORT</button><button onClick={() => shareToTwitter(selectedNode)} className="flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition text-xs font-bold" title="Share on X"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M4 4l11.733 16h4.267l-11.733 -16z" /><path d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772" /></svg> SHARE ON X</button><button onClick={() => copyRawJson(selectedNode)} className="flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-zinc-400 hover:text-white transition text-xs font-bold" title="Copy JSON">{copiedField === 'json' ? <Check size={14} className="text-green-500"/> : <FileJson size={14} />} DIAGNOSTICS</button></div><div className="flex gap-4 mt-1"><button onClick={() => setCompareMode(true)} className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] border border-zinc-700"><Swords size={16} className="text-red-400" /> COMPARE NODES</button><button onClick={() => setShareMode(true)} className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] shadow-lg shadow-blue-900/20"><Camera size={16} /> PROOF OF PULSE</button></div></>)}
+                      {!compareMode && !shareMode && (<><div className="flex justify-center -mt-2"><div className="text-[10px] text-zinc-500 flex items-center gap-1.5 bg-black/40 px-3 py-1 rounded-full border border-zinc-800/50"><Clock size={10} /> Last Seen: <span className="text-zinc-300 font-mono">{timeAgo}</span> <span className="text-zinc-600">({formatDetailedTimestamp(selectedNode.last_seen_timestamp)})</span></div></div><div className="flex gap-4 mt-1"><button onClick={() => setCompareMode(true)} className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] border border-zinc-700"><Swords size={16} className="text-red-400" /> COMPARE NODES</button><button onClick={() => setShareMode(true)} className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] shadow-lg shadow-blue-900/20"><Camera size={16} /> PROOF OF PULSE</button></div></>)}
                   </div>
               </div>
           </div>
