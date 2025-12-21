@@ -9,7 +9,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const cityMap = new Map<string, any>();
 
     nodes.forEach(node => {
-      const { city, countryName, lat, lon } = node.location;
+      const { city, countryName, countryCode, lat, lon } = node.location;
       if (lat === 0 && lon === 0) return; // Skip private IPs
 
       const key = `${city}-${countryName}`;
@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (node.health >= 75) existing.stableCount++;
         if (node.health < 50) existing.criticalCount++;
 
-        // --- NEW: Track the "King" of this city for each metric ---
+        // Track "King" nodes
         if (storageGB > existing.bestNodes.storageVal) {
             existing.bestNodes.storageVal = storageGB;
             existing.bestNodes.storagePk = node.pubkey;
@@ -43,6 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         cityMap.set(key, {
           name: city,
           country: countryName,
+          countryCode: countryCode, // <--- ADDED THIS
           lat, lon,
           count: 1,
           totalStorage: storageGB,
@@ -52,7 +53,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           criticalCount: node.health < 50 ? 1 : 0,
           ips: [node.address.split(':')[0]],
           
-          // --- NEW: Initialize "King" tracking ---
           bestNodes: {
               storageVal: storageGB, storagePk: node.pubkey,
               creditsVal: node.credits, creditsPk: node.pubkey,
@@ -65,7 +65,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const locations = Array.from(cityMap.values()).map(l => ({
       ...l,
       avgHealth: Math.round(l.healthSum / l.count),
-      // Clean up the object we send to frontend
       topPks: {
           STORAGE: l.bestNodes.storagePk,
           CREDITS: l.bestNodes.creditsPk,
