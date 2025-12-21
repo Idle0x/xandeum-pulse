@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { 
   Search, Download, Server, Activity, Database, X, Shield, Clock, Zap, Trophy, 
   HardDrive, Star, Copy, Check, CheckCircle, Globe, AlertTriangle, ArrowUp, 
-  ArrowDown, Wallet, Medal, Twitter, Info, ExternalLink, HelpCircle, 
+  ArrowDown, Wallet, Medal, Twitter, Code, Info, ExternalLink, HelpCircle, 
   ChevronRight, Maximize2, Map as MapIcon, BookOpen, Menu, LayoutDashboard, 
   HeartPulse, Swords, Monitor, ArrowLeftRight, Camera, 
   ChevronLeft, FileJson, ClipboardCopy, RefreshCw 
@@ -26,7 +26,7 @@ interface Node {
   storage_usage_raw?: number; 
   rank?: number;
   credits?: number;
-  rpc_endpoint?: string;
+  rpc_endpoint?: string; 
 }
 
 // --- HOOKS ---
@@ -255,6 +255,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [error, setError] = useState('');
+  const [lastUpdated, setLastUpdated] = useState('');
   
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'health'>('uptime');
@@ -275,7 +276,6 @@ export default function Home() {
   const [compareMode, setCompareMode] = useState(false);
   const [compareTarget, setCompareTarget] = useState<Node | null>(null);
   const [shareMode, setShareMode] = useState(false);
-  
   // UPDATED: Modal View now supports 3 expanded states + overview
   const [modalView, setModalView] = useState<'overview' | 'health' | 'storage' | 'identity'>('overview'); 
   
@@ -298,7 +298,7 @@ export default function Home() {
   const [medianCommitted, setMedianCommitted] = useState(0);
   const [medianCredits, setMedianCredits] = useState(0);
 
-  // --- TIME AGO HOOK ---
+  // --- NEW: Time Ago Hook for Selected Node ---
   const timeAgo = useTimeAgo(selectedNode?.last_seen_timestamp);
 
   useEffect(() => {
@@ -355,8 +355,8 @@ export default function Home() {
       if (activeTooltip) setActiveTooltip(null);
   };
 
-  // UPDATED: Modal Interaction Handlers
   const handleCardToggle = (view: 'health' | 'storage' | 'identity') => {
+      // Logic: If clicking the same view, collapse to overview. If different, switch.
       if (modalView === view) {
           setModalView('overview');
       } else {
@@ -550,7 +550,6 @@ export default function Home() {
   
   const isLatest = (nodeVersion: string) => { return mostCommonVersion !== 'N/A' && compareVersions(nodeVersion, mostCommonVersion) >= 0; };
 
-  // Helper for Card Cycles (Standard Mode)
   const getCycleContent = (node: Node, index: number) => {
     const step = (cycleStep + index) % 4;
     // Storage First Logic
@@ -709,7 +708,7 @@ export default function Home() {
       );
   };
 
-  // --- 3. IDENTITY EXPANSION (NEW) ---
+  // --- 3. IDENTITY EXPANSION ---
   const renderIdentityDetails = () => {
       const details = [
           { label: 'Public Key', val: selectedNode?.pubkey || 'Unknown' },
@@ -761,12 +760,11 @@ export default function Home() {
       );
   };
 
-  // --- 4. SYSTEM DIAGNOSTICS (RENAMED & REORDERED) ---
+  // --- 4. SYSTEM DIAGNOSTICS ---
   const renderHealthBreakdown = () => {
       const stats = calculateVitalityMetrics(selectedNode, mostCommonVersion, medianCredits);
       const healthPercentile = Math.round((stats.total / 100) * 100); 
       
-      // REORDERED METRICS: Capacity -> Reputation -> Uptime -> Version
       const metrics = [
           { label: 'Storage Capacity', val: stats.breakdown.capacity, avg: globalHealthBreakdown.capacity },
           { label: 'Reputation Score', val: stats.breakdown.reputation, avg: globalHealthBreakdown.reputation },
@@ -787,7 +785,6 @@ export default function Home() {
               
               <div className="space-y-4 flex-grow">
                   {metrics.map((m) => {
-                      // ADAPTIVE COLOR LOGIC: Green/Blue if >= Avg, Orange/Red if < Avg
                       const isGood = m.val >= m.avg;
                       const barColor = isGood 
                           ? (zenMode ? 'bg-green-500' : 'bg-blue-500') 
@@ -842,7 +839,6 @@ export default function Home() {
       const isPos = diff >= 0;
       const percentDiff = Math.abs((diff / median) * 100);
       
-      // Tank Fill: If surplus, tank is "Full". If deficit, it fills relative to median.
       const tankFill = isPos ? 100 : Math.max(10, (nodeCap / median) * 100); 
 
       return (
@@ -904,23 +900,20 @@ export default function Home() {
                       </div>
                   </div>
 
-                  {/* COMPARISON BAR (The Gap) */}
+                  {/* COMPARISON BAR */}
                   <div className={`p-4 rounded-2xl border ${zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/30 border-zinc-800'}`}>
                       <div className="flex justify-between text-[10px] uppercase font-bold text-zinc-500 mb-2">
                           <span>Your Capacity</span>
                           <span className={isPos ? 'text-green-500' : 'text-red-500'}>{isPos ? 'ABOVE MAJORITY' : 'BELOW MAJORITY'}</span>
                       </div>
                       
-                      {/* Bar Container */}
                       <div className="h-3 w-full bg-zinc-900 rounded-full relative overflow-hidden">
-                          {/* Case A: Surplus (Bar + Green Extension) */}
                           {isPos ? (
                               <>
                                   <div className="absolute top-0 bottom-0 left-0 bg-purple-600 w-3/4"></div> 
                                   <div className="absolute top-0 bottom-0 left-3/4 bg-green-500/20 border-l border-green-500 w-1/4"></div> 
                               </>
                           ) : (
-                          /* Case B: Deficit (Bar + Red Ghost) */
                               <>
                                   <div className="absolute top-0 bottom-0 left-0 bg-purple-600" style={{ width: `${tankFill}%` }}></div>
                                   <div className="absolute top-0 bottom-0 right-0 bg-red-500/10 border-l border-red-500/50" style={{ width: `${100 - tankFill}%` }}></div>
@@ -942,7 +935,7 @@ export default function Home() {
       
       {loading && <div className="fixed top-0 left-0 right-0 z-50"><LiveWireLoader /></div>}
 
-      {/* SIDE NAVIGATION (Keep existing) */}
+      {/* SIDE NAVIGATION */}
       <div className={`fixed inset-y-0 left-0 w-72 bg-[#09090b] border-r border-zinc-800 z-50 transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 flex flex-col h-full">
             <div className="flex justify-between items-center mb-8"><h2 className="font-bold text-white tracking-widest uppercase flex items-center gap-2"><Activity className="text-blue-500" size={18}/> Menu</h2><button onClick={() => setIsMenuOpen(false)} className="text-zinc-500 hover:text-white"><X size={20}/></button></div>
@@ -957,7 +950,7 @@ export default function Home() {
       </div>
       {isMenuOpen && <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>}
 
-      {/* HEADER (Keep existing) */}
+      {/* HEADER */}
       <header className={`sticky top-0 z-40 backdrop-blur-md border-b px-6 py-4 flex flex-col gap-6 ${zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'}`}>
           <div className="flex justify-between items-center w-full">
               <div className="flex items-center gap-4"><button onClick={() => setIsMenuOpen(true)} className={`p-3 rounded-xl transition ${zenMode ? 'text-zinc-400 border border-zinc-800' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white'}`}><Menu size={24}/></button><div className="hidden md:flex flex-col"><h1 className={`text-xl font-extrabold tracking-tight flex items-center gap-2 ${zenMode ? 'text-white' : 'text-white'}`}><Activity className={zenMode ? 'text-zinc-500' : 'text-blue-500'} /> PULSE</h1></div></div>
@@ -1055,30 +1048,6 @@ export default function Home() {
                                       <div className="relative z-10 scale-110"><RadialProgress score={getHealthScore(selectedNode, mostCommonVersion, medianCredits)} size={160} /></div>
                                       <div className="mt-6 text-center w-full z-10"><p className={`text-[9px] font-bold uppercase tracking-widest transition-colors ${zenMode ? 'text-zinc-500' : 'text-zinc-600'} group-hover:text-blue-400`}>CLICK FOR BREAKDOWN</p></div>
                                   </div>
-                              )}
-                              
-                              {/* OVERVIEW SPECIFIC: REPUTATION & PHYSICAL LAYER */}
-                              {modalView === 'overview' && (
-                                  <>
-                                     <Link href="/leaderboard">
-                                          <div className={`h-full p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-yellow-500/30'}`}>
-                                              <div className="absolute top-0 right-0 p-12 bg-yellow-500/5 blur-2xl rounded-full group-hover:bg-yellow-500/10 transition"></div>
-                                              <div className="flex justify-between items-start mb-2 relative z-10"><div className="flex items-center gap-2"><div className={`p-2 rounded-lg ${zenMode ? 'bg-yellow-900/20 text-yellow-600' : 'bg-yellow-500/10 text-yellow-500'}`}><Trophy size={18}/></div><div className={`text-xs font-bold uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>REPUTATION</div></div><HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" /></div>
-                                              <div className="mt-auto relative z-10"><div className={`text-3xl font-mono font-bold ${zenMode ? 'text-yellow-600' : 'text-yellow-500'}`}>#{selectedNode?.rank || '-'}</div><div className="w-full bg-zinc-900 h-1.5 rounded-full mt-2 shadow-[inset_0_-1px_1px_rgba(255,255,255,0.1),inset_0_1px_2px_rgba(0,0,0,0.5)]"><div className="h-full bg-yellow-600 rounded-full" style={{ width: `${Math.min(100, (selectedNode?.credits || 0) / (medianCredits * 2) * 100)}%` }}></div></div><div className="flex items-center gap-1.5 mt-1 text-zinc-400 font-mono text-xs"><Wallet size={10} className="text-zinc-600"/>{selectedNode?.credits?.toLocaleString() || '0'} Credits</div></div>
-                                          </div>
-                                      </Link>
-
-                                      <Link href={`/map?focus=${getSafeIp(selectedNode)}`}>
-                                          <div className={`h-full p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'}`}>
-                                              <div className="absolute top-0 right-0 p-8 bg-cyan-500/5 blur-xl rounded-full group-hover:bg-cyan-500/10 transition"></div>
-                                              <div className="flex justify-between items-start mb-2 relative z-10"><div className="flex items-center gap-2"><div className={`p-2 rounded-lg ${zenMode ? 'bg-cyan-900/20 text-cyan-600' : 'bg-cyan-500/10 text-cyan-500'}`}><Globe size={18}/></div><div className={`text-xs font-bold uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>PHYSICAL LAYER</div></div><HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" /></div>
-                                              <div className="mt-auto relative z-10">
-                                                <div className="inline-block px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-mono text-sm mb-1 shadow-[0_0_10px_rgba(34,211,238,0.1)]">{getSafeIp(selectedNode)}</div>
-                                                <div className="text-[10px] text-white font-bold animate-pulse mt-1">CLICK TO VISUALIZE ON MAP</div>
-                                              </div>
-                                          </div>
-                                      </Link>
-                                  </>
                               )}
 
                               {/* 4. EXPANSION AREA (Right 2 Cols) */}
