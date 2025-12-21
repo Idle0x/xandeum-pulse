@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import axios from 'axios';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleSqrt } from 'd3-scale';
-import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Info, X, Server, Layers, TrendingUp, BarChart3, AlertCircle, Eye, EyeOff, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Info, X, Server, Layers, TrendingUp, BarChart3, AlertCircle, Eye, EyeOff, HelpCircle, Share2, Check } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -53,29 +53,27 @@ export default function MapPage() {
 
   const [position, setPosition] = useState({ coordinates: [10, 20], zoom: 1.2 });
   const [copiedCoords, setCopiedCoords] = useState<string | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
   
+  // NEW: Share Link State
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
+
+  const listRef = useRef<HTMLDivElement>(null);
   const hasDeepLinked = useRef(false);
   const [dynamicThresholds, setDynamicThresholds] = useState<number[]>([0, 0, 0, 0]);
 
-  // Calculate Visibility Stats
   const visibleNodes = useMemo(() => locations.reduce((sum, loc) => sum + loc.count, 0), [locations]);
   const privateNodes = Math.max(0, stats.totalNodes - visibleNodes);
 
-  // --- NEW: AUTO-SCROLL ON TOGGLE SWITCH ---
   useEffect(() => {
       if (activeLocation && isSplitView) {
           const timer = setTimeout(() => {
               const item = document.getElementById(`list-item-${activeLocation}`);
-              if (item) {
-                  item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }
+              if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }, 150); 
           return () => clearTimeout(timer);
       }
   }, [viewMode, activeLocation, isSplitView]);
 
-  // --- FETCH DATA & HANDLE DEEP LINK ---
   useEffect(() => {
     const fetchGeo = async () => {
       try {
@@ -143,8 +141,6 @@ export default function MapPage() {
 
   }, [locations, viewMode]);
 
-  // --- LOGIC HELPERS ---
-
   const getTierIndex = (loc: LocationData): number => {
     let val = 0;
     if (viewMode === 'STORAGE') val = loc.totalStorage;
@@ -183,7 +179,7 @@ export default function MapPage() {
 
   const lockTarget = (name: string, lat: number, lon: number) => {
     if (activeLocation === name) {
-        // Just recenter, don't reset
+        // Just recenter
     } else {
         setActiveLocation(name);
         setExpandedLocation(name); 
@@ -199,7 +195,6 @@ export default function MapPage() {
     }
   };
 
-  // FIX: Collapsing now ONLY resets view, keeping drawer OPEN
   const toggleExpansion = (name: string, lat: number, lon: number) => {
       if (expandedLocation === name) {
           resetView(); 
@@ -224,6 +219,14 @@ export default function MapPage() {
     navigator.clipboard.writeText(text);
     setCopiedCoords(name);
     setTimeout(() => setCopiedCoords(null), 2000);
+  };
+
+  const handleShareLink = (e: React.MouseEvent, ip: string, name: string) => {
+      e.stopPropagation();
+      const url = `${window.location.origin}/map?focus=${ip}`;
+      navigator.clipboard.writeText(url);
+      setCopiedLink(name);
+      setTimeout(() => setCopiedLink(null), 2000);
   };
 
   const handleZoomIn = () => { if (position.zoom < 5) setPosition(pos => ({ ...pos, zoom: pos.zoom * 1.5 })); };
@@ -328,12 +331,10 @@ export default function MapPage() {
       }
   }
 
-  // --- SORTING FOR RENDER ORDER (Active Last = On Top) ---
   const locationsForMap = useMemo(() => {
     if (!activeLocation) return locations;
     const others = locations.filter(l => l.name !== activeLocation);
     const active = locations.find(l => l.name === activeLocation);
-    // Active MUST be last to be rendered on top (Z-Index in SVG relies on DOM order)
     return active ? [...others, active] : others;
   }, [locations, activeLocation]);
 
@@ -395,14 +396,12 @@ export default function MapPage() {
                 <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-300">Dashboard</span>
             </Link>
             
-            {/* RIGHT SIDE STACK */}
             <div className="flex flex-col items-end gap-1">
                 <div className="flex items-center gap-2">
                     <div className={`w-1.5 h-1.5 rounded-full animate-pulse`} style={{ backgroundColor: MODE_COLORS[viewMode].hex }}></div>
                     <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{viewMode} Mode</span>
                 </div>
                 
-                {/* TRACKING COUNTER BADGE (CLICKABLE TOOLTIP) */}
                 {!loading && (
                     <button 
                         onClick={() => {
@@ -446,33 +445,22 @@ export default function MapPage() {
                     const isActive = activeLocation === loc.name;
                     const tier = getTierIndex(loc);
                     const baseColor = TIER_COLORS[tier];
-                    
-                    // STRATEGY 1: "CINEMA MODE" - Dim others when one is active
                     const opacity = activeLocation && !isActive ? 0.3 : 1;
 
                     return (
                         <Marker key={loc.name} coordinates={[loc.lon, loc.lat]} onClick={() => lockTarget(loc.name, loc.lat, loc.lon)}>
                         <g className="group cursor-pointer transition-all duration-500" style={{ opacity }}>
-                            {/* Pulse Effect */}
                             <circle r={size * 2.5} fill={isActive ? '#22c55e' : baseColor} className="animate-ping opacity-20" style={{ animationDuration: isActive ? '1s' : '3s' }} />
-                            
-                            {/* Main Marker Shape */}
                             {isActive ? (
                                 <polygon points="0,-12 3,-4 11,-4 5,1 7,9 0,5 -7,9 -5,1 -11,-4 -3,-4" transform={`scale(${size/6})`} fill="#52525b" stroke="#22c55e" strokeWidth={1.5} className="drop-shadow-[0_0_15px_rgba(34,197,94,1)]" />
                             ) : (
                                 <>{viewMode === 'STORAGE' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} />}{viewMode === 'CREDITS' && <circle r={size} fill={baseColor} stroke="#fff" strokeWidth={1} />}{viewMode === 'HEALTH' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} className="rotate-45" />}</>
                             )}
                             
-                            {/* STRATEGY 2: THE "ELEVATED CALLOUT" (DIALOGUE BOX) */}
                             {isActive && (
                                 <g transform={`translate(0, ${-size - 18})`}>
-                                    {/* The Shadow/Glow */}
                                     <rect x="-60" y="-20" width="120" height="24" rx="4" fill="black" fillOpacity="0.8" stroke="#22c55e" strokeWidth="1" className="drop-shadow-lg" />
-                                    {/* The Text */}
-                                    <text y="-4" textAnchor="middle" className="font-mono text-[10px] fill-white font-bold uppercase tracking-widest pointer-events-none dominant-baseline-central">
-                                        {loc.name}
-                                    </text>
-                                    {/* The Arrow/Pointer */}
+                                    <text y="-4" textAnchor="middle" className="font-mono text-[10px] fill-white font-bold uppercase tracking-widest pointer-events-none dominant-baseline-central">{loc.name}</text>
                                     <path d="M -5 4 L 0 9 L 5 4" fill="black" stroke="#22c55e" strokeWidth="1" strokeDasharray="0,14,3" /> 
                                 </g>
                             )}
@@ -510,7 +498,6 @@ export default function MapPage() {
                  <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-zinc-800/30 bg-[#09090b]">
                     <div className="flex items-center gap-3"><h2 className="text-sm font-bold text-white flex items-center gap-2"><Activity size={14} className="text-green-500" /> Live Data</h2><div className="hidden md:block scale-90 origin-left"><ViewToggles /></div></div>
                     
-                    {/* RED BIG CLOSE BUTTON */}
                     <div className="flex items-center gap-2">
                         <div className="md:hidden scale-75 origin-right"><ViewToggles /></div>
                         <button 
@@ -528,6 +515,7 @@ export default function MapPage() {
                         const tierColor = TIER_COLORS[tier];
                         const isExpanded = expandedLocation === loc.name;
                         const xray = getXRayStats(loc, i);
+                        const sampleIp = loc.ips && loc.ips.length > 0 ? loc.ips[0] : null;
 
                         return (
                             <div 
@@ -554,10 +542,21 @@ export default function MapPage() {
 
                                 {isExpanded && (
                                     <div className="bg-black/30 border-t border-white/5 p-4 animate-in slide-in-from-top-2 duration-300">
-                                        <div className="flex justify-center items-center mb-4">
+                                        <div className="flex justify-between items-center mb-4">
                                             <div className="text-[10px] md:text-sm font-bold uppercase tracking-widest px-3 py-1 rounded border bg-black/50" style={{ color: tierColor, borderColor: `${tierColor}40` }}>
                                                 {TIER_LABELS[viewMode][tier]} TIER
                                             </div>
+                                            
+                                            {/* NEW: SHARE BUTTON */}
+                                            {sampleIp && (
+                                                <button 
+                                                    onClick={(e) => handleShareLink(e, sampleIp, loc.name)}
+                                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold hover:bg-blue-500/20 transition"
+                                                >
+                                                    {copiedLink === loc.name ? <Check size={12} /> : <Share2 size={12} />}
+                                                    {copiedLink === loc.name ? 'Link Copied' : 'Share Location'}
+                                                </button>
+                                            )}
                                         </div>
                                         <div className="grid grid-cols-3 gap-2 text-xs md:text-sm text-center">
                                             <div className="flex flex-col items-center">
