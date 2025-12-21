@@ -1,4 +1,3 @@
-// pages/api/geo.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getNetworkPulse } from '../../lib/xandeum-brain';
 
@@ -11,7 +10,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     nodes.forEach(node => {
       const { city, countryName, lat, lon } = node.location;
-      if (lat === 0 && lon === 0) return; // Skip private IPs for map
+      if (lat === 0 && lon === 0) return; // Skip private IPs
 
       const key = `${city}-${countryName}`;
       const storageGB = (node.storage_committed || 0) / (1024 ** 3);
@@ -25,6 +24,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         existing.ips.push(node.address.split(':')[0]);
         if (node.health >= 75) existing.stableCount++;
         if (node.health < 50) existing.criticalCount++;
+
+        // --- NEW: Track the "King" of this city for each metric ---
+        if (storageGB > existing.bestNodes.storageVal) {
+            existing.bestNodes.storageVal = storageGB;
+            existing.bestNodes.storagePk = node.pubkey;
+        }
+        if (node.credits > existing.bestNodes.creditsVal) {
+            existing.bestNodes.creditsVal = node.credits;
+            existing.bestNodes.creditsPk = node.pubkey;
+        }
+        if (node.health > existing.bestNodes.healthVal) {
+            existing.bestNodes.healthVal = node.health;
+            existing.bestNodes.healthPk = node.pubkey;
+        }
+
       } else {
         cityMap.set(key, {
           name: city,
@@ -36,14 +50,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           healthSum: node.health,
           stableCount: node.health >= 75 ? 1 : 0,
           criticalCount: node.health < 50 ? 1 : 0,
-          ips: [node.address.split(':')[0]]
+          ips: [node.address.split(':')[0]],
+          
+          // --- NEW: Initialize "King" tracking ---
+          bestNodes: {
+              storageVal: storageGB, storagePk: node.pubkey,
+              creditsVal: node.credits, creditsPk: node.pubkey,
+              healthVal: node.health, healthPk: node.pubkey
+          }
         });
       }
     });
 
     const locations = Array.from(cityMap.values()).map(l => ({
       ...l,
-      avgHealth: Math.round(l.healthSum / l.count)
+      avgHealth: Math.round(l.healthSum / l.count),
+      // Clean up the object we send to frontend
+      topPks: {
+          STORAGE: l.bestNodes.storagePk,
+          CREDITS: l.bestNodes.creditsPk,
+          HEALTH: l.bestNodes.healthPk
+      }
     }));
 
     const topRegion = [...locations].sort((a, b) => b.totalStorage - a.totalStorage)[0];
