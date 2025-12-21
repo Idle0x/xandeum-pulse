@@ -1,34 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import axios from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Trophy, Medal, ArrowLeft, Search, Wallet, X, ChevronRight, Activity, Users, BarChart3, HelpCircle, Star, Calculator, TrendingUp, Zap, Info, ChevronDown, ChevronUp, PlayCircle, RefreshCw, ExternalLink, ArrowUpRight, Eye } from 'lucide-react';
+import { 
+  Trophy, Medal, ArrowLeft, Search, Wallet, X, 
+  Activity, Users, BarChart3, HelpCircle, Star, 
+  Calculator, Zap, ChevronDown, 
+  ExternalLink, ArrowUpRight, Eye, MapPin, Copy, Check, Share2, AlertTriangle, ArrowUp, ArrowDown
+} from 'lucide-react';
 
 interface RankedNode {
   rank: number;
   pubkey: string;
   credits: number;
   address?: string;
+  location?: {
+      countryName: string;
+      countryCode: string;
+  };
+  // NEW: Trend Data
+  trend: number; // 0 = same, >0 = up, <0 = down
 }
 
-const ERA_BOOSTS = {
-    'DeepSouth': 16,
-    'South': 10,
-    'Main': 7,
-    'Coal': 3.5,
-    'Central': 2,
-    'North': 1.25
-};
-
-const NFT_BOOSTS = {
-    'Titan': 11,
-    'Dragon': 4,
-    'Coyote': 2.5,
-    'Rabbit': 1.5,
-    'Cricket': 1.1,
-    'XENO': 1.1
-};
+const ERA_BOOSTS = { 'DeepSouth': 16, 'South': 10, 'Main': 7, 'Coal': 3.5, 'Central': 2, 'North': 1.25 };
+const NFT_BOOSTS = { 'Titan': 11, 'Dragon': 4, 'Coyote': 2.5, 'Rabbit': 1.5, 'Cricket': 1.1, 'XENO': 1.1 };
 
 export default function Leaderboard() {
   const router = useRouter();
@@ -41,22 +37,25 @@ export default function Leaderboard() {
   const [showSim, setShowSim] = useState(false);
   const [showHardwareCalc, setShowHardwareCalc] = useState(false);
   
-  // The Core Input (Auto-filled on row click)
+  // Inputs
   const [baseCreditsInput, setBaseCreditsInput] = useState<number>(0);
-  
-  // Hardware Calculator Inputs
   const [simNodes, setSimNodes] = useState<number>(1);
   const [simStorageVal, setSimStorageVal] = useState<number>(1);
   const [simStorageUnit, setSimStorageUnit] = useState<'MB' | 'GB' | 'TB' | 'PB'>('TB');
   const [simStake, setSimStake] = useState<number>(1000); 
   const [simPerf, setSimPerf] = useState(0.95);
-  
-  // Boosts
   const [simBoosts, setSimBoosts] = useState<number[]>([]); 
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
   // EXPANDED ROW STATE
   const [expandedNode, setExpandedNode] = useState<string | null>(null);
+  
+  // COPY/SHARE FEEDBACK STATE
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
+
+  // DEEP LINK REF
+  const hasDeepLinked = useRef(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -66,53 +65,75 @@ export default function Leaderboard() {
           axios.get('/api/stats')
         ]);
 
-        const addressMap = new Map<string, string>();
+        const metaMap = new Map<string, { address: string, location?: any }>();
         if (statsRes.data.result?.pods) {
             statsRes.data.result.pods.forEach((node: any) => {
-                addressMap.set(node.pubkey, node.address);
+                metaMap.set(node.pubkey, { address: node.address, location: node.location });
             });
         }
+
+        // --- 1. FETCH HISTORICAL RANKS (For Whale Watch) ---
+        const historyRaw = localStorage.getItem('xandeum_rank_history');
+        const history = historyRaw ? JSON.parse(historyRaw) : {};
+        const newHistory: Record<string, number> = {};
 
         const rawData = creditsRes.data.pods_credits || creditsRes.data;
         let parsedList: RankedNode[] = [];
 
         if (Array.isArray(rawData)) {
-          parsedList = rawData.map((item: any) => ({
-            pubkey: item.pod_id || item.pubkey || 'Unknown',
-            credits: Number(item.credits || 0),
-            rank: 0,
-            address: addressMap.get(item.pod_id || item.pubkey)
-          }));
-        } else if (typeof rawData === 'object') {
-          parsedList = Object.entries(rawData).map(([key, val]: [string, any]) => {
-            if (key === 'status' || key === 'success') return null;
-            const pKey = val?.pod_id || val?.pubkey || key;
+          parsedList = rawData.map((item: any) => {
+            const pKey = item.pod_id || item.pubkey || 'Unknown';
+            const meta = metaMap.get(pKey);
             return {
               pubkey: pKey,
-              credits: typeof val === 'number' ? val : Number(val?.credits || 0),
-              rank: 0,
-              address: addressMap.get(pKey)
+              credits: Number(item.credits || 0),
+              rank: 0, // Calculated below
+              address: meta?.address,
+              location: meta?.location,
+              trend: 0
             };
-          }).filter(Boolean) as RankedNode[];
+          });
         }
 
+        // Sort & Rank
         parsedList.sort((a, b) => b.credits - a.credits);
         
         let currentRank = 1;
         for (let i = 0; i < parsedList.length; i++) {
-          if (i > 0 && parsedList[i].credits < parsedList[i - 1].credits) {
-            currentRank = i + 1;
-          }
+          if (i > 0 && parsedList[i].credits < parsedList[i - 1].credits) currentRank = i + 1;
           parsedList[i].rank = currentRank;
+          
+          // --- 2. CALCULATE TREND ---
+          const prevRank = history[parsedList[i].pubkey];
+          if (prevRank) {
+              // If previous rank was 10 and now 5, trend is +5 (Positive is good)
+              parsedList[i].trend = prevRank - currentRank;
+          }
+          // Save current rank for next time
+          newHistory[parsedList[i].pubkey] = currentRank;
         }
 
+        // Save history back to local storage
+        localStorage.setItem('xandeum_rank_history', JSON.stringify(newHistory));
+
         setRanking(parsedList);
-        
-        // Auto-fill top node for demo if input is empty
         if (parsedList.length > 0 && baseCreditsInput === 0) setBaseCreditsInput(parsedList[0].credits);
 
         const saved = localStorage.getItem('xandeum_favorites');
         if (saved) setFavorites(JSON.parse(saved));
+
+        // --- 3. HANDLE DEEP LINK (Share My Rank) ---
+        if (router.isReady && router.query.highlight && !hasDeepLinked.current) {
+            const targetKey = router.query.highlight as string;
+            if (parsedList.some(n => n.pubkey === targetKey)) {
+                hasDeepLinked.current = true;
+                setTimeout(() => {
+                    setExpandedNode(targetKey);
+                    const el = document.getElementById(`node-${targetKey}`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 500);
+            }
+        }
 
       } catch (err) {
         console.error("Leaderboard Error:", err);
@@ -122,38 +143,26 @@ export default function Leaderboard() {
     };
 
     fetchData();
-  }, []);
+  }, [router.isReady, router.query.highlight]);
 
-  // Update Base Credits when Hardware Inputs Change (If Hardware Calc is Open)
+  // Hardware Calc Logic
   useEffect(() => {
       if (showHardwareCalc) {
           let storageInGB = simStorageVal;
           if (simStorageUnit === 'MB') storageInGB = simStorageVal / 1000;
           if (simStorageUnit === 'TB') storageInGB = simStorageVal * 1000;
           if (simStorageUnit === 'PB') storageInGB = simStorageVal * 1000000;
-          
           const calculated = simNodes * storageInGB * simPerf * simStake;
           setBaseCreditsInput(calculated);
       }
   }, [simNodes, simStorageVal, simStorageUnit, simStake, simPerf, showHardwareCalc]);
 
-  const filtered = ranking.filter(n => 
-    n.pubkey.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // --- INTERACTION HANDLERS ---
+  const filtered = ranking.filter(n => n.pubkey.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const handleRowClick = (node: RankedNode) => {
-      // 1. Auto-fill the simulator (Backend Logic)
       setBaseCreditsInput(node.credits);
-      setShowHardwareCalc(false); // Switch to manual/auto input mode
-
-      // 2. Toggle Expansion (UI Logic)
-      if (expandedNode === node.pubkey) {
-          setExpandedNode(null);
-      } else {
-          setExpandedNode(node.pubkey);
-      }
+      setShowHardwareCalc(false);
+      setExpandedNode(expandedNode === node.pubkey ? null : node.pubkey);
   };
 
   const handleUseInSim = (e: React.MouseEvent) => {
@@ -162,16 +171,26 @@ export default function Leaderboard() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleCopyKey = (e: React.MouseEvent, key: string) => {
+      e.stopPropagation();
+      navigator.clipboard.writeText(key);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  // --- NEW: SHARE URL LOGIC ---
+  const handleShareUrl = (e: React.MouseEvent, key: string) => {
+      e.stopPropagation();
+      const url = `${window.location.origin}/leaderboard?highlight=${key}`;
+      navigator.clipboard.writeText(url);
+      setCopiedLink(key);
+      setTimeout(() => setCopiedLink(null), 2000);
+  };
+
   const calculateFinal = () => {
       let multiplier = 1;
-      if (simBoosts.length > 0) {
-          const totalBoostProduct = simBoosts.reduce((a, b) => a * b, 1);
-          multiplier = totalBoostProduct; 
-      }
-      return { 
-          boosted: baseCreditsInput * multiplier, 
-          multiplier 
-      };
+      if (simBoosts.length > 0) multiplier = simBoosts.reduce((a, b) => a * b, 1);
+      return { boosted: baseCreditsInput * multiplier, multiplier };
   };
 
   const simResult = calculateFinal();
@@ -187,30 +206,23 @@ export default function Leaderboard() {
 
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-4 md:p-8 selection:bg-yellow-500/30">
-      <Head>
-        <title>Xandeum Pulse - Reputation & Earnings</title>
-      </Head>
+      <Head><title>Xandeum Pulse - Reputation & Earnings</title></Head>
 
       {/* HEADER */}
-      <div className="max-w-5xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
+      <div className="max-w-5xl mx-4 md:mx-auto mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
         <Link href="/" className="flex items-center gap-2 text-zinc-500 hover:text-white transition text-sm font-bold uppercase tracking-wider group">
           <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back to Monitor
         </Link>
         <div className="text-center">
-          <h1 className="text-3xl font-extrabold flex items-center gap-3 text-yellow-500 justify-center">
-            <Trophy size={32} /> REPUTATION LEDGER
-          </h1>
+          <h1 className="text-3xl font-extrabold flex items-center gap-3 text-yellow-500 justify-center"><Trophy size={32} /> REPUTATION LEDGER</h1>
           <p className="text-xs text-zinc-500 mt-1 font-mono tracking-wide uppercase">The definitive registry of node reputation and network contribution</p>
         </div>
         <div className="w-32 hidden md:block"></div>
       </div>
 
-      {/* --- STOINC SIMULATOR WIDGET (With Glow) --- */}
+      {/* --- STOINC SIMULATOR WIDGET --- */}
       <div className="max-w-5xl mx-auto mb-10 bg-gradient-to-b from-zinc-900 to-black border border-yellow-500/30 rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.1)] transition-all duration-300">
-          <div 
-            className="p-4 bg-yellow-500/10 border-b border-yellow-500/20 flex justify-between items-center cursor-pointer hover:bg-yellow-500/20 transition"
-            onClick={() => setShowSim(!showSim)}
-          >
+          <div className="p-4 bg-yellow-500/10 border-b border-yellow-500/20 flex justify-between items-center cursor-pointer hover:bg-yellow-500/20 transition" onClick={() => setShowSim(!showSim)}>
               <div className="flex items-center gap-3">
                   <div className="p-2 bg-yellow-500 text-black rounded-lg animate-pulse"><Calculator size={20} /></div>
                   <div>
@@ -218,69 +230,35 @@ export default function Leaderboard() {
                       <p className="text-[10px] text-zinc-400">Estimate forecasted earnings based on official Xandeum calculations</p>
                   </div>
               </div>
-              {showSim ? <ChevronUp size={20} className="text-yellow-500" /> : <ChevronDown size={20} className="text-zinc-500" />}
+              {showSim ? <ChevronDown size={20} className="rotate-180 text-yellow-500 transition-transform" /> : <ChevronDown size={20} className="text-zinc-500 transition-transform" />}
           </div>
 
           {showSim && (
               <div className="p-6 md:p-8 animate-in slide-in-from-top-4 duration-500">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                      
-                      {/* LEFT: INPUTS */}
                       <div className="space-y-8">
-                          
-                          {/* BASE CREDIT INPUT - HIDDEN WHEN HARDWARE CALC IS OPEN */}
                           <div className={`relative ${showHardwareCalc ? 'hidden' : 'block'}`}>
                               <div className="flex justify-between items-end mb-2">
-                                  <div className="flex items-center gap-2 text-zinc-400">
-                                      <span className="text-xs font-bold uppercase tracking-wider text-white">Base Reputation Credits</span>
-                                      <HelpCircle size={12} className="cursor-help hover:text-white" onClick={() => toggleTooltip('base_input')} />
-                                  </div>
-                                  <button 
-                                    onClick={() => setShowHardwareCalc(true)}
-                                    className="text-[10px] text-blue-400 hover:text-blue-300 underline underline-offset-2 flex items-center gap-1"
-                                  >
-                                      Don't know? Calculate from Hardware
-                                  </button>
+                                  <div className="flex items-center gap-2 text-zinc-400"><span className="text-xs font-bold uppercase tracking-wider text-white">Base Reputation Credits</span><HelpCircle size={12} className="cursor-help hover:text-white" onClick={() => toggleTooltip('base_input')} /></div>
+                                  <button onClick={() => setShowHardwareCalc(true)} className="text-[10px] text-blue-400 hover:text-blue-300 underline underline-offset-2 flex items-center gap-1">Don't know? Calculate from Hardware</button>
                               </div>
                               {activeTooltip === 'base_input' && <div className="absolute z-10 bg-zinc-800 border border-zinc-700 p-3 rounded text-[10px] text-zinc-300 w-full -top-12 left-0 shadow-xl">The raw score derived from (Nodes × Storage × Stake). Select a node below to auto-fill, or type a hypothetical value.</div>}
-                              
                               <div className="flex items-center bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden focus-within:border-yellow-500 transition-all">
-                                  <input 
-                                    type="number" 
-                                    min="0" 
-                                    value={baseCreditsInput} 
-                                    onChange={(e) => setBaseCreditsInput(Number(e.target.value))}
-                                    className="w-full bg-transparent p-4 text-white text-2xl font-mono font-bold outline-none"
-                                    placeholder="0"
-                                  />
+                                  <input type="number" min="0" value={baseCreditsInput} onChange={(e) => setBaseCreditsInput(Number(e.target.value))} className="w-full bg-transparent p-4 text-white text-2xl font-mono font-bold outline-none" placeholder="0" />
                                   <span className="pr-6 text-xs font-bold text-zinc-600">CREDITS</span>
                               </div>
                           </div>
 
-                          {/* HARDWARE CALCULATOR (TOGGLEABLE) */}
                           {showHardwareCalc && (
                               <div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-top-2 relative">
                                   <div className="flex justify-between items-center mb-2">
                                       <div className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Hardware Specs Calculator</div>
-                                      <button 
-                                        onClick={() => setShowHardwareCalc(false)}
-                                        className="text-[10px] text-zinc-500 hover:text-white underline"
-                                      >
-                                          Hide Calculator
-                                      </button>
+                                      <button onClick={() => setShowHardwareCalc(false)} className="text-[10px] text-zinc-500 hover:text-white underline">Hide Calculator</button>
                                   </div>
-                                  
                                   <div className="grid grid-cols-2 gap-4">
-                                      <div>
-                                          <label className="text-[9px] text-zinc-500 uppercase font-bold block mb-1">Fleet Size</label>
-                                          <input type="number" min="1" value={simNodes} onChange={(e) => setSimNodes(Math.max(1, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-white text-xs font-mono outline-none focus:border-blue-500"/>
-                                      </div>
-                                      <div>
-                                          <label className="text-[9px] text-zinc-500 uppercase font-bold block mb-1">XAND Stake</label>
-                                          <input type="number" min="0" value={simStake} onChange={(e) => setSimStake(Math.max(0, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-white text-xs font-mono outline-none focus:border-blue-500"/>
-                                      </div>
+                                      <div><label className="text-[9px] text-zinc-500 uppercase font-bold block mb-1">Fleet Size</label><input type="number" min="1" value={simNodes} onChange={(e) => setSimNodes(Math.max(1, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-white text-xs font-mono outline-none focus:border-blue-500"/></div>
+                                      <div><label className="text-[9px] text-zinc-500 uppercase font-bold block mb-1">XAND Stake</label><input type="number" min="0" value={simStake} onChange={(e) => setSimStake(Math.max(0, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-white text-xs font-mono outline-none focus:border-blue-500"/></div>
                                   </div>
-                                  
                                   <div>
                                       <label className="text-[9px] text-zinc-500 uppercase font-bold block mb-1">Total Storage</label>
                                       <div className="flex gap-2">
@@ -291,63 +269,27 @@ export default function Leaderboard() {
                               </div>
                           )}
 
-                          {/* BOOSTS */}
                           <div className="relative pt-4 border-t border-zinc-800">
-                              <div className="flex items-center gap-2 mb-3 text-zinc-400">
-                                  <span className="text-xs font-bold uppercase tracking-wider">Apply Boosts (NFTs / Eras)</span>
-                                  <HelpCircle size={12} className="cursor-help hover:text-white" onClick={() => toggleTooltip('boost')} />
-                              </div>
-                              {activeTooltip === 'boost' && <div className="absolute z-10 bg-zinc-800 border border-zinc-700 p-3 rounded text-[10px] text-zinc-300 w-64 -top-12 left-0 shadow-xl">Multipliers from NFTs and pNode Eras. Stacks geometrically (Product of boosts).</div>}
+                              <div className="flex items-center gap-2 mb-3 text-zinc-400"><span className="text-xs font-bold uppercase tracking-wider">Apply Boosts (NFTs / Eras)</span><HelpCircle size={12} className="cursor-help hover:text-white" onClick={() => toggleTooltip('boost')} /></div>
+                              {activeTooltip === 'boost' && <div className="absolute z-10 bg-zinc-800 border border-zinc-700 p-3 rounded text-[10px] text-zinc-300 w-64 -top-12 left-0 shadow-xl">Multipliers from NFTs and pNode Eras. Stacks geometrically.</div>}
                               <div className="flex flex-wrap gap-2">
                                   {Object.entries({...ERA_BOOSTS, ...NFT_BOOSTS}).map(([name, val]) => (
-                                      <button 
-                                        key={name}
-                                        onClick={() => toggleBoost(val)}
-                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${simBoosts.includes(val) ? 'bg-yellow-500 text-black border-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.3)]' : 'bg-zinc-900 text-zinc-500 border-zinc-700 hover:border-zinc-500'}`}
-                                      >
-                                          {name} <span className="opacity-60">x{val}</span>
-                                      </button>
+                                      <button key={name} onClick={() => toggleBoost(val)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${simBoosts.includes(val) ? 'bg-yellow-500 text-black border-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.3)]' : 'bg-zinc-900 text-zinc-500 border-zinc-700 hover:border-zinc-500'}`}>{name} <span className="opacity-60">x{val}</span></button>
                                   ))}
                               </div>
                           </div>
                       </div>
 
-                      {/* RIGHT: OUTPUTS */}
                       <div className="bg-zinc-900 rounded-xl p-6 border border-zinc-800 flex flex-col justify-center space-y-6 relative">
-                          
                           <div className="text-center relative">
-                              <div className="text-xs font-bold text-zinc-500 uppercase mb-1 flex items-center justify-center gap-1">
-                                  Total Boost Factor
-                                  <HelpCircle size={10} className="cursor-help" onClick={() => toggleTooltip('factor')} />
-                              </div>
-                              {activeTooltip === 'factor' && <div className="absolute z-10 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 w-full top-8 left-0">Cumulative multiplier applied to your base credits.</div>}
-                              <div className="text-4xl font-extrabold text-white flex items-center justify-center gap-2">
-                                  <Zap size={24} className={simResult.multiplier > 1 ? "text-yellow-500 fill-yellow-500" : "text-zinc-700"} />
-                                  {simResult.multiplier.toLocaleString(undefined, { maximumFractionDigits: 4 })}x
-                              </div>
+                              <div className="text-xs font-bold text-zinc-500 uppercase mb-1 flex items-center justify-center gap-1">Total Boost Factor</div>
+                              <div className="text-4xl font-extrabold text-white flex items-center justify-center gap-2"><Zap size={24} className={simResult.multiplier > 1 ? "text-yellow-500 fill-yellow-500" : "text-zinc-700"} />{simResult.multiplier.toLocaleString(undefined, { maximumFractionDigits: 4 })}x</div>
                           </div>
-
                           <div className="space-y-4">
-                              <div className="flex justify-between items-center border-b border-zinc-800 pb-4 relative">
-                                  <span className="text-xs text-zinc-400 flex items-center gap-1">
-                                      Projected Credits <HelpCircle size={10} onClick={() => toggleTooltip('boosted')} className="cursor-help"/>
-                                  </span>
-                                  {activeTooltip === 'boosted' && <div className="absolute z-10 bg-black border border-zinc-700 p-3 rounded text-[10px] text-zinc-300 right-0 top-8 w-64 shadow-xl z-20">The final 'BoostedCredits' score used by the network to calculate your slice of the STOINC pie.</div>}
-                                  <span className="font-mono text-2xl font-bold text-yellow-500 text-shadow-glow">
-                                      {simResult.boosted.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                                  </span>
-                              </div>
-
+                              <div className="flex justify-between items-center border-b border-zinc-800 pb-4 relative"><span className="text-xs text-zinc-400 flex items-center gap-1">Projected Credits</span><span className="font-mono text-2xl font-bold text-yellow-500 text-shadow-glow">{simResult.boosted.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></div>
                               <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl text-center relative">
-                                  <div className="text-[10px] text-blue-400 font-bold uppercase mb-1 flex items-center justify-center gap-1">
-                                      Est. Network Share <HelpCircle size={10} onClick={() => toggleTooltip('share')} className="cursor-help"/>
-                                  </div>
-                                  {activeTooltip === 'share' && <div className="absolute z-10 bg-black border border-zinc-700 p-3 rounded text-[10px] text-zinc-300 w-full bottom-full mb-2 left-0 shadow-xl">Your theoretical percentage of the total reward pool, assuming current network conditions.</div>}
-                                  <div className="text-2xl font-bold text-white">
-                                      {ranking.length > 0 
-                                        ? ((simResult.boosted / (ranking.reduce((a,b)=>a+b.credits, 0) + simResult.boosted)) * 100).toFixed(8) 
-                                        : '0.00'}%
-                                  </div>
+                                  <div className="text-[10px] text-blue-400 font-bold uppercase mb-1 flex items-center justify-center gap-1">Est. Network Share</div>
+                                  <div className="text-2xl font-bold text-white">{ranking.length > 0 ? ((simResult.boosted / (ranking.reduce((a,b)=>a+b.credits, 0) + simResult.boosted)) * 100).toFixed(8) : '0.00'}%</div>
                                   <div className="text-[9px] text-blue-300/50 mt-1">of Total Epoch Rewards</div>
                               </div>
                           </div>
@@ -360,35 +302,10 @@ export default function Leaderboard() {
       {/* NETWORK STATS BAR */}
       {!loading && ranking.length > 0 && (
         <div className="max-w-5xl mx-auto mb-10 grid grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm">
-            <div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Users size={12}/> Nodes with Credits</div>
-            <div className="text-2xl font-bold text-white mt-1">{ranking.length}</div>
-          </div>
-          
-          <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm">
-            <div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Wallet size={12}/> Total Credits Issued</div>
-            <div className="text-2xl font-bold text-yellow-400 mt-1">
-              {(ranking.reduce((sum, n) => sum + n.credits, 0) / 1000000).toFixed(1)}M
-            </div>
-          </div>
-          
-          <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm">
-            <div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Activity size={12}/> Avg Credits</div>
-            <div className="text-2xl font-bold text-white mt-1">
-              {Math.round(ranking.reduce((sum, n) => sum + n.credits, 0) / ranking.length).toLocaleString()}
-            </div>
-          </div>
-          
-          <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm">
-            <div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><BarChart3 size={12}/> Top 10 Dominance</div>
-            <div className="text-2xl font-bold text-blue-400 mt-1">
-              {(() => {
-                const total = ranking.reduce((sum, n) => sum + n.credits, 0);
-                const top10 = ranking.slice(0, 10).reduce((sum, n) => sum + n.credits, 0);
-                return total > 0 ? ((top10 / total) * 100).toFixed(1) : 0;
-              })()}%
-            </div>
-          </div>
+          <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Users size={12}/> Nodes with Credits</div><div className="text-2xl font-bold text-white mt-1">{ranking.length}</div></div>
+          <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Wallet size={12}/> Total Credits Issued</div><div className="text-2xl font-bold text-yellow-400 mt-1">{(ranking.reduce((sum, n) => sum + n.credits, 0) / 1000000).toFixed(1)}M</div></div>
+          <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Activity size={12}/> Avg Credits</div><div className="text-2xl font-bold text-white mt-1">{Math.round(ranking.reduce((sum, n) => sum + n.credits, 0) / ranking.length).toLocaleString()}</div></div>
+          <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><BarChart3 size={12}/> Top 10 Dominance</div><div className="text-2xl font-bold text-blue-400 mt-1">{(() => { const total = ranking.reduce((sum, n) => sum + n.credits, 0); const top10 = ranking.slice(0, 10).reduce((sum, n) => sum + n.credits, 0); return total > 0 ? ((top10 / total) * 100).toFixed(1) : 0; })()}%</div></div>
         </div>
       )}
 
@@ -396,33 +313,8 @@ export default function Leaderboard() {
       <div className="max-w-5xl mx-auto mb-6 relative space-y-3">
         <div className="relative">
             <Search className="absolute left-4 top-3.5 text-zinc-500" size={20} />
-            <input 
-            type="text" 
-            placeholder="Find node by public key..." 
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-12 pr-10 text-white focus:border-yellow-500 outline-none transition placeholder-zinc-600"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
-            <button 
-                onClick={() => setSearchQuery('')}
-                className="absolute right-4 top-3.5 text-zinc-500 hover:text-white"
-            >
-                <X size={20} />
-            </button>
-            )}
-        </div>
-        
-        {/* DUAL TIPS - STACKED ON MOBILE, ROW ON DESKTOP */}
-        <div className="flex flex-col md:flex-row gap-2 md:gap-6 px-2">
-            <div className="flex items-center gap-2 text-[10px] text-zinc-500">
-                <RefreshCw size={10} />
-                <span>Credits update per <strong>Epoch</strong>. Liveness updates in real-time.</span>
-            </div>
-            <div className="flex items-center gap-2 text-[10px] text-zinc-500">
-                <Star size={10} className="text-yellow-500" />
-                <span>Highlighted rows indicate nodes in your <strong>Watchlist</strong>.</span>
-            </div>
+            <input type="text" placeholder="Find node by public key..." className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-12 pr-10 text-white focus:border-yellow-500 outline-none transition placeholder-zinc-600" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            {searchQuery && (<button onClick={() => setSearchQuery('')} className="absolute right-4 top-3.5 text-zinc-500 hover:text-white"><X size={20} /></button>)}
         </div>
       </div>
 
@@ -442,75 +334,112 @@ export default function Leaderboard() {
              </div>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="p-20 text-center text-zinc-600">
-            <Search size={48} className="mx-auto mb-4 opacity-50" />
-            <p>No nodes match your search.</p>
-          </div>
+          <div className="p-20 text-center text-zinc-600"><Search size={48} className="mx-auto mb-4 opacity-50" /><p>No nodes match your search.</p></div>
         ) : (
           <div className="divide-y divide-zinc-800/50">
             {filtered.slice(0, 100).map((node) => {
               const isMyNode = node.address && favorites.includes(node.address);
               const isExpanded = expandedNode === node.pubkey;
+              const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
 
               return (
-                <div key={node.pubkey} className="group transition-all duration-300">
-                    <div 
-                    className={`grid grid-cols-12 gap-4 p-4 hover:bg-white/5 items-center cursor-pointer relative ${
-                        isExpanded ? 'bg-white/5 border-l-4 border-yellow-500' : 
-                        isMyNode ? 'bg-yellow-500/5 border-l-4 border-yellow-500' : 'border-l-4 border-transparent'
-                    }`}
-                    onClick={() => handleRowClick(node)}
-                    >
-                    
-                    {/* RANK BADGE */}
-                    <div className="col-span-2 md:col-span-1 flex justify-center items-center gap-1 relative">
-                        {isMyNode && <Star size={12} className="text-yellow-500 absolute left-0 md:left-4" fill="currentColor" />}
-                        {node.rank === 1 && <Trophy size={20} className="text-yellow-400" />}
-                        {node.rank === 2 && <Medal size={20} className="text-zinc-300" />}
-                        {node.rank === 3 && <Medal size={20} className="text-amber-600" />}
-                        {node.rank > 3 && <span className="text-sm font-bold text-zinc-500">#{node.rank}</span>}
-                    </div>
-
-                    {/* PUBLIC KEY */}
-                    <div className="col-span-6 md:col-span-7 font-mono text-sm text-zinc-300 truncate group-hover:text-white transition flex items-center justify-between">
-                        {node.pubkey}
+                <div key={node.pubkey} id={`node-${node.pubkey}`} className="group transition-all duration-300">
+                    <div className={`grid grid-cols-12 gap-4 p-4 hover:bg-white/5 items-center cursor-pointer relative ${isExpanded ? 'bg-white/5 border-l-4 border-yellow-500' : isMyNode ? 'bg-yellow-500/5 border-l-4 border-yellow-500' : 'border-l-4 border-transparent'}`} onClick={() => handleRowClick(node)}>
                         
-                        {/* EXPAND INDICATOR */}
-                        <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180 text-white' : 'text-zinc-600 group-hover:text-zinc-400'}`}>
-                            <ChevronDown size={16} />
+                        {/* RANK + SATURATION WARNING */}
+                        <div className="col-span-2 md:col-span-1 flex flex-col justify-center items-center gap-1 relative">
+                            <div className="flex items-center gap-1">
+                                {node.rank === 1 && <Trophy size={16} className="text-yellow-400" />}
+                                {node.rank > 1 && node.rank <= 3 && <Medal size={16} className={node.rank === 2 ? "text-zinc-300" : "text-amber-600"} />}
+                                <span className={`text-sm font-bold ${node.rank <= 3 ? 'text-white' : 'text-zinc-500'}`}>#{node.rank}</span>
+                            </div>
+                            
+                            {/* SATURATION WARNING (Top 10) */}
+                            {node.rank <= 10 && (
+                                <div className="group/sat relative">
+                                    <AlertTriangle size={10} className="text-amber-500 animate-pulse cursor-help" />
+                                    <div className="absolute bottom-full mb-1 hidden group-hover/sat:block bg-black border border-amber-900 text-amber-500 text-[9px] p-2 rounded w-32 z-50 text-center">High concentration. Diminishing returns likely.</div>
+                                </div>
+                            )}
+
+                            {/* WHALE WATCH TREND */}
+                            {node.trend !== 0 && (
+                                <div className={`text-[9px] font-bold flex items-center ${node.trend > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                    {node.trend > 0 ? <ArrowUp size={8} /> : <ArrowDown size={8} />} {Math.abs(node.trend)}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* PUBKEY & ADDRESS */}
+                        <div className="col-span-6 md:col-span-7 font-mono text-sm text-zinc-300 truncate group-hover:text-white transition flex items-center justify-between pr-4">
+                            <span>{node.pubkey}</span>
+                            <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180 text-white' : 'text-zinc-600 group-hover:text-zinc-400'}`}><ChevronDown size={16} /></div>
+                        </div>
+
+                        {/* CREDITS */}
+                        <div className="col-span-4 text-right font-bold font-mono text-yellow-500 flex items-center justify-end gap-2">
+                            {node.credits.toLocaleString()}
+                            <Wallet size={14} className="text-zinc-600 group-hover:text-yellow-500 transition hidden md:block" />
                         </div>
                     </div>
 
-                    {/* CREDITS */}
-                    <div className="col-span-4 text-right font-bold font-mono text-yellow-500 flex items-center justify-end gap-2">
-                        {node.credits.toLocaleString()}
-                        <Wallet size={14} className="text-zinc-600 group-hover:text-yellow-500 transition hidden md:block" />
-                    </div>
-                    </div>
-
-                    {/* EXPANDED VIEW (ACCORDION - SPACIOUS LAYOUT) */}
+                    {/* EXPANDED ACTIONS - UPDATED */}
                     {isExpanded && (
                         <div className="bg-black/40 border-b border-zinc-800/50 p-4 pl-4 md:pl-12 animate-in slide-in-from-top-2 duration-200">
-                            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest hidden md:block">
-                                    Quick Actions
-                                </div>
-                                <div className="flex gap-4 w-full md:w-auto">
-                                    <Link href={`/?open=${node.pubkey}`} className="flex-1 md:flex-none">
-                                        <button className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-xs font-bold text-white transition-all shadow-lg hover:shadow-blue-500/10">
-                                            <Activity size={14} className="text-blue-400" />
-                                            VIEW NODE DIAGNOSTICS
-                                            <ExternalLink size={10} className="text-zinc-500" />
+                            <div className="flex flex-col gap-4">
+                                <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                                    
+                                    {/* ROW 1: ACTIONS */}
+                                    <div className="flex gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+                                        {/* 1. VIEW ON MAP (New) */}
+                                        {node.address && (
+                                            <Link href={`/map?focus=${node.address.split(':')[0]}`}>
+                                                <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-blue-900/20 border border-blue-500/30 hover:bg-blue-900/40 text-xs font-bold text-blue-400 transition-all whitespace-nowrap">
+                                                    {flagUrl ? <img src={flagUrl} className="w-4 rounded-sm" alt="flag"/> : <MapPin size={14} />}
+                                                    VIEW ON MAP
+                                                </button>
+                                            </Link>
+                                        )}
+
+                                        {/* 2. VIEW DIAGNOSTICS (Renamed) */}
+                                        <Link href={`/?open=${node.pubkey}`}>
+                                            <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-xs font-bold text-white transition-all shadow-lg hover:shadow-blue-500/10 whitespace-nowrap">
+                                                <Activity size={14} className="text-green-400" />
+                                                VIEW DIAGNOSTICS
+                                                <ExternalLink size={10} className="text-zinc-500" />
+                                            </button>
+                                        </Link>
+
+                                        {/* 3. CALCULATE */}
+                                        <button 
+                                            onClick={handleUseInSim}
+                                            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/20 text-xs font-bold text-yellow-500 transition-all shadow-lg hover:shadow-yellow-500/10 whitespace-nowrap"
+                                        >
+                                            <Calculator size={14} />
+                                            CALC
+                                            <ArrowUpRight size={10} className="text-yellow-500/50" />
                                         </button>
-                                    </Link>
-                                    <button 
-                                        onClick={handleUseInSim}
-                                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/20 text-xs font-bold text-yellow-500 transition-all shadow-lg hover:shadow-yellow-500/10"
-                                    >
-                                        <Calculator size={14} />
-                                        CALCULATE EARNINGS
-                                        <ArrowUpRight size={10} className="text-yellow-500/50" />
-                                    </button>
+                                    </div>
+
+                                    {/* ROW 2: UTILS (Copy & Share) */}
+                                    <div className="flex gap-2 w-full md:w-auto justify-start md:justify-end border-t md:border-t-0 border-white/5 pt-3 md:pt-0">
+                                        <button 
+                                            onClick={(e) => handleCopyKey(e, node.pubkey)}
+                                            className="flex items-center gap-2 px-3 py-2 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg text-[10px] font-mono text-zinc-400 hover:text-white transition"
+                                        >
+                                            {copiedKey === node.pubkey ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                                            {copiedKey === node.pubkey ? 'COPIED KEY' : 'COPY KEY'}
+                                        </button>
+
+                                        {/* SHARE RANK BUTTON */}
+                                        <button 
+                                            onClick={(e) => handleShareUrl(e, node.pubkey)}
+                                            className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg text-[10px] font-bold text-blue-400 transition"
+                                        >
+                                            {copiedLink === node.pubkey ? <Check size={12} /> : <Share2 size={12} />}
+                                            {copiedLink === node.pubkey ? 'LINK COPIED' : 'SHARE RANK'}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -522,15 +451,11 @@ export default function Leaderboard() {
         )}
       </div>
 
-      {/* FOOTER NOTE */}
+      {/* FOOTER */}
       {!loading && (
         <div className="max-w-5xl mx-auto mt-6 text-center text-xs text-zinc-600 flex flex-col md:flex-row items-center justify-center gap-2">
-          <div className="flex items-center gap-2">
-            <Eye size={12} />
-            <span>Tracking <span className="text-zinc-400 font-bold">{ranking.length}</span> earning nodes. Top 100 displayed.</span>
-          </div>
-          <span className="hidden md:inline text-zinc-700">•</span>
-          <span className="text-zinc-500">(Search to find others)</span>
+          <div className="flex items-center gap-2"><Eye size={12} /><span>Tracking <span className="text-zinc-400 font-bold">{ranking.length}</span> earning nodes. Top 100 displayed.</span></div>
+          <span className="hidden md:inline text-zinc-700">•</span><span className="text-zinc-500">(Search to find others)</span>
         </div>
       )}
     </div>
