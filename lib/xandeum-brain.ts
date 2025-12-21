@@ -10,6 +10,7 @@ const BACKUP_NODES = [
 ];
 const TIMEOUT_PRIMARY = 4000;
 const TIMEOUT_BACKUP = 6000;
+const TIMEOUT_CREDITS = 2000; // NEW: Strict timeout for credits
 
 // --- IN-MEMORY CACHE ---
 const geoCache = new Map<string, { lat: number; lon: number; country: string; countryCode: string; city: string }>();
@@ -22,8 +23,8 @@ export interface EnrichedNode {
   uptime: number;
   last_seen_timestamp: number;
   is_public: boolean;
-  storage_used: number;      // Forced Number
-  storage_committed: number; // Forced Number
+  storage_used: number;      
+  storage_committed: number; 
   credits: number;
   health: number;
   location: {
@@ -86,13 +87,11 @@ const calculateVitalityScore = (storageBytes: number, uptime: number, version: s
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
   
-  // 1. Try Primary
   try {
     const res = await axios.post(`http://${PRIMARY_NODE}:6000/rpc`, payload, { timeout: TIMEOUT_PRIMARY });
     if (res.data?.result?.pods) return res.data.result.pods;
-  } catch (e) { /* silent fail */ }
+  } catch (e) { /* failover */ }
 
-  // 2. Race Backups
   const shuffled = BACKUP_NODES.sort(() => 0.5 - Math.random()).slice(0, 3);
   try {
     const winner = await Promise.any(shuffled.map(ip => 
@@ -100,6 +99,17 @@ async function fetchRawData() {
     ));
     return winner;
   } catch (e) { return []; }
+}
+
+// --- CORE: Fetch Credits (Non-Blocking) ---
+async function fetchCredits() {
+    try {
+        const res = await axios.get('https://podcredits.xandeum.network/api/pods-credits', { timeout: TIMEOUT_CREDITS });
+        return res.data;
+    } catch (error) {
+        console.warn("Credits API slow/down, skipping...");
+        return [];
+    }
 }
 
 // --- CORE: Geo Resolver ---
@@ -145,26 +155,26 @@ async function resolveLocations(ips: string[]) {
 
 // --- MAIN EXPORT ---
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  // 1. Parallel Fetch
-  const [rawPods, creditsRes] = await Promise.all([
+  // 1. Parallel Fetch (With Fail-Safes)
+  const [rawPods, creditsData] = await Promise.all([
     fetchRawData(),
-    axios.get('https://podcredits.xandeum.network/api/pods-credits').catch(() => ({ data: [] }))
+    fetchCredits()
   ]);
 
-  if (!rawPods) throw new Error("Network Unreachable");
+  if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable");
 
-  // 2. ROBUST CREDITS PARSING (The Fix for Zero Credits)
+  // 2. ROBUST CREDITS PARSING
   const creditsMap = new Map<string, number>();
   const creditsArray: number[] = [];
   
-  // Handle both array format and object wrapper format
-  const rawCredits = Array.isArray(creditsRes.data) ? creditsRes.data : (creditsRes.data?.pods_credits || []);
+  const rawCredits = Array.isArray(creditsData) ? creditsData : (creditsData?.pods_credits || []);
   
   if (Array.isArray(rawCredits)) {
       rawCredits.forEach((c: any) => {
+        // Force parse, default to 0 if NaN
         const val = parseFloat(c.credits || c.amount || '0');
         const key = c.pod_id || c.pubkey || c.node;
-        if (key) {
+        if (key && !isNaN(val)) {
             creditsMap.set(key, val);
             creditsArray.push(val);
         }
@@ -191,18 +201,18 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
     const ip = pod.address.split(':')[0];
     const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
     
-    // TYPE CASTING (The Fix for Zero Storage)
-    const storageCommitted = parseFloat(pod.storage_committed || '0');
-    const storageUsed = parseFloat(pod.storage_used || '0');
+    // SAFETY FORCE CASTING - Prevents "0" strings from breaking math
+    const storageCommitted = Number(pod.storage_committed) || 0;
+    const storageUsed = Number(pod.storage_used) || 0;
     const credits = creditsMap.get(pod.pubkey) || 0;
-    const uptime = pod.uptime || 0;
+    const uptime = Number(pod.uptime) || 0;
     
     const health = calculateVitalityScore(storageCommitted, uptime, pod.version, consensusVersion, medianCredits, credits);
 
     return {
       ...pod,
-      storage_committed: storageCommitted, // Sent as Number
-      storage_used: storageUsed,           // Sent as Number
+      storage_committed: storageCommitted, 
+      storage_used: storageUsed,           
       credits,
       health,
       location: {
