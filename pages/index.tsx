@@ -190,7 +190,6 @@ export default function Home() {
     }
   }, [loading, nodes, router.query.open]);
 
-  // --- ACTIONS ---
   const closeModal = () => { setSelectedNode(null); setCompareMode(false); setShareMode(false); setCompareTarget(null); setShowOpponentSelector(false); setModalView('overview'); setActiveTooltip(null); if (router.query.open) router.replace('/', undefined, { shallow: true }); };
   const handleGlobalClick = () => { if (activeTooltip) setActiveTooltip(null); };
   const handleCompareLink = () => { if (nodes.length > 0) { setSelectedNode(nodes[0]); setCompareMode(true); setIsMenuOpen(false); } };
@@ -502,6 +501,21 @@ export default function Home() {
                                   </>
                               )}
                           </div>
+                      )}
+                  </div>
+                  
+                  <div className={`p-6 border-t flex flex-col gap-4 ${zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/30 border-zinc-800'}`}>
+                      {!compareMode && !shareMode && (
+                          <>
+                              <div className="flex flex-col items-center justify-center gap-3 -mt-2">
+                                  <div className="text-[10px] text-zinc-500 flex items-center gap-1.5 bg-black/40 px-3 py-1 rounded-full border border-zinc-800/50"><Clock size={10} /> Last Seen: <span className="text-zinc-300 font-mono">{timeAgo}</span> <span className="text-zinc-600">({formatDetailedTimestamp(selectedNode.last_seen_timestamp)})</span></div>
+                                  <button onClick={(e) => copyNodeUrl(e, selectedNode.pubkey || '')} className="flex items-center justify-center gap-2 px-6 py-2 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/20 hover:border-blue-500/30 rounded-full text-[10px] font-bold text-blue-400 transition group"><LinkIcon size={12} />{copiedField === 'url' ? 'LINK COPIED' : 'COPY NODE URL'}</button>
+                              </div>
+                              <div className="flex gap-4 mt-1">
+                                  <button onClick={() => setCompareMode(true)} className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] border border-zinc-700"><Swords size={16} className="text-red-400" /> COMPARE NODES</button>
+                                  <button onClick={() => setShareMode(true)} className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] shadow-lg shadow-blue-900/20"><Camera size={16} /> PROOF OF PULSE</button>
+                              </div>
+                          </>
                       )}
                   </div>
               </div>
