@@ -446,6 +446,8 @@ export default function Home() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [cycleStep, setCycleStep] = useState(0);
+  const [isCycleLocked, setIsCycleLocked] = useState(false); // NEW: Lock State
+  const lockTimerRef = useRef<NodeJS.Timeout | null>(null); // NEW: Lock Timer
   const proofRef = useRef<HTMLDivElement>(null);
 
   const [zenMode, setZenMode] = useState(false);
@@ -461,6 +463,36 @@ export default function Home() {
 
   const timeAgo = useTimeAgo(selectedNode?.last_seen_timestamp);
 
+  // --- NEW: Smart Lock Logic for Cycling Cards ---
+  useEffect(() => {
+    // Clear existing timer if any (reset behavior)
+    if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
+
+    // Determine target view based on sort
+    let targetStep = -1;
+    if (sortBy === 'storage') targetStep = 1; // Show Committed Storage
+    else if (sortBy === 'health') targetStep = 2; // Show Health Score
+    else if (sortBy === 'uptime') targetStep = 3; // Show Last Seen (proxy for uptime/activity)
+    
+    // If a valid cycle target exists for this sort type
+    if (targetStep !== -1) {
+        setCycleStep(targetStep);
+        setIsCycleLocked(true);
+
+        // Start 20s countdown to unlock
+        lockTimerRef.current = setTimeout(() => {
+            setIsCycleLocked(false);
+        }, 20000); // 20 Seconds
+    } else {
+        // If sorting by version (or other non-cycle metric), unlock immediately
+        setIsCycleLocked(false);
+    }
+
+    return () => {
+        if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
+    };
+  }, [sortBy]);
+
   useEffect(() => {
     fetchData();
 
@@ -468,8 +500,11 @@ export default function Home() {
     if (saved) setFavorites(JSON.parse(saved));
 
     const cycleInterval = setInterval(() => {
-      setCycleStep((prev) => prev + 1);
-    }, 4000);
+      // UPDATED: Only cycle if NOT locked
+      if (!isCycleLocked) {
+          setCycleStep((prev) => prev + 1);
+      }
+    }, 5000); // 5 seconds per cycle
 
     const tipInterval = setInterval(() => {
       if (!isSearchFocused) {
@@ -498,7 +533,7 @@ export default function Home() {
       window.removeEventListener('scroll', handleScroll);
       document.removeEventListener('keydown', handleEscape);
     };
-  }, [isSearchFocused]);
+  }, [isSearchFocused, isCycleLocked]); // Added isCycleLocked dependency
 
   useEffect(() => {
     if (!loading && nodes.length > 0 && router.query.open) {
@@ -774,8 +809,12 @@ export default function Home() {
     return mostCommonVersion !== 'N/A' && compareVersions(nodeVersion, mostCommonVersion) >= 0;
   };
 
-  const getCycleContent = (node: Node, index: number) => {
-    const step = (cycleStep + index) % 4;
+  // --- CHANGED: Updated for Synchronized Cycling & Locking ---
+  const getCycleContent = (node: Node) => {
+    // 1. Calculate which step to show. If locked, use state. If not, use timer.
+    // The modulo % 4 logic is already handled by the interval update or the manual setCycleStep.
+    // We just read the current 'cycleStep' state.
+    const step = cycleStep % 4;
 
     if (step === 0) {
       return {
@@ -823,7 +862,8 @@ export default function Home() {
 
   // --- RENDER FUNCTIONS ---
   const renderNodeCard = (node: Node, i: number) => {
-    const cycleData = getCycleContent(node, i);
+    // CHANGED: Passing only node, removed index to sync all cards
+    const cycleData = getCycleContent(node);
     const isFav = favorites.includes(node.address || '');
     const latest = isLatest(getSafeVersion(node));
     const flagUrl =
@@ -1047,7 +1087,7 @@ export default function Home() {
       { label: 'RPC Endpoint', val: `http://${getSafeIp(selectedNode)}:6000` },
       { label: 'IP Address', val: getSafeIp(selectedNode) },
       { label: 'Node Version', val: getSafeVersion(selectedNode) },
-      // UPDATED: Added Current Uptime to the details list
+      // UPDATED: Added Current Uptime to details list
       { label: 'Current Uptime', val: formatUptime(selectedNode?.uptime) },
     ];
 
@@ -1105,6 +1145,36 @@ export default function Home() {
               </div>
             </div>
           ))}
+
+          {/* UPDATED: Version Status moved inside left column */}
+          <div
+            className={`mt-6 p-4 rounded-xl border flex items-center gap-3 ${
+              isLatest(getSafeVersion(selectedNode))
+                ? 'bg-green-500/10 border-green-500/30'
+                : 'bg-orange-500/10 border-orange-500/30'
+            }`}
+          >
+            {isLatest(getSafeVersion(selectedNode)) ? (
+              <CheckCircle size={20} className="text-green-500" />
+            ) : (
+              <AlertTriangle size={20} className="text-orange-500" />
+            )}
+            <div>
+              <div
+                className={`text-xs font-bold ${
+                  isLatest(getSafeVersion(selectedNode)) ? 'text-green-400' : 'text-orange-400'
+                }`}
+              >
+                {isLatest(getSafeVersion(selectedNode))
+                  ? 'Node is Up to Date'
+                  : 'Update Recommended'}
+              </div>
+              <div className="text-[10px] text-zinc-500">
+                Current consensus version is{' '}
+                <span className="font-mono text-zinc-300">{mostCommonVersion}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -2289,19 +2359,8 @@ export default function Home() {
                                 </div>
                                 <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
                               </div>
-                              <div className="relative z-10 flex flex-col items-center gap-4">
+                              <div className="relative z-10">
                                 <Shield size={64} className="text-blue-500 opacity-80" />
-                                {isLatest(getSafeVersion(selectedNode)) ? (
-                                  <div className="text-[10px] text-green-500 font-bold bg-green-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-green-500/20">
-                                    <CheckCircle size={12} />
-                                    UP TO DATE
-                                  </div>
-                                ) : (
-                                  <div className="text-[10px] text-orange-500 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-orange-500/20">
-                                    <AlertTriangle size={12} />
-                                    UPDATE NEEDED
-                                  </div>
-                                )}
                               </div>
                               <div className="mt-6 text-center w-full z-10 flex justify-center">
                                 <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
