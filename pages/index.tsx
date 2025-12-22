@@ -137,7 +137,7 @@ const ModalAvatar = ({ node }: { node: Node }) => {
 
   if (code && code !== 'XX') {
     return (
-      <div className="w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center shadow-lg border border-white/10 overflow-hidden bg-zinc-900 relative group">
+      <div className="w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center shadow-lg border border-white/10 overflow-hidden bg-zinc-900 relative group shrink-0">
         <img
           src={`https://flagcdn.com/w160/${code.toLowerCase()}.png`}
           alt="country flag"
@@ -148,7 +148,7 @@ const ModalAvatar = ({ node }: { node: Node }) => {
   }
 
   return (
-    <div className="w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center font-bold text-xl md:text-2xl shadow-lg border border-white/10 bg-gradient-to-br from-blue-600 to-purple-600 text-white">
+    <div className="w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center font-bold text-xl md:text-2xl shadow-lg border border-white/10 bg-gradient-to-br from-blue-600 to-purple-600 text-white shrink-0">
       {node.pubkey?.slice(0, 2) || '??'}
     </div>
   );
@@ -413,6 +413,7 @@ export default function Home() {
 
   const [searchQuery, setSearchQuery] = useState('');
   
+  // DEFAULT: Sort by Storage
   const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'health'>('storage');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -447,6 +448,7 @@ export default function Home() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   
+  // DEFAULT: Start Cycle at 1 (Committed Storage)
   const [cycleStep, setCycleStep] = useState(1);
   const proofRef = useRef<HTMLDivElement>(null);
 
@@ -463,12 +465,18 @@ export default function Home() {
 
   const timeAgo = useTimeAgo(selectedNode?.last_seen_timestamp);
 
+  // --- NEW: Jump-to-View Logic (Instant Switch, No Lock) ---
   useEffect(() => {
+    // Determine target view based on sort
+    // Step 0: Used, Step 1: Committed, Step 2: Health, Step 3: Uptime, Step 4: Last Seen
     let targetStep = -1;
-    if (sortBy === 'storage') targetStep = 1; 
-    else if (sortBy === 'health') targetStep = 2; 
-    else if (sortBy === 'uptime') targetStep = 3; 
+    if (sortBy === 'storage') targetStep = 1; // Committed Storage
+    else if (sortBy === 'health') targetStep = 2; // Health
+    else if (sortBy === 'uptime') targetStep = 3; // NEW: Jump to Uptime
 
+    // If valid target, jump immediately. 
+    // This resets the visual to the user's intent.
+    // The main cycle interval will naturally pick up from here after 5s.
     if (targetStep !== -1) {
         setCycleStep(targetStep);
     }
@@ -480,6 +488,7 @@ export default function Home() {
     const saved = localStorage.getItem('xandeum_favorites');
     if (saved) setFavorites(JSON.parse(saved));
 
+    // Standard 5s Cycle
     const cycleInterval = setInterval(() => {
       setCycleStep((prev) => prev + 1);
     }, 5000);
@@ -856,7 +865,7 @@ export default function Home() {
         ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png`
         : null;
 
-    // NEW: Effect for Version Sort
+    // NEW: Visual Effect when sorting by Version
     const isVersionSort = sortBy === 'version';
 
     return (
@@ -919,7 +928,7 @@ export default function Home() {
             <span className="text-zinc-500">Version</span>
             <div className="flex items-center gap-2">
               <span
-                // CHANGED: Visual pulse effect when sorting by version
+                // CHANGED: Added Pulse/Glow effect for Version Sort
                 className={`text-zinc-300 px-2 py-0.5 rounded transition-all duration-500 ${
                   zenMode ? 'bg-zinc-900 border border-zinc-700' : 'bg-zinc-800'
                 } ${isVersionSort ? 'text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.4)] border-cyan-500/50' : ''}`}
@@ -1078,7 +1087,7 @@ export default function Home() {
       { label: 'RPC Endpoint', val: `http://${getSafeIp(selectedNode)}:6000` },
       { label: 'IP Address', val: getSafeIp(selectedNode) },
       { label: 'Node Version', val: getSafeVersion(selectedNode) },
-      // UPDATED: Added Current Uptime to details list with orange color
+      // UPDATED: Uptime with Orange Color
       { label: 'Current Uptime', val: formatUptime(selectedNode?.uptime), color: 'text-orange-400' },
     ];
 
@@ -1100,9 +1109,10 @@ export default function Home() {
           </h3>
           <button
             onClick={() => setModalView('overview')}
-            className="text-[10px] font-bold text-zinc-500 hover:text-white flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 transition"
+            // UPDATED: Back button uses red text and arrow-left icon
+            className="text-[10px] font-bold text-red-500 hover:text-red-400 flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 transition"
           >
-            <ChevronLeft size={10} /> BACK
+            <ArrowLeft size={10} /> BACK
           </button>
         </div>
 
@@ -1205,9 +1215,10 @@ export default function Home() {
           </h3>
           <button
             onClick={() => setModalView('overview')}
-            className="text-[10px] font-bold text-zinc-500 hover:text-white flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 transition"
+            // UPDATED: Back button uses red text and arrow-left icon
+            className="text-[10px] font-bold text-red-500 hover:text-red-400 flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 transition"
           >
-            <ChevronLeft size={10} /> BACK
+            <ArrowLeft size={10} /> BACK
           </button>
         </div>
 
@@ -1313,9 +1324,10 @@ export default function Home() {
           </h3>
           <button
             onClick={() => setModalView('overview')}
-            className="text-[10px] font-bold text-zinc-500 hover:text-white flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 transition"
+            // UPDATED: Back button uses red text and arrow-left icon
+            className="text-[10px] font-bold text-red-500 hover:text-red-400 flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 transition"
           >
-            <ChevronLeft size={10} /> BACK
+            <ArrowLeft size={10} /> BACK
           </button>
         </div>
 
@@ -1870,43 +1882,45 @@ export default function Home() {
             }`}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* -- MODAL HEADER (Responsive Fix) -- */}
             <div
-              className={`p-6 border-b flex justify-between items-start ${
+              className={`shrink-0 p-4 md:p-6 border-b flex justify-between items-start ${
                 zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'
               }`}
             >
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 md:gap-4">
                 <ModalAvatar node={selectedNode} />
                 <div>
                   <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
-                    <h2 className="text-2xl font-black font-sans tracking-tight text-white mb-0.5">
+                    {/* Responsive Font Size */}
+                    <h2 className="text-lg md:text-2xl font-black font-sans tracking-tight text-white mb-0.5">
                       NODE INSPECTOR
                     </h2>
                     <button
                       onClick={(e) => toggleFavorite(e, selectedNode.address || '')}
                       // UPDATED: Favorites button is now larger with toggle text
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition group w-fit ${
+                      className={`flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-xl border transition group w-fit ${
                         favorites.includes(selectedNode.address || '') 
                         ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500 hover:bg-yellow-500/20' 
                         : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-400'
                       }`}
                     >
                       <Star
-                        size={16}
+                        size={14}
                         className={
                           favorites.includes(selectedNode.address || '')
                             ? 'fill-yellow-500'
                             : 'group-hover:text-yellow-500'
                         }
                       />
-                      <span className="text-xs font-bold uppercase leading-none">
+                      <span className="text-[10px] md:text-xs font-bold uppercase leading-none">
                         {favorites.includes(selectedNode.address || '') ? 'REMOVE WATCHLIST' : 'ADD TO WATCHLIST'}
                       </span>
                     </button>
                   </div>
 
                   <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono mt-1">
-                    <span className="text-zinc-400">
+                    <span className="text-zinc-400 truncate max-w-[120px] md:max-w-none">
                       {selectedNode.pubkey ? `${selectedNode.pubkey.slice(0, 12)}...` : 'Unknown'}
                     </span>
                     <Copy
@@ -1935,14 +1949,15 @@ export default function Home() {
               <div className="flex flex-col items-end gap-2">
                 <button
                   onClick={closeModal}
-                  className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition group"
+                  className="p-2 md:p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition group"
                 >
-                  <X size={24} className="group-hover:scale-110 transition-transform" />
+                  <X size={20} className="group-hover:scale-110 transition-transform" />
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 relative">
+            {/* -- SCROLLABLE CONTENT (Includes Footer Buttons Now) -- */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 relative flex flex-col">
               {compareMode ? (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300 h-full flex flex-col relative">
                   <div className="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
@@ -2720,16 +2735,11 @@ export default function Home() {
                   </div>
                 </>
               )}
-            </div>
 
-            <div
-              className={`p-6 border-t flex flex-col gap-4 ${
-                zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/30 border-zinc-800'
-              }`}
-            >
+              {/* --- FOOTER CONTENT MOVED INSIDE SCROLLABLE AREA (MOBILE FIX) --- */}
               {!compareMode && !shareMode && (
-                <>
-                  <div className="flex flex-col items-center justify-center gap-3 -mt-2">
+                <div className="mt-6 pt-6 border-t border-zinc-800 flex flex-col gap-4">
+                  <div className="flex flex-col items-center justify-center gap-3">
                     <div className="text-[10px] text-zinc-500 flex items-center gap-1.5 bg-black/40 px-3 py-1 rounded-full border border-zinc-800/50">
                       <Clock size={10} /> Last Seen:{' '}
                       <span className="text-zinc-300 font-mono">{timeAgo}</span>{' '}
@@ -2746,7 +2756,7 @@ export default function Home() {
                     </button>
                   </div>
 
-                  <div className="flex gap-4 mt-1">
+                  <div className="flex gap-4">
                     <button
                       onClick={() => setCompareMode(true)}
                       className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] border border-zinc-700"
@@ -2760,7 +2770,7 @@ export default function Home() {
                       <Camera size={16} /> PROOF OF PULSE
                     </button>
                   </div>
-                </>
+                </div>
               )}
             </div>
           </div>
