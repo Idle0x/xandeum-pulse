@@ -74,7 +74,6 @@ interface Node {
     city: string;
   };
   health?: number;
-  // UPDATED: 'capacity' renamed to 'storage' to match the new Brain V2 logic
   healthBreakdown?: {
     uptime: number;
     version: number;
@@ -166,7 +165,6 @@ const useTimeAgo = (timestamp: number | undefined) => {
       const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
       const diff = Math.floor((now - time) / 1000);
 
-      // FIXED: Restored correct string interpolation syntax
       if (diff < 60) {
         setTimeAgo(`${diff} second${diff !== 1 ? 's' : ''} ago`);
       } else if (diff < 3600) {
@@ -207,7 +205,6 @@ const formatUptime = (seconds: number | undefined) => {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
 
-  // FIXED: Restored correct string interpolation syntax
   return d > 0 ? `${d}d ${h}h` : `${h}h`;
 };
 
@@ -424,7 +421,6 @@ export default function Home() {
   const [scrolled, setScrolled] = useState(false);
   const [lastSync, setLastSync] = useState<string>('Syncing...');
 
-  // UPDATED: Initial state uses 'storage' instead of 'capacity'
   const [networkStats, setNetworkStats] = useState({
     avgBreakdown: { uptime: 0, version: 0, reputation: 0, storage: 0, total: 0 },
     totalNodes: 0,
@@ -584,7 +580,6 @@ export default function Home() {
 
   const copyStatusReport = (node: Node) => {
     const health = node.health || 0;
-    // FIXED: Corrected string interpolation
     const report = `[XANDEUM PULSE REPORT]\nNode: ${node.address || 'Unknown'}\nStatus: ${
       (node.uptime || 0) > 86400 ? 'STABLE' : 'BOOTING'
     }\nHealth: ${health}/100\nMonitor at: https://xandeum-pulse.vercel.app`;
@@ -600,7 +595,6 @@ export default function Home() {
       (node.uptime || 0) > 86400 ? 'Stable' : 'Booting'
     }\n❤️ Health: ${health}/100\n💰 Credits: ${node.credits?.toLocaleString() || 0}\n\nMonitor here:`;
 
-    // FIXED: Corrected string interpolation
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(
         'https://xandeum-pulse.vercel.app'
@@ -611,7 +605,6 @@ export default function Home() {
 
   const copyNodeUrl = (e: React.MouseEvent, pubkey: string) => {
     e.stopPropagation();
-    // FIXED: Corrected string interpolation
     const url = `${window.location.origin}/?open=${pubkey}`;
     navigator.clipboard.writeText(url);
     setCopiedField('url');
@@ -628,7 +621,6 @@ export default function Home() {
       const country = n.location?.countryName || 'Unknown';
       const isoTime = new Date(n.last_seen_timestamp || Date.now()).toISOString();
 
-      // FIXED: Corrected string interpolation
       return `${getSafeIp(n)},${n.pubkey || 'Unknown'},${n.rank},${n.credits},${getSafeVersion(
         n
       )},${n.uptime},${n.storage_committed},${n.storage_used},${utilization},${health},${country},${isoTime},${
@@ -868,7 +860,6 @@ export default function Home() {
                   zenMode ? 'text-zinc-300' : 'text-zinc-300'
                 }`}
               >
-                {/* FIXED: Restored correct string interpolation */}
                 {(node.pubkey || '').length > 12
                   ? `${(node.pubkey || '').slice(0, 12)}...${(node.pubkey || '').slice(-4)}`
                   : node.pubkey || 'Unknown Identity'}
@@ -1056,6 +1047,8 @@ export default function Home() {
       { label: 'RPC Endpoint', val: `http://${getSafeIp(selectedNode)}:6000` },
       { label: 'IP Address', val: getSafeIp(selectedNode) },
       { label: 'Node Version', val: getSafeVersion(selectedNode) },
+      // UPDATED: Added Current Uptime to the details list
+      { label: 'Current Uptime', val: formatUptime(selectedNode?.uptime) },
     ];
 
     return (
@@ -1112,35 +1105,6 @@ export default function Home() {
               </div>
             </div>
           ))}
-
-          <div
-            className={`mt-6 p-4 rounded-xl border flex items-center gap-3 ${
-              isLatest(getSafeVersion(selectedNode))
-                ? 'bg-green-500/10 border-green-500/30'
-                : 'bg-orange-500/10 border-orange-500/30'
-            }`}
-          >
-            {isLatest(getSafeVersion(selectedNode)) ? (
-              <CheckCircle size={20} className="text-green-500" />
-            ) : (
-              <AlertTriangle size={20} className="text-orange-500" />
-            )}
-            <div>
-              <div
-                className={`text-xs font-bold ${
-                  isLatest(getSafeVersion(selectedNode)) ? 'text-green-400' : 'text-orange-400'
-                }`}
-              >
-                {isLatest(getSafeVersion(selectedNode))
-                  ? 'Node is Up to Date'
-                  : 'Update Recommended'}
-              </div>
-              <div className="text-[10px] text-zinc-500">
-                Current consensus version is{' '}
-                <span className="font-mono text-zinc-300">{mostCommonVersion}</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     );
@@ -1148,12 +1112,12 @@ export default function Home() {
 
   const renderHealthBreakdown = () => {
     const health = selectedNode?.health || 0;
-    // UPDATED: Using 'storage' correctly here from the new backend data structure
+    // UPDATED: Using 'storage' correctly here from the new backend
     const bd = selectedNode?.healthBreakdown || {
       uptime: health,
       version: health,
       reputation: health,
-      storage: health, 
+      storage: health,
     };
     const avgs = networkStats.avgBreakdown;
     const totalNodes = networkStats.totalNodes || 1;
@@ -1862,20 +1826,24 @@ export default function Home() {
                     </h2>
                     <button
                       onClick={(e) => toggleFavorite(e, selectedNode.address || '')}
-                      className="flex items-center gap-2 p-1.5 rounded-lg border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 transition group w-fit"
+                      // UPDATED: Favorites button is now larger with toggle text
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition group w-fit ${
+                        favorites.includes(selectedNode.address || '') 
+                        ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500 hover:bg-yellow-500/20' 
+                        : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-400'
+                      }`}
                     >
                       <Star
                         size={16}
                         className={
                           favorites.includes(selectedNode.address || '')
-                            ? 'text-yellow-500 fill-yellow-500'
-                            : 'text-zinc-500 group-hover:text-yellow-500'
+                            ? 'fill-yellow-500'
+                            : 'group-hover:text-yellow-500'
                         }
                       />
-                      <div className="flex flex-col text-[8px] font-bold uppercase leading-none text-zinc-500 text-left">
-                        <span>ADD TO</span>
-                        <span>WATCHLIST</span>
-                      </div>
+                      <span className="text-xs font-bold uppercase leading-none">
+                        {favorites.includes(selectedNode.address || '') ? 'REMOVE WATCHLIST' : 'ADD TO WATCHLIST'}
+                      </span>
                     </button>
                   </div>
 
@@ -2321,8 +2289,19 @@ export default function Home() {
                                 </div>
                                 <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
                               </div>
-                              <div className="relative z-10">
+                              <div className="relative z-10 flex flex-col items-center gap-4">
                                 <Shield size={64} className="text-blue-500 opacity-80" />
+                                {isLatest(getSafeVersion(selectedNode)) ? (
+                                  <div className="text-[10px] text-green-500 font-bold bg-green-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-green-500/20">
+                                    <CheckCircle size={12} />
+                                    UP TO DATE
+                                  </div>
+                                ) : (
+                                  <div className="text-[10px] text-orange-500 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-orange-500/20">
+                                    <AlertTriangle size={12} />
+                                    UPDATE NEEDED
+                                  </div>
+                                )}
                               </div>
                               <div className="mt-6 text-center w-full z-10 flex justify-center">
                                 <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
@@ -2528,13 +2507,20 @@ export default function Home() {
                                 {getSafeVersion(selectedNode)}
                               </div>
 
+                              {/* UPDATED: Added Uptime Display beneath version in collapsed view */}
+                              <div className="text-xs text-zinc-500 mt-1 font-mono flex items-center gap-1">
+                                <Clock size={12} className="text-zinc-600" />
+                                Up: <span className="text-zinc-400">{formatUptime(selectedNode.uptime)}</span>
+                              </div>
+
+                              {/* Existing status pill below uptime */}
                               {isLatest(getSafeVersion(selectedNode)) ? (
-                                <div className="text-[10px] text-green-500 mt-1 font-bold bg-green-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
+                                <div className="text-[10px] text-green-500 mt-2 font-bold bg-green-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
                                   <CheckCircle size={10} />
                                   UP TO DATE
                                 </div>
                               ) : (
-                                <div className="text-[10px] text-orange-500 mt-1 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
+                                <div className="text-[10px] text-orange-500 mt-2 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
                                   <AlertTriangle size={10} />
                                   UPDATE NEEDED
                                 </div>
