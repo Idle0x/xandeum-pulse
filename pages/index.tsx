@@ -412,7 +412,9 @@ export default function Home() {
   const [error, setError] = useState('');
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'health'>('uptime');
+  
+  // CHANGED: Default sort is now 'storage' as requested
+  const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'health'>('storage');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const [searchTipIndex, setSearchTipIndex] = useState(0);
@@ -445,9 +447,13 @@ export default function Home() {
 
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [cycleStep, setCycleStep] = useState(0);
-  const [isCycleLocked, setIsCycleLocked] = useState(false); // NEW: Lock State
-  const lockTimerRef = useRef<NodeJS.Timeout | null>(null); // NEW: Lock Timer
+  
+  // CHANGED: Cycle step defaults to 1 (Committed Storage) to match default sort
+  const [cycleStep, setCycleStep] = useState(1);
+  const [isCycleLocked, setIsCycleLocked] = useState(false);
+  const lockTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isFirstRun = useRef(true); // NEW: To prevent lock on initial load
+  
   const proofRef = useRef<HTMLDivElement>(null);
 
   const [zenMode, setZenMode] = useState(false);
@@ -463,28 +469,34 @@ export default function Home() {
 
   const timeAgo = useTimeAgo(selectedNode?.last_seen_timestamp);
 
-  // --- NEW: Smart Lock Logic for Cycling Cards ---
+  // --- CHANGED: Smart Lock Logic Fixed ---
   useEffect(() => {
-    // Clear existing timer if any (reset behavior)
+    // 1. If it's the very first render, just mark it done and skip locking.
+    if (isFirstRun.current) {
+        isFirstRun.current = false;
+        return; 
+    }
+
     if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
 
-    // Determine target view based on sort
     let targetStep = -1;
-    if (sortBy === 'storage') targetStep = 1; // Show Committed Storage
-    else if (sortBy === 'health') targetStep = 2; // Show Health Score
-    else if (sortBy === 'uptime') targetStep = 3; // Show Last Seen (proxy for uptime/activity)
+    // Map Sort keys to Cycle Steps
+    // Step 0: Used, Step 1: Committed, Step 2: Health, Step 3: Last Seen
+    if (sortBy === 'storage') targetStep = 1; // Default to Committed
+    else if (sortBy === 'health') targetStep = 2; 
+    else if (sortBy === 'uptime') targetStep = 3; 
     
-    // If a valid cycle target exists for this sort type
     if (targetStep !== -1) {
         setCycleStep(targetStep);
         setIsCycleLocked(true);
 
-        // Start 20s countdown to unlock
         lockTimerRef.current = setTimeout(() => {
+            // 2. UNLOCK
             setIsCycleLocked(false);
-        }, 20000); // 20 Seconds
+            // 3. IMMEDIATELY ADVANCE (Fixing the 24s lag issue)
+            setCycleStep(prev => prev + 1); 
+        }, 20000); // Exactly 20 Seconds
     } else {
-        // If sorting by version (or other non-cycle metric), unlock immediately
         setIsCycleLocked(false);
     }
 
@@ -499,12 +511,12 @@ export default function Home() {
     const saved = localStorage.getItem('xandeum_favorites');
     if (saved) setFavorites(JSON.parse(saved));
 
+    // UPDATED: Cycle logic respects lock
     const cycleInterval = setInterval(() => {
-      // UPDATED: Only cycle if NOT locked
       if (!isCycleLocked) {
           setCycleStep((prev) => prev + 1);
       }
-    }, 5000); // 5 seconds per cycle
+    }, 5000); 
 
     const tipInterval = setInterval(() => {
       if (!isSearchFocused) {
@@ -533,7 +545,7 @@ export default function Home() {
       window.removeEventListener('scroll', handleScroll);
       document.removeEventListener('keydown', handleEscape);
     };
-  }, [isSearchFocused, isCycleLocked]); // Added isCycleLocked dependency
+  }, [isSearchFocused, isCycleLocked]); // Re-binds interval when lock state changes
 
   useEffect(() => {
     if (!loading && nodes.length > 0 && router.query.open) {
@@ -809,11 +821,8 @@ export default function Home() {
     return mostCommonVersion !== 'N/A' && compareVersions(nodeVersion, mostCommonVersion) >= 0;
   };
 
-  // --- CHANGED: Updated for Synchronized Cycling & Locking ---
   const getCycleContent = (node: Node) => {
-    // 1. Calculate which step to show. If locked, use state. If not, use timer.
-    // The modulo % 4 logic is already handled by the interval update or the manual setCycleStep.
-    // We just read the current 'cycleStep' state.
+    // Synchronized cycle step, controlled by state
     const step = cycleStep % 4;
 
     if (step === 0) {
@@ -862,7 +871,6 @@ export default function Home() {
 
   // --- RENDER FUNCTIONS ---
   const renderNodeCard = (node: Node, i: number) => {
-    // CHANGED: Passing only node, removed index to sync all cards
     const cycleData = getCycleContent(node);
     const isFav = favorites.includes(node.address || '');
     const latest = isLatest(getSafeVersion(node));
@@ -1087,7 +1095,6 @@ export default function Home() {
       { label: 'RPC Endpoint', val: `http://${getSafeIp(selectedNode)}:6000` },
       { label: 'IP Address', val: getSafeIp(selectedNode) },
       { label: 'Node Version', val: getSafeVersion(selectedNode) },
-      // UPDATED: Added Current Uptime to details list
       { label: 'Current Uptime', val: formatUptime(selectedNode?.uptime) },
     ];
 
@@ -1146,7 +1153,6 @@ export default function Home() {
             </div>
           ))}
 
-          {/* UPDATED: Version Status moved inside left column */}
           <div
             className={`mt-6 p-4 rounded-xl border flex items-center gap-3 ${
               isLatest(getSafeVersion(selectedNode))
@@ -1182,7 +1188,6 @@ export default function Home() {
 
   const renderHealthBreakdown = () => {
     const health = selectedNode?.health || 0;
-    // UPDATED: Using 'storage' correctly here from the new backend
     const bd = selectedNode?.healthBreakdown || {
       uptime: health,
       version: health,
@@ -1197,7 +1202,6 @@ export default function Home() {
     const netAvgHealth = avgs.total || 50;
     const diff = health - netAvgHealth;
 
-    // UPDATED: Metric labels match new logic
     const metrics = [
       { label: 'Storage Capacity', val: bd.storage, avg: avgs.storage },
       { label: 'Reputation Score', val: bd.reputation, avg: avgs.reputation },
@@ -2359,8 +2363,19 @@ export default function Home() {
                                 </div>
                                 <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
                               </div>
-                              <div className="relative z-10">
+                              <div className="relative z-10 flex flex-col items-center gap-4">
                                 <Shield size={64} className="text-blue-500 opacity-80" />
+                                {isLatest(getSafeVersion(selectedNode)) ? (
+                                  <div className="text-[10px] text-green-500 font-bold bg-green-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-green-500/20">
+                                    <CheckCircle size={12} />
+                                    UP TO DATE
+                                  </div>
+                                ) : (
+                                  <div className="text-[10px] text-orange-500 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-orange-500/20">
+                                    <AlertTriangle size={12} />
+                                    UPDATE NEEDED
+                                  </div>
+                                )}
                               </div>
                               <div className="mt-6 text-center w-full z-10 flex justify-center">
                                 <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
