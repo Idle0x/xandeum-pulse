@@ -40,12 +40,14 @@ export interface EnrichedNode {
   rank?: number;
 }
 
-// Helper: Semver Comparison
+// Helper: Standard Semver Comparison to sort the list correctly
 const compareVersions = (v1: string, v2: string) => {
-  const s1 = v1 || '0.0.0';
-  const s2 = v2 || '0.0.0';
-  const p1 = s1.replace(/[^0-9.]/g, '').split('.').map(Number);
-  const p2 = s2.replace(/[^0-9.]/g, '').split('.').map(Number);
+  const s1 = (v1 || '0.0.0').replace(/[^0-9.]/g, ''); // Remove suffixes like '-trynet'
+  const s2 = (v2 || '0.0.0').replace(/[^0-9.]/g, '');
+  
+  const p1 = s1.split('.').map(Number);
+  const p2 = s2.split('.').map(Number);
+  
   for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
     const n1 = p1[i] || 0;
     const n2 = p2[i] || 0;
@@ -55,30 +57,55 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
-// --- V2 MATH HELPERS ---
+// --- MATH HELPERS V2.1 ---
 
-// Sigmoid Function: Creates a smooth "S" curve for trust
-// [attachment_0](attachment)
+// 1. Sigmoid Function: Smooth "S" curve for trust
 const calculateSigmoidScore = (value: number, midpoint: number, steepness: number) => {
     return 100 / (1 + Math.exp(-steepness * (value - midpoint)));
 };
 
-// Logarithmic Function: Rewards growth early, diminishes returns for whales
-// [attachment_1](attachment)
+// 2. Logarithmic Function: Fair relative scaling
 const calculateLogScore = (value: number, median: number) => {
     if (median === 0) return value > 0 ? 100 : 0;
     const ratio = value / median;
-    // Formula: Score hits 50 at median, 100 at 4x median
+    // Score hits 50 at median, 100 at 4x median
     return Math.min(100, 50 * Math.log2(ratio + 1));
 };
 
-// --- MAIN SCORING LOGIC V2 ---
+// 3. Network Rank Distance (The Fix for Version Gaps)
+const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedUniqueVersions: string[]) => {
+    if (nodeVersion === consensusVersion) return 100;
+
+    // Find indices in the sorted list (High to Low)
+    const consensusIndex = sortedUniqueVersions.indexOf(consensusVersion);
+    const nodeIndex = sortedUniqueVersions.indexOf(nodeVersion);
+
+    // Safety fallback if version not found (shouldn't happen as list is built from scan)
+    if (nodeIndex === -1) return 0;
+
+    // "Distance" is simply how many active versions exist between you and consensus
+    // If Consensus is index 0, and you are index 1 -> Distance is 1.
+    const distance = nodeIndex - consensusIndex;
+
+    // If you are AHEAD of consensus (negative distance), full score
+    if (distance < 0) return 100;
+
+    // Penalize by Rank Step, not numerical value
+    // 1 step behind = 90 (Safe)
+    // 2 steps behind = 80
+    // 3 steps behind = 70
+    // ...
+    // Floor at 0
+    return Math.max(0, 100 - (distance * 10));
+};
+
+// --- MAIN SCORING LOGIC V2.1 ---
 const calculateVitalityScore = (
     storageCommitted: number, 
     uptimeSeconds: number, 
     version: string, 
     consensusVersion: string, 
-    latestVersion: string,
+    sortedUniqueVersions: string[], // New Parameter: The List of Reality
     medianCredits: number, 
     credits: number,
     medianStorage: number
@@ -89,32 +116,22 @@ const calculateVitalityScore = (
   }
 
   // 2. UPTIME SCORE (Weight: 35%) -> Sigmoid Curve
-  // Midpoint = 7 days, Steepness = 0.2
   const uptimeDays = uptimeSeconds / 86400;
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
-  // Penalize brand new nodes (< 24h) hard
-  if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20);
+  if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); // Hard penalty for <24h
 
   // 3. CAPACITY SCORE (Weight: 30%) -> Logarithmic Relative to Network
   const capacityScore = calculateLogScore(storageCommitted, medianStorage);
 
   // 4. REPUTATION SCORE (Weight: 20%) -> Linear Relative with Decay
-  // Median = 50pts, 2x Median = 100pts
   let reputationScore = 0;
   if (medianCredits > 0) {
       reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
   }
 
-  // 5. VERSION SCORE (Weight: 15%) -> Consensus Aware
-  let versionScore = 0;
-  if (version === latestVersion) versionScore = 100;
-  else if (version === consensusVersion) versionScore = 95; // Safe lag
-  else {
-      // Check distance
-      const diff = compareVersions(version, consensusVersion);
-      if (diff >= -1) versionScore = 80; // 1 minor version behind
-      else versionScore = 0; // Major lag / Unsafe
-  }
+  // 5. VERSION SCORE (Weight: 15%) -> Rank-Based Network Awareness
+  // This ignores numerical gaps (e.g. 1.1 -> 2.5) and only counts active steps.
+  const versionScore = getVersionScoreByRank(version, consensusVersion, sortedUniqueVersions);
 
   // WEIGHTED TOTAL
   const total = Math.round(
@@ -185,7 +202,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const [rawPods, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
   if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable");
 
-  // 1. Process Credits & Calculate Median Credits
+  // 1. Process Credits
   const creditsMap = new Map<string, number>();
   const creditsArray: number[] = [];
   const rawCredits = Array.isArray(creditsData) ? creditsData : (creditsData?.pods_credits || []);
@@ -199,28 +216,32 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   creditsArray.sort((a, b) => a - b);
   const medianCredits = creditsArray.length ? creditsArray[Math.floor(creditsArray.length / 2)] : 0;
 
-  // 2. Calculate Median Storage (CRITICAL FOR V2)
+  // 2. Calculate Median Storage
   const storageArray: number[] = rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
   const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
 
-  // 3. Determine Versions (Consensus & Latest)
+  // 3. Determine Versions & Create "The List of Reality"
   const versionCounts: Record<string, number> = {};
-  const uniqueVersions: string[] = [];
+  const uniqueVersionsSet = new Set<string>();
+  
   rawPods.forEach((p: any) => { 
       const v = p.version || '0.0.0'; 
       versionCounts[v] = (versionCounts[v] || 0) + 1;
-      if (!uniqueVersions.includes(v)) uniqueVersions.push(v);
+      uniqueVersionsSet.add(v);
   });
   
+  // Sort by count to find consensus (most popular = consensus)
   const consensusVersion = Object.keys(versionCounts).sort((a, b) => versionCounts[b] - versionCounts[a])[0] || '0.0.0';
-  // Simple assumption: "Latest" is the highest semver in the list
-  const latestVersion = uniqueVersions.sort((a, b) => compareVersions(b, a))[0] || consensusVersion;
+  
+  // Create sorted list of ALL active versions (High -> Low)
+  // This is the key to Rank-Based Scoring
+  const sortedUniqueVersions = Array.from(uniqueVersionsSet).sort((a, b) => compareVersions(b, a));
 
   // 4. Resolve Locations
   const uniqueIps = [...new Set(rawPods.map((p: any) => p.address.split(':')[0]))] as string[];
   await resolveLocations(uniqueIps);
 
-  // 5. Build Nodes with V2 Logic
+  // 5. Build Nodes with V2.1 Logic
   let sumUptimeScore = 0;
   let sumVersionScore = 0;
   let sumReputationScore = 0;
@@ -236,13 +257,13 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
     const credits = creditsMap.get(pod.pubkey) || 0;
     const uptime = Number(pod.uptime) || 0;
     
-    // --- V2 CALCULATION CALL ---
+    // --- V2.1 SCORE CALL ---
     const vitality = calculateVitalityScore(
         storageCommitted, 
         uptime, 
         pod.version || '0.0.0', 
         consensusVersion, 
-        latestVersion,
+        sortedUniqueVersions, // Pass the active network versions list
         medianCredits, 
         credits,
         medianStorage
@@ -277,7 +298,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
     stats: { 
         consensusVersion, 
         medianCredits, 
-        medianStorage, // Exposed for frontend if needed
+        medianStorage,
         totalNodes: total,
         avgBreakdown: {
             uptime: Math.round(sumUptimeScore / total),
