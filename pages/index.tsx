@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
@@ -413,7 +413,7 @@ export default function Home() {
 
   const [searchQuery, setSearchQuery] = useState('');
   
-  // CHANGED: Default sort is now 'storage' as requested
+  // DEFAULT: Sort by Storage
   const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'health'>('storage');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -448,12 +448,8 @@ export default function Home() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   
-  // CHANGED: Cycle step defaults to 1 (Committed Storage) to match default sort
+  // DEFAULT: Start Cycle at 1 (Committed Storage)
   const [cycleStep, setCycleStep] = useState(1);
-  const [isCycleLocked, setIsCycleLocked] = useState(false);
-  const lockTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isFirstRun = useRef(true); // NEW: To prevent lock on initial load
-  
   const proofRef = useRef<HTMLDivElement>(null);
 
   const [zenMode, setZenMode] = useState(false);
@@ -469,40 +465,19 @@ export default function Home() {
 
   const timeAgo = useTimeAgo(selectedNode?.last_seen_timestamp);
 
-  // --- CHANGED: Smart Lock Logic Fixed ---
+  // --- NEW: Jump-to-View Logic (No Locking) ---
   useEffect(() => {
-    // 1. If it's the very first render, just mark it done and skip locking.
-    if (isFirstRun.current) {
-        isFirstRun.current = false;
-        return; 
-    }
-
-    if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
-
-    let targetStep = -1;
-    // Map Sort keys to Cycle Steps
+    // Determine target view based on sort
     // Step 0: Used, Step 1: Committed, Step 2: Health, Step 3: Last Seen
-    if (sortBy === 'storage') targetStep = 1; // Default to Committed
-    else if (sortBy === 'health') targetStep = 2; 
-    else if (sortBy === 'uptime') targetStep = 3; 
-    
+    let targetStep = -1;
+    if (sortBy === 'storage') targetStep = 1; // Committed Storage
+    else if (sortBy === 'health') targetStep = 2; // Health
+    else if (sortBy === 'uptime') targetStep = 3; // Last Seen
+
+    // If valid target, jump immediately
     if (targetStep !== -1) {
         setCycleStep(targetStep);
-        setIsCycleLocked(true);
-
-        lockTimerRef.current = setTimeout(() => {
-            // 2. UNLOCK
-            setIsCycleLocked(false);
-            // 3. IMMEDIATELY ADVANCE (Fixing the 24s lag issue)
-            setCycleStep(prev => prev + 1); 
-        }, 20000); // Exactly 20 Seconds
-    } else {
-        setIsCycleLocked(false);
     }
-
-    return () => {
-        if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
-    };
   }, [sortBy]);
 
   useEffect(() => {
@@ -511,12 +486,10 @@ export default function Home() {
     const saved = localStorage.getItem('xandeum_favorites');
     if (saved) setFavorites(JSON.parse(saved));
 
-    // UPDATED: Cycle logic respects lock
+    // Standard 5s Cycle
     const cycleInterval = setInterval(() => {
-      if (!isCycleLocked) {
-          setCycleStep((prev) => prev + 1);
-      }
-    }, 5000); 
+      setCycleStep((prev) => prev + 1);
+    }, 5000);
 
     const tipInterval = setInterval(() => {
       if (!isSearchFocused) {
@@ -545,7 +518,7 @@ export default function Home() {
       window.removeEventListener('scroll', handleScroll);
       document.removeEventListener('keydown', handleEscape);
     };
-  }, [isSearchFocused, isCycleLocked]); // Re-binds interval when lock state changes
+  }, [isSearchFocused]);
 
   useEffect(() => {
     if (!loading && nodes.length > 0 && router.query.open) {
@@ -821,8 +794,9 @@ export default function Home() {
     return mostCommonVersion !== 'N/A' && compareVersions(nodeVersion, mostCommonVersion) >= 0;
   };
 
+  // --- CHANGED: Standard Synchronized Cycle ---
   const getCycleContent = (node: Node) => {
-    // Synchronized cycle step, controlled by state
+    // Simply use the step from state
     const step = cycleStep % 4;
 
     if (step === 0) {
