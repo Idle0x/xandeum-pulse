@@ -115,14 +115,12 @@ export default function Home() {
   const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'health'>('uptime');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
-  // UX STATE
   const [searchTipIndex, setSearchTipIndex] = useState(0);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null); 
   const [scrolled, setScrolled] = useState(false); 
   const [lastSync, setLastSync] = useState<string>('Syncing...');
 
-  // Store Global Network Averages
   const [networkStats, setNetworkStats] = useState({
       avgBreakdown: { uptime: 0, version: 0, reputation: 0, capacity: 0, total: 0 },
       totalNodes: 0
@@ -137,7 +135,6 @@ export default function Home() {
     "Copy node url to share a direct link to your diagnostics, reputation or topology"
   ];
 
-  // MODAL STATES
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const [compareTarget, setCompareTarget] = useState<Node | null>(null);
@@ -150,7 +147,6 @@ export default function Home() {
   const [copiedField, setCopiedField] = useState<string | null>(null); 
   const [cycleStep, setCycleStep] = useState(0);
 
-  // GLOBAL STATES
   const [zenMode, setZenMode] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -168,14 +164,11 @@ export default function Home() {
     fetchData();
     const saved = localStorage.getItem('xandeum_favorites');
     if (saved) setFavorites(JSON.parse(saved));
-    
     const cycleInterval = setInterval(() => { setCycleStep(prev => prev + 1); }, 4000);
     const tipInterval = setInterval(() => { if (!isSearchFocused) setSearchTipIndex(prev => (prev + 1) % searchTips.length); }, 9000);
     const dataInterval = setInterval(fetchData, 30000);
     
-    const handleScroll = () => {
-        setScrolled(window.scrollY > 50);
-    };
+    const handleScroll = () => { setScrolled(window.scrollY > 50); };
     window.addEventListener('scroll', handleScroll);
     
     const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') { closeModal(); } };
@@ -198,7 +191,6 @@ export default function Home() {
     }
   }, [loading, nodes, router.query.open]);
 
-  // --- ACTIONS ---
   const closeModal = () => { setSelectedNode(null); setCompareMode(false); setShareMode(false); setCompareTarget(null); setShowOpponentSelector(false); setModalView('overview'); setActiveTooltip(null); if (router.query.open) router.replace('/', undefined, { shallow: true }); };
   const handleGlobalClick = () => { if (activeTooltip) setActiveTooltip(null); };
   const handleCompareLink = () => { if (nodes.length > 0) { setSelectedNode(nodes[0]); setCompareMode(true); setIsMenuOpen(false); } };
@@ -287,7 +279,6 @@ export default function Home() {
       return (<div className="animate-in fade-in slide-in-from-right-2 duration-200 h-full flex flex-col"><div className="flex justify-between items-center mb-6"><h3 className={`text-xs font-bold tracking-widest uppercase flex items-center gap-2 ${zenMode ? 'text-zinc-200' : 'text-zinc-500'}`}><Shield size={14} /> IDENTITY & STATUS <span className="relative group/tip ml-1"><HelpCircle size={12} className="cursor-help opacity-50 hover:opacity-100" /><div className="absolute bottom-full mb-2 hidden group-hover/tip:block bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 w-48 z-50">Public identity and version status.</div></span></h3><button onClick={() => setModalView('overview')} className="text-[10px] font-bold text-zinc-500 hover:text-white flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 transition"><ChevronLeft size={10} /> BACK</button></div><div className="space-y-4 flex-grow">{details.map((d) => (<div key={d.label} className={`p-4 rounded-xl border ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/30 border-zinc-800'}`}><div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">{d.label}</div><div className="flex items-center justify-between"><code className={`text-sm font-mono truncate ${zenMode ? 'text-zinc-300' : 'text-zinc-200'}`}>{d.val}</code><button onClick={() => copyToClipboard(d.val, d.label)} className="p-1.5 rounded bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition">{copiedField === d.label ? <Check size={12} className="text-green-500"/> : <Copy size={12}/>}</button></div></div>))}<div className={`mt-6 p-4 rounded-xl border flex items-center gap-3 ${isLatest(getSafeVersion(selectedNode)) ? 'bg-green-500/10 border-green-500/30' : 'bg-orange-500/10 border-orange-500/30'}`}>{isLatest(getSafeVersion(selectedNode)) ? <CheckCircle size={20} className="text-green-500" /> : <AlertTriangle size={20} className="text-orange-500" />}<div><div className={`text-xs font-bold ${isLatest(getSafeVersion(selectedNode)) ? 'text-green-400' : 'text-orange-400'}`}>{isLatest(getSafeVersion(selectedNode)) ? 'Node is Up to Date' : 'Update Recommended'}</div><div className="text-[10px] text-zinc-500">Current consensus version is <span className="font-mono text-zinc-300">{mostCommonVersion}</span></div></div></div></div></div>);
   };
 
-  // --- UPDATED RENDER HEALTH BREAKDOWN (DATA DENSITY) ---
   const renderHealthBreakdown = () => {
       const health = selectedNode?.health || 0;
       const bd = selectedNode?.healthBreakdown || { uptime: health, version: health, reputation: health, capacity: health };
@@ -383,7 +374,7 @@ export default function Home() {
       {loading && <div className="fixed top-0 left-0 right-0 z-50"><LiveWireLoader /></div>}
 
       {/* --- SIDE NAVIGATION --- */}
-      <div className={`fixed inset-y-0 left-0 w-72 bg-[#09090b] border-r border-zinc-800 z-50 transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed inset-y-0 left-0 w-72 bg-[#09090b] border-r border-zinc-800 z-[100] transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 flex flex-col h-full">
             <div className="flex justify-between items-center mb-8"><h2 className="font-bold text-white tracking-widest uppercase flex items-center gap-2"><Activity className="text-blue-500" size={18}/> Menu</h2><button onClick={() => setIsMenuOpen(false)} className="text-zinc-500 hover:text-white p-2 rounded-lg bg-zinc-900 border border-zinc-800"><X size={24}/></button></div>
             <nav className="flex-grow space-y-2">
@@ -396,7 +387,7 @@ export default function Home() {
             <div className="mt-auto border-t border-zinc-800 pt-6 space-y-4"><div className="bg-zinc-900 p-4 rounded-xl border border-zinc-800"><div className="text-[10px] text-zinc-500 uppercase font-bold mb-2">Quick Actions</div><button onClick={exportCSV} className="w-full py-2 bg-black border border-zinc-700 rounded-lg text-xs font-bold text-zinc-300 hover:text-white hover:border-zinc-500 transition flex items-center justify-center gap-2"><Download size={14}/> Export Data</button></div></div>
         </div>
       </div>
-      {isMenuOpen && <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>}
+      {isMenuOpen && <div className="fixed inset-0 bg-black/50 z-[90] backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* --- HEADER --- */}
       <header className={`sticky top-0 z-50 backdrop-blur-md border-b px-6 py-4 flex flex-col gap-6 transition-all duration-500 ${zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'}`}>
@@ -416,7 +407,6 @@ export default function Home() {
           <div className="flex items-center justify-between gap-4 overflow-x-auto pb-2 scrollbar-hide w-full mt-6 border-t border-zinc-800/50 pt-4"><button onClick={fetchData} disabled={loading} className={`flex items-center gap-2 px-6 h-12 rounded-xl transition font-bold text-xs ${loading ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'}`}><RefreshCw size={18} className={loading ? "animate-spin" : ""} /> {loading ? 'SYNCING...' : 'REFRESH'}</button><div className="flex gap-2">{[{ id: 'uptime', icon: Clock, label: 'UPTIME' }, { id: 'storage', icon: Database, label: 'STORAGE' }, { id: 'version', icon: Server, label: 'VERSION' }, { id: 'health', icon: HeartPulse, label: 'HEALTH' }].map((opt) => (<button key={opt.id} onClick={() => { if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); else setSortBy(opt.id as any); }} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${sortBy === opt.id ? (zenMode ? 'bg-zinc-800 border-zinc-600 text-zinc-200' : 'bg-blue-500/10 border-blue-500/50 text-blue-400') : (zenMode ? 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800')}`}><opt.icon size={14} /> {opt.label}{sortBy === opt.id && (sortOrder === 'asc' ? <ArrowUp size={12} className="ml-1" /> : <ArrowDown size={12} className="ml-1" />)}</button>))}</div></div>
       </header>
 
-      {/* --- STATUS BARS --- */}
       {!loading && (
          <div className={`sticky top-[208px] md:top-[212px] z-40 flex flex-col transition-all duration-300 ${scrolled ? 'shadow-xl' : ''}`}>
              <div className={`w-full border-b border-zinc-800/50 py-3 px-6 flex items-center justify-center backdrop-blur-md transition-colors duration-300 ${scrolled ? 'bg-black/95 border-b-zinc-800' : 'bg-[#09090b]/80'}`}>
@@ -444,7 +434,7 @@ export default function Home() {
           {loading && nodes.length === 0 ? <PulseGraphLoader /> : (<div className={`grid gap-4 ${zenMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:gap-8'} pb-20 mt-6`}>{filteredNodes.map((node, i) => { if (zenMode) return renderZenCard(node); return renderNodeCard(node, i); })}</div>)}
       </main>
 
-      {/* --- THE ULTRA MODAL --- */}
+      {/* ... [MODAL COMPONENT & FOOTER REMAIN IDENTICAL - PLEASE PASTE FROM PREVIOUS RESPONSE] ... */}
       {selectedNode && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-4" onClick={closeModal}>
               <div className={`border w-full max-w-4xl 2xl:max-w-6xl rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300 ${zenMode ? 'bg-black border-zinc-800 shadow-none' : 'bg-[#09090b] border-zinc-800'}`} onClick={(e) => e.stopPropagation()}>
