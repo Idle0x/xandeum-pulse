@@ -10,7 +10,7 @@ import {
   ArrowDown, Wallet, Medal, Twitter, Info, ExternalLink, HelpCircle, 
   Maximize2, Map as MapIcon, BookOpen, Menu, LayoutDashboard, 
   HeartPulse, Swords, Monitor, ArrowLeftRight, Camera, 
-  ChevronLeft, FileJson, ClipboardCopy, RefreshCw, Share2, Plus, Share, Link as LinkIcon, Minimize2, Image as ImageIcon
+  ChevronLeft, FileJson, ClipboardCopy, RefreshCw, Share2, Plus, Link as LinkIcon, Minimize2, Image as ImageIcon
 } from 'lucide-react';
 
 // --- TYPES ---
@@ -409,7 +409,7 @@ export default function Home() {
                       {!searchQuery && !isSearchFocused && (<div className="absolute inset-0 flex items-center pointer-events-none pl-10 pr-4 overflow-hidden z-0"><div className="whitespace-nowrap animate-marquee text-sm text-zinc-600 font-mono opacity-80">Search nodes by Version, IP Address, Country, or Public Key...</div></div>)}
                       <input type="text" placeholder="" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full rounded-lg py-2 pl-10 pr-4 text-sm outline-none shadow-inner transition-all relative z-10 bg-transparent ${zenMode ? 'border border-zinc-800 text-zinc-300 focus:border-zinc-600' : 'border border-zinc-800 text-white focus:border-blue-500'}`} onFocus={() => setIsSearchFocused(true)} onBlur={() => setIsSearchFocused(false)} />
                   </div>
-                  {!zenMode && (<div className="mt-2 text-center pointer-events-none w-full min-h-[20px] transition-all duration-300"><p className="text-[10px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 key={searchTipIndex} whitespace-normal text-center leading-tight"><Info size={12} className="text-blue-500 shrink-0" /><span>{isSearchFocused ? "Type to filter nodes instantly" : searchTips[searchTipIndex]}</span></p></div>)}
+                  {!zenMode && (<div className="mt-2 text-center pointer-events-none w-full min-h-[20px] transition-all duration-300"><p key={searchTipIndex} className="text-[10px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 whitespace-normal text-center leading-tight"><Info size={12} className="text-blue-500 shrink-0" /><span>{isSearchFocused ? "Type to filter nodes instantly" : searchTips[searchTipIndex]}</span></p></div>)}
                   <style jsx>{`@keyframes marquee { 0% { transform: translateY(0); } 100% { transform: translateX(-100%); } } .animate-marquee { animation: marquee 15s linear infinite; }`}</style>
               </div>
               <button onClick={() => setZenMode(!zenMode)} className={`p-2 rounded-lg transition flex items-center gap-2 group ${zenMode ? 'bg-zinc-800 border border-zinc-700 text-zinc-400' : 'bg-red-900/10 border border-red-500/20 text-red-500 hover:bg-red-900/30'}`} title={zenMode ? "Exit Zen Mode" : "Enter Zen Mode"}><Monitor size={18} /> <span className="hidden md:inline text-xs font-bold">{zenMode ? 'EXIT ZEN' : 'ZEN MODE'}</span></button>
