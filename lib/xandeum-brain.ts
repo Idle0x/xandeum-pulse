@@ -9,7 +9,7 @@ const BACKUP_NODES = [
 ];
 const TIMEOUT_PRIMARY = 4000;
 const TIMEOUT_BACKUP = 6000;
-const TIMEOUT_CREDITS = 5000; // Bumped slightly for safety
+const TIMEOUT_CREDITS = 4000; // Fail fast if down
 
 const geoCache = new Map<string, { lat: number; lon: number; country: string; countryCode: string; city: string }>();
 
@@ -22,13 +22,13 @@ export interface EnrichedNode {
   is_public: boolean;
   storage_used: number;      
   storage_committed: number; 
-  credits: number;
+  credits: number | null; // Nullable if API fails
   health: number;
   healthBreakdown: {
       uptime: number;
       version: number;
-      reputation: number;
-      storage: number; // Renamed from 'capacity'
+      reputation: number | null; // Nullable
+      storage: number;
   };
   location: {
     lat: number;
@@ -47,10 +47,8 @@ const cleanSemver = (v: string) => (v || '0.0.0').replace(/[^0-9.]/g, '');
 const compareVersions = (v1: string, v2: string) => {
   const s1 = cleanSemver(v1);
   const s2 = cleanSemver(v2);
-  
   const p1 = s1.split('.').map(Number);
   const p2 = s2.split('.').map(Number);
-  
   for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
     const n1 = p1[i] || 0;
     const n2 = p2[i] || 0;
@@ -60,8 +58,7 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
-// --- V2 MATH HELPERS ---
-
+// --- MATH HELPERS ---
 const calculateSigmoidScore = (value: number, midpoint: number, steepness: number) => {
     return 100 / (1 + Math.exp(-steepness * (value - midpoint)));
 };
@@ -72,30 +69,17 @@ const calculateLogScore = (value: number, median: number, maxScore: number = 100
     return Math.min(maxScore, (maxScore / 2) * Math.log2(ratio + 1));
 };
 
-// --- VERSION LOGIC (Urgency Curve + Semantic Safety) ---
+// --- VERSION LOGIC ---
 const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedUniqueVersions: string[]) => {
-    // 1. Semantic Check (The Fix for 0.8.0-trynet)
-    // If the clean numbers match (0.8.0 == 0.8.0), it is 100% compliant.
-    if (compareVersions(nodeVersion, consensusVersion) === 0) return 100;
-    
-    // 2. If semantically newer (e.g. 0.9.0 vs 0.8.0), automatic 100
-    if (compareVersions(nodeVersion, consensusVersion) > 0) return 100;
+    // Semantic Check (0.8.0-trynet == 0.8.0)
+    if (compareVersions(nodeVersion, consensusVersion) >= 0) return 100;
 
-    // 3. Fallback to Rank Logic for older versions
-    // Note: We search for the RAW strings in the sorted list
     const consensusIndex = sortedUniqueVersions.indexOf(consensusVersion);
     const nodeIndex = sortedUniqueVersions.indexOf(nodeVersion);
 
-    // If exact string match failed, try to match by clean semver in the list
-    if (nodeIndex === -1) {
-       // If we can't find it in the list, but we know it's older (step 1&2 failed),
-       // assume it's at least 1 step behind.
-       return 90; 
-    }
-
+    if (nodeIndex === -1) return 0;
     const distance = nodeIndex - consensusIndex;
 
-    // Urgency Ladder
     if (distance <= 0) return 100;
     if (distance === 1) return 90; 
     if (distance === 2) return 70; 
@@ -103,11 +87,10 @@ const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, so
     if (distance === 4) return 30; 
     if (distance === 5) return 10; 
     
-    const extraSteps = distance - 5;
-    return Math.max(0, 10 - extraSteps); 
+    return Math.max(0, 10 - (distance - 5)); 
 };
 
-// --- MAIN SCORING LOGIC ---
+// --- MAIN SCORING LOGIC (Dynamic Re-Weighting) ---
 const calculateVitalityScore = (
     storageCommitted: number, 
     storageUsed: number,
@@ -116,20 +99,20 @@ const calculateVitalityScore = (
     consensusVersion: string, 
     sortedUniqueVersions: string[], 
     medianCredits: number, 
-    credits: number,
+    credits: number | null, // Nullable
     medianStorage: number
 ) => {
-  // 1. GATEKEEPER RULE
+  // 1. GATEKEEPER
   if (storageCommitted <= 0) {
       return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
   }
 
-  // 2. UPTIME SCORE (Weight: 35%)
+  // 2. UPTIME
   const uptimeDays = uptimeSeconds / 86400;
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
   if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
 
-  // 3. STORAGE SCORE (Weight: 30%) - [Base + Bonus]
+  // 3. STORAGE
   const baseStorageScore = calculateLogScore(storageCommitted, medianStorage, 80);
   let utilizationBonus = 0;
   if (storageUsed > 0) {
@@ -138,35 +121,45 @@ const calculateVitalityScore = (
   }
   const totalStorageScore = Math.min(100, baseStorageScore + utilizationBonus);
 
-  // 4. REPUTATION SCORE (Weight: 20%)
-  let reputationScore = 0;
-  if (medianCredits > 0) {
-      reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
-  }
-
-  // 5. VERSION SCORE (Weight: 15%)
+  // 4. VERSION
   const versionScore = getVersionScoreByRank(version, consensusVersion, sortedUniqueVersions);
 
-  // WEIGHTED TOTAL
-  const total = Math.round(
-      (uptimeScore * 0.35) + 
-      (totalStorageScore * 0.30) + 
-      (reputationScore * 0.20) + 
-      (versionScore * 0.15)
-  );
+  // 5. REPUTATION & WEIGHTING
+  let total = 0;
+  let reputationScore: number | null = null;
+
+  if (credits !== null && medianCredits > 0) {
+      // FULL MODE: All APIs working
+      reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
+      total = Math.round(
+          (uptimeScore * 0.35) + 
+          (totalStorageScore * 0.30) + 
+          (reputationScore * 0.20) + 
+          (versionScore * 0.15)
+      );
+  } else {
+      // LITE MODE: Credits API Down -> Redistribute 20% weight
+      // Uptime: 35% -> 45%
+      // Storage: 30% -> 35%
+      // Version: 15% -> 20%
+      total = Math.round(
+          (uptimeScore * 0.45) + 
+          (totalStorageScore * 0.35) + 
+          (versionScore * 0.20)
+      );
+      reputationScore = null; // Signal to UI that this metric is dead
+  }
   
   return {
       total: Math.max(0, Math.min(100, total)),
       breakdown: {
           uptime: Math.round(uptimeScore),
           version: Math.round(versionScore),
-          reputation: Math.round(reputationScore),
+          reputation: reputationScore, // Can be null
           storage: Math.round(totalStorageScore) 
       }
   };
 };
-
-// --- DATA FETCHING (Restored from your working "Old Brain") ---
 
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
@@ -188,7 +181,10 @@ async function fetchCredits() {
     try {
         const res = await axios.get('https://podcredits.xandeum.network/api/pods-credits', { timeout: TIMEOUT_CREDITS });
         return res.data;
-    } catch (error) { return []; }
+    } catch (error) { 
+        console.error("Brain: Credits API Offline");
+        return null; // Return null to signal failure explicitly
+    }
 }
 
 async function resolveLocations(ips: string[]) {
@@ -218,51 +214,49 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const [rawPods, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
   if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable");
 
-  // 1. Process Credits (Exact logic from your working brain)
+  // 1. Process Credits with Safety Checks
   const creditsMap = new Map<string, number>();
   const creditsArray: number[] = [];
+  const creditsSystemOnline = creditsData !== null;
   
-  const rawCredits = Array.isArray(creditsData) ? creditsData : (creditsData?.pods_credits || []);
-  
-  if (Array.isArray(rawCredits)) {
-      rawCredits.forEach((c: any) => {
-        const val = parseFloat(c.credits || c.amount || '0');
-        // Match ANY of these keys
-        const key = c.pod_id || c.pubkey || c.node;
-        
-        if (key && !isNaN(val)) { 
-            creditsMap.set(key, val); 
-            creditsArray.push(val); 
-        }
-      });
+  if (creditsSystemOnline) {
+      const rawCredits = Array.isArray(creditsData) ? creditsData : (creditsData?.pods_credits || []);
+      if (Array.isArray(rawCredits)) {
+          rawCredits.forEach((c: any) => {
+            const val = parseFloat(c.credits || c.amount || '0');
+            const key = c.pod_id || c.pubkey || c.node;
+            if (key && !isNaN(val)) { 
+                creditsMap.set(key, val); 
+                creditsArray.push(val); 
+            }
+          });
+      }
   }
   
   creditsArray.sort((a, b) => a - b);
   const medianCredits = creditsArray.length ? creditsArray[Math.floor(creditsArray.length / 2)] : 0;
 
-  // 2. Calculate Median Storage
+  // 2. Median Storage
   const storageArray: number[] = rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
   const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
 
-  // 3. Determine Consensus Version
+  // 3. Consensus Version
   const versionCounts: Record<string, number> = {};
   const uniqueVersionsSet = new Set<string>();
   
   rawPods.forEach((p: any) => { 
       const v = (p.version || '0.0.0'); 
-      const cleanV = cleanSemver(v); // Count by Clean Version
+      const cleanV = cleanSemver(v);
       versionCounts[cleanV] = (versionCounts[cleanV] || 0) + 1;
-      uniqueVersionsSet.add(v); // But keep Raw strings for rank list
+      uniqueVersionsSet.add(v);
   });
   
   const consensusVersion = Object.keys(versionCounts).sort((a, b) => versionCounts[b] - versionCounts[a])[0] || '0.0.0';
   const sortedUniqueVersions = Array.from(uniqueVersionsSet).sort((a, b) => compareVersions(b, a));
 
-  // 4. Resolve Locations
-  const uniqueIps = [...new Set(rawPods.map((p: any) => p.address.split(':')[0]))] as string[];
-  await resolveLocations(uniqueIps);
+  await resolveLocations([...new Set(rawPods.map((p: any) => p.address.split(':')[0]))] as string[]);
 
-  // 5. Build Nodes
+  // 4. Build Enriched Nodes
   let sumUptimeScore = 0;
   let sumVersionScore = 0;
   let sumReputationScore = 0;
@@ -277,8 +271,9 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
     const storageUsed = Number(pod.storage_used) || 0;
     const uptime = Number(pod.uptime) || 0;
     
-    // Exact match used in working brain
-    const credits = creditsMap.get(pod.pubkey) || 0;
+    // Fallback logic: check multiple keys for ID
+    const nodeKey = pod.pubkey || pod.public_key;
+    const credits = creditsSystemOnline ? (creditsMap.get(nodeKey) || 0) : null;
     
     const vitality = calculateVitalityScore(
         storageCommitted,
@@ -288,18 +283,19 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
         consensusVersion, 
         sortedUniqueVersions,
         medianCredits, 
-        credits,
+        credits, // Can be null
         medianStorage
     );
 
     sumUptimeScore += vitality.breakdown.uptime;
     sumVersionScore += vitality.breakdown.version;
-    sumReputationScore += vitality.breakdown.reputation;
+    if (vitality.breakdown.reputation !== null) sumReputationScore += vitality.breakdown.reputation;
     sumStorageScore += vitality.breakdown.storage;
     sumHealthTotal += vitality.total;
 
     return {
       ...pod,
+      pubkey: nodeKey,
       storage_committed: storageCommitted, 
       storage_used: storageUsed,           
       credits, 
@@ -309,10 +305,10 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
     };
   });
 
-  // 6. Final Sort
-  enrichedNodes.sort((a, b) => b.credits - a.credits);
+  // 6. Sort (Handle null credits in sort)
+  enrichedNodes.sort((a, b) => (b.credits || 0) - (a.credits || 0));
   let currentRank = 1;
-  enrichedNodes.forEach((node, i) => { if (i > 0 && node.credits < enrichedNodes[i - 1].credits) currentRank = i + 1; node.rank = currentRank; });
+  enrichedNodes.forEach((node, i) => { if (i > 0 && (node.credits || 0) < (enrichedNodes[i - 1].credits || 0)) currentRank = i + 1; node.rank = currentRank; });
 
   const total = enrichedNodes.length;
 
@@ -323,10 +319,14 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
         medianCredits, 
         medianStorage,
         totalNodes: total,
+        systemStatus: {
+            credits: creditsSystemOnline, // Report status to frontend
+            rpc: true // RPC is implicit if we got here
+        },
         avgBreakdown: {
             uptime: Math.round(sumUptimeScore / total),
             version: Math.round(sumVersionScore / total),
-            reputation: Math.round(sumReputationScore / total),
+            reputation: creditsSystemOnline ? Math.round(sumReputationScore / total) : null,
             storage: Math.round(sumStorageScore / total), 
             total: Math.round(sumHealthTotal / total)
         }
