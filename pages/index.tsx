@@ -190,6 +190,7 @@ export default function Home() {
     }
   }, [loading, nodes, router.query.open]);
 
+  // --- ACTIONS ---
   const closeModal = () => { setSelectedNode(null); setCompareMode(false); setShareMode(false); setCompareTarget(null); setShowOpponentSelector(false); setModalView('overview'); setActiveTooltip(null); if (router.query.open) router.replace('/', undefined, { shallow: true }); };
   const handleGlobalClick = () => { if (activeTooltip) setActiveTooltip(null); };
   const handleCompareLink = () => { if (nodes.length > 0) { setSelectedNode(nodes[0]); setCompareMode(true); setIsMenuOpen(false); } };
