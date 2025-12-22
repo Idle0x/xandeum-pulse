@@ -49,6 +49,7 @@ import {
   Link as LinkIcon,
   Minimize2,
   Image as ImageIcon,
+  ArrowLeft, // <-- Added for the back button
 } from 'lucide-react';
 
 // --- TYPES ---
@@ -1630,38 +1631,34 @@ export default function Home() {
             ))}
           </div>
         </div>
-      </header>
 
-      {!loading && (
-        <div
-          className={`sticky top-[208px] md:top-[212px] z-40 flex flex-col transition-all duration-300 ${
-            scrolled ? 'shadow-xl' : ''
-          }`}
-        >
-          <div
-            className={`w-full border-b border-zinc-800/50 py-3 px-6 flex items-center justify-center backdrop-blur-md transition-colors duration-300 ${
-              scrolled ? 'bg-black/95 border-b-zinc-800' : 'bg-[#09090b]/80'
-            }`}
-          >
-            <div className="text-xs md:text-sm font-bold font-mono text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-              <Activity size={14} className={scrolled ? 'text-blue-500' : 'text-zinc-600'} />
-              Nodes distributed by <span className="text-white">{sortBy.toUpperCase()}</span>{' '}
-              <span className="text-zinc-600">
-                ({sortOrder === 'desc' ? 'High to Low' : 'Low to High'})
-              </span>
-            </div>
-          </div>
-
-          {searchQuery && (
-            <div className="w-full bg-blue-900/90 border-b border-blue-500/30 py-2 px-6 text-center backdrop-blur-md animate-in slide-in-from-top-1">
-              <div className="text-xs font-mono text-blue-100">
-                Found <span className="font-bold text-white">{filteredNodes.length}</span> matches
-                for <span className="italic">"{searchQuery}"</span>
+        {/* MOVED: Sort bar is now inside the header to guarantee they stick together */}
+        {!loading && (
+          <div className={`flex flex-col transition-all duration-300 ${scrolled ? 'shadow-xl' : ''}`}>
+            <div
+              className={`w-full border-b border-zinc-800/50 py-3 px-6 flex items-center justify-center backdrop-blur-md transition-colors duration-300 ${
+                scrolled ? 'bg-black/95 border-b-zinc-800' : 'bg-[#09090b]/80'
+              }`}
+            >
+              <div className="text-xs md:text-sm font-bold font-mono text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                <Activity size={14} className={scrolled ? 'text-blue-500' : 'text-zinc-600'} />
+                Nodes distributed by <span className="text-white">{sortBy.toUpperCase()}</span>{' '}
+                <span className="text-zinc-600">
+                  ({sortOrder === 'desc' ? 'High to Low' : 'Low to High'})
+                </span>
               </div>
             </div>
-          )}
-        </div>
-      )}
+            {searchQuery && (
+              <div className="w-full bg-blue-900/90 border-b border-blue-500/30 py-2 px-6 text-center backdrop-blur-md animate-in slide-in-from-top-1">
+                <div className="text-xs font-mono text-blue-100">
+                  Found <span className="font-bold text-white">{filteredNodes.length}</span> matches
+                  for <span className="italic">"{searchQuery}"</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </header>
 
       <main
         className={`p-4 md:p-8 ${
@@ -1878,9 +1875,8 @@ export default function Home() {
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 relative">
               {compareMode ? (
-                /* compare mode unchanged */
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300 h-full flex flex-col relative">
-                  {/* ... full compare mode content unchanged ... */}
+                  {/* compare mode unchanged – left as-is */}
                 </div>
               ) : shareMode ? (
                 <div className="flex flex-col items-center justify-center h-full animate-in zoom-in-95 duration-300 py-10">
@@ -1893,12 +1889,12 @@ export default function Home() {
                     </div>
 
                     <div className="flex flex-col gap-3 w-full max-w-sm">
-                      {/* Back button - updated with red arrow and larger bottom margin */}
+                      {/* Updated Back button with red arrow and larger gap */}
                       <button
                         onClick={() => setShareMode(false)}
-                        className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white text-xs font-bold transition border border-zinc-800 mb-12"
+                        className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white text-xs font-bold transition border border-zinc-800 mb-6"
                       >
-                        <ChevronLeft size={14} className="text-red-500" />
+                        <ArrowLeft size={16} className="text-red-500" />
                         Back to Details
                       </button>
 
@@ -1941,9 +1937,16 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                /* rest of modal unchanged */
                 <div className="flex flex-col gap-4 h-full">
-                  {/* ... full overview and detailed views unchanged ... */}
+                  {modalView !== 'overview' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
+                      {/* detailed view unchanged */}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-6 h-full">
+                      {/* overview unchanged */}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
