@@ -42,7 +42,7 @@ export interface EnrichedNode {
 
 // Helper: Standard Semver Comparison to sort the list correctly
 const compareVersions = (v1: string, v2: string) => {
-  const s1 = (v1 || '0.0.0').replace(/[^0-9.]/g, ''); // Remove suffixes like '-trynet'
+  const s1 = (v1 || '0.0.0').replace(/[^0-9.]/g, ''); 
   const s2 = (v2 || '0.0.0').replace(/[^0-9.]/g, '');
   
   const p1 = s1.split('.').map(Number);
@@ -57,55 +57,57 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
-// --- MATH HELPERS V2.1 ---
+// --- MATH HELPERS V2.2 ---
 
-// 1. Sigmoid Function: Smooth "S" curve for trust
 const calculateSigmoidScore = (value: number, midpoint: number, steepness: number) => {
     return 100 / (1 + Math.exp(-steepness * (value - midpoint)));
 };
 
-// 2. Logarithmic Function: Fair relative scaling
 const calculateLogScore = (value: number, median: number) => {
     if (median === 0) return value > 0 ? 100 : 0;
     const ratio = value / median;
-    // Score hits 50 at median, 100 at 4x median
     return Math.min(100, 50 * Math.log2(ratio + 1));
 };
 
-// 3. Network Rank Distance (The Fix for Version Gaps)
+// --- YOUR CUSTOM VERSION LOGIC ---
 const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedUniqueVersions: string[]) => {
+    // 1. If exact match or better
     if (nodeVersion === consensusVersion) return 100;
 
-    // Find indices in the sorted list (High to Low)
+    // 2. Find indices in the sorted list (High to Low)
     const consensusIndex = sortedUniqueVersions.indexOf(consensusVersion);
     const nodeIndex = sortedUniqueVersions.indexOf(nodeVersion);
 
-    // Safety fallback if version not found (shouldn't happen as list is built from scan)
+    // If version not found in the list (rare edge case), default to 0
     if (nodeIndex === -1) return 0;
 
-    // "Distance" is simply how many active versions exist between you and consensus
-    // If Consensus is index 0, and you are index 1 -> Distance is 1.
+    // "Distance" = How many active network versions separate you from consensus
     const distance = nodeIndex - consensusIndex;
 
-    // If you are AHEAD of consensus (negative distance), full score
+    // If negative distance (you are on a newer version than consensus), you get 100
     if (distance < 0) return 100;
 
-    // Penalize by Rank Step, not numerical value
-    // 1 step behind = 90 (Safe)
-    // 2 steps behind = 80
-    // 3 steps behind = 70
-    // ...
-    // Floor at 0
-    return Math.max(0, 100 - (distance * 10));
+    // --- YOUR SPECIFIC PENALTY LADDER ---
+    if (distance === 0) return 100;       // Same as consensus
+    if (distance === 1) return 90;        // 1 version behind: -10
+    if (distance === 2) return 70;        // 2 versions behind: -20
+    if (distance === 3) return 50;        // 3 versions behind: -20
+    if (distance === 4) return 30;        // 4 versions behind: -20
+    if (distance === 5) return 10;        // 5 versions behind: -20
+    
+    // For ranks > 5, subtract 1 for each additional step
+    // Rank 6 = 9, Rank 7 = 8, ... Rank 15 = 0
+    const extraSteps = distance - 5;
+    return Math.max(0, 10 - extraSteps); 
 };
 
-// --- MAIN SCORING LOGIC V2.1 ---
+// --- MAIN SCORING LOGIC ---
 const calculateVitalityScore = (
     storageCommitted: number, 
     uptimeSeconds: number, 
     version: string, 
     consensusVersion: string, 
-    sortedUniqueVersions: string[], // New Parameter: The List of Reality
+    sortedUniqueVersions: string[], 
     medianCredits: number, 
     credits: number,
     medianStorage: number
@@ -115,22 +117,21 @@ const calculateVitalityScore = (
       return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, capacity: 0 } };
   }
 
-  // 2. UPTIME SCORE (Weight: 35%) -> Sigmoid Curve
+  // 2. UPTIME SCORE (Weight: 35%) -> Sigmoid
   const uptimeDays = uptimeSeconds / 86400;
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
-  if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); // Hard penalty for <24h
+  if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
 
-  // 3. CAPACITY SCORE (Weight: 30%) -> Logarithmic Relative to Network
+  // 3. CAPACITY SCORE (Weight: 30%) -> Logarithmic Relative
   const capacityScore = calculateLogScore(storageCommitted, medianStorage);
 
-  // 4. REPUTATION SCORE (Weight: 20%) -> Linear Relative with Decay
+  // 4. REPUTATION SCORE (Weight: 20%) -> Linear Relative
   let reputationScore = 0;
   if (medianCredits > 0) {
       reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
   }
 
-  // 5. VERSION SCORE (Weight: 15%) -> Rank-Based Network Awareness
-  // This ignores numerical gaps (e.g. 1.1 -> 2.5) and only counts active steps.
+  // 5. VERSION SCORE (Weight: 15%) -> Your Custom Rank Logic
   const versionScore = getVersionScoreByRank(version, consensusVersion, sortedUniqueVersions);
 
   // WEIGHTED TOTAL
@@ -216,32 +217,32 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   creditsArray.sort((a, b) => a - b);
   const medianCredits = creditsArray.length ? creditsArray[Math.floor(creditsArray.length / 2)] : 0;
 
-  // 2. Calculate Median Storage
+  // 2. Calculate Median Storage (for V2)
   const storageArray: number[] = rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
   const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
 
-  // 3. Determine Versions & Create "The List of Reality"
+  // 3. Version Ranking (Consensus & List)
   const versionCounts: Record<string, number> = {};
   const uniqueVersionsSet = new Set<string>();
   
   rawPods.forEach((p: any) => { 
+      // Normalize version string (remove suffix) for fair comparison
       const v = p.version || '0.0.0'; 
       versionCounts[v] = (versionCounts[v] || 0) + 1;
       uniqueVersionsSet.add(v);
   });
   
-  // Sort by count to find consensus (most popular = consensus)
+  // Consensus is simply the version with the highest count
   const consensusVersion = Object.keys(versionCounts).sort((a, b) => versionCounts[b] - versionCounts[a])[0] || '0.0.0';
   
-  // Create sorted list of ALL active versions (High -> Low)
-  // This is the key to Rank-Based Scoring
+  // Sorted unique versions (High -> Low)
   const sortedUniqueVersions = Array.from(uniqueVersionsSet).sort((a, b) => compareVersions(b, a));
 
-  // 4. Resolve Locations
+  // 4. Locations
   const uniqueIps = [...new Set(rawPods.map((p: any) => p.address.split(':')[0]))] as string[];
   await resolveLocations(uniqueIps);
 
-  // 5. Build Nodes with V2.1 Logic
+  // 5. Enrichment Loop
   let sumUptimeScore = 0;
   let sumVersionScore = 0;
   let sumReputationScore = 0;
@@ -257,13 +258,12 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
     const credits = creditsMap.get(pod.pubkey) || 0;
     const uptime = Number(pod.uptime) || 0;
     
-    // --- V2.1 SCORE CALL ---
     const vitality = calculateVitalityScore(
         storageCommitted, 
         uptime, 
         pod.version || '0.0.0', 
         consensusVersion, 
-        sortedUniqueVersions, // Pass the active network versions list
+        sortedUniqueVersions, // Passing the full network context
         medianCredits, 
         credits,
         medianStorage
@@ -286,7 +286,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
     };
   });
 
-  // 6. Sort and Return
+  // 6. Final Sort
   enrichedNodes.sort((a, b) => b.credits - a.credits);
   let currentRank = 1;
   enrichedNodes.forEach((node, i) => { if (i > 0 && node.credits < enrichedNodes[i - 1].credits) currentRank = i + 1; node.rank = currentRank; });
