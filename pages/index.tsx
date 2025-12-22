@@ -137,7 +137,7 @@ const ModalAvatar = ({ node }: { node: Node }) => {
 
   if (code && code !== 'XX') {
     return (
-      <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg border border-white/10 overflow-hidden bg-zinc-900 relative group">
+      <div className="w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center shadow-lg border border-white/10 overflow-hidden bg-zinc-900 relative group">
         <img
           src={`https://flagcdn.com/w160/${code.toLowerCase()}.png`}
           alt="country flag"
@@ -148,7 +148,7 @@ const ModalAvatar = ({ node }: { node: Node }) => {
   }
 
   return (
-    <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-lg border border-white/10 bg-gradient-to-br from-blue-600 to-purple-600 text-white">
+    <div className="w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center font-bold text-xl md:text-2xl shadow-lg border border-white/10 bg-gradient-to-br from-blue-600 to-purple-600 text-white">
       {node.pubkey?.slice(0, 2) || '??'}
     </div>
   );
@@ -447,7 +447,6 @@ export default function Home() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   
-  // DEFAULT: Start Cycle at 1 (Committed Storage)
   const [cycleStep, setCycleStep] = useState(1);
   const proofRef = useRef<HTMLDivElement>(null);
 
@@ -464,18 +463,12 @@ export default function Home() {
 
   const timeAgo = useTimeAgo(selectedNode?.last_seen_timestamp);
 
-  // --- CHANGED: Jump-to-View Logic (Instant Switch, No Lock) ---
   useEffect(() => {
-    // Determine target view based on sort
-    // Step 0: Used, Step 1: Committed, Step 2: Health, Step 3: Uptime, Step 4: Last Seen
     let targetStep = -1;
-    if (sortBy === 'storage') targetStep = 1; // Committed Storage
-    else if (sortBy === 'health') targetStep = 2; // Health
-    else if (sortBy === 'uptime') targetStep = 3; // NEW: Jump to Uptime
+    if (sortBy === 'storage') targetStep = 1; 
+    else if (sortBy === 'health') targetStep = 2; 
+    else if (sortBy === 'uptime') targetStep = 3; 
 
-    // If valid target, jump immediately. 
-    // This resets the visual to the user's intent.
-    // The main cycle interval will naturally pick up from here after 5s.
     if (targetStep !== -1) {
         setCycleStep(targetStep);
     }
@@ -487,7 +480,6 @@ export default function Home() {
     const saved = localStorage.getItem('xandeum_favorites');
     if (saved) setFavorites(JSON.parse(saved));
 
-    // Standard 5s Cycle
     const cycleInterval = setInterval(() => {
       setCycleStep((prev) => prev + 1);
     }, 5000);
@@ -797,8 +789,7 @@ export default function Home() {
 
   // --- CHANGED: Updated Cycle List (Added Uptime) ---
   const getCycleContent = (node: Node) => {
-    // 5 Steps total now
-    const step = cycleStep % 5;
+    const step = cycleStep % 5; // Now 5 steps including Uptime
 
     if (step === 0) {
       return {
@@ -828,17 +819,17 @@ export default function Home() {
       };
     }
 
-    // NEW: Step 3 - Uptime with Orange/Amber Color
+    // NEW: Uptime
     if (step === 3) {
       return {
         label: 'Continuous Uptime',
         value: formatUptime(node.uptime),
-        color: 'text-orange-400', 
+        color: 'text-orange-400',
         icon: Zap,
       };
     }
 
-    // Pushed Last Seen to Step 4
+    // Last Seen moved to Step 4
     return {
       label: 'Last Seen',
       value: formatLastSeen(node.last_seen_timestamp),
@@ -864,8 +855,8 @@ export default function Home() {
       node.location?.countryCode && node.location.countryCode !== 'XX'
         ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png`
         : null;
-    
-    // NEW: Visual Effect when sorting by Version
+
+    // NEW: Effect for Version Sort
     const isVersionSort = sortBy === 'version';
 
     return (
@@ -928,7 +919,7 @@ export default function Home() {
             <span className="text-zinc-500">Version</span>
             <div className="flex items-center gap-2">
               <span
-                // CHANGED: Added Pulse/Glow effect for Version Sort
+                // CHANGED: Visual pulse effect when sorting by version
                 className={`text-zinc-300 px-2 py-0.5 rounded transition-all duration-500 ${
                   zenMode ? 'bg-zinc-900 border border-zinc-700' : 'bg-zinc-800'
                 } ${isVersionSort ? 'text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.4)] border-cyan-500/50' : ''}`}
@@ -1087,7 +1078,7 @@ export default function Home() {
       { label: 'RPC Endpoint', val: `http://${getSafeIp(selectedNode)}:6000` },
       { label: 'IP Address', val: getSafeIp(selectedNode) },
       { label: 'Node Version', val: getSafeVersion(selectedNode) },
-      // UPDATED: Uptime with Orange Color
+      // UPDATED: Added Current Uptime to details list with orange color
       { label: 'Current Uptime', val: formatUptime(selectedNode?.uptime), color: 'text-orange-400' },
     ];
 
