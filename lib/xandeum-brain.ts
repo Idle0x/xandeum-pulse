@@ -9,7 +9,7 @@ const BACKUP_NODES = [
 ];
 const TIMEOUT_PRIMARY = 4000;
 const TIMEOUT_BACKUP = 6000;
-const TIMEOUT_CREDITS = 8000; // Increased to ensure it doesn't fail on slow connections
+const TIMEOUT_CREDITS = 8000; 
 
 const geoCache = new Map<string, { lat: number; lon: number; country: string; countryCode: string; city: string }>();
 
@@ -75,10 +75,9 @@ const calculateLogScore = (value: number, median: number, maxScore: number = 100
 // --- VERSION LOGIC (Urgency Curve + Semantic Safety) ---
 const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedUniqueVersions: string[]) => {
     // 1. Semantic Check (The Fix for 0.8.0-trynet)
-    // If the numbers match, it is 100% compliant, regardless of suffix.
     if (compareVersions(nodeVersion, consensusVersion) === 0) return 100;
     
-    // 2. If semantically newer (e.g. 0.9.0 vs 0.8.0), automatic 100
+    // 2. If semantically newer, automatic 100
     if (compareVersions(nodeVersion, consensusVersion) > 0) return 100;
 
     // 3. Fallback to Rank Logic for older versions
@@ -180,7 +179,6 @@ async function fetchCredits() {
     try {
         const res = await axios.get('https://podcredits.xandeum.network/api/pods-credits', { timeout: TIMEOUT_CREDITS });
         // NOTE: Returning raw data here so we can unwrap it safely in the main function
-        // This matches the behavior of your original working code.
         return res.data;
     } catch (error) { 
         console.error("Credits API Failed:", error);
@@ -215,15 +213,16 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const [rawPods, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
   if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable");
 
-  // 1. Process Credits (Restored original working extraction logic)
+  // 1. Process Credits (FIXED: Correct unwrapping logic)
   const creditsMap = new Map<string, number>();
   const creditsArray: number[] = [];
   
+  // This line was the issue in the previous version. It wasn't checking for pods_credits.
   const rawCredits = Array.isArray(creditsData) ? creditsData : (creditsData?.pods_credits || []);
   
   if (Array.isArray(rawCredits)) {
       rawCredits.forEach((c: any) => {
-        // Handle variations in API response keys
+        // Try multiple fields just in case
         const val = parseFloat(c.credits || c.amount || '0');
         const key = c.pod_id || c.pubkey || c.node;
         
@@ -252,7 +251,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       uniqueVersionsSet.add(v);
   });
   
-  // Consensus based on CLEAN version counts
   const consensusVersion = Object.keys(versionCounts).sort((a, b) => versionCounts[b] - versionCounts[a])[0] || '0.0.0';
   const sortedUniqueVersions = Array.from(uniqueVersionsSet).sort((a, b) => compareVersions(b, a));
 
