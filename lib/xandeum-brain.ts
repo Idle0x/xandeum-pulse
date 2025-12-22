@@ -40,17 +40,13 @@ export interface EnrichedNode {
   rank?: number;
 }
 
-// Helper: Clean non-numeric suffixes (e.g. "0.8.0-trynet" -> "0.8.0")
 const cleanSemver = (v: string) => (v || '0.0.0').replace(/[^0-9.]/g, '');
 
-// Helper: Standard Semver Comparison
 const compareVersions = (v1: string, v2: string) => {
   const s1 = cleanSemver(v1);
   const s2 = cleanSemver(v2);
-  
   const p1 = s1.split('.').map(Number);
   const p2 = s2.split('.').map(Number);
-  
   for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
     const n1 = p1[i] || 0;
     const n2 = p2[i] || 0;
@@ -61,7 +57,6 @@ const compareVersions = (v1: string, v2: string) => {
 };
 
 // --- MATH HELPERS V2.3 ---
-
 const calculateSigmoidScore = (value: number, midpoint: number, steepness: number) => {
     return 100 / (1 + Math.exp(-steepness * (value - midpoint)));
 };
@@ -72,30 +67,20 @@ const calculateLogScore = (value: number, median: number, maxScore: number = 100
     return Math.min(maxScore, (maxScore / 2) * Math.log2(ratio + 1));
 };
 
-// --- VERSION LOGIC (Urgency Curve + Semantic Safety) ---
+// --- VERSION LOGIC ---
 const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedUniqueVersions: string[]) => {
-    // 1. Semantic Check (The Fix for 0.8.0-trynet)
     if (compareVersions(nodeVersion, consensusVersion) === 0) return 100;
-    
-    // 2. If semantically newer, automatic 100
     if (compareVersions(nodeVersion, consensusVersion) > 0) return 100;
-
-    // 3. Fallback to Rank Logic for older versions
     const consensusIndex = sortedUniqueVersions.indexOf(consensusVersion);
     const nodeIndex = sortedUniqueVersions.indexOf(nodeVersion);
-
     if (nodeIndex === -1) return 0;
-
     const distance = nodeIndex - consensusIndex;
-
-    // Urgency Ladder
     if (distance <= 0) return 100;
     if (distance === 1) return 90; 
     if (distance === 2) return 70; 
     if (distance === 3) return 50; 
     if (distance === 4) return 30; 
     if (distance === 5) return 10; 
-    
     const extraSteps = distance - 5;
     return Math.max(0, 10 - extraSteps); 
 };
@@ -112,17 +97,13 @@ const calculateVitalityScore = (
     credits: number,
     medianStorage: number
 ) => {
-  // 1. GATEKEEPER RULE
   if (storageCommitted <= 0) {
       return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
   }
-
-  // 2. UPTIME SCORE (Weight: 35%)
   const uptimeDays = uptimeSeconds / 86400;
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
   if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
 
-  // 3. STORAGE SCORE (Weight: 30%) - [Base + Bonus]
   const baseStorageScore = calculateLogScore(storageCommitted, medianStorage, 80);
   let utilizationBonus = 0;
   if (storageUsed > 0) {
@@ -131,16 +112,13 @@ const calculateVitalityScore = (
   }
   const totalStorageScore = Math.min(100, baseStorageScore + utilizationBonus);
 
-  // 4. REPUTATION SCORE (Weight: 20%)
   let reputationScore = 0;
   if (medianCredits > 0) {
       reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
   }
 
-  // 5. VERSION SCORE (Weight: 15%)
   const versionScore = getVersionScoreByRank(version, consensusVersion, sortedUniqueVersions);
 
-  // WEIGHTED TOTAL
   const total = Math.round(
       (uptimeScore * 0.35) + 
       (totalStorageScore * 0.30) + 
@@ -178,10 +156,13 @@ async function fetchRawData() {
 async function fetchCredits() {
     try {
         const res = await axios.get('https://podcredits.xandeum.network/api/pods-credits', { timeout: TIMEOUT_CREDITS });
-        // NOTE: Returning raw data here so we can unwrap it safely in the main function
-        return res.data;
+        // Defensive unwrapping: Support both array and object wrapper
+        if (Array.isArray(res.data)) return res.data;
+        if (res.data && Array.isArray(res.data.pods_credits)) return res.data.pods_credits;
+        // Last resort: check keys just in case it's named something else
+        if (res.data && typeof res.data === 'object') return Object.values(res.data).find(Array.isArray) || [];
+        return [];
     } catch (error) { 
-        console.error("Credits API Failed:", error);
         return []; 
     }
 }
@@ -213,26 +194,25 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const [rawPods, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
   if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable");
 
-  // 1. Process Credits (FIXED: Correct unwrapping logic)
   const creditsMap = new Map<string, number>();
   const creditsArray: number[] = [];
   
-  // This line was the issue in the previous version. It wasn't checking for pods_credits.
-  const rawCredits = Array.isArray(creditsData) ? creditsData : (creditsData?.pods_credits || []);
+  // 1. Process Credits (AGGRESSIVE NORMALIZATION)
+  const rawCredits = Array.isArray(creditsData) ? creditsData : [];
   
-  if (Array.isArray(rawCredits)) {
-      rawCredits.forEach((c: any) => {
-        // Try multiple fields just in case
-        const val = parseFloat(c.credits || c.amount || '0');
-        const key = c.pod_id || c.pubkey || c.node;
-        
-        if (key && !isNaN(val)) { 
-            creditsMap.set(key, val); 
-            creditsArray.push(val); 
-        }
-      });
-  }
-  
+  rawCredits.forEach((c: any) => {
+    const val = parseFloat(c.credits || c.amount || '0');
+    // Check every possible key name
+    const rawKey = c.pod_id || c.pubkey || c.node || c.identity;
+    
+    if (rawKey && !isNaN(val)) { 
+        // Normalize: trim whitespace + lowercase
+        const normalizedKey = String(rawKey).trim(); 
+        creditsMap.set(normalizedKey, val); 
+        creditsArray.push(val); 
+    }
+  });
+
   creditsArray.sort((a, b) => a - b);
   const medianCredits = creditsArray.length ? creditsArray[Math.floor(creditsArray.length / 2)] : 0;
 
@@ -258,7 +238,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const uniqueIps = [...new Set(rawPods.map((p: any) => p.address.split(':')[0]))] as string[];
   await resolveLocations(uniqueIps);
 
-  // 5. Build Nodes
+  // 5. Enrichment Loop
   let sumUptimeScore = 0;
   let sumVersionScore = 0;
   let sumReputationScore = 0;
@@ -273,8 +253,11 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
     const storageUsed = Number(pod.storage_used) || 0;
     const uptime = Number(pod.uptime) || 0;
     
-    // Check both pubkey locations to match credits
-    const nodeKey = pod.pubkey || pod.public_key;
+    // Normalize the node pubkey just like we did for credits
+    const nodeKeyRaw = pod.pubkey || pod.public_key;
+    const nodeKey = String(nodeKeyRaw).trim();
+    
+    // Attempt match with normalized key
     const credits = creditsMap.get(nodeKey) || 0;
     
     const vitality = calculateVitalityScore(
@@ -297,7 +280,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
 
     return {
       ...pod,
-      pubkey: nodeKey,
+      pubkey: nodeKeyRaw, // Keep original casing for display
       storage_committed: storageCommitted, 
       storage_used: storageUsed,           
       credits, 
