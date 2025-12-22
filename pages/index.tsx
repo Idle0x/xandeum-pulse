@@ -166,11 +166,11 @@ const useTimeAgo = (timestamp: number | undefined) => {
       const diff = Math.floor((now - time) / 1000);
 
       if (diff < 60) {
-        setTimeAgo(`\( {diff} second \){diff !== 1 ? 's' : ''} ago`);
+        setTimeAgo(`${diff} second${diff !== 1 ? 's' : ''} ago`);
       } else if (diff < 3600) {
-        setTimeAgo(`\( {Math.floor(diff / 60)} minute \){Math.floor(diff / 60) !== 1 ? 's' : ''} ago`);
+        setTimeAgo(`${Math.floor(diff / 60)} minute${Math.floor(diff / 60) !== 1 ? 's' : ''} ago`);
       } else {
-        setTimeAgo(`\( {Math.floor(diff / 3600)} hour \){Math.floor(diff / 3600) !== 1 ? 's' : ''} ago`);
+        setTimeAgo(`${Math.floor(diff / 3600)} hour${Math.floor(diff / 3600) !== 1 ? 's' : ''} ago`);
       }
     };
 
@@ -205,7 +205,7 @@ const formatUptime = (seconds: number | undefined) => {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
 
-  return d > 0 ? `${d}d \( {h}h` : ` \){h}h`;
+  return d > 0 ? `${d}d ${h}h` : `${h}h`;
 };
 
 const formatLastSeen = (timestamp: number | undefined) => {
@@ -596,7 +596,7 @@ export default function Home() {
     }\n❤️ Health: ${health}/100\n💰 Credits: ${node.credits?.toLocaleString() || 0}\n\nMonitor here:`;
 
     window.open(
-      `https://twitter.com/intent/tweet?text=\( {encodeURIComponent(text)}&url= \){encodeURIComponent(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(
         'https://xandeum-pulse.vercel.app'
       )}`,
       '_blank'
@@ -605,7 +605,7 @@ export default function Home() {
 
   const copyNodeUrl = (e: React.MouseEvent, pubkey: string) => {
     e.stopPropagation();
-    const url = `\( {window.location.origin}/?open= \){pubkey}`;
+    const url = `${window.location.origin}/?open=${pubkey}`;
     navigator.clipboard.writeText(url);
     setCopiedField('url');
     setTimeout(() => setCopiedField(null), 2000);
@@ -621,9 +621,9 @@ export default function Home() {
       const country = n.location?.countryName || 'Unknown';
       const isoTime = new Date(n.last_seen_timestamp || Date.now()).toISOString();
 
-      return `\( {getSafeIp(n)}, \){n.pubkey || 'Unknown'},\( {n.rank}, \){n.credits},${getSafeVersion(
+      return `${getSafeIp(n)},${n.pubkey || 'Unknown'},${n.rank},${n.credits},${getSafeVersion(
         n
-      )},\( {n.uptime}, \){n.storage_committed},\( {n.storage_used}, \){utilization},\( {health}, \){country},\( {isoTime}, \){
+      )},${n.uptime},${n.storage_committed},${n.storage_used},${utilization},${health},${country},${isoTime},${
         favorites.includes(n.address || '')
       }`;
     });
@@ -861,7 +861,7 @@ export default function Home() {
                 }`}
               >
                 {(node.pubkey || '').length > 12
-                  ? `\( {(node.pubkey || '').slice(0, 12)}... \){(node.pubkey || '').slice(-4)}`
+                  ? `${(node.pubkey || '').slice(0, 12)}...${(node.pubkey || '').slice(-4)}`
                   : node.pubkey || 'Unknown Identity'}
               </div>
 
