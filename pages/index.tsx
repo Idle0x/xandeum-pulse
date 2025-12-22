@@ -3,7 +3,6 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
 import Link from 'next/link';
-// NEW: Import for image generation
 import { toPng } from 'html-to-image';
 import { 
   Search, Download, Server, Activity, Database, X, Shield, Clock, Zap, Trophy, 
@@ -117,14 +116,12 @@ export default function Home() {
   const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'health'>('uptime');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
-  // UX STATE
   const [searchTipIndex, setSearchTipIndex] = useState(0);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null); 
   const [scrolled, setScrolled] = useState(false); 
   const [lastSync, setLastSync] = useState<string>('Syncing...');
 
-  // Store Global Network Averages
   const [networkStats, setNetworkStats] = useState({
       avgBreakdown: { uptime: 0, version: 0, reputation: 0, capacity: 0, total: 0 },
       totalNodes: 0
@@ -139,7 +136,6 @@ export default function Home() {
     "Copy node url to share a direct link to your diagnostics, reputation or topology"
   ];
 
-  // MODAL STATES
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const [compareTarget, setCompareTarget] = useState<Node | null>(null);
@@ -151,11 +147,8 @@ export default function Home() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null); 
   const [cycleStep, setCycleStep] = useState(0);
-  
-  // NEW: Proof Ref
   const proofRef = useRef<HTMLDivElement>(null);
 
-  // GLOBAL STATES
   const [zenMode, setZenMode] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -176,13 +169,10 @@ export default function Home() {
     const cycleInterval = setInterval(() => { setCycleStep(prev => prev + 1); }, 4000);
     const tipInterval = setInterval(() => { if (!isSearchFocused) setSearchTipIndex(prev => (prev + 1) % searchTips.length); }, 9000);
     const dataInterval = setInterval(fetchData, 30000);
-    
     const handleScroll = () => { setScrolled(window.scrollY > 50); };
     window.addEventListener('scroll', handleScroll);
-    
     const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') { closeModal(); } };
     document.addEventListener('keydown', handleEscape);
-    
     return () => { 
         clearInterval(cycleInterval); 
         clearInterval(tipInterval); 
@@ -200,7 +190,6 @@ export default function Home() {
     }
   }, [loading, nodes, router.query.open]);
 
-  // --- ACTIONS ---
   const closeModal = () => { setSelectedNode(null); setCompareMode(false); setShareMode(false); setCompareTarget(null); setShowOpponentSelector(false); setModalView('overview'); setActiveTooltip(null); if (router.query.open) router.replace('/', undefined, { shallow: true }); };
   const handleGlobalClick = () => { if (activeTooltip) setActiveTooltip(null); };
   const handleCompareLink = () => { if (nodes.length > 0) { setSelectedNode(nodes[0]); setCompareMode(true); setIsMenuOpen(false); } };
@@ -214,7 +203,6 @@ export default function Home() {
   const copyNodeUrl = (e: React.MouseEvent, pubkey: string) => { e.stopPropagation(); const url = `${window.location.origin}/?open=${pubkey}`; navigator.clipboard.writeText(url); setCopiedField('url'); setTimeout(() => setCopiedField(null), 2000); };
   const exportCSV = () => { const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Utilization_Percent,Health_Score,Country,Last_Seen_ISO,Is_Favorite\n'; const rows = filteredNodes.map(n => { const health = n.health || 0; const utilization = n.storage_usage_percentage?.replace('%', '') || '0'; const country = n.location?.countryName || 'Unknown'; const isoTime = new Date(n.last_seen_timestamp || Date.now()).toISOString(); return `${getSafeIp(n)},${n.pubkey || 'Unknown'},${n.rank},${n.credits},${getSafeVersion(n)},${n.uptime},${n.storage_committed},${n.storage_used},${utilization},${health},${country},${isoTime},${favorites.includes(n.address || '')}`; }); const blob = new Blob([headers + rows.join('\n')], { type: 'text/csv' }); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `xandeum_pulse_export_${new Date().toISOString().split('T')[0]}.csv`; a.click(); };
   
-  // NEW: Download Proof Logic
   const handleDownloadProof = async () => {
     if (proofRef.current === null) return;
     try {
@@ -223,9 +211,7 @@ export default function Home() {
         link.download = `xandeum-proof-${selectedNode?.pubkey?.slice(0,6) || 'node'}.png`;
         link.href = dataUrl;
         link.click();
-    } catch (err) {
-        console.error("Failed to generate proof image", err);
-    }
+    } catch (err) { console.error("Failed to generate proof image", err); }
   };
 
   const fetchData = async () => {
@@ -235,14 +221,12 @@ export default function Home() {
       if (res.data.result && res.data.result.pods) {
         let podList: Node[] = res.data.result.pods;
         const stats = res.data.stats;
-        
         if (stats.avgBreakdown) {
             setNetworkStats({
                 avgBreakdown: stats.avgBreakdown,
                 totalNodes: stats.totalNodes || podList.length
             });
         }
-        
         podList = podList.map(node => { const used = node.storage_used || 0; const cap = node.storage_committed || 0; let percentStr = "0%"; let rawPercent = 0; if (cap > 0 && used > 0) { rawPercent = (used / cap) * 100; percentStr = rawPercent < 0.01 ? "< 0.01%" : `${rawPercent.toFixed(2)}%`; } return { ...node, storage_usage_percentage: percentStr, storage_usage_raw: rawPercent }; });
         setNodes(podList);
         setMostCommonVersion(stats.consensusVersion || '0.0.0');
@@ -431,7 +415,6 @@ export default function Home() {
           <div className="flex items-center justify-between gap-4 overflow-x-auto pb-2 scrollbar-hide w-full mt-6 border-t border-zinc-800/50 pt-4"><button onClick={fetchData} disabled={loading} className={`flex items-center gap-2 px-6 h-12 rounded-xl transition font-bold text-xs ${loading ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'}`}><RefreshCw size={18} className={loading ? "animate-spin" : ""} /> {loading ? 'SYNCING...' : 'REFRESH'}</button><div className="flex gap-2">{[{ id: 'uptime', icon: Clock, label: 'UPTIME' }, { id: 'storage', icon: Database, label: 'STORAGE' }, { id: 'version', icon: Server, label: 'VERSION' }, { id: 'health', icon: HeartPulse, label: 'HEALTH' }].map((opt) => (<button key={opt.id} onClick={() => { if (sortBy === opt.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); else setSortBy(opt.id as any); }} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${sortBy === opt.id ? (zenMode ? 'bg-zinc-800 border-zinc-600 text-zinc-200' : 'bg-blue-500/10 border-blue-500/50 text-blue-400') : (zenMode ? 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800')}`}><opt.icon size={14} /> {opt.label}{sortBy === opt.id && (sortOrder === 'asc' ? <ArrowUp size={12} className="ml-1" /> : <ArrowDown size={12} className="ml-1" />)}</button>))}</div></div>
       </header>
 
-      {/* --- STATUS BARS --- */}
       {!loading && (
          <div className={`sticky top-[208px] md:top-[212px] z-40 flex flex-col transition-all duration-300 ${scrolled ? 'shadow-xl' : ''}`}>
              <div className={`w-full border-b border-zinc-800/50 py-3 px-6 flex items-center justify-center backdrop-blur-md transition-colors duration-300 ${scrolled ? 'bg-black/95 border-b-zinc-800' : 'bg-[#09090b]/80'}`}>
@@ -512,7 +495,7 @@ export default function Home() {
                                           <div className={`p-5 rounded-2xl border flex flex-col justify-between relative overflow-hidden cursor-pointer group h-64 ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'}`} onClick={() => handleCardToggle('identity')}><div className="flex justify-between items-start mb-2 relative z-10"><div className="flex items-center gap-2"><div className={`p-2 rounded-lg ${zenMode ? 'bg-zinc-800 text-zinc-400' : 'bg-zinc-800 text-zinc-400'}`}><Server size={18}/></div><div className={`text-xs font-bold uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>IDENTITY & STATUS</div></div><HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" /></div><div className="mt-auto relative z-10"><div className={`text-xl font-mono group-hover:text-blue-400 group-hover:animate-pulse ${zenMode ? 'text-white' : 'text-white'}`}>{getSafeVersion(selectedNode)}</div>{isLatest(getSafeVersion(selectedNode)) ? <div className="text-[10px] text-green-500 mt-1 font-bold bg-green-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded"><CheckCircle size={10}/> UP TO DATE</div> : <div className="text-[10px] text-orange-500 mt-1 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded"><AlertTriangle size={10}/> UPDATE NEEDED</div>}<div className="mt-4 flex justify-center"><div className="text-[9px] font-bold uppercase tracking-widest text-blue-400/80 animate-pulse group-hover:text-blue-300 transition-colors flex items-center gap-1"><Maximize2 size={8} /> CLICK TO EXPAND</div></div></div></div>
                                       </div>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                          <Link href="/leaderboard"><div className={`h-40 p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-yellow-500/30'}`}><div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/5 to-transparent z-20 pointer-events-none"></div><div className="absolute top-0 right-0 p-12 bg-yellow-500/5 blur-2xl rounded-full group-hover:bg-yellow-500/10 transition"></div><div className="flex justify-between items-start mb-2 relative z-10"><div className="flex items-center gap-2"><div className={`p-2 rounded-lg ${zenMode ? 'bg-yellow-900/20 text-yellow-600' : 'bg-yellow-500/10 text-yellow-500'}`}><Trophy size={18}/></div><div className={`text-xs font-bold uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>REPUTATION</div></div><HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" onClick={(e) => toggleTooltip(e, 'card_rank')} /></div>{activeTooltip === 'card_rank' && <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-12 left-4 right-4 animate-in fade-in">Rank is determined by total reputation credits.</div>}<div className="mt-auto relative z-10"><div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Global Rank <span className="text-white text-lg ml-1">#{selectedNode?.rank || '-'}</span></div><div className="bg-zinc-800 shadow-[0_4px_0_0_rgba(0,0,0,0.3)] rounded-lg p-3 mt-2 border-b border-white/5"><div className="flex justify-between items-center"><span className="text-[10px] text-zinc-500 font-mono uppercase">Credits Earned</span><span className="text-yellow-500 font-mono font-bold text-xs">{selectedNode?.credits ? selectedNode.credits.toLocaleString() : '0'}</span></div></div></div><div className="mt-3 flex justify-end"><span className="text-[9px] font-bold uppercase tracking-widest text-yellow-500/80 animate-pulse group-hover:text-yellow-300 transition-colors flex items-center gap-1">OPEN LEADERBOARD <ExternalLink size={8} /></span></div></div></div></Link>
+                                          <Link href="/leaderboard"><div className={`h-40 p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-yellow-500/30'}`}><div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/5 to-transparent z-20 pointer-events-none"></div><div className="absolute top-0 right-0 p-12 bg-yellow-500/5 blur-2xl rounded-full group-hover:bg-yellow-500/10 transition"></div><div className="flex justify-between items-start mb-2 relative z-10"><div className="flex items-center gap-2"><div className={`p-2 rounded-lg ${zenMode ? 'bg-yellow-900/20 text-yellow-600' : 'bg-yellow-500/10 text-yellow-500'}`}><Trophy size={18}/></div><div className={`text-xs font-bold uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>REPUTATION</div></div><HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" onClick={(e) => toggleTooltip(e, 'card_rank')} /></div>{activeTooltip === 'card_rank' && <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-12 left-4 right-4 animate-in fade-in">Rank is determined by total reputation credits.</div>}<div className="mt-auto relative z-10"><div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">Global Rank <span className="text-white text-lg ml-1">#{selectedNode?.rank || '-'}</span></div><div className="bg-zinc-800 shadow-[0_4px_0_0_rgba(0,0,0,0.3)] rounded-lg p-3 mt-2 border-b border-white/5"><div className="flex justify-between items-center"><span className="text-[10px] text-zinc-500 font-mono uppercase">Credits Earned</span><span className="text-yellow-500 font-mono font-bold text-xs">{selectedNode?.credits ? selectedNode.credits.toLocaleString() : '0'}</span></div></div></div><div className="mt-3 flex justify-end"><span className="text-[9px] font-bold uppercase tracking-widest text-yellow-500/80 animate-pulse group-hover:text-yellow-300 transition-colors flex items-center gap-1">OPEN LEADERBOARD <ExternalLink size={8} /></span></div></div></Link>
                                           <Link href={`/map?focus=${getSafeIp(selectedNode)}`}><div className={`h-40 p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'}`}><div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition group-hover:scale-150 duration-700"></div><div className="flex justify-between items-start mb-2 relative z-10"><div className="flex items-center gap-2"><div className={`p-2 rounded-lg ${zenMode ? 'bg-blue-900/20 text-blue-600' : 'bg-blue-500/10 text-blue-500'}`}><Globe size={18}/></div><div className={`text-xs font-bold uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>PHYSICAL LAYER</div></div><HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" onClick={(e) => toggleTooltip(e, 'card_loc')} /></div>{activeTooltip === 'card_loc' && <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-12 left-4 right-4 animate-in fade-in">Approximate physical location based on IP triangulation.</div>}<div className="mt-auto relative z-10 group-hover:translate-x-1 transition-transform"><PhysicalLocationBadge node={selectedNode} zenMode={zenMode} /><div className="mt-3 flex justify-end"><span className="text-[9px] font-bold uppercase tracking-widest text-blue-400/80 animate-pulse group-hover:text-blue-300 transition-colors flex items-center gap-1">OPEN MAP VIEW <ExternalLink size={8} /></span></div></div></div></Link>
                                       </div>
                                   </>
