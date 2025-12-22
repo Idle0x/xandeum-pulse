@@ -9,8 +9,7 @@ const BACKUP_NODES = [
 ];
 const TIMEOUT_PRIMARY = 4000;
 const TIMEOUT_BACKUP = 6000;
-// CHANGED: Increased timeout to 8s to prevent 0-credit failures
-const TIMEOUT_CREDITS = 8000; 
+const TIMEOUT_CREDITS = 8000; // Increased to ensure it doesn't fail on slow connections
 
 const geoCache = new Map<string, { lat: number; lon: number; country: string; countryCode: string; city: string }>();
 
@@ -73,17 +72,24 @@ const calculateLogScore = (value: number, median: number, maxScore: number = 100
     return Math.min(maxScore, (maxScore / 2) * Math.log2(ratio + 1));
 };
 
-// --- VERSION LOGIC ---
+// --- VERSION LOGIC (Urgency Curve + Semantic Safety) ---
 const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedUniqueVersions: string[]) => {
+    // 1. Semantic Check (The Fix for 0.8.0-trynet)
+    // If the numbers match, it is 100% compliant, regardless of suffix.
     if (compareVersions(nodeVersion, consensusVersion) === 0) return 100;
+    
+    // 2. If semantically newer (e.g. 0.9.0 vs 0.8.0), automatic 100
     if (compareVersions(nodeVersion, consensusVersion) > 0) return 100;
 
+    // 3. Fallback to Rank Logic for older versions
     const consensusIndex = sortedUniqueVersions.indexOf(consensusVersion);
     const nodeIndex = sortedUniqueVersions.indexOf(nodeVersion);
 
     if (nodeIndex === -1) return 0;
 
     const distance = nodeIndex - consensusIndex;
+
+    // Urgency Ladder
     if (distance <= 0) return 100;
     if (distance === 1) return 90; 
     if (distance === 2) return 70; 
@@ -117,7 +123,7 @@ const calculateVitalityScore = (
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
   if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
 
-  // 3. STORAGE SCORE (Weight: 30%)
+  // 3. STORAGE SCORE (Weight: 30%) - [Base + Bonus]
   const baseStorageScore = calculateLogScore(storageCommitted, medianStorage, 80);
   let utilizationBonus = 0;
   if (storageUsed > 0) {
@@ -172,12 +178,10 @@ async function fetchRawData() {
 
 async function fetchCredits() {
     try {
-        console.log("Fetching credits...");
         const res = await axios.get('https://podcredits.xandeum.network/api/pods-credits', { timeout: TIMEOUT_CREDITS });
-        // CHANGED: Handle nested data structure if API wraps response
-        if (res.data && Array.isArray(res.data)) return res.data;
-        if (res.data && res.data.pods_credits) return res.data.pods_credits;
-        return [];
+        // NOTE: Returning raw data here so we can unwrap it safely in the main function
+        // This matches the behavior of your original working code.
+        return res.data;
     } catch (error) { 
         console.error("Credits API Failed:", error);
         return []; 
@@ -211,27 +215,23 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const [rawPods, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
   if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable");
 
-  // 1. Process Credits (Enhanced Matching)
+  // 1. Process Credits (Restored original working extraction logic)
   const creditsMap = new Map<string, number>();
   const creditsArray: number[] = [];
   
-  // Ensure we have an array
-  const rawCredits = Array.isArray(creditsData) ? creditsData : [];
+  const rawCredits = Array.isArray(creditsData) ? creditsData : (creditsData?.pods_credits || []);
   
-  if (rawCredits.length > 0) {
+  if (Array.isArray(rawCredits)) {
       rawCredits.forEach((c: any) => {
-        // Try multiple fields for credit value
-        const val = parseFloat(c.credits || c.amount || c.total || '0');
-        // Try multiple fields for node ID
-        const key = c.pod_id || c.pubkey || c.node || c.identity;
+        // Handle variations in API response keys
+        const val = parseFloat(c.credits || c.amount || '0');
+        const key = c.pod_id || c.pubkey || c.node;
         
         if (key && !isNaN(val)) { 
             creditsMap.set(key, val); 
             creditsArray.push(val); 
         }
       });
-  } else {
-      console.warn("No credits data found or array is empty");
   }
   
   creditsArray.sort((a, b) => a - b);
@@ -252,6 +252,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       uniqueVersionsSet.add(v);
   });
   
+  // Consensus based on CLEAN version counts
   const consensusVersion = Object.keys(versionCounts).sort((a, b) => versionCounts[b] - versionCounts[a])[0] || '0.0.0';
   const sortedUniqueVersions = Array.from(uniqueVersionsSet).sort((a, b) => compareVersions(b, a));
 
@@ -274,7 +275,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
     const storageUsed = Number(pod.storage_used) || 0;
     const uptime = Number(pod.uptime) || 0;
     
-    // Fallback ID check (some RPCs return snake_case)
+    // Check both pubkey locations to match credits
     const nodeKey = pod.pubkey || pod.public_key;
     const credits = creditsMap.get(nodeKey) || 0;
     
@@ -298,10 +299,10 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
 
     return {
       ...pod,
-      pubkey: nodeKey, // Ensure we use the detected key
+      pubkey: nodeKey,
       storage_committed: storageCommitted, 
       storage_used: storageUsed,           
-      credits, // IMPORTANT: Credits attached here
+      credits, 
       health: vitality.total,
       healthBreakdown: vitality.breakdown, 
       location: { lat: loc.lat, lon: loc.lon, countryName: loc.country, countryCode: loc.countryCode, city: loc.city }
