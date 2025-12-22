@@ -7,7 +7,7 @@ import {
   Trophy, Medal, ArrowLeft, Search, Wallet, X, 
   Activity, Users, BarChart3, HelpCircle, Star, 
   Calculator, Zap, ChevronDown, 
-  ExternalLink, ArrowUpRight, Eye, MapPin, Copy, Check, Share2, AlertTriangle, ArrowUp, ArrowDown
+  ExternalLink, ArrowUpRight, Eye, MapPin, Copy, Check, Share2, ArrowUp, ArrowDown
 } from 'lucide-react';
 
 interface RankedNode {
@@ -346,7 +346,7 @@ export default function Leaderboard() {
                 <div key={node.pubkey} id={`node-${node.pubkey}`} className="group transition-all duration-300">
                     <div className={`grid grid-cols-12 gap-4 p-4 hover:bg-white/5 items-center cursor-pointer relative ${isExpanded ? 'bg-white/5 border-l-4 border-yellow-500' : isMyNode ? 'bg-yellow-500/5 border-l-4 border-yellow-500' : 'border-l-4 border-transparent'}`} onClick={() => handleRowClick(node)}>
                         
-                        {/* RANK + SATURATION WARNING */}
+                        {/* RANK */}
                         <div className="col-span-2 md:col-span-1 flex flex-col justify-center items-center gap-1 relative">
                             <div className="flex items-center gap-1">
                                 {node.rank === 1 && <Trophy size={16} className="text-yellow-400" />}
@@ -354,14 +354,6 @@ export default function Leaderboard() {
                                 <span className={`text-sm font-bold ${node.rank <= 3 ? 'text-white' : 'text-zinc-500'}`}>#{node.rank}</span>
                             </div>
                             
-                            {/* SATURATION WARNING (Top 10) */}
-                            {node.rank <= 10 && (
-                                <div className="group/sat relative">
-                                    <AlertTriangle size={10} className="text-amber-500 animate-pulse cursor-help" />
-                                    <div className="absolute bottom-full mb-1 hidden group-hover/sat:block bg-black border border-amber-900 text-amber-500 text-[9px] p-2 rounded w-32 z-50 text-center">High concentration. Diminishing returns likely.</div>
-                                </div>
-                            )}
-
                             {/* WHALE WATCH TREND */}
                             {node.trend !== 0 && (
                                 <div className={`text-[9px] font-bold flex items-center ${node.trend > 0 ? 'text-green-500' : 'text-red-500'}`}>
