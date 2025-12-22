@@ -40,6 +40,7 @@ export interface EnrichedNode {
   rank?: number;
 }
 
+// Helper: Semver Comparison
 const compareVersions = (v1: string, v2: string) => {
   const s1 = v1 || '0.0.0';
   const s2 = v2 || '0.0.0';
@@ -54,64 +55,73 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
-// --- LOGIC V1.5: Smoothed & Relative Scoring ---
+// --- V2 MATH HELPERS ---
+
+// Sigmoid Function: Creates a smooth "S" curve for trust
+// [attachment_0](attachment)
+const calculateSigmoidScore = (value: number, midpoint: number, steepness: number) => {
+    return 100 / (1 + Math.exp(-steepness * (value - midpoint)));
+};
+
+// Logarithmic Function: Rewards growth early, diminishes returns for whales
+// [attachment_1](attachment)
+const calculateLogScore = (value: number, median: number) => {
+    if (median === 0) return value > 0 ? 100 : 0;
+    const ratio = value / median;
+    // Formula: Score hits 50 at median, 100 at 4x median
+    return Math.min(100, 50 * Math.log2(ratio + 1));
+};
+
+// --- MAIN SCORING LOGIC V2 ---
 const calculateVitalityScore = (
-  storageCommitted: number, 
-  uptime: number, 
-  version: string, 
-  consensusVersion: string, 
-  medianCredits: number, 
-  credits: number,
-  medianStorage: number // NEW: We now pass the network median storage
+    storageCommitted: number, 
+    uptimeSeconds: number, 
+    version: string, 
+    consensusVersion: string, 
+    latestVersion: string,
+    medianCredits: number, 
+    credits: number,
+    medianStorage: number
 ) => {
-  
-  // 1. GATEKEEPER RULE: No storage = No Health
+  // 1. GATEKEEPER RULE
   if (storageCommitted <= 0) {
       return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, capacity: 0 } };
   }
 
-  // 2. UPTIME (Smoothed Curve)
-  // Logic: Linear ramp up to 30 days. No more cliffs.
-  // 30 days * 24 hours * 60 mins * 60 seconds = 2,592,000 seconds
-  const MAX_UPTIME_CAP = 2592000; 
-  let uptimeScore = (uptime / MAX_UPTIME_CAP) * 100;
-  // Penalty: New nodes (<24h) get a slight dampener to prove stability
-  if (uptime < 86400) uptimeScore = uptimeScore * 0.5; 
-  uptimeScore = Math.min(100, Math.max(0, uptimeScore));
+  // 2. UPTIME SCORE (Weight: 35%) -> Sigmoid Curve
+  // Midpoint = 7 days, Steepness = 0.2
+  const uptimeDays = uptimeSeconds / 86400;
+  let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
+  // Penalize brand new nodes (< 24h) hard
+  if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20);
 
-  // 3. VERSION (Risk Aware)
-  // Logic: Latest = 100. Older = 50.
-  let versionScore = 100;
-  if (consensusVersion !== '0.0.0' && compareVersions(version || '0.0.0', consensusVersion) < 0) {
-      versionScore = 50; 
-  }
+  // 3. CAPACITY SCORE (Weight: 30%) -> Logarithmic Relative to Network
+  const capacityScore = calculateLogScore(storageCommitted, medianStorage);
 
-  // 4. REPUTATION (Relative to Network Wealth)
-  // Logic: If you have 2x the median credits, you get 100 points.
+  // 4. REPUTATION SCORE (Weight: 20%) -> Linear Relative with Decay
+  // Median = 50pts, 2x Median = 100pts
   let reputationScore = 0;
-  const safeMedianCredits = medianCredits || 1; // Prevent divide by zero
-  if (credits > 0) {
-      // Formula: (YourCredits / (Median * 2)) * 100
-      reputationScore = (credits / (safeMedianCredits * 2)) * 100;
-      reputationScore = Math.min(100, reputationScore);
+  if (medianCredits > 0) {
+      reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
   }
 
-  // 5. CAPACITY (Relative to Network Size)
-  // Logic: If you commit 2x the median storage, you get 100 points.
-  // This auto-adjusts if the network average grows from 100GB to 10TB.
-  let capacityScore = 0;
-  const safeMedianStorage = medianStorage || (10 * 1024 * 1024 * 1024); // Fallback to 10GB if network is empty
-  
-  // Formula: (YourStorage / (Median * 2)) * 100
-  capacityScore = (storageCommitted / (safeMedianStorage * 2)) * 100;
-  capacityScore = Math.min(100, capacityScore);
+  // 5. VERSION SCORE (Weight: 15%) -> Consensus Aware
+  let versionScore = 0;
+  if (version === latestVersion) versionScore = 100;
+  else if (version === consensusVersion) versionScore = 95; // Safe lag
+  else {
+      // Check distance
+      const diff = compareVersions(version, consensusVersion);
+      if (diff >= -1) versionScore = 80; // 1 minor version behind
+      else versionScore = 0; // Major lag / Unsafe
+  }
 
-  // WEIGHTING
+  // WEIGHTED TOTAL
   const total = Math.round(
-      (uptimeScore * 0.30) + 
-      (versionScore * 0.20) + 
-      (reputationScore * 0.25) + 
-      (capacityScore * 0.25)
+      (uptimeScore * 0.35) + 
+      (capacityScore * 0.30) + 
+      (reputationScore * 0.20) + 
+      (versionScore * 0.15)
   );
   
   return {
@@ -175,7 +185,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const [rawPods, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
   if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable");
 
-  // 1. Process Credits (Existing logic)
+  // 1. Process Credits & Calculate Median Credits
   const creditsMap = new Map<string, number>();
   const creditsArray: number[] = [];
   const rawCredits = Array.isArray(creditsData) ? creditsData : (creditsData?.pods_credits || []);
@@ -189,22 +199,28 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   creditsArray.sort((a, b) => a - b);
   const medianCredits = creditsArray.length ? creditsArray[Math.floor(creditsArray.length / 2)] : 0;
 
-  // 2. Process Storage (NEW: Calculate Median Storage)
-  const storageArray: number[] = rawPods
-    .map((p: any) => Number(p.storage_committed) || 0)
-    .sort((a: number, b: number) => a - b);
-  const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 0;
+  // 2. Calculate Median Storage (CRITICAL FOR V2)
+  const storageArray: number[] = rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
+  const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
 
-  // 3. Process Version
+  // 3. Determine Versions (Consensus & Latest)
   const versionCounts: Record<string, number> = {};
-  rawPods.forEach((p: any) => { const v = p.version || '0.0.0'; versionCounts[v] = (versionCounts[v] || 0) + 1; });
+  const uniqueVersions: string[] = [];
+  rawPods.forEach((p: any) => { 
+      const v = p.version || '0.0.0'; 
+      versionCounts[v] = (versionCounts[v] || 0) + 1;
+      if (!uniqueVersions.includes(v)) uniqueVersions.push(v);
+  });
+  
   const consensusVersion = Object.keys(versionCounts).sort((a, b) => versionCounts[b] - versionCounts[a])[0] || '0.0.0';
+  // Simple assumption: "Latest" is the highest semver in the list
+  const latestVersion = uniqueVersions.sort((a, b) => compareVersions(b, a))[0] || consensusVersion;
 
   // 4. Resolve Locations
   const uniqueIps = [...new Set(rawPods.map((p: any) => p.address.split(':')[0]))] as string[];
   await resolveLocations(uniqueIps);
 
-  // 5. Build Nodes & Calculate Scores
+  // 5. Build Nodes with V2 Logic
   let sumUptimeScore = 0;
   let sumVersionScore = 0;
   let sumReputationScore = 0;
@@ -220,18 +236,18 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
     const credits = creditsMap.get(pod.pubkey) || 0;
     const uptime = Number(pod.uptime) || 0;
     
-    // PASS MEDIAN STORAGE HERE
+    // --- V2 CALCULATION CALL ---
     const vitality = calculateVitalityScore(
         storageCommitted, 
         uptime, 
-        pod.version, 
+        pod.version || '0.0.0', 
         consensusVersion, 
+        latestVersion,
         medianCredits, 
         credits,
-        medianStorage // <--- Injected
+        medianStorage
     );
 
-    // Add to sums for network averages
     sumUptimeScore += vitality.breakdown.uptime;
     sumVersionScore += vitality.breakdown.version;
     sumReputationScore += vitality.breakdown.reputation;
@@ -249,6 +265,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
     };
   });
 
+  // 6. Sort and Return
   enrichedNodes.sort((a, b) => b.credits - a.credits);
   let currentRank = 1;
   enrichedNodes.forEach((node, i) => { if (i > 0 && node.credits < enrichedNodes[i - 1].credits) currentRank = i + 1; node.rank = currentRank; });
@@ -260,6 +277,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
     stats: { 
         consensusVersion, 
         medianCredits, 
+        medianStorage, // Exposed for frontend if needed
         totalNodes: total,
         avgBreakdown: {
             uptime: Math.round(sumUptimeScore / total),
