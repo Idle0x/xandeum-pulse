@@ -467,16 +467,11 @@ export default function Home() {
 
   // --- NEW: Jump-to-View Logic (Instant Switch, No Lock) ---
   useEffect(() => {
-    // Determine target view based on sort
-    // Step 0: Used, Step 1: Committed, Step 2: Health, Step 3: Uptime, Step 4: Last Seen
     let targetStep = -1;
     if (sortBy === 'storage') targetStep = 1; // Committed Storage
     else if (sortBy === 'health') targetStep = 2; // Health
     else if (sortBy === 'uptime') targetStep = 3; // NEW: Jump to Uptime
 
-    // If valid target, jump immediately. 
-    // This resets the visual to the user's intent.
-    // The main cycle interval will naturally pick up from here after 5s.
     if (targetStep !== -1) {
         setCycleStep(targetStep);
     }
@@ -488,7 +483,6 @@ export default function Home() {
     const saved = localStorage.getItem('xandeum_favorites');
     if (saved) setFavorites(JSON.parse(saved));
 
-    // Standard 5s Cycle
     const cycleInterval = setInterval(() => {
       setCycleStep((prev) => prev + 1);
     }, 5000);
@@ -1147,6 +1141,7 @@ export default function Home() {
             </div>
           ))}
 
+          {/* UPDATED: Version Status moved inside left column */}
           <div
             className={`mt-6 p-4 rounded-xl border flex items-center gap-3 ${
               isLatest(getSafeVersion(selectedNode))
@@ -1182,6 +1177,7 @@ export default function Home() {
 
   const renderHealthBreakdown = () => {
     const health = selectedNode?.health || 0;
+    // UPDATED: Using 'storage' correctly here from the new backend
     const bd = selectedNode?.healthBreakdown || {
       uptime: health,
       version: health,
@@ -1196,6 +1192,7 @@ export default function Home() {
     const netAvgHealth = avgs.total || 50;
     const diff = health - netAvgHealth;
 
+    // UPDATED: Metric labels match new logic
     const metrics = [
       { label: 'Storage Capacity', val: bd.storage, avg: avgs.storage },
       { label: 'Reputation Score', val: bd.reputation, avg: avgs.reputation },
@@ -1215,10 +1212,9 @@ export default function Home() {
           </h3>
           <button
             onClick={() => setModalView('overview')}
-            // UPDATED: Back button uses red text and arrow-left icon
-            className="text-[10px] font-bold text-red-500 hover:text-red-400 flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 transition"
+            className="text-[10px] font-bold text-zinc-500 hover:text-white flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 transition"
           >
-            <ArrowLeft size={10} /> BACK
+            <ChevronLeft size={10} /> BACK
           </button>
         </div>
 
@@ -1324,10 +1320,9 @@ export default function Home() {
           </h3>
           <button
             onClick={() => setModalView('overview')}
-            // UPDATED: Back button uses red text and arrow-left icon
-            className="text-[10px] font-bold text-red-500 hover:text-red-400 flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 transition"
+            className="text-[10px] font-bold text-zinc-500 hover:text-white flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 transition"
           >
-            <ArrowLeft size={10} /> BACK
+            <ChevronLeft size={10} /> BACK
           </button>
         </div>
 
