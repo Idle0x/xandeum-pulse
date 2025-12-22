@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
@@ -413,7 +413,6 @@ export default function Home() {
 
   const [searchQuery, setSearchQuery] = useState('');
   
-  // DEFAULT: Sort by Storage
   const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'health'>('storage');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -465,16 +464,18 @@ export default function Home() {
 
   const timeAgo = useTimeAgo(selectedNode?.last_seen_timestamp);
 
-  // --- NEW: Jump-to-View Logic (No Locking) ---
+  // --- CHANGED: Jump-to-View Logic (Instant Switch, No Lock) ---
   useEffect(() => {
     // Determine target view based on sort
-    // Step 0: Used, Step 1: Committed, Step 2: Health, Step 3: Last Seen
+    // Step 0: Used, Step 1: Committed, Step 2: Health, Step 3: Uptime, Step 4: Last Seen
     let targetStep = -1;
     if (sortBy === 'storage') targetStep = 1; // Committed Storage
     else if (sortBy === 'health') targetStep = 2; // Health
-    else if (sortBy === 'uptime') targetStep = 3; // Last Seen
+    else if (sortBy === 'uptime') targetStep = 3; // NEW: Jump to Uptime
 
-    // If valid target, jump immediately
+    // If valid target, jump immediately. 
+    // This resets the visual to the user's intent.
+    // The main cycle interval will naturally pick up from here after 5s.
     if (targetStep !== -1) {
         setCycleStep(targetStep);
     }
@@ -794,10 +795,10 @@ export default function Home() {
     return mostCommonVersion !== 'N/A' && compareVersions(nodeVersion, mostCommonVersion) >= 0;
   };
 
-  // --- CHANGED: Standard Synchronized Cycle ---
+  // --- CHANGED: Updated Cycle List (Added Uptime) ---
   const getCycleContent = (node: Node) => {
-    // Simply use the step from state
-    const step = cycleStep % 4;
+    // 5 Steps total now
+    const step = cycleStep % 5;
 
     if (step === 0) {
       return {
@@ -827,6 +828,17 @@ export default function Home() {
       };
     }
 
+    // NEW: Step 3 - Uptime with Orange/Amber Color
+    if (step === 3) {
+      return {
+        label: 'Continuous Uptime',
+        value: formatUptime(node.uptime),
+        color: 'text-orange-400', 
+        icon: Zap,
+      };
+    }
+
+    // Pushed Last Seen to Step 4
     return {
       label: 'Last Seen',
       value: formatLastSeen(node.last_seen_timestamp),
@@ -852,6 +864,9 @@ export default function Home() {
       node.location?.countryCode && node.location.countryCode !== 'XX'
         ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png`
         : null;
+    
+    // NEW: Visual Effect when sorting by Version
+    const isVersionSort = sortBy === 'version';
 
     return (
       <div
@@ -913,9 +928,10 @@ export default function Home() {
             <span className="text-zinc-500">Version</span>
             <div className="flex items-center gap-2">
               <span
-                className={`text-zinc-300 px-2 py-0.5 rounded ${
+                // CHANGED: Added Pulse/Glow effect for Version Sort
+                className={`text-zinc-300 px-2 py-0.5 rounded transition-all duration-500 ${
                   zenMode ? 'bg-zinc-900 border border-zinc-700' : 'bg-zinc-800'
-                }`}
+                } ${isVersionSort ? 'text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.4)] border-cyan-500/50' : ''}`}
               >
                 {getSafeVersion(node)}
               </span>
@@ -965,6 +981,8 @@ export default function Home() {
   const renderZenCard = (node: Node) => {
     const latest = isLatest(getSafeVersion(node));
     const health = node.health || 0;
+    // NEW: Version effect for Zen Mode
+    const isVersionSort = sortBy === 'version';
 
     return (
       <div
@@ -1009,12 +1027,12 @@ export default function Home() {
 
           <div>
             <div className="text-[9px] text-zinc-600 uppercase font-bold mb-1">Uptime</div>
-            <div className="font-mono text-zinc-300">{formatUptime(node.uptime)}</div>
+            <div className="font-mono text-orange-400">{formatUptime(node.uptime)}</div>
           </div>
 
           <div>
             <div className="text-[9px] text-zinc-600 uppercase font-bold mb-1">Version</div>
-            <div className="font-mono text-zinc-300 flex items-center gap-2">
+            <div className={`font-mono flex items-center gap-2 ${isVersionSort ? 'text-cyan-400 animate-pulse' : 'text-zinc-300'}`}>
               {getSafeVersion(node)} {latest && <CheckCircle size={10} className="text-green-500" />}
             </div>
           </div>
@@ -1069,7 +1087,8 @@ export default function Home() {
       { label: 'RPC Endpoint', val: `http://${getSafeIp(selectedNode)}:6000` },
       { label: 'IP Address', val: getSafeIp(selectedNode) },
       { label: 'Node Version', val: getSafeVersion(selectedNode) },
-      { label: 'Current Uptime', val: formatUptime(selectedNode?.uptime) },
+      // UPDATED: Uptime with Orange Color
+      { label: 'Current Uptime', val: formatUptime(selectedNode?.uptime), color: 'text-orange-400' },
     ];
 
     return (
@@ -1108,7 +1127,7 @@ export default function Home() {
               <div className="flex items-center justify-between">
                 <code
                   className={`text-sm font-mono truncate ${
-                    zenMode ? 'text-zinc-300' : 'text-zinc-200'
+                    d.color || (zenMode ? 'text-zinc-300' : 'text-zinc-200')
                   }`}
                 >
                   {d.val}
