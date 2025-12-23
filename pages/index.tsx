@@ -84,18 +84,29 @@ interface Node {
   };
 }
 
-// --- WELCOME CURTAIN COMPONENT ---
+// --- WELCOME CURTAIN COMPONENT (Context Aware) ---
 
 const WelcomeCurtain = () => {
   const [show, setShow] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
+    // Detect Screen Size
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    // Set initial
+    handleResize();
+    window.addEventListener('resize', handleResize);
+
     // Check if user has seen the welcome screen
     const seen = localStorage.getItem('xandeum_pulse_welcome_v1');
     if (!seen) {
-      // Small delay to ensure smooth entrance animation
       setTimeout(() => setShow(true), 100);
     }
+
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const handleEnter = () => {
@@ -115,19 +126,19 @@ const WelcomeCurtain = () => {
         {/* Icons Visual */}
         <div className="flex justify-center items-center gap-6 mb-6 relative z-10">
           <div className="flex flex-col items-center gap-2">
-            <div className="p-3 bg-zinc-900 rounded-xl border border-zinc-800 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+            <div className={`p-3 rounded-xl border border-zinc-800 shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-colors duration-500 ${!isMobile ? 'bg-zinc-800 text-blue-400' : 'bg-zinc-900 text-zinc-600'}`}>
               <Monitor size={32} />
             </div>
-            <span className="text-[9px] font-bold uppercase tracking-widest text-blue-400">Best Experience</span>
+            <span className={`text-[9px] font-bold uppercase tracking-widest ${!isMobile ? 'text-blue-400' : 'text-zinc-600'}`}>Desktop</span>
           </div>
           <div className="h-px w-8 bg-zinc-800"></div>
-          <div className="flex flex-col items-center gap-2 opacity-60">
-            <div className="p-3 bg-zinc-900 rounded-xl border border-zinc-800 text-zinc-500">
+          <div className="flex flex-col items-center gap-2">
+            <div className={`p-3 rounded-xl border border-zinc-800 transition-colors duration-500 ${isMobile ? 'bg-zinc-800 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'bg-zinc-900 text-zinc-600'}`}>
               <div className="relative">
                 <LayoutDashboard size={24} />
               </div>
             </div>
-            <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500">Mobile Optimized</span>
+            <span className={`text-[9px] font-bold uppercase tracking-widest ${isMobile ? 'text-blue-400' : 'text-zinc-600'}`}>Mobile</span>
           </div>
         </div>
 
@@ -136,9 +147,15 @@ const WelcomeCurtain = () => {
           <h2 className="text-xl md:text-2xl font-black text-white tracking-tight">
             Welcome to Pulse
           </h2>
-          <p className="text-xs text-zinc-400 leading-relaxed px-4">
-            For the deepest analysis and topology visualization, a desktop display is recommended. However, this interface is fully optimized for quick mobile checks.
-          </p>
+          <div className="text-xs text-zinc-400 leading-relaxed px-2 space-y-3">
+            <p>Hi there! This dashboard is packed with real-time data sourced directly from the network.</p>
+            <p className={isMobile ? "text-blue-200" : "text-zinc-300"}>
+              {isMobile 
+                ? "Because of the data complexity, a desktop screen provides the best experience, though we have optimized this mobile view for quick checks on the go."
+                : "You're using a large screen, which is perfect! You are ready to fully explore the interactive map and detailed metrics."
+              }
+            </p>
+          </div>
         </div>
 
         {/* 3 Key Tips */}
@@ -1444,7 +1461,7 @@ export default function Home() {
       <Head>
         <title>Xandeum Pulse {zenMode ? '[ZEN MODE]' : ''}</title>
       </Head>
-      
+
       {/* --- WELCOME CURTAIN --- */}
       <WelcomeCurtain />
 
@@ -1538,7 +1555,7 @@ export default function Home() {
 
       {/* --- HEADER --- */}
       <header
-        className={`sticky top-0 z-[100] backdrop-blur-md border-b px-6 py-2 md:py-4 flex flex-col gap-4 md:gap-6 transition-all duration-500 ${
+        className={`sticky top-0 z-[100] backdrop-blur-md border-b px-6 py-2 md:py-4 flex flex-col gap-2 md:gap-6 transition-all duration-500 ${
           zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'
         }`}
       >
@@ -1602,9 +1619,9 @@ export default function Home() {
               />
             </div>
 
-            {/* ROTATING TOOLTIPS: Hidden on Mobile (hidden md:block) */}
+            {/* ROTATING TOOLTIPS: Now visible on mobile, tiny font, no gaps */}
             {!zenMode && (
-              <div className="mt-1 md:mt-2 w-full text-center pointer-events-none min-h-[16px] md:min-h-[20px] transition-all duration-300 hidden md:block">
+              <div className="mt-1 md:mt-2 w-full text-center pointer-events-none min-h-[16px] md:min-h-[20px] transition-all duration-300 block">
                 <p
                   key={searchTipIndex}
                   className="text-[9px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 whitespace-normal text-center leading-tight"
@@ -1654,7 +1671,7 @@ export default function Home() {
           <button
             onClick={fetchData}
             disabled={loading}
-            className={`flex items-center gap-2 px-6 h-9 md:h-12 rounded-xl transition font-bold text-[10px] md:text-xs ${
+            className={`flex items-center gap-2 px-4 h-8 md:h-12 rounded-xl transition font-bold text-[10px] md:text-xs ${
               loading
                 ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait'
                 : zenMode
