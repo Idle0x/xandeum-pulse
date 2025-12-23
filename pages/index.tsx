@@ -961,7 +961,7 @@ export default function Home() {
       <div
         key={node.address || i}
         onClick={() => { setSelectedNode(node); setModalView('overview'); }}
-        className={`group relative border rounded-xl p-5 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${
+        className={`group relative border rounded-xl p-3 md:p-5 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${
           zenMode
             ? 'bg-black border-zinc-800 hover:border-zinc-600'
             : isFav
@@ -974,11 +974,11 @@ export default function Home() {
         </div>
         
         {/* HEADER: Flex layout separates Left(Identity) from Right(Star) */}
-        <div className="mb-4 flex justify-between items-start">
+        <div className="mb-2 md:mb-4 flex justify-between items-start">
           <div className="overflow-hidden pr-2 w-full">
             {/* Identity Label */}
             <div className="flex items-center gap-2 mb-1">
-              <div className="text-[10px] text-zinc-500 uppercase font-bold">NODE IDENTITY</div>
+              <div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold">NODE IDENTITY</div>
               {!node.is_public && <Shield size={10} className="text-zinc-600" />}
             </div>
             
@@ -986,13 +986,13 @@ export default function Home() {
             <div className="relative h-6 w-full">
                {/* Layer 1: PubKey (Default) */}
                <div className="absolute inset-0 transition-opacity duration-300 group-hover:opacity-0 flex items-center">
-                  <span className="font-mono text-sm text-zinc-300 truncate w-full">{node.pubkey?.slice(0,16)}...</span>
+                  <span className="font-mono text-xs md:text-sm text-zinc-300 truncate w-full">{node.pubkey?.slice(0,16)}...</span>
                </div>
                
                {/* Layer 2: IP + Flag (Hover) */}
                <div className="absolute inset-0 transition-opacity duration-300 opacity-0 group-hover:opacity-100 flex items-center gap-2">
                    {flagUrl && <img src={flagUrl} className="w-4 h-auto rounded-sm shrink-0" />}
-                   <span className="font-mono text-sm text-blue-400 truncate">{getSafeIp(node)}</span>
+                   <span className="font-mono text-xs md:text-sm text-blue-400 truncate">{getSafeIp(node)}</span>
                </div>
             </div>
           </div>
@@ -1008,8 +1008,8 @@ export default function Home() {
           </button>
         </div>
         
-        <div className="space-y-3">
-          <div className="flex justify-between items-center text-xs">
+        <div className="space-y-1.5 md:space-y-3">
+          <div className="flex justify-between items-center text-[10px] md:text-xs">
             <span className="text-zinc-500">Version</span>
             <span
               className={`px-2 py-0.5 rounded transition-all duration-500 ${
@@ -1022,35 +1022,35 @@ export default function Home() {
             </span>
           </div>
           
-          <div className="pt-2">
-            <div className="text-[10px] text-zinc-600 uppercase font-bold mb-1">Network Rewards</div>
-            <div className="flex justify-between items-center text-xs p-2 rounded-lg border bg-black/40 border-zinc-800/50">
+          <div className="pt-1 md:pt-2">
+            <div className="text-[9px] md:text-[10px] text-zinc-600 uppercase font-bold mb-1">Network Rewards</div>
+            <div className="flex justify-between items-center text-[10px] md:text-xs p-1.5 md:p-2 rounded-lg border bg-black/40 border-zinc-800/50">
                {/* CRASHPROOF UI: Check Null Credits */}
                {node.credits !== null ? (
                    <>
                        <div className="flex items-center gap-1.5">
-                         <Medal size={12} className={node.rank===1?'text-yellow-400':'text-zinc-500'} />
+                         <Medal size={10} className={node.rank===1?'text-yellow-400':'text-zinc-500'} />
                          <span className="text-zinc-400 font-bold">#{node.rank}</span>
                        </div>
                        <div className="flex items-center gap-1.5">
                          <span className="text-zinc-300 font-mono">{node.credits.toLocaleString()}</span>
-                         <Wallet size={12} className="text-yellow-600"/>
+                         <Wallet size={10} className="text-yellow-600"/>
                        </div>
                    </>
                ) : (
-                   <div className="flex items-center gap-2 text-red-400 w-full justify-center font-bold italic text-[10px]">
-                     <AlertOctagon size={12}/> CREDITS API OFFLINE
+                   <div className="flex items-center gap-2 text-red-400 w-full justify-center font-bold italic text-[9px] md:text-[10px]">
+                     <AlertOctagon size={10}/> CREDITS API OFFLINE
                    </div>
                )}
             </div>
           </div>
           
-          <div className="pt-3 mt-3 border-t border-white/5 flex justify-between items-end">
+          <div className="pt-2 md:pt-3 mt-2 md:mt-3 border-t border-white/5 flex justify-between items-end">
             <div>
-              <span className="text-[10px] text-zinc-500 uppercase font-bold block mb-0.5 flex items-center gap-1">
+              <span className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold block mb-0.5 flex items-center gap-1">
                 <cycleData.icon size={10} /> {cycleData.label}
               </span>
-              <span className={`text-lg font-bold ${cycleData.color} font-mono tracking-tight`}>
+              <span className={`text-sm md:text-lg font-bold ${cycleData.color} font-mono tracking-tight`}>
                 {cycleData.value}
               </span>
             </div>
@@ -1070,39 +1070,39 @@ export default function Home() {
       <div
         key={node.address || node.pubkey}
         onClick={() => { setSelectedNode(node); setModalView('overview'); }}
-        className="group relative border border-zinc-800 bg-black/50 hover:border-zinc-600 p-4 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-lg flex flex-col justify-between"
+        className="group relative border border-zinc-800 bg-black/50 hover:border-zinc-600 p-3 md:p-4 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-lg flex flex-col justify-between"
       >
-        <div className="flex justify-between items-start mb-4 border-b border-zinc-800 pb-3">
+        <div className="flex justify-between items-start mb-2 md:mb-4 border-b border-zinc-800 pb-2 md:pb-3">
           <div>
-            <div className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-1">NODE ID</div>
-            <div className="font-mono text-sm text-zinc-300 truncate w-32 md:w-48">{node.pubkey || 'Unknown'}</div>
-            <div className="text-[10px] text-zinc-600 font-mono mt-0.5">{getSafeIp(node)}</div>
+            <div className="text-[8px] md:text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-1">NODE ID</div>
+            <div className="font-mono text-xs md:text-sm text-zinc-300 truncate w-24 md:w-32 lg:w-48">{node.pubkey || 'Unknown'}</div>
+            <div className="text-[9px] md:text-[10px] text-zinc-600 font-mono mt-0.5">{getSafeIp(node)}</div>
           </div>
-          <div className={`text-xl font-bold ${health && health >= 80 ? 'text-green-500' : 'text-yellow-500'}`}>
+          <div className={`text-lg md:text-xl font-bold ${health && health >= 80 ? 'text-green-500' : 'text-yellow-500'}`}>
             {health}
           </div>
         </div>
         
-        <div className="grid grid-cols-2 gap-4 text-xs">
+        <div className="grid grid-cols-2 gap-2 md:gap-4 text-[10px] md:text-xs">
           <div>
-            <div className="text-[9px] text-zinc-600 uppercase font-bold mb-1">Storage</div>
+            <div className="text-[8px] md:text-[9px] text-zinc-600 uppercase font-bold mb-1">Storage</div>
             <div className="font-mono text-zinc-300">{formatBytes(node.storage_used)}</div>
             <div className="w-full h-1 bg-zinc-900 rounded-full mt-1">
               <div className="h-full bg-zinc-600" style={{ width: node.storage_usage_percentage }}></div>
             </div>
           </div>
           <div>
-            <div className="text-[9px] text-zinc-600 uppercase font-bold mb-1">Uptime</div>
+            <div className="text-[8px] md:text-[9px] text-zinc-600 uppercase font-bold mb-1">Uptime</div>
             <div className="font-mono text-orange-400">{formatUptime(node.uptime)}</div>
           </div>
           <div>
-            <div className="text-[9px] text-zinc-600 uppercase font-bold mb-1">Version</div>
-            <div className={`font-mono flex items-center gap-2 ${isVersionSort ? 'text-cyan-400 animate-pulse' : 'text-zinc-300'}`}>
-              {node.version} {isLatest && <CheckCircle size={10} className="text-green-500" />}
+            <div className="text-[8px] md:text-[9px] text-zinc-600 uppercase font-bold mb-1">Version</div>
+            <div className={`font-mono flex items-center gap-1 md:gap-2 ${isVersionSort ? 'text-cyan-400 animate-pulse' : 'text-zinc-300'}`}>
+              {node.version} {isLatest && <CheckCircle size={8} className="text-green-500" />}
             </div>
           </div>
           <div>
-            <div className="text-[9px] text-zinc-600 uppercase font-bold mb-1">Rank</div>
+            <div className="text-[8px] md:text-[9px] text-zinc-600 uppercase font-bold mb-1">Rank</div>
             <div className="font-mono text-yellow-600">#{node.rank || '-'}</div>
           </div>
         </div>
@@ -1461,7 +1461,7 @@ export default function Home() {
       <Head>
         <title>Xandeum Pulse {zenMode ? '[ZEN MODE]' : ''}</title>
       </Head>
-
+      
       {/* --- WELCOME CURTAIN --- */}
       <WelcomeCurtain />
 
@@ -1555,7 +1555,7 @@ export default function Home() {
 
       {/* --- HEADER --- */}
       <header
-        className={`sticky top-0 z-[100] backdrop-blur-md border-b px-6 py-2 md:py-4 flex flex-col gap-2 md:gap-6 transition-all duration-500 ${
+        className={`sticky top-0 z-[100] backdrop-blur-md border-b px-6 py-2 md:py-4 flex flex-col gap-4 md:gap-6 transition-all duration-500 ${
           zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'
         }`}
       >
@@ -1619,9 +1619,9 @@ export default function Home() {
               />
             </div>
 
-            {/* ROTATING TOOLTIPS: Now visible on mobile, tiny font, no gaps */}
+            {/* ROTATING TOOLTIPS: Now hidden on mobile (hidden md:block) */}
             {!zenMode && (
-              <div className="mt-1 md:mt-2 w-full text-center pointer-events-none min-h-[16px] md:min-h-[20px] transition-all duration-300 block">
+              <div className="mt-1 md:mt-2 w-full text-center pointer-events-none min-h-[16px] md:min-h-[20px] transition-all duration-300 hidden md:block">
                 <p
                   key={searchTipIndex}
                   className="text-[9px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 whitespace-normal text-center leading-tight"
@@ -1671,7 +1671,7 @@ export default function Home() {
           <button
             onClick={fetchData}
             disabled={loading}
-            className={`flex items-center gap-2 px-4 h-8 md:h-12 rounded-xl transition font-bold text-[10px] md:text-xs ${
+            className={`flex items-center gap-2 px-6 h-9 md:h-12 rounded-xl transition font-bold text-[10px] md:text-xs ${
               loading
                 ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait'
                 : zenMode
@@ -1741,37 +1741,37 @@ export default function Home() {
         } transition-all duration-500`}
       >
         {!zenMode && !loading && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
-              <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
+            <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm">
+              <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
                 Network Capacity
               </div>
-              <div className="text-2xl md:text-3xl font-bold text-white mt-1">
+              <div className="text-lg md:text-3xl font-bold text-white mt-1">
                 {formatBytes(totalStorageCommitted)}
               </div>
             </div>
 
-            <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer active:scale-95 transition-transform">
+            <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer active:scale-95 transition-transform">
               <div className="absolute inset-0 opacity-20 pointer-events-none">
                 <div className="ekg-line"></div>
               </div>
               <div className="relative z-10">
-                <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1">
+                <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1">
                   <HeartPulse size={12} className="text-green-500 animate-pulse" />
                   Network Vitals
                 </div>
                 <div className="space-y-1 mt-1">
-                  <div className="flex justify-between text-xs">
+                  <div className="flex justify-between text-[8px] md:text-xs">
                     <span className="text-zinc-400">Stability</span>
                     <span className="font-mono font-bold text-white">{networkHealth}%</span>
                   </div>
-                  <div className="flex justify-between text-xs">
+                  <div className="flex justify-between text-[8px] md:text-xs">
                     <span className="text-zinc-400">Avg Health</span>
                     <span className="font-mono font-bold text-green-400">
                       {avgNetworkHealth}/100
                     </span>
                   </div>
-                  <div className="flex justify-between text-xs">
+                  <div className="flex justify-between text-[8px] md:text-xs">
                     <span className="text-zinc-400">Consensus</span>
                     <span className="font-mono font-bold text-blue-400">
                       {networkConsensus.toFixed(1)}%
@@ -1809,20 +1809,20 @@ export default function Home() {
               `}</style>
             </div>
 
-            <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
-              <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
+            <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm">
+              <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
                 Consensus Ver
               </div>
-              <div className="text-2xl md:text-3xl font-bold text-blue-400 mt-1">
+              <div className="text-lg md:text-3xl font-bold text-blue-400 mt-1">
                 {mostCommonVersion}
               </div>
             </div>
 
-            <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-xl backdrop-blur-sm">
-              <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
+            <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm">
+              <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
                 Active Nodes
               </div>
-              <div className="text-2xl md:text-3xl font-bold text-white mt-1">{nodes.length}</div>
+              <div className="text-lg md:text-3xl font-bold text-white mt-1">{nodes.length}</div>
             </div>
           </div>
         )}
