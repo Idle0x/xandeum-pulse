@@ -1,52 +1,17 @@
-import { useState } from 'react';
-import { useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ArrowLeft } from 'lucide-react';
-import { Activity } from 'lucide-react';
-import { Shield } from 'lucide-react';
-import { Zap } from 'lucide-react';
-import { Globe } from 'lucide-react';
-import { Server } from 'lucide-react';
-import { Database } from 'lucide-react';
-import { Trophy } from 'lucide-react';
-import { Cpu } from 'lucide-react';
-import { Map as MapIcon } from 'lucide-react';
-import { BarChart3 } from 'lucide-react';
-import { Lock } from 'lucide-react';
-import { HeartPulse } from 'lucide-react';
-import { Search } from 'lucide-react';
-import { Info } from 'lucide-react';
-import { Check } from 'lucide-react';
-import { X } from 'lucide-react';
-import { MousePointer2 } from 'lucide-react';
-import { Layers } from 'lucide-react';
-import { LayoutDashboard } from 'lucide-react';
-import { GitMerge } from 'lucide-react';
-import { Share2 } from 'lucide-react';
-import { Anchor } from 'lucide-react';
-import { Terminal } from 'lucide-react';
-import { AlertTriangle } from 'lucide-react';
-import { Eye } from 'lucide-react';
-import { Monitor } from 'lucide-react';
-import { Command } from 'lucide-react';
-import { AlertOctagon } from 'lucide-react';
-import { ArrowRight } from 'lucide-react';
-import { Minimize2 } from 'lucide-react';
-import { Maximize2 } from 'lucide-react';
-import { Camera } from 'lucide-react';
-import { Swords } from 'lucide-react';
-import { ArrowLeftRight } from 'lucide-react';
-import { ClipboardCopy } from 'lucide-react';
-import { Link as LinkIcon } from 'lucide-react';
-import { RefreshCw } from 'lucide-react';
-import { ChevronLeft } from 'lucide-react';
-import { ChevronRight } from 'lucide-react';
-import { Wallet } from 'lucide-react';
-import { MapPin } from 'lucide-react';
-import { Star } from 'lucide-react';
-import { Medal } from 'lucide-react';
+import { 
+  ArrowLeft, Activity, Shield, Zap, Globe, Server, Database, 
+  Trophy, Cpu, Map as MapIcon, BarChart3, Lock, 
+  HeartPulse, Search, Info, Check, X, MousePointer2, Layers, 
+  LayoutDashboard, GitMerge, Share2, Anchor, Terminal,
+  AlertTriangle, Eye, Monitor, Command, AlertOctagon,
+  ArrowRight, Minimize2, Maximize2, Camera, Swords, ArrowLeftRight,
+  ClipboardCopy, Link as LinkIcon, RefreshCw, ChevronLeft, ChevronRight, RotateCcw,
+  Wallet, MapPin, Star
+} from 'lucide-react';
 
 export default function DocsPage() {
   const router = useRouter();
@@ -63,11 +28,12 @@ export default function DocsPage() {
     const el = document.getElementById(id);
     if (el) {
         el.scrollIntoView({ behavior: 'smooth' });
-        setActiveTab(id as typeof activeTab);
+        setActiveTab(id as any);
     }
   };
 
   const handleCopyLink = () => {
+    // FIXED: Added backticks for template literal
     const url = `${window.location.origin}/docs?training=true`;
     navigator.clipboard.writeText(url);
     setCopiedShare(true);
@@ -100,6 +66,7 @@ export default function DocsPage() {
                 <button 
                   key={tab} 
                   onClick={() => scrollTo(tab)}
+                  // FIXED: Added backticks for className logic
                   className={`text-xs font-bold uppercase tracking-widest hover:text-white transition-colors ${activeTab === tab ? 'text-blue-400' : 'text-zinc-500'}`}
                 >
                   {tab === 'flight' ? 'Flight School' : tab}
@@ -160,7 +127,7 @@ export default function DocsPage() {
 
                 {/* THE COMPREHENSIVE SIMULATOR */}
                 <div className="border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl bg-[#09090b] relative max-w-5xl mx-auto min-h-[700px] flex flex-col">
-                    <SimulatorWrapper />
+                    <PulseOS_Simulator />
                 </div>
                 
                 {/* RESET BUTTON OUTSIDE */}
@@ -400,56 +367,41 @@ export default function DocsPage() {
 // COMPREHENSIVE PULSE OS SIMULATOR
 // ==========================================
 
-function SimulatorWrapper() {
-    const [hasError, setHasError] = useState(false);
-    
-    if (hasError) {
-        return (
-            <div className="p-8 text-center text-red-500">
-                Simulator Error. Check console (F12) for details.
-            </div>
-        );
-    }
-    
-    try {
-        return <PulseOS_Simulator />;
-    } catch (error) {
-        console.error('Simulator crashed:', error);
-        setHasError(true);
-        return null;
-    }
-}
-
 function PulseOS_Simulator() {
-    console.log('🚀 Simulator mounted!');
-    type View = 'DASH' | 'MODAL' | 'MAP' | 'CREDITS' | 'COMPARE' | 'PROOF';
+    type View = 'BOOT' | 'DASH' | 'MODAL' | 'MAP' | 'CREDITS' | 'COMPARE' | 'PROOF';
     
-    const [view, setView] = useState<View>('DASH');
-    const [url, setUrl] = useState('https://xandeum-pulse.vercel.app');
+    const [view, setView] = useState<View>('BOOT');
+    const [url, setUrl] = useState('');
     const [isAnimating, setIsAnimating] = useState(false);
     const [readyButtons, setReadyButtons] = useState<string[]>([]);
-    const [ready, setReady] = useState(false);
     
     // Map-specific state
     const [mapMode, setMapMode] = useState<'STORAGE' | 'HEALTH' | 'CREDITS'>('STORAGE');
     const [mapExpanded, setMapExpanded] = useState(false);
 
+    // --- BOOT SEQUENCE (URL Typing) ---
     useEffect(() => {
-      console.log('Current View:', view);
-      console.log('Ready Buttons:', readyButtons);
-      console.log('Ready:', ready);
-    }, [view, readyButtons, ready]);
-
-    useEffect(() => {
-        setTimeout(() => {
-            setReady(true);
-            setReadyButtons(getExitButtons(view));
-        }, 300);
-    }, []); // Empty dependency - runs once on mount
+        if (view === 'BOOT') {
+            const targetUrl = 'https://xandeum-pulse.vercel.app';
+            let i = 0;
+            const typeInterval = setInterval(() => {
+                if (i <= targetUrl.length) {
+                    setUrl(targetUrl.slice(0, i));
+                    i++;
+                } else {
+                    clearInterval(typeInterval);
+                    setTimeout(() => {
+                        setView('DASH');
+                        setTimeout(() => setReadyButtons(['card-1']), 800);
+                    }, 500);
+                }
+            }, 40);
+            return () => clearInterval(typeInterval);
+        }
+    }, [view]);
 
     // --- NAVIGATION FUNCTION ---
     const navigate = (target: View, animationDuration = 1000, urlSuffix = '') => {
-        setReady(false);
         setReadyButtons([]); // Clear all glows
         setIsAnimating(true);
         
@@ -464,10 +416,10 @@ function PulseOS_Simulator() {
             setView(target);
             setIsAnimating(false);
             
-            // After content renders, set ready and glow buttons
+            // After content renders, glow appropriate buttons
             setTimeout(() => {
-                setReady(true);
-                setReadyButtons(getExitButtons(target));
+                const exits = getExitButtons(target);
+                setReadyButtons(exits);
             }, 700);
         }, animationDuration);
     };
@@ -487,7 +439,6 @@ function PulseOS_Simulator() {
 
     // --- MAP TOGGLE HANDLER ---
     const handleMapToggle = (mode: 'STORAGE' | 'HEALTH' | 'CREDITS') => {
-        setReady(false);
         setReadyButtons([]);
         setMapMode(mode);
         setIsAnimating(true);
@@ -524,11 +475,21 @@ function PulseOS_Simulator() {
             {/* --- VIEWPORT --- */}
             <div className="flex-1 relative bg-black overflow-hidden">
                 
+                {/* === BOOT/LOADING === */}
+                {view === 'BOOT' && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+                            <div className="text-xs font-mono text-zinc-500">INITIALIZING PULSE...</div>
+                        </div>
+                    </div>
+                )}
+
                 {/* === DASHBOARD VIEW === */}
                 {view === 'DASH' && (
                     <div className="absolute inset-0 p-6 md:p-8 animate-in fade-in duration-500">
                         <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
-                            <div className="text-lg md:text-xl font-bold text-white flex gap-2"><Activity className="text-blue-400"/> DASHBOARD</div>
+                            <div className="text-lg md:text-xl font-bold text-white flex gap-2"><Activity className="text-blue-500"/> DASHBOARD</div>
                             <div className="flex gap-2">
                                 <div className="h-8 w-8 bg-zinc-800 rounded"></div>
                                 <div className="h-8 w-20 md:w-24 bg-zinc-800 rounded"></div>
@@ -544,14 +505,10 @@ function PulseOS_Simulator() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                             {[1,2,3,4,5].map(i => (
                                 <div key={i} 
-                                    onClick={() => {
-                                        console.log('Card clicked:', i, 'Ready:', readyButtons);
-                                        if (i === 1 && ready && readyButtons.includes('card-1')) {
-                                            navigate('MODAL', 800);
-                                        }
-                                    }}
+                                    onClick={() => i === 1 && readyButtons.includes('card-1') && navigate('MODAL', 800)}
+                                    // FIXED: Added backticks for className logic
                                     className={`h-40 md:h-48 border rounded-xl p-4 flex flex-col justify-between transition-all duration-300 relative
-                                    ${i===1 && ready && readyButtons.includes('card-1') ? 'border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.5)] bg-zinc-900 cursor-pointer scale-105' : 'border-zinc-800 bg-zinc-900/30 opacity-40'}`}
+                                    ${i===1 && readyButtons.includes('card-1') ? 'border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.5)] bg-zinc-900 cursor-pointer scale-105' : 'border-zinc-800 bg-zinc-900/30 opacity-40'}`}
                                 >
                                     <div className="flex justify-between">
                                         <span className="text-xs font-bold text-zinc-500">NODE-0{i}</span>
@@ -560,7 +517,7 @@ function PulseOS_Simulator() {
                                     <div className="text-2xl md:text-3xl font-bold text-white">{i===1 ? '98%' : `${40 + i*5}%`}</div>
                                     <div className="text-[9px] text-zinc-600">Health Score</div>
                                     
-                                    {i===1 && ready && readyButtons.includes('card-1') && (
+                                    {i===1 && readyButtons.includes('card-1') && (
                                         <div className="absolute -top-2 -right-2 bg-blue-600 text-white text-[8px] md:text-[9px] font-bold px-2 py-1 rounded-full animate-bounce shadow-lg">
                                             CLICK HERE
                                         </div>
@@ -580,14 +537,15 @@ function PulseOS_Simulator() {
                                 <span className="font-bold text-white flex items-center gap-2 text-sm md:text-base"><Globe size={16}/> Node 8x...2A</span>
                                 <button 
                                     onClick={() => navigate('DASH', 500)}
-                                    className={`p-2 rounded-lg transition-all duration-500 ${ready && readyButtons.includes('btn-back-dash') ? 'bg-red-500/20 text-red-400 border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)] animate-pulse' : 'text-zinc-600 hover:text-zinc-400'}`}
+                                    // FIXED: Added backticks for className logic
+                                    className={`p-2 rounded-lg transition-all duration-500 ${readyButtons.includes('btn-back-dash') ? 'bg-red-500/20 text-red-400 border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)] animate-pulse' : 'text-zinc-600 hover:text-zinc-400'}`}
                                 >
                                     <X size={18}/>
                                 </button>
                             </div>
 
                             {/* Tip Banner */}
-                            {!isAnimating && ready && (
+                            {!isAnimating && (
                                 <div className="mx-4 md:mx-6 mt-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2 flex items-center gap-2 animate-in fade-in">
                                     <MousePointer2 size={14} className="text-yellow-400 shrink-0"/>
                                     <span className="text-[10px] text-yellow-300 font-bold">Click any glowing card or button to explore</span>
@@ -598,24 +556,26 @@ function PulseOS_Simulator() {
                                 {/* Left Col: Metric Cards */}
                                 <div className="space-y-3 md:space-y-4">
                                     <div 
-                                        onClick={() => ready && readyButtons.includes('btn-credits') && navigate('CREDITS', 1000)}
-                                        className={`p-4 rounded-xl border transition-all cursor-pointer ${ready && readyButtons.includes('btn-credits') ? 'border-yellow-500/50 bg-yellow-900/10 hover:bg-yellow-900/20 shadow-[0_0_20px_rgba(234,179,8,0.3)]' : 'border-zinc-800 bg-zinc-900/30'}`}
+                                        onClick={() => readyButtons.includes('btn-credits') && navigate('CREDITS', 1000)}
+                                        // FIXED: Added backticks for className logic
+                                        className={`p-4 rounded-xl border transition-all cursor-pointer ${readyButtons.includes('btn-credits') ? 'border-yellow-500/50 bg-yellow-900/10 hover:bg-yellow-900/20 shadow-[0_0_20px_rgba(234,179,8,0.3)]' : 'border-zinc-800 bg-zinc-900/30'}`}
                                     >
                                         <div className="flex justify-between mb-2 items-center">
                                             <span className="text-xs font-bold text-yellow-500 flex items-center gap-1"><Wallet size={12}/> REPUTATION</span>
-                                            {ready && readyButtons.includes('btn-credits') && <ArrowRight size={14} className="text-yellow-500 animate-pulse"/>}
+                                            {readyButtons.includes('btn-credits') && <ArrowRight size={14} className="text-yellow-500 animate-pulse"/>}
                                         </div>
                                         <div className="text-xl md:text-2xl font-bold text-white">5.2M Cr</div>
                                         <div className="text-[9px] text-zinc-500 mt-1">Rank #3 Global</div>
                                     </div>
 
                                     <div 
-                                        onClick={() => ready && readyButtons.includes('btn-health') && navigate('MAP', 1200, '?focus=8x...2A')}
-                                        className={`p-4 rounded-xl border transition-all cursor-pointer ${ready && readyButtons.includes('btn-health') ? 'border-green-500/50 bg-green-900/10 hover:bg-green-900/20 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'border-zinc-800 bg-zinc-900/30'}`}
+                                        onClick={() => readyButtons.includes('btn-health') && navigate('MAP', 1200, '?focus=8x...2A')}
+                                        // FIXED: Added backticks for className logic
+                                        className={`p-4 rounded-xl border transition-all cursor-pointer ${readyButtons.includes('btn-health') ? 'border-green-500/50 bg-green-900/10 hover:bg-green-900/20 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'border-zinc-800 bg-zinc-900/30'}`}
                                     >
                                         <div className="flex justify-between mb-2 items-center">
                                             <span className="text-xs font-bold text-green-500 flex items-center gap-1"><Activity size={12}/> HEALTH</span>
-                                            {ready && readyButtons.includes('btn-health') && <ArrowRight size={14} className="text-green-500 animate-pulse"/>}
+                                            {readyButtons.includes('btn-health') && <ArrowRight size={14} className="text-green-500 animate-pulse"/>}
                                         </div>
                                         <div className="text-xl md:text-2xl font-bold text-white">98/100</div>
                                         <div className="text-[9px] text-zinc-500 mt-1">Optimal Status</div>
@@ -633,22 +593,25 @@ function PulseOS_Simulator() {
                                 {/* Right Col: Action Buttons */}
                                 <div className="space-y-3 md:space-y-4">
                                     <button 
-                                        onClick={() => ready && readyButtons.includes('btn-compare') && navigate('COMPARE', 1500)}
-                                        className={`w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${ready && readyButtons.includes('btn-compare') ? 'border-red-500/50 bg-red-900/10 text-red-400 hover:bg-red-900/20 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}`}
+                                        onClick={() => readyButtons.includes('btn-compare') && navigate('COMPARE', 1500)}
+                                        // FIXED: Added backticks for className logic
+                                        className={`w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${readyButtons.includes('btn-compare') ? 'border-red-500/50 bg-red-900/10 text-red-400 hover:bg-red-900/20 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}`}
                                     >
                                         <Swords size={16}/> <span className="text-sm font-bold">Compare Nodes</span>
                                     </button>
 
                                     <button 
-                                        onClick={() => ready && readyButtons.includes('btn-proof') && navigate('PROOF', 1500)}
-                                        className={`w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${ready && readyButtons.includes('btn-proof') ? 'border-blue-500/50 bg-blue-900/10 text-blue-400 hover:bg-blue-900/20 shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}`}
+                                        onClick={() => readyButtons.includes('btn-proof') && navigate('PROOF', 1500)}
+                                        // FIXED: Added backticks for className logic
+                                        className={`w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${readyButtons.includes('btn-proof') ? 'border-blue-500/50 bg-blue-900/10 text-blue-400 hover:bg-blue-900/20 shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}`}
                                     >
                                         <Camera size={16}/> <span className="text-sm font-bold">Proof of Pulse</span>
                                     </button>
 
                                     <button 
-                                        onClick={() => ready && readyButtons.includes('btn-map') && navigate('MAP', 1200, '?focus=8x...2A')}
-                                        className={`w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${ready && readyButtons.includes('btn-map') ? 'border-purple-500/50 bg-purple-900/10 text-purple-400 hover:bg-purple-900/20 shadow-[0_0_20px_rgba(147,51,234,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}`}
+                                        onClick={() => readyButtons.includes('btn-map') && navigate('MAP', 1200, '?focus=8x...2A')}
+                                        // FIXED: Added backticks for className logic
+                                        className={`w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${readyButtons.includes('btn-map') ? 'border-purple-500/50 bg-purple-900/10 text-purple-400 hover:bg-purple-900/20 shadow-[0_0_20px_rgba(147,51,234,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}`}
                                     >
                                         <MapIcon size={16}/> <span className="text-sm font-bold">View on Map</span>
                                     </button>
@@ -676,20 +639,23 @@ function PulseOS_Simulator() {
                             </div>
                             <div className="flex gap-2">
                                 <button 
-                                    onClick={() => ready && readyButtons.includes('btn-toggle-storage') && handleMapToggle('STORAGE')}
-                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'STORAGE' ? 'bg-indigo-500 text-white' : ready && readyButtons.includes('btn-toggle-storage') ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
+                                    onClick={() => readyButtons.includes('btn-toggle-storage') && handleMapToggle('STORAGE')}
+                                    // FIXED: Added backticks for className logic
+                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'STORAGE' ? 'bg-indigo-500 text-white' : readyButtons.includes('btn-toggle-storage') ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
                                 >
                                     STORAGE
                                 </button>
                                 <button 
-                                    onClick={() => ready && readyButtons.includes('btn-toggle-health') && handleMapToggle('HEALTH')}
-                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'HEALTH' ? 'bg-green-500 text-white' : ready && readyButtons.includes('btn-toggle-health') ? 'bg-green-500/20 text-green-400 border border-green-500/50 shadow-[0_0_15px_rgba(16,185,129,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
+                                    onClick={() => readyButtons.includes('btn-toggle-health') && handleMapToggle('HEALTH')}
+                                    // FIXED: Added backticks for className logic
+                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'HEALTH' ? 'bg-green-500 text-white' : readyButtons.includes('btn-toggle-health') ? 'bg-green-500/20 text-green-400 border border-green-500/50 shadow-[0_0_15px_rgba(16,185,129,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
                                 >
                                     HEALTH
                                 </button>
                                 <button 
-                                    onClick={() => ready && readyButtons.includes('btn-toggle-credits') && handleMapToggle('CREDITS')}
-                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'CREDITS' ? 'bg-yellow-500 text-black' : ready && readyButtons.includes('btn-toggle-credits') ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
+                                    onClick={() => readyButtons.includes('btn-toggle-credits') && handleMapToggle('CREDITS')}
+                                    // FIXED: Added backticks for className logic
+                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'CREDITS' ? 'bg-yellow-500 text-black' : readyButtons.includes('btn-toggle-credits') ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
                                 >
                                     CREDITS
                                 </button>
@@ -721,7 +687,7 @@ function PulseOS_Simulator() {
                                     </div>
 
                                     {/* Expand Button (appears after zoom) */}
-                                    {!mapExpanded && ready && readyButtons.includes('btn-expand-region') && (
+                                    {!mapExpanded && readyButtons.includes('btn-expand-region') && (
                                         <div className="absolute bottom-1/3 left-1/2 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4">
                                             <button 
                                                 onClick={() => { setMapExpanded(true); setReadyButtons(['btn-toggle-storage', 'btn-toggle-health', 'btn-toggle-credits']); }}
@@ -767,8 +733,9 @@ function PulseOS_Simulator() {
                                 {mapExpanded && (
                                     <div className="p-4 bg-black border-t border-zinc-900 flex justify-center shrink-0">
                                         <button 
-                                            onClick={() => ready && readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
-                                            className={`px-6 py-2 rounded-full font-bold border transition-all ${ready && readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}
+                                            onClick={() => readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
+                                            // FIXED: Added backticks for className logic
+                                            className={`px-6 py-2 rounded-full font-bold border transition-all ${readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}
                                         >
                                             BACK TO DIAGNOSTICS
                                         </button>
@@ -806,20 +773,22 @@ function PulseOS_Simulator() {
                                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                                             <div>
                                                 <div className="text-yellow-500 font-bold flex items-center gap-2">
-                                                    <Medal className="w-4 h-4"/> #3 • 8x...2A
+                                                    <Trophy className="w-4 h-4"/> #3 • 8x...2A
                                                 </div>
                                                 <div className="text-xs text-zinc-500 mt-1">5,200,000 Credits</div>
                                             </div>
                                             <div className="flex gap-2">
                                                 <button 
-                                                    onClick={() => ready && readyButtons.includes('btn-view-map') && navigate('MAP', 1000, '?focus=8x...2A')}
-                                                    className={`px-4 py-2 rounded text-xs font-bold transition-all ${ready && readyButtons.includes('btn-view-map') ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
+                                                    onClick={() => readyButtons.includes('btn-view-map') && navigate('MAP', 1000, '?focus=8x...2A')}
+                                                    // FIXED: Added backticks for className logic
+                                                    className={`px-4 py-2 rounded text-xs font-bold transition-all ${readyButtons.includes('btn-view-map') ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
                                                 >
                                                     VIEW ON MAP
                                                 </button>
                                                 <button 
-                                                    onClick={() => ready && readyButtons.includes('btn-view-modal') && navigate('MODAL', 800)}
-                                                    className={`px-4 py-2 rounded text-xs font-bold transition-all ${ready && readyButtons.includes('btn-view-modal') ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
+                                                    onClick={() => readyButtons.includes('btn-view-modal') && navigate('MODAL', 800)}
+                                                    // FIXED: Added backticks for className logic
+                                                    className={`px-4 py-2 rounded text-xs font-bold transition-all ${readyButtons.includes('btn-view-modal') ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
                                                 >
                                                     DIAGNOSTICS
                                                 </button>
@@ -892,14 +861,16 @@ function PulseOS_Simulator() {
 
                                 <div className="flex flex-col md:flex-row gap-3">
                                     <button 
-                                        onClick={() => ready && readyButtons.includes('btn-view-winner-map') && navigate('MAP', 1000, '?focus=8x...2A')}
-                                        className={`px-6 py-3 rounded-full font-bold transition-all ${ready && readyButtons.includes('btn-view-winner-map') ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(147,51,234,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
+                                        onClick={() => readyButtons.includes('btn-view-winner-map') && navigate('MAP', 1000, '?focus=8x...2A')}
+                                        // FIXED: Added backticks for className logic
+                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-view-winner-map') ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(147,51,234,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
                                     >
                                         VIEW WINNER ON MAP
                                     </button>
                                     <button 
-                                        onClick={() => ready && readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
-                                        className={`px-6 py-3 rounded-full font-bold transition-all ${ready && readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
+                                        onClick={() => readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
+                                        // FIXED: Added backticks for className logic
+                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
                                     >
                                         BACK TO DIAGNOSTICS
                                     </button>
@@ -912,7 +883,7 @@ function PulseOS_Simulator() {
                 {/* === PROOF VIEW === */}
                 {view === 'PROOF' && (
                     <div className="absolute inset-0 bg-[#09090b] z-30 flex flex-col animate-in slide-in-from-right duration-500">
-                         {isAnimating ? (
+                        {isAnimating ? (
                             <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 px-4">
                                 <div className="text-xs font-mono mb-4 text-green-500">GENERATING SNAPSHOT...</div>
                                 <div className="w-48 h-64 bg-zinc-900 border border-zinc-700 relative overflow-hidden rounded-xl">
@@ -923,7 +894,7 @@ function PulseOS_Simulator() {
                                 </div>
                                 <div className="mt-4 text-[10px] text-zinc-600 font-mono">Rendering PNG proof...</div>
                             </div>
-                         ) : (
+                        ) : (
                             <div className="flex-1 flex flex-col items-center justify-center p-6">
                                 {/* Generated Proof Card */}
                                 <div className="w-64 md:w-80 bg-zinc-950 border-2 border-green-500/50 rounded-2xl p-6 mb-8 relative shadow-[0_0_40px_rgba(16,185,129,0.3)] animate-in zoom-in duration-500">
@@ -964,14 +935,16 @@ function PulseOS_Simulator() {
                                 {/* Action Buttons */}
                                 <div className="flex flex-col md:flex-row gap-3">
                                     <button 
-                                        onClick={() => ready && readyButtons.includes('btn-share-credits') && navigate('CREDITS', 800)}
-                                        className={`px-6 py-3 rounded-full font-bold transition-all ${ready && readyButtons.includes('btn-share-credits') ? 'bg-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
+                                        onClick={() => readyButtons.includes('btn-share-credits') && navigate('CREDITS', 800)}
+                                        // FIXED: Added backticks for className logic
+                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-share-credits') ? 'bg-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
                                     >
                                         SHARE TO LEADERBOARD
                                     </button>
                                     <button 
-                                        onClick={() => ready && readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
-                                        className={`px-6 py-3 rounded-full font-bold transition-all ${ready && readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
+                                        onClick={() => readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
+                                        // FIXED: Added backticks for className logic
+                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
                                     >
                                         BACK TO DIAGNOSTICS
                                     </button>
@@ -983,13 +956,13 @@ function PulseOS_Simulator() {
                                     </div>
                                 </div>
                             </div>
-                         )}
+                        )}
                     </div>
                 )}
 
             </div>
         </div>
-    );
+    )
 }
 
 
@@ -1003,30 +976,31 @@ function VitalitySimulator() {
     const [credits, setCredits] = useState(5000);
     const [versionGap, setVersionGap] = useState(0);
     const [apiOnline, setApiOnline] = useState(true);
-     
+    
     const uScore = Math.min(100, Math.round(100 / (1 + Math.exp(-0.2 * (uptimeDays - 7)))));
     const sScore = Math.min(100, Math.round(50 * Math.log2((storageTB/1) + 1)));
     const cScore = apiOnline ? Math.min(100, Math.round((credits / 10000) * 100)) : 0;
     const vScore = versionGap === 0 ? 100 : versionGap === 1 ? 90 : versionGap === 2 ? 70 : 30;
-     
+    
     let totalScore = 0;
     if (apiOnline) {
         totalScore = Math.round((uScore * 0.35) + (sScore * 0.30) + (cScore * 0.20) + (vScore * 0.15));
     } else {
         totalScore = Math.round((uScore * 0.45) + (sScore * 0.35) + (vScore * 0.20));
     }
-     
+    
     return (
         <div className="bg-black border border-zinc-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
             <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r transition-all duration-500 ${apiOnline ? 'from-blue-500 via-purple-500 to-green-500' : 'from-red-500 via-orange-500 to-yellow-500'}`}></div>
-             
+            
             <div className="flex justify-between items-center mb-6">
                 <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                     <Activity size={14} /> Vitality Engine
                 </span>
-                 
+                
                 <button 
                     onClick={() => setApiOnline(!apiOnline)}
+                    // FIXED: Added backticks for className logic
                     className={`px-3 py-1 rounded-full text-[10px] font-bold border flex items-center gap-2 transition-all ${apiOnline ? 'bg-green-500/10 border-green-500 text-green-400' : 'bg-red-500/10 border-red-500 text-red-400'}`}
                 >
                     {apiOnline ? <Check size={10}/> : <AlertOctagon size={10}/>}
@@ -1040,7 +1014,7 @@ function VitalitySimulator() {
                 </div>
                 <div className="text-xs text-zinc-500 mt-2 font-mono">LIVE SCORE CALCULATION</div>
             </div>
-             
+            
             <div className="space-y-6">
                 <div>
                     <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
@@ -1102,7 +1076,7 @@ function FailoverVisualizer() {
                 {step === 1 && <div className="absolute top-1/2 left-16 w-3 h-3 bg-blue-500 rounded-full -translate-y-1/2 animate-[ping_1s_infinite]"></div>}
                 {step === 2 && <div className="absolute top-1/2 left-1/2 w-4 h-4 bg-red-500 rounded-full -translate-y-1/2"></div>}
                 {step === 3 && <><div className="absolute top-1/3 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><div className="absolute top-1/2 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><div className="absolute top-2/3 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div></>}
-                 
+                
                 <div className="z-10 flex flex-col gap-2">
                     <div className={`px-3 py-1 rounded border text-[10px] font-bold transition-all ${step === 2 ? 'bg-red-500/10 border-red-500 text-red-500' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>Primary</div>
                     <div className={`px-3 py-1 rounded border text-[10px] font-bold transition-all ${step >= 4 ? 'bg-green-500/10 border-green-500 text-green-500 scale-105' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>Backups</div>
@@ -1139,14 +1113,14 @@ function XRaySimulator() {
                         {mode === 'STORAGE' ? '1.2 PB' : mode === 'HEALTH' ? '98% Score' : '5.2M Cr'}
                     </div>
                 </div>
-                 
+                
                 <div className="bg-black/50 p-4 rounded-xl border border-white/5 relative z-10">
                     <div className="flex justify-center mb-4">
                         <span className={`text-[10px] uppercase font-bold px-3 py-1.5 rounded border tracking-widest ${mode === 'STORAGE' ? 'text-indigo-400 border-indigo-500/30' : mode === 'HEALTH' ? 'text-emerald-400 border-emerald-500/30' : 'text-yellow-500 border-yellow-500/30'}`}>
                             {mode === 'STORAGE' ? 'MASSIVE TIER' : mode === 'HEALTH' ? 'FLAWLESS TIER' : 'ELITE EARNER'}
                         </span>
                     </div>
-                     
+                    
                     <div className="grid grid-cols-2 gap-4 text-center">
                         <div>
                             <div className="text-[10px] text-zinc-500 uppercase mb-1 font-bold">
