@@ -5,13 +5,19 @@ import { useRouter } from 'next/router';
 import axios from 'axios';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { scaleSqrt } from 'd3-scale';
-import { ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, ChevronDown, MapPin, RotateCcw, Info, X, Server, Layers, TrendingUp, BarChart3, AlertCircle, Eye, EyeOff, HelpCircle, Share2, Check, ArrowRight, ExternalLink } from 'lucide-react';
+import { 
+  ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, 
+  MapPin, RotateCcw, Info, X, HelpCircle, Share2, Check, ArrowRight, 
+  AlertOctagon // New Icon for Errors
+} from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
 interface LocationData {
   name: string; country: string; lat: number; lon: number; count: number;
-  totalStorage: number; totalCredits: number; avgHealth: number;
+  totalStorage: number; 
+  totalCredits: number | null; // Nullable for crash safety
+  avgHealth: number;
   avgUptime: number;
   publicRatio: number;
   ips?: string[];
@@ -125,7 +131,10 @@ export default function MapPage() {
           return;
       }
 
-      const values = locations.map(l => viewMode === 'STORAGE' ? l.totalStorage : l.totalCredits).sort((a, b) => a - b);
+      // Safe Map handling for potentially null values
+      const values = locations
+        .map(l => viewMode === 'STORAGE' ? l.totalStorage : (l.totalCredits || 0))
+        .sort((a, b) => a - b);
       
       const getQuantile = (q: number) => {
           const pos = (values.length - 1) * q;
@@ -149,8 +158,13 @@ export default function MapPage() {
 
   const getTierIndex = (loc: LocationData): number => {
     let val = 0;
+    
+    // CRASHPROOF: Handle missing data for tiering
     if (viewMode === 'STORAGE') val = loc.totalStorage;
-    else if (viewMode === 'CREDITS') val = loc.totalCredits;
+    else if (viewMode === 'CREDITS') {
+        if (loc.totalCredits === null) return -1; // Special "Unknown" tier
+        val = loc.totalCredits;
+    }
     else val = loc.avgHealth;
 
     if (val >= dynamicThresholds[0]) return 0;
@@ -165,7 +179,8 @@ export default function MapPage() {
     return `${Math.round(gb)} GB`;
   };
 
-  const formatCredits = (cr: number) => {
+  const formatCredits = (cr: number | null) => {
+      if (cr === null) return "N/A";
       if (cr >= 1000000) return `${(cr/1000000).toFixed(1)}M`;
       if (cr >= 1000) return `${(cr/1000).toFixed(0)}k`;
       return cr.toString();
@@ -179,7 +194,10 @@ export default function MapPage() {
 
   const getLegendLabels = () => {
       if (viewMode === 'HEALTH') return ['> 90%', '75-90%', '60-75%', '40-60%', '< 40%'];
+      
+      // Formatting helper that handles potential 0/nulls gracefully in legend
       const format = (v: number) => viewMode === 'STORAGE' ? formatStorage(v) : formatCredits(v);
+      
       return [
           `> ${format(dynamicThresholds[0])}`,
           `${format(dynamicThresholds[1])} - ${format(dynamicThresholds[0])}`,
@@ -240,11 +258,6 @@ export default function MapPage() {
       setTimeout(() => setCopiedLink(null), 2000);
   };
   
-  const toggleTooltip = (e: React.MouseEvent, id: string) => {
-      e.stopPropagation();
-      setActiveTooltip(activeTooltip === id ? null : id);
-  };
-
   const handleZoomIn = () => { if (position.zoom < 5) setPosition(pos => ({ ...pos, zoom: pos.zoom * 1.5 })); };
   const handleZoomOut = () => { if (position.zoom > 1) setPosition(pos => ({ ...pos, zoom: pos.zoom / 1.5 })); };
   const handleMoveEnd = (pos: any) => setPosition(pos);
@@ -254,16 +267,23 @@ export default function MapPage() {
     return scaleSqrt().domain([0, maxVal]).range([5, 12]);
   }, [locations]);
 
+  // --- CRASHPROOF: GET METRIC TEXT ---
   const getMetricText = (loc: LocationData) => {
     switch (viewMode) {
         case 'STORAGE': return formatStorage(loc.totalStorage);
         case 'HEALTH': return `${loc.avgHealth}% Health`;
-        case 'CREDITS': return `${loc.totalCredits.toLocaleString()} Cr`;
+        case 'CREDITS': 
+            // Return Safe Message if Null
+            if (loc.totalCredits === null) return "Credits API Offline";
+            return `${loc.totalCredits.toLocaleString()} Cr`;
     }
   };
 
+  // --- CRASHPROOF: X-RAY STATS ---
   const getXRayStats = (loc: LocationData, index: number, tierColor: string) => {
       const globalShare = ((loc.count / stats.totalNodes) * 100).toFixed(1);
+      
+      // Calculate Percentile
       const rawPercentile = ((locations.length - index) / locations.length) * 100;
       const topPercent = 100 - rawPercentile;
       let rankText = `Top < 0.01%`;
@@ -284,6 +304,21 @@ export default function MapPage() {
           };
       }
       if (viewMode === 'CREDITS') {
+          // --- ERROR HANDLING FOR CREDITS ---
+          if (loc.totalCredits === null) {
+              return {
+                  labelA: 'Avg Earnings',
+                  valA: <span className="text-red-400 flex items-center justify-center gap-1"><AlertOctagon size={12}/> API OFFLINE</span>,
+                  descA: "Source endpoint is unreachable.",
+                  labelB: 'Contribution',
+                  valB: <span className="text-zinc-500 italic">Unknown</span>,
+                  descB: "Data unavailable.",
+                  labelC: 'Tier Rank',
+                  valC: <span className="text-zinc-500 italic">Unknown</span>,
+                  descC: "Cannot calculate rank without data."
+              };
+          }
+
           const avgCred = Math.round(loc.totalCredits / loc.count);
           return {
               labelA: 'Avg Earnings',
@@ -298,7 +333,6 @@ export default function MapPage() {
           };
       }
       
-      // FIXED HEALTH STATS - Removed "Public Ratio" display text
       return {
           labelA: 'Reliability',
           valA: <span className="text-green-400">{formatUptime(loc.avgUptime)} Avg Uptime</span>,
@@ -315,7 +349,7 @@ export default function MapPage() {
   const sortedLocations = useMemo(() => {
     return [...locations].sort((a, b) => {
         if (viewMode === 'STORAGE') return b.totalStorage - a.totalStorage;
-        if (viewMode === 'CREDITS') return b.totalCredits - a.totalCredits;
+        if (viewMode === 'CREDITS') return (b.totalCredits || 0) - (a.totalCredits || 0); // Sort nulls to bottom
         return b.avgHealth - a.avgHealth;
     });
   }, [locations, viewMode]);
@@ -339,7 +373,9 @@ export default function MapPage() {
      const { name, totalStorage, totalCredits, avgHealth, count } = leadingRegion;
      switch (viewMode) {
         case 'STORAGE': return `The largest hub, ${name}, is currently providing ${formatStorage(totalStorage)}.`;
-        case 'CREDITS': return `Operators in ${name} have generated a total of ${totalCredits.toLocaleString()} Cr.`;
+        case 'CREDITS': 
+            if (totalCredits === null) return "Network credits data is currently unavailable from the endpoint.";
+            return `Operators in ${name} have generated a total of ${totalCredits.toLocaleString()} Cr.`;
         case 'HEALTH': return `${name} is performing optimally with an average health score of ${avgHealth}% across ${count} nodes.`;
      }
   };
@@ -428,8 +464,12 @@ export default function MapPage() {
                     const size = sizeScale(loc.count);
                     const isActive = activeLocation === loc.name;
                     const tier = getTierIndex(loc);
-                    const baseColor = TIER_COLORS[tier];
+                    
+                    // CRASHPROOF COLOR: If credits are broken/null for this node, show gray
+                    const isMissingData = viewMode === 'CREDITS' && loc.totalCredits === null;
+                    const baseColor = isMissingData ? '#52525b' : TIER_COLORS[tier];
                     const opacity = activeLocation && !isActive ? 0.3 : 1;
+
                     return (
                         <Marker key={loc.name} coordinates={[loc.lon, loc.lat]} onClick={() => lockTarget(loc.name, loc.lat, loc.lon)}>
                         <g className="group cursor-pointer transition-all duration-500" style={{ opacity }}>
@@ -475,7 +515,10 @@ export default function MapPage() {
                  <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar bg-[#09090b]">
                     {sortedLocations.map((loc, i) => {
                         const tier = getTierIndex(loc);
-                        const tierColor = TIER_COLORS[tier];
+                        // CRASHPROOF: Gray out text/borders if data is missing for this mode
+                        const isMissingData = viewMode === 'CREDITS' && loc.totalCredits === null;
+                        const tierColor = isMissingData ? '#71717a' : TIER_COLORS[tier];
+                        
                         const isExpanded = expandedLocation === loc.name;
                         const xray = getXRayStats(loc, i, tierColor);
                         const sampleIp = loc.ips && loc.ips.length > 0 ? loc.ips[0] : null;
@@ -491,11 +534,15 @@ export default function MapPage() {
                                             <span onClick={(e) => { e.stopPropagation(); handleCopyCoords(loc.lat, loc.lon, loc.name); }} className="text-[10px] text-zinc-500 flex items-center gap-1 hover:text-blue-400 cursor-copy transition-colors"><MapPin size={10} /> {copiedCoords === loc.name ? <span className="text-green-500 font-bold">Copied!</span> : `${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}`}</span>
                                         </div>
                                     </div>
-                                    <div className="text-right"><div className="text-sm font-mono font-bold" style={{ color: tierColor }}>{getMetricText(loc)}</div><div className="text-[10px] text-zinc-500">{loc.count} Nodes</div></div>
+                                    <div className="text-right">
+                                        {/* CRASHPROOF: Dynamic Color for Metric Text */}
+                                        <div className={`text-sm font-mono font-bold ${isMissingData ? 'text-red-400' : ''}`} style={isMissingData ? {} : { color: tierColor }}>{getMetricText(loc)}</div>
+                                        <div className="text-[10px] text-zinc-500">{loc.count} Nodes</div>
+                                    </div>
                                 </div>
                                 {isExpanded && (
                                     <div className="bg-black/30 border-t border-white/5 p-4 animate-in slide-in-from-top-2 duration-300">
-                                        <div className="flex justify-between items-center mb-4"><div className="text-[10px] md:text-sm font-bold uppercase tracking-widest px-3 py-1 rounded border bg-black/50" style={{ color: tierColor, borderColor: `${tierColor}40` }}>{TIER_LABELS[viewMode][tier]} TIER</div><div className="flex gap-2">{sampleIp && (<button onClick={(e) => handleShareLink(e, sampleIp, loc.name)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold hover:bg-blue-500/20 transition">{copiedLink === loc.name ? <Check size={12} /> : <Share2 size={12} />}{copiedLink === loc.name ? 'Link Copied' : 'Share Region'}</button>)}</div></div>
+                                        <div className="flex justify-between items-center mb-4"><div className="text-[10px] md:text-sm font-bold uppercase tracking-widest px-3 py-1 rounded border bg-black/50" style={{ color: tierColor, borderColor: `${tierColor}40` }}>{isMissingData ? 'UNKNOWN' : TIER_LABELS[viewMode][tier]} TIER</div><div className="flex gap-2">{sampleIp && (<button onClick={(e) => handleShareLink(e, sampleIp, loc.name)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold hover:bg-blue-500/20 transition">{copiedLink === loc.name ? <Check size={12} /> : <Share2 size={12} />}{copiedLink === loc.name ? 'Link Copied' : 'Share Region'}</button>)}</div></div>
                                         <div className="grid grid-cols-3 gap-2 text-xs md:text-sm text-center mb-4">
                                             <div className="flex flex-col items-center group/stat"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1 flex items-center gap-1">{xray.labelA}<HelpCircle size={8} className="cursor-help opacity-50"/><div className="absolute bottom-1/2 mb-2 hidden group-hover/stat:block bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-50 w-32">{xray.descA}</div></div><div className="font-mono font-bold">{xray.valA}</div></div>
                                             <div className="flex flex-col items-center border-l border-zinc-800/50 group/stat"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1 flex items-center gap-1">{xray.labelB}<HelpCircle size={8} className="cursor-help opacity-50"/><div className="absolute bottom-1/2 mb-2 hidden group-hover/stat:block bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-50 w-32">{xray.descB}</div></div><div className="text-white font-mono font-bold">{xray.valB}</div></div>
