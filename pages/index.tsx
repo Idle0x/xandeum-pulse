@@ -84,23 +84,20 @@ interface Node {
   };
 }
 
-// --- WELCOME CURTAIN COMPONENT (Context Aware) ---
+// --- WELCOME CURTAIN COMPONENT ---
 
 const WelcomeCurtain = () => {
   const [show, setShow] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    // Detect Screen Size
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
     };
     
-    // Set initial
     handleResize();
     window.addEventListener('resize', handleResize);
 
-    // Check if user has seen the welcome screen
     const seen = localStorage.getItem('xandeum_pulse_welcome_v1');
     if (!seen) {
       setTimeout(() => setShow(true), 100);
@@ -119,11 +116,8 @@ const WelcomeCurtain = () => {
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
       <div className="bg-[#09090b] border border-zinc-800 p-6 md:p-8 rounded-3xl shadow-2xl max-w-md w-full relative overflow-hidden group">
-        
-        {/* Background Ambient Glow */}
         <div className="absolute top-0 right-0 p-32 bg-blue-500/10 blur-[80px] rounded-full pointer-events-none"></div>
 
-        {/* Icons Visual */}
         <div className="flex justify-center items-center gap-6 mb-6 relative z-10">
           <div className="flex flex-col items-center gap-2">
             <div className={`p-3 rounded-xl border border-zinc-800 shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-colors duration-500 ${!isMobile ? 'bg-zinc-800 text-blue-400' : 'bg-zinc-900 text-zinc-600'}`}>
@@ -142,7 +136,6 @@ const WelcomeCurtain = () => {
           </div>
         </div>
 
-        {/* Content */}
         <div className="text-center relative z-10 space-y-2 mb-6">
           <h2 className="text-xl md:text-2xl font-black text-white tracking-tight">
             Welcome to Pulse
@@ -158,7 +151,6 @@ const WelcomeCurtain = () => {
           </div>
         </div>
 
-        {/* 3 Key Tips */}
         <div className="space-y-3 text-left relative z-10">
           <div className="flex items-start gap-3 bg-zinc-900/50 p-3 rounded-xl border border-zinc-800/50">
              <div className="p-1.5 bg-blue-500/10 rounded-lg shrink-0 text-blue-400 mt-0.5"><Maximize2 size={14}/></div>
@@ -185,7 +177,6 @@ const WelcomeCurtain = () => {
           </div>
         </div>
 
-        {/* Action Button */}
         <button 
           onClick={handleEnter}
           className="mt-6 w-full py-3.5 bg-zinc-100 hover:bg-white text-black rounded-xl font-bold text-sm tracking-wide uppercase transition-all hover:scale-[1.02] active:scale-95 shadow-lg relative z-10"
@@ -1226,14 +1217,43 @@ export default function Home() {
     const netAvgHealth = avgs.total || 50;
     const diff = health - netAvgHealth;
 
+    // --- WEIGHTED CONTRIBUTION LOGIC ---
+    // Detect Offline Credits to switch weighting logic
+    const isCreditsOffline = selectedNode?.credits === null;
+    
+    // Define Weights (Must match Brain Logic)
+    const weights = isCreditsOffline 
+        ? { uptime: 0.45, storage: 0.35, reputation: 0, version: 0.20 }
+        : { uptime: 0.35, storage: 0.30, reputation: 0.20, version: 0.15 };
+
     const metrics = [
-      { label: 'Storage Capacity', val: bd.storage, avg: avgs.storage },
-      { label: 'Reputation Score', val: bd.reputation, avg: avgs.reputation },
-      { label: 'Uptime Stability', val: bd.uptime, avg: avgs.uptime },
-      { label: 'Version Consensus', val: bd.version, avg: avgs.version },
+      { 
+          label: 'Storage Capacity', 
+          rawVal: bd.storage, 
+          avgRaw: avgs.storage,
+          weight: weights.storage 
+      },
+      { 
+          label: 'Reputation Score', 
+          rawVal: bd.reputation, 
+          avgRaw: avgs.reputation, 
+          weight: weights.reputation 
+      },
+      { 
+          label: 'Uptime Stability', 
+          rawVal: bd.uptime, 
+          avgRaw: avgs.uptime, 
+          weight: weights.uptime 
+      },
+      { 
+          label: 'Version Consensus', 
+          rawVal: bd.version, 
+          avgRaw: avgs.version, 
+          weight: weights.version 
+      },
     ];
     
-    // FIX 3: Helper to calculate local storage breakdown text
+    // FIX 3: Helper to calculate local storage breakdown text (replicated from Brain logic)
     const getStorageBreakdownText = (node: Node, median: number) => {
         const commGB = (node.storage_committed || 0) / (1024**3);
         const usedGB = (node.storage_used || 0) / (1024**3);
@@ -1298,17 +1318,38 @@ export default function Home() {
 
           <div className="space-y-5">
             {metrics.map((m) => {
-              if (m.val === null && m.label === 'Reputation Score') {
-                  // Hide Reputation row if system is offline
-                  return null;
+              // OFFLINE HANDLING: Specific UI for Reputation when offline
+              if (m.label === 'Reputation Score' && isCreditsOffline) {
+                  return (
+                    <div key={m.label}>
+                        <div className="flex justify-between text-xs mb-2">
+                             <span className="text-zinc-500 font-bold flex items-center gap-2">
+                                {m.label} <span className="text-[9px] font-mono text-zinc-600">(Weighted: 0%)</span>
+                             </span>
+                             <div className="font-mono text-[10px] text-red-500 font-bold flex items-center gap-1">
+                                <AlertOctagon size={10}/> API OFFLINE
+                             </div>
+                        </div>
+                        <div className="h-2 bg-zinc-800/50 rounded-full border border-red-900/30 overflow-hidden">
+                             <div className="h-full w-full bg-red-500/10 pattern-diagonal-lines opacity-50"></div>
+                        </div>
+                    </div>
+                  )
               }
-              const val = m.val || 0; // fallback for safety
+
+              // Normal Logic
+              const rawVal = m.rawVal || 0; 
+              const rawAvg = m.avgRaw || 0;
               
-              // FIX 2: Bar Color is Absolute (Quality)
+              // Calculate Weighted Contribution
+              const weightedVal = (rawVal * m.weight).toFixed(2);
+              const weightedAvg = (rawAvg * m.weight).toFixed(2);
+
+              // Bar Color is determined by RAW QUALITY (0-100), not weighted score
               const barColor =
-                val >= 80
+                rawVal >= 80
                   ? 'bg-green-500'
-                  : val >= 50
+                  : rawVal >= 50
                   ? 'bg-yellow-500'
                   : 'bg-red-500';
 
@@ -1317,28 +1358,33 @@ export default function Home() {
                   <div className="flex justify-between text-xs mb-2">
                     <span className="text-zinc-400 font-bold flex items-center gap-2">
                         {m.label}
-                        {/* FIX 3: Tiny Text for Storage Breakdown */}
-                        {m.label === 'Storage Capacity' && selectedNode && (
+                        {/* TINY BREAKDOWN TEXT */}
+                        {m.label === 'Storage Capacity' && selectedNode ? (
                             <span className="text-[9px] font-mono text-zinc-600 font-normal">
                                 {getStorageBreakdownText(selectedNode, medianCommitted)}
+                            </span>
+                        ) : (
+                            <span className="text-[9px] font-mono text-zinc-600 font-normal">
+                                (Score: {rawVal})
                             </span>
                         )}
                     </span>
                     <div className="font-mono text-[10px]">
-                      <span className="text-white font-bold">{val}</span>
+                      {/* Show Weighted Contributions */}
+                      <span className="text-white font-bold">{weightedVal}</span>
                       <span className="text-zinc-600 mx-1">/</span>
-                      <span className="text-zinc-500">Avg: {m.avg}</span>
+                      <span className="text-zinc-500">Avg: {weightedAvg}</span>
                     </div>
                   </div>
                   <div className="h-2 bg-zinc-800 rounded-full overflow-visible relative">
                     <div
                       className={`h-full rounded-l-full transition-all duration-1000 ${barColor} shadow-[0_0_10px_rgba(255,255,255,0.1)]`}
-                      style={{ width: `${val}%` }}
+                      style={{ width: `${Math.min(100, rawVal)}%` }} // Width represents raw quality (0-100)
                     ></div>
                     <div
                       className="absolute top-[-4px] bottom-[-4px] w-0.5 bg-white shadow-[0_0_5px_white] z-10"
-                      style={{ left: `${m.avg}%` }}
-                      title={`Network Average: ${m.avg}`}
+                      style={{ left: `${Math.min(100, rawAvg)}%` }} // Avg marker represents raw average quality
+                      title={`Network Average: ${rawAvg}`}
                     ></div>
                   </div>
                 </div>
