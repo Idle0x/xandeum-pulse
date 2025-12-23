@@ -9,7 +9,8 @@ import {
   LayoutDashboard, GitMerge, Share2, Anchor, Terminal,
   AlertTriangle, Eye, Monitor, Command, AlertOctagon,
   ArrowRight, Minimize2, Maximize2, Camera, Swords, ArrowLeftRight,
-  ClipboardCopy, Link as LinkIcon, RefreshCw, ChevronLeft, ChevronRight, RotateCcw
+  ClipboardCopy, Link as LinkIcon, RefreshCw, ChevronLeft, ChevronRight, RotateCcw,
+  List
 } from 'lucide-react';
 
 export default function DocsPage() {
@@ -118,12 +119,12 @@ export default function DocsPage() {
                     <h2 className="text-3xl md:text-5xl font-extrabold text-white">Flight School</h2>
                     <p className="text-zinc-500 mt-4 max-w-lg mx-auto">
                         Don't just read the manual. Fly the ship. <br/>
-                        Follow the <span className="text-blue-400 font-bold animate-pulse">Glowing Cues</span> to navigate the infinite loop.
+                        Use the <span className="text-blue-400 font-bold animate-pulse">Glowing Cues</span> to navigate the interconnected loop.
                     </p>
                 </div>
 
                 {/* THE SIMULATOR APP - FORCE HEIGHT TO PREVENT COLLAPSE */}
-                <div className="border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl bg-[#09090b] relative max-w-5xl mx-auto h-[600px] flex flex-col">
+                <div className="border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl bg-[#09090b] relative max-w-5xl mx-auto h-[600px] flex flex-col select-none">
                     <PulseOS_Simulator />
                 </div>
              </div>
@@ -351,7 +352,7 @@ export default function DocsPage() {
 
 
 // ==========================================
-// INTERACTIVE PULSE OS SIMULATOR (THE INFINITE LOOP)
+// INTERACTIVE PULSE OS SIMULATOR (NEURAL GRAPH)
 // ==========================================
 
 function PulseOS_Simulator() {
@@ -360,10 +361,13 @@ function PulseOS_Simulator() {
     const [url, setUrl] = useState('https://xandeum-pulse.vercel.app');
     const [ready, setReady] = useState(false); 
     const [ghost, setGhost] = useState(false); 
+    
+    // Internal States for Views
+    const [mapDrawerOpen, setMapDrawerOpen] = useState(false);
+    const [mapMode, setMapMode] = useState<'STORAGE' | 'HEALTH' | 'CREDITS'>('STORAGE');
 
     // --- BOOT SEQUENCE ---
     useEffect(() => {
-        // Immediate start to prevent blank box issues
         setTimeout(() => setReady(true), 300);
     }, []);
 
@@ -372,6 +376,7 @@ function PulseOS_Simulator() {
         setView('DASH');
         setReady(false);
         setUrl('https://xandeum-pulse.vercel.app');
+        setMapDrawerOpen(false);
         setTimeout(() => setReady(true), 500);
     }
 
@@ -379,6 +384,7 @@ function PulseOS_Simulator() {
     const nav = (target: ViewState, delay = 0) => {
         setReady(false);
         setGhost(true); // Start transition animation
+        setMapDrawerOpen(false); // Reset internal states
         
         // URL Bar Updates
         let newUrl = 'https://xandeum-pulse.vercel.app';
@@ -420,7 +426,7 @@ function PulseOS_Simulator() {
                         <Lock size={8} className="mr-2 text-green-500"/>
                         {url}
                     </div>
-                    {/* FIXED: Wrapped in button to validly support title prop */}
+                    {/* Fixed: wrapped in button to support title prop validly */}
                     <button onClick={reboot} title="Reboot System" className="cursor-pointer hover:text-white bg-transparent border-none p-0 flex items-center">
                         <RotateCcw size={10} />
                     </button>
@@ -463,7 +469,7 @@ function PulseOS_Simulator() {
                     </div>
                 )}
 
-                {/* === MODAL HUB === */}
+                {/* === MODAL HUB (The Central Node) === */}
                 {view === 'MODAL' && (
                     <div className="absolute inset-0 bg-black/80 z-20 flex items-center justify-center p-8 animate-in zoom-in-95 duration-300">
                         <div className="w-full h-full max-w-4xl bg-[#09090b] border border-zinc-700 rounded-2xl flex flex-col relative shadow-2xl">
@@ -598,21 +604,50 @@ function PulseOS_Simulator() {
                     </div>
                 )}
 
-                {/* === FULL MAP VIEW === */}
+                {/* === FULL MAP VIEW (INTERACTIVE STATE MACHINE) === */}
                 {view === 'MAP' && (
                     <div className="absolute inset-0 bg-[#050505] z-30 flex flex-col animate-in zoom-in-90 duration-700">
                         <div className="flex-1 relative overflow-hidden">
                             <div className="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900 via-black to-black"></div>
+                            
+                            {/* Map Toggles */}
+                            <div className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+                                {['STORAGE', 'HEALTH', 'CREDITS'].map(m => (
+                                    <button key={m} onClick={() => setMapMode(m as any)} className={`px-2 py-1 rounded text-[9px] font-bold border transition-all ${mapMode === m ? 'bg-white text-black' : 'bg-black text-zinc-500 border-zinc-700'}`}>{m}</button>
+                                ))}
+                            </div>
+
                             {/* Simulated Pins */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                                <div className="w-4 h-4 bg-blue-500 rounded-full animate-ping absolute"></div>
-                                <div className="w-4 h-4 bg-blue-500 rounded-full relative shadow-[0_0_20px_rgba(59,130,246,1)]"></div>
-                                <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-black border border-zinc-700 px-3 py-1 rounded text-xs whitespace-nowrap">
-                                    Lisbon, PT
-                                </div>
+                            <div 
+                                onClick={() => setMapDrawerOpen(true)}
+                                className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform duration-300 ${mapDrawerOpen ? 'scale-125' : 'scale-100 hover:scale-110'}`}
+                            >
+                                <div className={`w-4 h-4 rounded-full animate-ping absolute ${mapMode === 'CREDITS' ? 'bg-yellow-500' : 'bg-blue-500'}`}></div>
+                                <div className={`w-4 h-4 rounded-full relative shadow-[0_0_20px_rgba(59,130,246,1)] ${mapMode === 'CREDITS' ? 'bg-yellow-500' : 'bg-blue-500'}`}></div>
+                                {ready && !mapDrawerOpen && <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-[9px] text-white bg-black px-2 rounded animate-bounce whitespace-nowrap">CLICK ME</div>}
                             </div>
                         </div>
-                        <div className="p-6 bg-black border-t border-zinc-900 flex justify-center">
+
+                        {/* DRAWER */}
+                        <div className={`bg-zinc-900 border-t border-zinc-800 transition-all duration-300 flex flex-col ${mapDrawerOpen ? 'h-48' : 'h-0 overflow-hidden'}`}>
+                            <div className="p-4 flex justify-between items-start">
+                                <div>
+                                    <div className="text-xs font-bold text-white flex items-center gap-2"><Globe size={12}/> LISBON, PT</div>
+                                    <div className="text-[10px] text-zinc-500">12 Nodes Active</div>
+                                </div>
+                                <X size={14} className="cursor-pointer" onClick={() => setMapDrawerOpen(false)}/>
+                            </div>
+                            <div className="p-4 border-t border-zinc-800/50 bg-black/20 flex gap-2">
+                                <button onClick={() => nav('CREDITS')} className="flex-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-[10px] font-bold py-2 rounded hover:bg-yellow-500/20">
+                                    VIEW TOP EARNER
+                                </button>
+                                <button onClick={() => nav('MODAL')} className="flex-1 bg-blue-500/10 border border-blue-500/20 text-blue-500 text-[10px] font-bold py-2 rounded hover:bg-blue-500/20">
+                                    INSPECT HUB
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-black border-t border-zinc-900 flex justify-center shrink-0">
                              <button 
                                 onClick={() => nav('MODAL')}
                                 className={`px-6 py-2 rounded-full font-bold border transition-all ${ready ? 'bg-red-500 text-white border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}
