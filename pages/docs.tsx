@@ -1,17 +1,52 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { 
-  ArrowLeft, Activity, Shield, Zap, Globe, Server, Database, 
-  Trophy, Cpu, Map as MapIcon, BarChart3, Lock, 
-  HeartPulse, Search, Info, Check, X, MousePointer2, Layers, 
-  LayoutDashboard, GitMerge, Share2, Anchor, Terminal,
-  AlertTriangle, Eye, Monitor, Command, AlertOctagon,
-  ArrowRight, Minimize2, Maximize2, Camera, Swords, ArrowLeftRight,
-  ClipboardCopy, Link as LinkIcon, RefreshCw, ChevronLeft, ChevronRight,
-  Wallet, MapPin, Star
-} from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
+import { Activity } from 'lucide-react';
+import { Shield } from 'lucide-react';
+import { Zap } from 'lucide-react';
+import { Globe } from 'lucide-react';
+import { Server } from 'lucide-react';
+import { Database } from 'lucide-react';
+import { Trophy } from 'lucide-react';
+import { Cpu } from 'lucide-react';
+import { Map as MapIcon } from 'lucide-react';
+import { BarChart3 } from 'lucide-react';
+import { Lock } from 'lucide-react';
+import { HeartPulse } from 'lucide-react';
+import { Search } from 'lucide-react';
+import { Info } from 'lucide-react';
+import { Check } from 'lucide-react';
+import { X } from 'lucide-react';
+import { MousePointer2 } from 'lucide-react';
+import { Layers } from 'lucide-react';
+import { LayoutDashboard } from 'lucide-react';
+import { GitMerge } from 'lucide-react';
+import { Share2 } from 'lucide-react';
+import { Anchor } from 'lucide-react';
+import { Terminal } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
+import { Eye } from 'lucide-react';
+import { Monitor } from 'lucide-react';
+import { Command } from 'lucide-react';
+import { AlertOctagon } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { Minimize2 } from 'lucide-react';
+import { Maximize2 } from 'lucide-react';
+import { Camera } from 'lucide-react';
+import { Swords } from 'lucide-react';
+import { ArrowLeftRight } from 'lucide-react';
+import { ClipboardCopy } from 'lucide-react';
+import { Link as LinkIcon } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+import { Wallet } from 'lucide-react';
+import { MapPin } from 'lucide-react';
+import { Star } from 'lucide-react';
+import { Medal } from 'lucide-react';
 
 export default function DocsPage() {
   const router = useRouter();
@@ -28,12 +63,12 @@ export default function DocsPage() {
     const el = document.getElementById(id);
     if (el) {
         el.scrollIntoView({ behavior: 'smooth' });
-        setActiveTab(id as any);
+        setActiveTab(id as typeof activeTab);
     }
   };
 
   const handleCopyLink = () => {
-    const url = ${window.location.origin}/docs?training=true;
+    const url = `${window.location.origin}/docs?training=true`;
     navigator.clipboard.writeText(url);
     setCopiedShare(true);
     setTimeout(() => setCopiedShare(false), 2000);
@@ -65,7 +100,7 @@ export default function DocsPage() {
                 <button 
                   key={tab} 
                   onClick={() => scrollTo(tab)}
-                  className={text-xs font-bold uppercase tracking-widest hover:text-white transition-colors ${activeTab === tab ? 'text-blue-400' : 'text-zinc-500'}}
+                  className={`text-xs font-bold uppercase tracking-widest hover:text-white transition-colors ${activeTab === tab ? 'text-blue-400' : 'text-zinc-500'}`}
                 >
                   {tab === 'flight' ? 'Flight School' : tab}
                 </button>
@@ -511,7 +546,7 @@ function PulseOS_Simulator() {
                                         <span className="text-xs font-bold text-zinc-500">NODE-0{i}</span>
                                         {i===1 && <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>}
                                     </div>
-                                    <div className="text-2xl md:text-3xl font-bold text-white">{i===1 ? '98%' : ${40 + i*5}%}</div>
+                                    <div className="text-2xl md:text-3xl font-bold text-white">{i===1 ? '98%' : `${40 + i*5}%`}</div>
                                     <div className="text-[9px] text-zinc-600">Health Score</div>
                                     
                                     {i===1 && readyButtons.includes('card-1') && (
@@ -534,7 +569,7 @@ function PulseOS_Simulator() {
                                 <span className="font-bold text-white flex items-center gap-2 text-sm md:text-base"><Globe size={16}/> Node 8x...2A</span>
                                 <button 
                                     onClick={() => navigate('DASH', 500)}
-                                    className={p-2 rounded-lg transition-all duration-500 ${readyButtons.includes('btn-back-dash') ? 'bg-red-500/20 text-red-400 border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)] animate-pulse' : 'text-zinc-600 hover:text-zinc-400'}}
+                                    className={`p-2 rounded-lg transition-all duration-500 ${readyButtons.includes('btn-back-dash') ? 'bg-red-500/20 text-red-400 border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)] animate-pulse' : 'text-zinc-600 hover:text-zinc-400'}`}
                                 >
                                     <X size={18}/>
                                 </button>
@@ -553,7 +588,7 @@ function PulseOS_Simulator() {
                                 <div className="space-y-3 md:space-y-4">
                                     <div 
                                         onClick={() => readyButtons.includes('btn-credits') && navigate('CREDITS', 1000)}
-                                        className={p-4 rounded-xl border transition-all cursor-pointer ${readyButtons.includes('btn-credits') ? 'border-yellow-500/50 bg-yellow-900/10 hover:bg-yellow-900/20 shadow-[0_0_20px_rgba(234,179,8,0.3)]' : 'border-zinc-800 bg-zinc-900/30'}}
+                                        className={`p-4 rounded-xl border transition-all cursor-pointer ${readyButtons.includes('btn-credits') ? 'border-yellow-500/50 bg-yellow-900/10 hover:bg-yellow-900/20 shadow-[0_0_20px_rgba(234,179,8,0.3)]' : 'border-zinc-800 bg-zinc-900/30'}`}
                                     >
                                         <div className="flex justify-between mb-2 items-center">
                                             <span className="text-xs font-bold text-yellow-500 flex items-center gap-1"><Wallet size={12}/> REPUTATION</span>
@@ -565,7 +600,7 @@ function PulseOS_Simulator() {
 
                                     <div 
                                         onClick={() => readyButtons.includes('btn-health') && navigate('MAP', 1200, '?focus=8x...2A')}
-                                        className={p-4 rounded-xl border transition-all cursor-pointer ${readyButtons.includes('btn-health') ? 'border-green-500/50 bg-green-900/10 hover:bg-green-900/20 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'border-zinc-800 bg-zinc-900/30'}}
+                                        className={`p-4 rounded-xl border transition-all cursor-pointer ${readyButtons.includes('btn-health') ? 'border-green-500/50 bg-green-900/10 hover:bg-green-900/20 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'border-zinc-800 bg-zinc-900/30'}`}
                                     >
                                         <div className="flex justify-between mb-2 items-center">
                                             <span className="text-xs font-bold text-green-500 flex items-center gap-1"><Activity size={12}/> HEALTH</span>
@@ -588,21 +623,21 @@ function PulseOS_Simulator() {
                                 <div className="space-y-3 md:space-y-4">
                                     <button 
                                         onClick={() => readyButtons.includes('btn-compare') && navigate('COMPARE', 1500)}
-                                        className={w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${readyButtons.includes('btn-compare') ? 'border-red-500/50 bg-red-900/10 text-red-400 hover:bg-red-900/20 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}}
+                                        className={`w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${readyButtons.includes('btn-compare') ? 'border-red-500/50 bg-red-900/10 text-red-400 hover:bg-red-900/20 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}`}
                                     >
                                         <Swords size={16}/> <span className="text-sm font-bold">Compare Nodes</span>
                                     </button>
 
                                     <button 
                                         onClick={() => readyButtons.includes('btn-proof') && navigate('PROOF', 1500)}
-                                        className={w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${readyButtons.includes('btn-proof') ? 'border-blue-500/50 bg-blue-900/10 text-blue-400 hover:bg-blue-900/20 shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}}
+                                        className={`w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${readyButtons.includes('btn-proof') ? 'border-blue-500/50 bg-blue-900/10 text-blue-400 hover:bg-blue-900/20 shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}`}
                                     >
                                         <Camera size={16}/> <span className="text-sm font-bold">Proof of Pulse</span>
                                     </button>
 
                                     <button 
                                         onClick={() => readyButtons.includes('btn-map') && navigate('MAP', 1200, '?focus=8x...2A')}
-                                        className={w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${readyButtons.includes('btn-map') ? 'border-purple-500/50 bg-purple-900/10 text-purple-400 hover:bg-purple-900/20 shadow-[0_0_20px_rgba(147,51,234,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}}
+                                        className={`w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${readyButtons.includes('btn-map') ? 'border-purple-500/50 bg-purple-900/10 text-purple-400 hover:bg-purple-900/20 shadow-[0_0_20px_rgba(147,51,234,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}`}
                                     >
                                         <MapIcon size={16}/> <span className="text-sm font-bold">View on Map</span>
                                     </button>
@@ -631,19 +666,19 @@ function PulseOS_Simulator() {
                             <div className="flex gap-2">
                                 <button 
                                     onClick={() => readyButtons.includes('btn-toggle-storage') && handleMapToggle('STORAGE')}
-                                    className={px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'STORAGE' ? 'bg-indigo-500 text-white' : readyButtons.includes('btn-toggle-storage') ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}}
+                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'STORAGE' ? 'bg-indigo-500 text-white' : readyButtons.includes('btn-toggle-storage') ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
                                 >
                                     STORAGE
                                 </button>
                                 <button 
                                     onClick={() => readyButtons.includes('btn-toggle-health') && handleMapToggle('HEALTH')}
-                                    className={px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'HEALTH' ? 'bg-green-500 text-white' : readyButtons.includes('btn-toggle-health') ? 'bg-green-500/20 text-green-400 border border-green-500/50 shadow-[0_0_15px_rgba(16,185,129,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}}
+                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'HEALTH' ? 'bg-green-500 text-white' : readyButtons.includes('btn-toggle-health') ? 'bg-green-500/20 text-green-400 border border-green-500/50 shadow-[0_0_15px_rgba(16,185,129,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
                                 >
                                     HEALTH
                                 </button>
                                 <button 
                                     onClick={() => readyButtons.includes('btn-toggle-credits') && handleMapToggle('CREDITS')}
-                                    className={px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'CREDITS' ? 'bg-yellow-500 text-black' : readyButtons.includes('btn-toggle-credits') ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}}
+                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'CREDITS' ? 'bg-yellow-500 text-black' : readyButtons.includes('btn-toggle-credits') ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
                                 >
                                     CREDITS
                                 </button>
@@ -722,7 +757,7 @@ function PulseOS_Simulator() {
                                     <div className="p-4 bg-black border-t border-zinc-900 flex justify-center shrink-0">
                                         <button 
                                             onClick={() => readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
-                                            className={px-6 py-2 rounded-full font-bold border transition-all ${readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}}
+                                            className={`px-6 py-2 rounded-full font-bold border transition-all ${readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}
                                         >
                                             BACK TO DIAGNOSTICS
                                         </button>
@@ -767,13 +802,13 @@ function PulseOS_Simulator() {
                                             <div className="flex gap-2">
                                                 <button 
                                                     onClick={() => readyButtons.includes('btn-view-map') && navigate('MAP', 1000, '?focus=8x...2A')}
-                                                    className={px-4 py-2 rounded text-xs font-bold transition-all ${readyButtons.includes('btn-view-map') ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}}
+                                                    className={`px-4 py-2 rounded text-xs font-bold transition-all ${readyButtons.includes('btn-view-map') ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
                                                 >
                                                     VIEW ON MAP
                                                 </button>
                                                 <button 
                                                     onClick={() => readyButtons.includes('btn-view-modal') && navigate('MODAL', 800)}
-                                                    className={px-4 py-2 rounded text-xs font-bold transition-all ${readyButtons.includes('btn-view-modal') ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}}
+                                                    className={`px-4 py-2 rounded text-xs font-bold transition-all ${readyButtons.includes('btn-view-modal') ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
                                                 >
                                                     DIAGNOSTICS
                                                 </button>
@@ -847,13 +882,13 @@ function PulseOS_Simulator() {
                                 <div className="flex flex-col md:flex-row gap-3">
                                     <button 
                                         onClick={() => readyButtons.includes('btn-view-winner-map') && navigate('MAP', 1000, '?focus=8x...2A')}
-                                        className={px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-view-winner-map') ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(147,51,234,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}}
+                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-view-winner-map') ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(147,51,234,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
                                     >
                                         VIEW WINNER ON MAP
                                     </button>
                                     <button 
                                         onClick={() => readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
-                                        className={px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}}
+                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
                                     >
                                         BACK TO DIAGNOSTICS
                                     </button>
@@ -866,84 +901,84 @@ function PulseOS_Simulator() {
                 {/* === PROOF VIEW === */}
                 {view === 'PROOF' && (
                     <div className="absolute inset-0 bg-[#09090b] z-30 flex flex-col animate-in slide-in-from-right duration-500">
-                         {isAnimating ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 px-4">
-                                <div className="text-xs font-mono mb-4 text-green-500">GENERATING SNAPSHOT...</div>
-                                <div className="w-48 h-64 bg-zinc-900 border border-zinc-700 relative overflow-hidden rounded-xl">
-                                    <div className="absolute inset-0 bg-green-500/20 animate-pulse"></div>
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <Camera className="text-green-500/50 animate-bounce" size={48}/>
-                                    </div>
-                                </div>
-                                <div className="mt-4 text-[10px] text-zinc-600 font-mono">Rendering PNG proof...</div>
-                            </div>
-                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center p-6">
-                                {/* Generated Proof Card */}
-                                <div className="w-64 md:w-80 bg-zinc-950 border-2 border-green-500/50 rounded-2xl p-6 mb-8 relative shadow-[0_0_40px_rgba(16,185,129,0.3)] animate-in zoom-in duration-500">
-                                    <div className="absolute top-0 right-0 p-20 bg-green-500/10 blur-3xl rounded-full"></div>
-                                    
-                                    <div className="text-center relative z-10">
-                                        <div className="inline-block p-3 bg-zinc-900 rounded-xl mb-4 border border-zinc-800">
-                                            <Activity size={32} className="text-green-500" />
-                                        </div>
-                                        <h3 className="text-xl font-extrabold text-white mb-2">PROOF OF PULSE</h3>
-                                        <div className="text-[10px] font-mono text-zinc-500 mb-6">8x...2A • Verified</div>
+                         {isAnimating ? (
+                            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 px-4">
+                                <div className="text-xs font-mono mb-4 text-green-500">GENERATING SNAPSHOT...</div>
+                                <div className="w-48 h-64 bg-zinc-900 border border-zinc-700 relative overflow-hidden rounded-xl">
+                                    <div className="absolute inset-0 bg-green-500/20 animate-pulse"></div>
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <Camera className="text-green-500/50 animate-bounce" size={48}/>
+                                    </div>
+                                </div>
+                                <div className="mt-4 text-[10px] text-zinc-600 font-mono">Rendering PNG proof...</div>
+                            </div>
+                         ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center p-6">
+                                {/* Generated Proof Card */}
+                                <div className="w-64 md:w-80 bg-zinc-950 border-2 border-green-500/50 rounded-2xl p-6 mb-8 relative shadow-[0_0_40px_rgba(16,185,129,0.3)] animate-in zoom-in duration-500">
+                                    <div className="absolute top-0 right-0 p-20 bg-green-500/10 blur-3xl rounded-full"></div>
+                                    
+                                    <div className="text-center relative z-10">
+                                        <div className="inline-block p-3 bg-zinc-900 rounded-xl mb-4 border border-zinc-800">
+                                            <Activity size={32} className="text-green-500" />
+                                        </div>
+                                        <h3 className="text-xl font-extrabold text-white mb-2">PROOF OF PULSE</h3>
+                                        <div className="text-[10px] font-mono text-zinc-500 mb-6">8x...2A • Verified</div>
 
-                                        <div className="grid grid-cols-2 gap-3 mb-4">
-                                            <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
-                                                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Health</div>
-                                                <div className="text-xl font-extrabold text-green-400">98</div>
-                                            </div>
-                                            <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
-                                                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Credits</div>
-                                                <div className="text-lg font-extrabold text-yellow-500">5.2M</div>
-                                            </div>
-                                            <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
-                                                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Storage</div>
-                                                <div className="text-lg font-extrabold text-purple-400">1.2TB</div>
-                                            </div>
-                                            <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
-                                                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Rank</div>
-                                                <div className="text-lg font-extrabold text-yellow-500">#3</div>
-                                            </div>
-                                        </div>
+                                        <div className="grid grid-cols-2 gap-3 mb-4">
+                                            <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
+                                                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Health</div>
+                                                <div className="text-xl font-extrabold text-green-400">98</div>
+                                            </div>
+                                            <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
+                                                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Credits</div>
+                                                <div className="text-lg font-extrabold text-yellow-500">5.2M</div>
+                                            </div>
+                                            <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
+                                                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Storage</div>
+                                                <div className="text-lg font-extrabold text-purple-400">1.2TB</div>
+                                            </div>
+                                            <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
+                                                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Rank</div>
+                                                <div className="text-lg font-extrabold text-yellow-500">#3</div>
+                                            </div>
+                                        </div>
 
-                                        <div className="text-[9px] text-zinc-600 font-mono flex items-center justify-center gap-1">
-                                            <Shield size={8}/> VERIFIED BY XANDEUM PULSE
-                                        </div>
-                                    </div>
-                                </div>
+                                        <div className="text-[9px] text-zinc-600 font-mono flex items-center justify-center gap-1">
+                                            <Shield size={8}/> VERIFIED BY XANDEUM PULSE
+                                        </div>
+                                    </div>
+                                </div>
 
-                                {/* Action Buttons */}
-                                <div className="flex flex-col md:flex-row gap-3">
-                                    <button 
-                                        onClick={() => readyButtons.includes('btn-share-credits') && navigate('CREDITS', 800)}
-                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-share-credits') ? 'bg-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
-                                    >
-                                        SHARE TO LEADERBOARD
-                                    </button>
-                                    <button 
-                                        onClick={() => readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
-                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
-                                    >
-                                        BACK TO DIAGNOSTICS
-                                    </button>
-                                </div>
+                                {/* Action Buttons */}
+                                <div className="flex flex-col md:flex-row gap-3">
+                                    <button 
+                                        onClick={() => readyButtons.includes('btn-share-credits') && navigate('CREDITS', 800)}
+                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-share-credits') ? 'bg-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
+                                    >
+                                        SHARE TO LEADERBOARD
+                                    </button>
+                                    <button 
+                                        onClick={() => readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
+                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
+                                    >
+                                        BACK TO DIAGNOSTICS
+                                    </button>
+                                </div>
 
-                                <div className="mt-6 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg max-w-md">
-                                    <div className="text-[10px] text-blue-300 font-bold flex items-center gap-2">
-                                        <Info size={12}/> In the real app, this downloads as PNG
-                                    </div>
-                                </div>
-                            </div>
-                         )}
-                    </div>
-                )}
+                                <div className="mt-6 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg max-w-md">
+                                    <div className="text-[10px] text-blue-300 font-bold flex items-center gap-2">
+                                        <Info size={12}/> In the real app, this downloads as PNG
+                                    </div>
+                                </div>
+                            </div>
+                         )}
+                    </div>
+                )}
 
-            </div>
-        </div>
-    );
+            </div>
+        </div>
+    );
 }
 
 
@@ -952,187 +987,187 @@ function PulseOS_Simulator() {
 // ==========================================
 
 function VitalitySimulator() {
-    const [uptimeDays, setUptimeDays] = useState(14);
-    const [storageTB, setStorageTB] = useState(2);
-    const [credits, setCredits] = useState(5000);
-    const [versionGap, setVersionGap] = useState(0);
-    const [apiOnline, setApiOnline] = useState(true);
-    
-    const uScore = Math.min(100, Math.round(100 / (1 + Math.exp(-0.2 * (uptimeDays - 7)))));
-    const sScore = Math.min(100, Math.round(50 * Math.log2((storageTB/1) + 1)));
-    const cScore = apiOnline ? Math.min(100, Math.round((credits / 10000) * 100)) : 0;
-    const vScore = versionGap === 0 ? 100 : versionGap === 1 ? 90 : versionGap === 2 ? 70 : 30;
-    
-    let totalScore = 0;
-    if (apiOnline) {
-        totalScore = Math.round((uScore * 0.35) + (sScore * 0.30) + (cScore * 0.20) + (vScore * 0.15));
-    } else {
-        totalScore = Math.round((uScore * 0.45) + (sScore * 0.35) + (vScore * 0.20));
-    }
-    
-    return (
-        <div className="bg-black border border-zinc-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
-            <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r transition-all duration-500 ${apiOnline ? 'from-blue-500 via-purple-500 to-green-500' : 'from-red-500 via-orange-500 to-yellow-500'}`}></div>
-            
-            <div className="flex justify-between items-center mb-6">
-                <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                    <Activity size={14} /> Vitality Engine
-                </span>
-                
-                <button 
-                    onClick={() => setApiOnline(!apiOnline)}
-                    className={`px-3 py-1 rounded-full text-[10px] font-bold border flex items-center gap-2 transition-all ${apiOnline ? 'bg-green-500/10 border-green-500 text-green-400' : 'bg-red-500/10 border-red-500 text-red-400'}`}
-                >
-                    {apiOnline ? <Check size={10}/> : <AlertOctagon size={10}/>}
-                    {apiOnline ? "API ONLINE" : "API DOWN (FAILOVER)"}
-                </button>
-            </div>
+    const [uptimeDays, setUptimeDays] = useState(14);
+    const [storageTB, setStorageTB] = useState(2);
+    const [credits, setCredits] = useState(5000);
+    const [versionGap, setVersionGap] = useState(0);
+    const [apiOnline, setApiOnline] = useState(true);
+     
+    const uScore = Math.min(100, Math.round(100 / (1 + Math.exp(-0.2 * (uptimeDays - 7)))));
+    const sScore = Math.min(100, Math.round(50 * Math.log2((storageTB/1) + 1)));
+    const cScore = apiOnline ? Math.min(100, Math.round((credits / 10000) * 100)) : 0;
+    const vScore = versionGap === 0 ? 100 : versionGap === 1 ? 90 : versionGap === 2 ? 70 : 30;
+     
+    let totalScore = 0;
+    if (apiOnline) {
+        totalScore = Math.round((uScore * 0.35) + (sScore * 0.30) + (cScore * 0.20) + (vScore * 0.15));
+    } else {
+        totalScore = Math.round((uScore * 0.45) + (sScore * 0.35) + (vScore * 0.20));
+    }
+     
+    return (
+        <div className="bg-black border border-zinc-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
+            <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r transition-all duration-500 ${apiOnline ? 'from-blue-500 via-purple-500 to-green-500' : 'from-red-500 via-orange-500 to-yellow-500'}`}></div>
+             
+            <div className="flex justify-between items-center mb-6">
+                <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                    <Activity size={14} /> Vitality Engine
+                </span>
+                 
+                <button 
+                    onClick={() => setApiOnline(!apiOnline)}
+                    className={`px-3 py-1 rounded-full text-[10px] font-bold border flex items-center gap-2 transition-all ${apiOnline ? 'bg-green-500/10 border-green-500 text-green-400' : 'bg-red-500/10 border-red-500 text-red-400'}`}
+                >
+                    {apiOnline ? <Check size={10}/> : <AlertOctagon size={10}/>}
+                    {apiOnline ? "API ONLINE" : "API DOWN (FAILOVER)"}
+                </button>
+            </div>
 
-            <div className="text-center mb-8">
-                <div className={`text-6xl font-extrabold transition-colors duration-500 ${totalScore > 80 ? 'text-green-500' : totalScore > 50 ? 'text-yellow-500' : 'text-red-500'}`}>
-                    {totalScore}
-                </div>
-                <div className="text-xs text-zinc-500 mt-2 font-mono">LIVE SCORE CALCULATION</div>
-            </div>
-            
-            <div className="space-y-6">
-                <div>
-                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
-                        <span className="text-blue-400">Uptime ({apiOnline ? '35%' : '45%'})</span>
-                        <span className="text-white">{uScore} pts</span>
-                    </div>
-                    <input type="range" min="0" max="30" value={uptimeDays} onChange={(e) => setUptimeDays(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500"/>
-                </div>
+            <div className="text-center mb-8">
+                <div className={`text-6xl font-extrabold transition-colors duration-500 ${totalScore > 80 ? 'text-green-500' : totalScore > 50 ? 'text-yellow-500' : 'text-red-500'}`}>
+                    {totalScore}
+                </div>
+                <div className="text-xs text-zinc-500 mt-2 font-mono">LIVE SCORE CALCULATION</div>
+            </div>
+             
+            <div className="space-y-6">
+                <div>
+                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
+                        <span className="text-blue-400">Uptime ({apiOnline ? '35%' : '45%'})</span>
+                        <span className="text-white">{uScore} pts</span>
+                    </div>
+                    <input type="range" min="0" max="30" value={uptimeDays} onChange={(e) => setUptimeDays(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500"/>
+                </div>
 
-                <div>
-                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
-                        <span className="text-purple-400">Storage ({apiOnline ? '30%' : '35%'})</span>
-                        <span className="text-white">{sScore} pts</span>
-                    </div>
-                    <input type="range" min="0" max="10" step="0.1" value={storageTB} onChange={(e) => setStorageTB(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-purple-500"/>
-                </div>
+                <div>
+                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
+                        <span className="text-purple-400">Storage ({apiOnline ? '30%' : '35%'})</span>
+                        <span className="text-white">{sScore} pts</span>
+                    </div>
+                    <input type="range" min="0" max="10" step="0.1" value={storageTB} onChange={(e) => setStorageTB(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-purple-500"/>
+                </div>
 
-                <div className={`transition-opacity duration-500 ${apiOnline ? 'opacity-100' : 'opacity-30 grayscale'}`}>
-                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
-                        <span className="text-yellow-500">Credits ({apiOnline ? '20%' : '0%'})</span>
-                        <span className="text-white">{apiOnline ? cScore : 'N/A'} pts</span>
-                    </div>
-                    <input disabled={!apiOnline} type="range" min="0" max="20000" value={credits} onChange={(e) => setCredits(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-yellow-500 disabled:cursor-not-allowed"/>
-                    {!apiOnline && <div className="text-[9px] text-red-500 mt-1 font-bold">⚠ SIGNAL LOST: EXCLUDED FROM CALCULATION</div>}
-                </div>
+                <div className={`transition-opacity duration-500 ${apiOnline ? 'opacity-100' : 'opacity-30 grayscale'}`}>
+                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
+                        <span className="text-yellow-500">Credits ({apiOnline ? '20%' : '0%'})</span>
+                        <span className="text-white">{apiOnline ? cScore : 'N/A'} pts</span>
+                    </div>
+                    <input disabled={!apiOnline} type="range" min="0" max="20000" value={credits} onChange={(e) => setCredits(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-yellow-500 disabled:cursor-not-allowed"/>
+                    {!apiOnline && <div className="text-[9px] text-red-500 mt-1 font-bold">⚠ SIGNAL LOST: EXCLUDED FROM CALCULATION</div>}
+                </div>
 
-                <div>
-                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
-                        <span className="text-green-500">Version ({apiOnline ? '15%' : '20%'})</span>
-                        <span className="text-white">{vScore} pts</span>
-                    </div>
-                    <div className="grid grid-cols-4 gap-2">
-                        {['Latest', '-1', '-2', 'Old'].map((label, i) => (
-                            <button key={i} onClick={() => setVersionGap(i)} className={`py-1 rounded text-[9px] font-bold border ${versionGap === i ? 'bg-green-500/20 border-green-500 text-green-400' : 'bg-zinc-900 border-zinc-800 text-zinc-500'}`}>{label}</button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
+                <div>
+                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
+                        <span className="text-green-500">Version ({apiOnline ? '15%' : '20%'})</span>
+                        <span className="text-white">{vScore} pts</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                        {['Latest', '-1', '-2', 'Old'].map((label, i) => (
+                            <button key={i} onClick={() => setVersionGap(i)} className={`py-1 rounded text-[9px] font-bold border ${versionGap === i ? 'bg-green-500/20 border-green-500 text-green-400' : 'bg-zinc-900 border-zinc-800 text-zinc-500'}`}>{label}</button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
 }
 
 function FailoverVisualizer() {
-    const [step, setStep] = useState(0);
-    useEffect(() => {
-        const interval = setInterval(() => setStep(prev => (prev + 1) % 5), 1500);
-        return () => clearInterval(interval);
-    }, []);
-    const logs = ["System Idle...", "Connecting Primary [173.x]...", "TIMEOUT (>4000ms)!", "RACE MODE: 3 Backups...", "Winner: Node 2 (80ms)"];
+    const [step, setStep] = useState(0);
+    useEffect(() => {
+        const interval = setInterval(() => setStep(prev => (prev + 1) % 5), 1500);
+        return () => clearInterval(interval);
+    }, []);
+    const logs = ["System Idle...", "Connecting Primary [173.x]...", "TIMEOUT (>4000ms)!", "RACE MODE: 3 Backups...", "Winner: Node 2 (80ms)"];
 
-    return (
-        <div>
-            <div className="mb-6 flex items-center justify-between relative h-24 select-none">
-                <div className="z-10 flex flex-col items-center gap-2">
-                    <div className="w-12 h-12 bg-zinc-900 rounded-full flex items-center justify-center border border-zinc-700 shadow-xl"><Monitor size={20} className="text-white" /></div>
-                    <span className="text-[9px] font-bold uppercase text-zinc-500">Client</span>
-                </div>
-                <div className="absolute top-1/2 left-12 right-12 h-0.5 bg-zinc-800 -translate-y-1/2"></div>
-                {step === 1 && <div className="absolute top-1/2 left-16 w-3 h-3 bg-blue-500 rounded-full -translate-y-1/2 animate-[ping_1s_infinite]"></div>}
-                {step === 2 && <div className="absolute top-1/2 left-1/2 w-4 h-4 bg-red-500 rounded-full -translate-y-1/2"></div>}
-                {step === 3 && <><div className="absolute top-1/3 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><div className="absolute top-1/2 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><div className="absolute top-2/3 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div></>}
-                
-                <div className="z-10 flex flex-col gap-2">
-                    <div className={`px-3 py-1 rounded border text-[10px] font-bold transition-all ${step === 2 ? 'bg-red-500/10 border-red-500 text-red-500' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>Primary</div>
-                    <div className={`px-3 py-1 rounded border text-[10px] font-bold transition-all ${step >= 4 ? 'bg-green-500/10 border-green-500 text-green-500 scale-105' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>Backups</div>
-                </div>
-            </div>
-            <div className="bg-black/80 rounded-lg p-3 font-mono text-[9px] text-zinc-400 border-t-2 border-zinc-800 h-24 flex flex-col justify-end">
-                {logs.map((log, i) => (
-                    <div key={i} className={`transition-opacity duration-300 ${i === step ? 'text-green-400 opacity-100' : i < step ? 'opacity-30' : 'opacity-0'}`}>
-                        <span className="text-zinc-600 mr-2">{`[00:0${i}]`}</span>{log}
-                    </div>
-                ))}
-            </div>
-        </div>
-    )
+    return (
+        <div>
+            <div className="mb-6 flex items-center justify-between relative h-24 select-none">
+                <div className="z-10 flex flex-col items-center gap-2">
+                    <div className="w-12 h-12 bg-zinc-900 rounded-full flex items-center justify-center border border-zinc-700 shadow-xl"><Monitor size={20} className="text-white" /></div>
+                    <span className="text-[9px] font-bold uppercase text-zinc-500">Client</span>
+                </div>
+                <div className="absolute top-1/2 left-12 right-12 h-0.5 bg-zinc-800 -translate-y-1/2"></div>
+                {step === 1 && <div className="absolute top-1/2 left-16 w-3 h-3 bg-blue-500 rounded-full -translate-y-1/2 animate-[ping_1s_infinite]"></div>}
+                {step === 2 && <div className="absolute top-1/2 left-1/2 w-4 h-4 bg-red-500 rounded-full -translate-y-1/2"></div>}
+                {step === 3 && <><div className="absolute top-1/3 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><div className="absolute top-1/2 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><div className="absolute top-2/3 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div></>}
+                 
+                <div className="z-10 flex flex-col gap-2">
+                    <div className={`px-3 py-1 rounded border text-[10px] font-bold transition-all ${step === 2 ? 'bg-red-500/10 border-red-500 text-red-500' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>Primary</div>
+                    <div className={`px-3 py-1 rounded border text-[10px] font-bold transition-all ${step >= 4 ? 'bg-green-500/10 border-green-500 text-green-500 scale-105' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>Backups</div>
+                </div>
+            </div>
+            <div className="bg-black/80 rounded-lg p-3 font-mono text-[9px] text-zinc-400 border-t-2 border-zinc-800 h-24 flex flex-col justify-end">
+                {logs.map((log, i) => (
+                    <div key={i} className={`transition-opacity duration-300 ${i === step ? 'text-green-400 opacity-100' : i < step ? 'opacity-30' : 'opacity-0'}`}>
+                        <span className="text-zinc-600 mr-2">{`[00:0${i}]`}</span>{log}
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
 }
 
 function XRaySimulator() {
-    const [mode, setMode] = useState<'STORAGE' | 'HEALTH' | 'CREDITS'>('STORAGE');
+    const [mode, setMode] = useState<'STORAGE' | 'HEALTH' | 'CREDITS'>('STORAGE');
 
-    return (
-        <div className="relative">
-            <div className="flex gap-2 mb-8 justify-center">
-                {['STORAGE', 'HEALTH', 'CREDITS'].map(m => (
-                    <button key={m} onClick={() => setMode(m as any)} className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border ${mode === m ? 'bg-white text-black border-white' : 'bg-zinc-900 text-zinc-500 border-zinc-800'}`}>{m}</button>
-                ))}
-            </div>
+    return (
+        <div className="relative">
+            <div className="flex gap-2 mb-8 justify-center">
+                {['STORAGE', 'HEALTH', 'CREDITS'].map(m => (
+                    <button key={m} onClick={() => setMode(m as any)} className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border ${mode === m ? 'bg-white text-black border-white' : 'bg-zinc-900 text-zinc-500 border-zinc-800'}`}>{m}</button>
+                ))}
+            </div>
 
-            <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 transition-all max-w-sm mx-auto shadow-2xl relative overflow-hidden h-64 flex flex-col justify-center">
-                <div className={`absolute top-0 right-0 p-24 blur-[80px] rounded-full opacity-20 transition-colors duration-500 ${mode === 'STORAGE' ? 'bg-indigo-500' : mode === 'HEALTH' ? 'bg-emerald-500' : 'bg-yellow-500'}`}></div>
+            <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 transition-all max-w-sm mx-auto shadow-2xl relative overflow-hidden h-64 flex flex-col justify-center">
+                <div className={`absolute top-0 right-0 p-24 blur-[80px] rounded-full opacity-20 transition-colors duration-500 ${mode === 'STORAGE' ? 'bg-indigo-500' : mode === 'HEALTH' ? 'bg-emerald-500' : 'bg-yellow-500'}`}></div>
 
-                <div className="flex justify-between items-center mb-6 relative z-10">
-                    <div className="font-bold text-white text-lg">Lisbon, PT</div>
-                    <div className={`text-sm font-mono font-bold ${mode === 'STORAGE' ? 'text-indigo-400' : mode === 'HEALTH' ? 'text-emerald-400' : 'text-yellow-500'}`}>
-                        {mode === 'STORAGE' ? '1.2 PB' : mode === 'HEALTH' ? '98% Score' : '5.2M Cr'}
-                    </div>
-                </div>
-                
-                <div className="bg-black/50 p-4 rounded-xl border border-white/5 relative z-10">
-                    <div className="flex justify-center mb-4">
-                        <span className={`text-[10px] uppercase font-bold px-3 py-1.5 rounded border tracking-widest ${mode === 'STORAGE' ? 'text-indigo-400 border-indigo-500/30' : mode === 'HEALTH' ? 'text-emerald-400 border-emerald-500/30' : 'text-yellow-500 border-yellow-500/30'}`}>
-                            {mode === 'STORAGE' ? 'MASSIVE TIER' : mode === 'HEALTH' ? 'FLAWLESS TIER' : 'ELITE EARNER'}
-                        </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 text-center">
-                        <div>
-                            <div className="text-[10px] text-zinc-500 uppercase mb-1 font-bold">
-                                {mode === 'STORAGE' ? 'Avg Density' : mode === 'HEALTH' ? 'Status' : 'Economy'}
-                            </div>
-                            <div className="text-white font-mono text-xs font-bold">
-                                {mode === 'STORAGE' ? '120 TB / Node' : mode === 'HEALTH' ? '5 Up • 0 Down' : '2.1% Share'}
-                            </div>
-                        </div>
-                        <div className="border-l border-zinc-800">
-                            <div className="text-[10px] text-zinc-500 uppercase mb-1 font-bold">
-                                {mode === 'STORAGE' ? 'Global Share' : mode === 'HEALTH' ? 'King Node' : 'Top Earner'}
-                            </div>
-                            <div className="text-white font-mono text-xs font-bold truncate px-2">
-                                {mode === 'STORAGE' ? '12.5%' : '8x...2A'}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
+                <div className="flex justify-between items-center mb-6 relative z-10">
+                    <div className="font-bold text-white text-lg">Lisbon, PT</div>
+                    <div className={`text-sm font-mono font-bold ${mode === 'STORAGE' ? 'text-indigo-400' : mode === 'HEALTH' ? 'text-emerald-400' : 'text-yellow-500'}`}>
+                        {mode === 'STORAGE' ? '1.2 PB' : mode === 'HEALTH' ? '98% Score' : '5.2M Cr'}
+                    </div>
+                </div>
+                 
+                <div className="bg-black/50 p-4 rounded-xl border border-white/5 relative z-10">
+                    <div className="flex justify-center mb-4">
+                        <span className={`text-[10px] uppercase font-bold px-3 py-1.5 rounded border tracking-widest ${mode === 'STORAGE' ? 'text-indigo-400 border-indigo-500/30' : mode === 'HEALTH' ? 'text-emerald-400 border-emerald-500/30' : 'text-yellow-500 border-yellow-500/30'}`}>
+                            {mode === 'STORAGE' ? 'MASSIVE TIER' : mode === 'HEALTH' ? 'FLAWLESS TIER' : 'ELITE EARNER'}
+                        </span>
+                    </div>
+                     
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                            <div className="text-[10px] text-zinc-500 uppercase mb-1 font-bold">
+                                {mode === 'STORAGE' ? 'Avg Density' : mode === 'HEALTH' ? 'Status' : 'Economy'}
+                            </div>
+                            <div className="text-white font-mono text-xs font-bold">
+                                {mode === 'STORAGE' ? '120 TB / Node' : mode === 'HEALTH' ? '5 Up • 0 Down' : '2.1% Share'}
+                            </div>
+                        </div>
+                        <div className="border-l border-zinc-800">
+                            <div className="text-[10px] text-zinc-500 uppercase mb-1 font-bold">
+                                {mode === 'STORAGE' ? 'Global Share' : mode === 'HEALTH' ? 'King Node' : 'Top Earner'}
+                            </div>
+                            <div className="text-white font-mono text-xs font-bold truncate px-2">
+                                {mode === 'STORAGE' ? '12.5%' : '8x...2A'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
 }
 
 function FeatureCard({ icon: Icon, title, desc, color = "blue" }: { icon: any, title: string, desc: string, color?: string }) {
-    return (
-        <div className="p-8 bg-zinc-900/20 border border-zinc-800 rounded-3xl hover:bg-zinc-900/40 transition-all group hover:-translate-y-1">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-6 transition-all bg-zinc-800 text-zinc-400 group-hover:bg-emerald-500/20 group-hover:text-emerald-400`}>
-                <Icon size={24} />
-            </div>
-            <h3 className="text-lg font-bold text-white mb-3">{title}</h3>
-            <p className="text-sm text-zinc-400 leading-relaxed">{desc}</p>
-        </div>
-    )
+    return (
+        <div className="p-8 bg-zinc-900/20 border border-zinc-800 rounded-3xl hover:bg-zinc-900/40 transition-all group hover:-translate-y-1">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-6 transition-all bg-zinc-800 text-zinc-400 group-hover:bg-emerald-500/20 group-hover:text-emerald-400`}>
+                <Icon size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-white mb-3">{title}</h3>
+            <p className="text-sm text-zinc-400 leading-relaxed">{desc}</p>
+        </div>
+    )
 }
