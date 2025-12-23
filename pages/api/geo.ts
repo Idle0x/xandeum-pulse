@@ -19,12 +19,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const existing = cityMap.get(key);
         existing.count++;
         existing.totalStorage += storageGB;
-        existing.totalCredits += node.credits;
+        
+        // CRASHPROOF: Only add credits if valid
+        if (node.credits !== null) {
+            existing.totalCredits = (existing.totalCredits || 0) + node.credits;
+        }
+
         existing.healthSum += node.health;
-        // --- NEW: Aggregating Real Health Metrics ---
         existing.totalUptime += (node.uptime || 0);
         if (node.is_public) existing.publicCount++;
-        // --------------------------------------------
+        
         existing.ips.push(node.address.split(':')[0]);
 
         // Track "King" nodes
@@ -32,10 +36,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             existing.bestNodes.storageVal = storageGB;
             existing.bestNodes.storagePk = node.pubkey;
         }
-        if (node.credits > existing.bestNodes.creditsVal) {
+        
+        // CRASHPROOF: Only compare if credits valid
+        if (node.credits !== null && node.credits > existing.bestNodes.creditsVal) {
             existing.bestNodes.creditsVal = node.credits;
             existing.bestNodes.creditsPk = node.pubkey;
         }
+        
         if (node.health > existing.bestNodes.healthVal) {
             existing.bestNodes.healthVal = node.health;
             existing.bestNodes.healthPk = node.pubkey;
@@ -49,36 +56,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           lat, lon,
           count: 1,
           totalStorage: storageGB,
-          totalCredits: node.credits,
+          totalCredits: node.credits || 0, // Default to 0 if null for new entries
           healthSum: node.health,
-          // --- NEW: Init Metrics ---
           totalUptime: node.uptime || 0,
           publicCount: node.is_public ? 1 : 0,
-          // -------------------------
           ips: [node.address.split(':')[0]],
           
           bestNodes: {
               storageVal: storageGB, storagePk: node.pubkey,
-              creditsVal: node.credits, creditsPk: node.pubkey,
+              creditsVal: node.credits || 0, creditsPk: node.pubkey,
               healthVal: node.health, healthPk: node.pubkey
           }
         });
       }
     });
 
-    const locations = Array.from(cityMap.values()).map(l => ({
-      ...l,
-      avgHealth: Math.round(l.healthSum / l.count),
-      // --- NEW: Calculate Averages ---
-      avgUptime: l.totalUptime / l.count,
-      publicRatio: (l.publicCount / l.count) * 100,
-      // -------------------------------
-      topPks: {
-          STORAGE: l.bestNodes.storagePk,
-          CREDITS: l.bestNodes.creditsPk,
-          HEALTH: l.bestNodes.healthPk
-      }
-    }));
+    const locations = Array.from(cityMap.values()).map(l => {
+        // If totalCredits stayed 0 but nodes exist, it might mean API is down.
+        // We pass 'null' if we suspect the data is actually missing, 
+        // BUT for aggregation, usually 0 is safer unless we track "validCreditCount".
+        // For map visualization, 0 is fine, the frontend handles the "Offline" label based on viewMode.
+        
+        return {
+          ...l,
+          avgHealth: Math.round(l.healthSum / l.count),
+          avgUptime: l.totalUptime / l.count,
+          publicRatio: (l.publicCount / l.count) * 100,
+          
+          topPks: {
+              STORAGE: l.bestNodes.storagePk,
+              CREDITS: l.bestNodes.creditsPk,
+              HEALTH: l.bestNodes.healthPk
+          }
+        };
+    });
 
     const topRegion = [...locations].sort((a, b) => b.totalStorage - a.totalStorage)[0];
 
