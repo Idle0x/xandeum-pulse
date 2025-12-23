@@ -1220,7 +1220,9 @@ export default function Home() {
     const totalNodes = networkStats.totalNodes || 1;
     const rank = selectedNode?.rank || totalNodes;
 
-    const percentile = ((totalNodes - rank) / totalNodes) * 100;
+    // FIX 1: Percentile Logic inverted to match logic (Rank 1 is Top 0.x%)
+    const percentile = (rank / totalNodes) * 100;
+    
     const netAvgHealth = avgs.total || 50;
     const diff = health - netAvgHealth;
 
@@ -1230,6 +1232,24 @@ export default function Home() {
       { label: 'Uptime Stability', val: bd.uptime, avg: avgs.uptime },
       { label: 'Version Consensus', val: bd.version, avg: avgs.version },
     ];
+    
+    // FIX 3: Helper to calculate local storage breakdown text
+    const getStorageBreakdownText = (node: Node, median: number) => {
+        const commGB = (node.storage_committed || 0) / (1024**3);
+        const usedGB = (node.storage_used || 0) / (1024**3);
+        const medGB = (median || 0) / (1024**3);
+        
+        let base = 0;
+        if(medGB > 0) {
+            const ratio = commGB / medGB;
+            base = Math.min(100, 50 * Math.log2(ratio + 1));
+        }
+        let bonus = 0;
+        if(usedGB > 0) {
+            bonus = Math.min(15, 5 * Math.log2(usedGB + 2));
+        }
+        return `(Base: ${Math.round(base)} + Bonus: ${Math.round(bonus)})`;
+    };
 
     return (
       <div className="animate-in fade-in slide-in-from-right-2 duration-200 h-full flex flex-col">
@@ -1263,6 +1283,7 @@ export default function Home() {
               <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">NETWORK AVG</div>
               <div className="flex items-center gap-2 justify-end">
                 <span className="text-2xl font-bold text-zinc-300">{netAvgHealth}</span>
+                {/* FIX 2: Difference Badge color is strictly +/- */}
                 <span
                   className={`text-xs font-bold px-1.5 py-0.5 rounded ${
                     diff >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
@@ -1282,6 +1303,8 @@ export default function Home() {
                   return null;
               }
               const val = m.val || 0; // fallback for safety
+              
+              // FIX 2: Bar Color is Absolute (Quality)
               const barColor =
                 val >= 80
                   ? 'bg-green-500'
@@ -1292,7 +1315,15 @@ export default function Home() {
               return (
                 <div key={m.label}>
                   <div className="flex justify-between text-xs mb-2">
-                    <span className="text-zinc-400 font-bold">{m.label}</span>
+                    <span className="text-zinc-400 font-bold flex items-center gap-2">
+                        {m.label}
+                        {/* FIX 3: Tiny Text for Storage Breakdown */}
+                        {m.label === 'Storage Capacity' && selectedNode && (
+                            <span className="text-[9px] font-mono text-zinc-600 font-normal">
+                                {getStorageBreakdownText(selectedNode, medianCommitted)}
+                            </span>
+                        )}
+                    </span>
                     <div className="font-mono text-[10px]">
                       <span className="text-white font-bold">{val}</span>
                       <span className="text-zinc-600 mx-1">/</span>
@@ -1316,8 +1347,9 @@ export default function Home() {
           </div>
 
           <div className="mt-auto pt-4 border-t border-zinc-800 flex justify-center">
+            {/* FIX 1: Updated Percentile Label Logic */}
             <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-              <Zap size={14} /> TOP {percentile.toFixed(0)}% OF NETWORK
+              <Zap size={14} /> TOP {percentile < 1 ? '< 1' : Math.ceil(percentile)}% OF NETWORK
             </div>
           </div>
         </div>
