@@ -856,36 +856,39 @@ export default function Home() {
           View Details <Maximize2 size={8} />
         </div>
         
-        <div className="mb-4">
-          {/* Identity Label */}
-          <div className="flex items-center gap-2 mb-1">
-            <div className="text-[10px] text-zinc-500 uppercase font-bold">NODE IDENTITY</div>
-            {!node.is_public && <Shield size={10} className="text-zinc-600" />}
+        {/* HEADER: Flex layout separates Left(Identity) from Right(Star) */}
+        <div className="mb-4 flex justify-between items-start">
+          <div className="overflow-hidden pr-2 w-full">
+            {/* Identity Label */}
+            <div className="flex items-center gap-2 mb-1">
+              <div className="text-[10px] text-zinc-500 uppercase font-bold">NODE IDENTITY</div>
+              {!node.is_public && <Shield size={10} className="text-zinc-600" />}
+            </div>
+            
+            {/* IDENTITY SWAP CONTAINER */}
+            <div className="relative h-6 w-full">
+               {/* Layer 1: PubKey (Default) */}
+               <div className="absolute inset-0 transition-opacity duration-300 group-hover:opacity-0 flex items-center">
+                  <span className="font-mono text-sm text-zinc-300 truncate w-full">{node.pubkey?.slice(0,16)}...</span>
+               </div>
+               
+               {/* Layer 2: IP + Flag (Hover) */}
+               <div className="absolute inset-0 transition-opacity duration-300 opacity-0 group-hover:opacity-100 flex items-center gap-2">
+                   {flagUrl && <img src={flagUrl} className="w-4 h-auto rounded-sm shrink-0" />}
+                   <span className="font-mono text-sm text-blue-400 truncate">{getSafeIp(node)}</span>
+               </div>
+            </div>
           </div>
           
-          {/* IDENTITY SWAP CONTAINER */}
-          <div className="relative h-6 w-full flex items-center justify-between">
-             {/* Layer 1: PubKey (Default) */}
-             <div className="absolute inset-0 transition-opacity duration-300 group-hover:opacity-0 flex items-center">
-                <span className="font-mono text-sm text-zinc-300 truncate w-56">{node.pubkey?.slice(0,16)}...</span>
-             </div>
-             
-             {/* Layer 2: IP + Flag (Hover) */}
-             <div className="absolute inset-0 transition-opacity duration-300 opacity-0 group-hover:opacity-100 flex items-center gap-2">
-                 {flagUrl && <img src={flagUrl} className="w-4 h-auto rounded-sm" />}
-                 <span className="font-mono text-sm text-blue-400 truncate">{getSafeIp(node)}</span>
-             </div>
-             
-             {/* Star Button (Fixed position right) */}
-             <button
-                onClick={(e) => toggleFavorite(e, node.address || '')}
-                className={`p-1.5 rounded-full transition relative z-10 ${
-                  isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'
-                }`}
-              >
-                <Star size={16} fill={isFav ? "currentColor" : "none"} />
-             </button>
-          </div>
+          {/* Star Button - Pushed to the right by flex justify-between */}
+          <button
+            onClick={(e) => toggleFavorite(e, node.address || '')}
+            className={`p-1.5 rounded-full transition shrink-0 ${
+              isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'
+            }`}
+          >
+            <Star size={16} fill={isFav ? "currentColor" : "none"} />
+          </button>
         </div>
         
         <div className="space-y-3">
@@ -1432,7 +1435,7 @@ export default function Home() {
 
       {/* --- HEADER --- */}
       <header
-        className={`sticky top-0 z-[100] backdrop-blur-md border-b px-6 py-2 md:py-4 flex flex-col gap-4 md:gap-6 transition-all duration-500 ${
+        className={`sticky top-0 z-[100] backdrop-blur-md border-b px-6 py-2 md:py-4 flex flex-col gap-2 md:gap-6 transition-all duration-500 ${
           zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'
         }`}
       >
@@ -1449,13 +1452,14 @@ export default function Home() {
               <Menu size={24} className="md:w-7 md:h-7" />
             </button>
 
+            {/* Title visible on Mobile now but simpler */}
             <div className="flex flex-col">
               <h1
-                className={`text-xl font-extrabold tracking-tight flex items-center gap-2 ${
+                className={`text-lg md:text-xl font-extrabold tracking-tight flex items-center gap-2 ${
                   zenMode ? 'text-white' : 'text-white'
                 }`}
               >
-                <Activity className={zenMode ? 'text-zinc-500' : 'text-blue-500'} />
+                <Activity className={zenMode ? 'text-zinc-500' : 'text-blue-500'} size={20} />
                 PULSE
               </h1>
               <span className="text-[9px] text-zinc-600 font-mono tracking-wider ml-1">
@@ -1543,11 +1547,11 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="flex items-center justify-between gap-4 overflow-x-auto pb-2 scrollbar-hide w-full mt-2 md:mt-6 border-t border-zinc-800/50 pt-4">
+        <div className="flex items-center justify-between gap-4 overflow-x-auto pb-2 scrollbar-hide w-full mt-1 md:mt-6 border-t border-zinc-800/50 pt-2">
           <button
             onClick={fetchData}
             disabled={loading}
-            className={`flex items-center gap-2 px-6 h-9 md:h-12 rounded-xl transition font-bold text-xs ${
+            className={`flex items-center gap-2 px-4 h-8 md:h-12 rounded-xl transition font-bold text-[10px] md:text-xs ${
               loading
                 ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait'
                 : zenMode
@@ -1555,7 +1559,7 @@ export default function Home() {
                 : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'
             }`}
           >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             {loading ? 'SYNCING...' : 'REFRESH'}
           </button>
 
@@ -1570,7 +1574,7 @@ export default function Home() {
                     setSortBy(opt as any);
                   }
                 }}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap h-9 md:h-auto ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg text-[10px] md:text-xs font-bold transition border whitespace-nowrap h-8 md:h-auto ${
                   sortBy === opt
                     ? zenMode
                       ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
@@ -1580,16 +1584,16 @@ export default function Home() {
                     : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'
                 }`}
               >
-                {opt === 'uptime' && <Clock size={14} />}
-                {opt === 'storage' && <Database size={14} />}
-                {opt === 'version' && <Server size={14} />}
-                {opt === 'health' && <HeartPulse size={14} />}
+                {opt === 'uptime' && <Clock size={12} />}
+                {opt === 'storage' && <Database size={12} />}
+                {opt === 'version' && <Server size={12} />}
+                {opt === 'health' && <HeartPulse size={12} />}
                 {opt.toUpperCase()}
                 {sortBy === opt &&
                   (sortOrder === 'asc' ? (
-                    <ArrowUp size={12} className="ml-1" />
+                    <ArrowUp size={10} className="ml-1" />
                   ) : (
-                    <ArrowDown size={12} className="ml-1" />
+                    <ArrowDown size={10} className="ml-1" />
                   ))}
               </button>
             ))}
@@ -1597,20 +1601,13 @@ export default function Home() {
             <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#09090b] to-transparent pointer-events-none md:hidden"></div>
           </div>
         </div>
-        
-        {/* NEW: Distribution Text Row (Inside Header, Bottom) */}
-        <div className="w-full text-center border-t border-zinc-800/50 pt-2 mt-2 pb-1">
-             <span className="text-[8px] md:text-xs text-zinc-500 font-mono tracking-wide">
-                 Nodes distributed by <span className="text-zinc-300 font-bold">{sortBy.toUpperCase()}</span> ({sortOrder === 'asc' ? 'Lowest to Highest' : 'Highest to Lowest'})
-             </span>
-        </div>
       </header>
 
-      {/* NEW: Sticky Shadow Trigger (Replaces old sticky bar) */}
+      {/* NEW: Sticky Shadow Trigger */}
       <div className={`sticky top-0 z-[80] w-full h-1 bg-gradient-to-b from-black/50 to-transparent pointer-events-none transition-opacity duration-300 ${scrolled ? 'opacity-100' : 'opacity-0'}`}></div>
 
       {searchQuery && (
-        <div className="sticky top-[180px] z-[85] w-full bg-blue-900/90 border-b border-blue-500/30 py-2 px-6 text-center backdrop-blur-md animate-in slide-in-from-top-1">
+        <div className="sticky top-[140px] z-[85] w-full bg-blue-900/90 border-b border-blue-500/30 py-2 px-6 text-center backdrop-blur-md animate-in slide-in-from-top-1">
             <div className="text-xs font-mono text-blue-100">
             Found <span className="font-bold text-white">{filteredNodes.length}</span> matches
             for <span className="italic">"{searchQuery}"</span>
