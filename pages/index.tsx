@@ -524,7 +524,6 @@ export default function Home() {
   }, [loading, nodes, router.query.open]);
 
   // --- HELPER FOR LATEST CHECK ---
-  // Fix: This helper is now available to all render functions within Home
   const checkIsLatest = (nodeVersion: string | null | undefined) => {
     const cleanVer = (nodeVersion || '').replace(/[^0-9.]/g, '');
     const cleanConsensus = mostCommonVersion.replace(/[^0-9.]/g, '');
@@ -836,8 +835,6 @@ export default function Home() {
     const cycleData = getCycleContent(node);
     const isFav = favorites.includes(node.address || '');
     const isVersionSort = sortBy === 'version';
-    
-    // FIX: Use shared helper logic
     const isLatest = checkIsLatest(node.version); 
 
     return (
@@ -929,7 +926,6 @@ export default function Home() {
   };
 
   const renderZenCard = (node: Node) => {
-    // FIX: Use shared helper logic
     const isLatest = checkIsLatest(node.version);
     const health = node.health || 0;
     const isVersionSort = sortBy === 'version';
@@ -988,7 +984,6 @@ export default function Home() {
       { label: 'Current Uptime', val: formatUptime(selectedNode?.uptime), color: 'text-orange-400' },
     ];
     
-    // Use Helper
     const isLatest = checkIsLatest(selectedNode?.version);
 
     return (
@@ -1315,6 +1310,10 @@ export default function Home() {
       </div>
     );
   };
+
+  // --- TOP LEVEL VARIABLE FOR MODAL ---
+  // Fix: This variable is now accessible to the entire modal return block
+  const isSelectedNodeLatest = checkIsLatest(selectedNode?.version);
 
   return (
     <div
@@ -1760,7 +1759,7 @@ export default function Home() {
                 <div className="min-w-0">
                   <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
                     {/* Responsive Font Size */}
-                    <h2 className="text-lg md:text-2xl font-black font-sans tracking-tight text-white mb-0.5">
+                    <h2 className="text-lg md:text-2xl font-black font-sans tracking-tight text-white mb-0.5 truncate">
                       NODE INSPECTOR
                     </h2>
                     <button
@@ -2236,7 +2235,7 @@ export default function Home() {
                               </div>
                               <div className="relative z-10 flex flex-col items-center gap-4">
                                 <Shield size={64} className="text-blue-500 opacity-80" />
-                                {isLatest
+                                {isSelectedNodeLatest
                                   ? (
                                   <div className="text-[10px] text-green-500 font-bold bg-green-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-green-500/20">
                                     <CheckCircle size={12} />
@@ -2460,7 +2459,7 @@ export default function Home() {
                               </div>
 
                               {/* Existing status pill below uptime */}
-                              {isLatest
+                              {isSelectedNodeLatest
                                 ? (
                                 <div className="text-[10px] text-green-500 mt-2 font-bold bg-green-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
                                   <CheckCircle size={10} />
