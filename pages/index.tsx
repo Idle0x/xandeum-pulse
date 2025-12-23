@@ -1499,9 +1499,9 @@ export default function Home() {
               />
             </div>
 
-            {/* ROTATING TOOLTIPS: Now visible on mobile but smaller font */}
+            {/* ROTATING TOOLTIPS: Full width on mobile */}
             {!zenMode && (
-              <div className="mt-1 md:mt-2 text-center pointer-events-none w-full min-h-[16px] md:min-h-[20px] transition-all duration-300 block">
+              <div className="mt-1 md:mt-2 w-full text-center pointer-events-none min-h-[16px] md:min-h-[20px] transition-all duration-300 block">
                 <p
                   key={searchTipIndex}
                   className="text-[9px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 whitespace-normal text-center leading-tight"
@@ -1551,7 +1551,7 @@ export default function Home() {
           <button
             onClick={fetchData}
             disabled={loading}
-            className={`flex items-center gap-2 px-4 h-8 md:h-12 rounded-xl transition font-bold text-[10px] md:text-xs ${
+            className={`flex items-center gap-2 px-6 h-8 md:h-12 rounded-xl transition font-bold text-xs ${
               loading
                 ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait'
                 : zenMode
@@ -1603,7 +1603,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* NEW: Sticky Shadow Trigger */}
+      {/* NEW: Sticky Shadow Trigger (Replaces old sticky bar) */}
       <div className={`sticky top-0 z-[80] w-full h-1 bg-gradient-to-b from-black/50 to-transparent pointer-events-none transition-opacity duration-300 ${scrolled ? 'opacity-100' : 'opacity-0'}`}></div>
 
       {searchQuery && (
@@ -1728,18 +1728,18 @@ export default function Home() {
           </div>
         )}
 
-        {/* NEW: Active Nodes Header */}
+        {/* NEW: Active Nodes Header with 2-Line Filter Info */}
         {!loading && nodes.length > 0 && (
              <div className="flex items-center gap-2 mb-4 mt-8">
                 <Activity className="text-green-500" size={20} />
                 <h3 className="text-lg font-bold text-white tracking-widest uppercase">
                     Active Nodes - {filteredNodes.length}
                 </h3>
-                <div className="flex flex-col justify-center ml-1">
-                    <span className="text-[7px] md:text-[10px] font-mono text-zinc-500 uppercase leading-tight">
+                <div className="flex flex-col justify-center ml-2 leading-none">
+                    <span className="text-[7px] md:text-[9px] font-mono text-zinc-500 uppercase">
                         (Distributed by <span className="text-zinc-300">{sortBy}</span>
                     </span>
-                    <span className="text-[7px] md:text-[10px] font-mono text-zinc-500 uppercase leading-tight text-center">
+                    <span className="text-[7px] md:text-[9px] font-mono text-zinc-500 uppercase text-center">
                         {sortOrder === 'asc' ? 'Lowest to Highest' : 'Highest to Lowest'})
                     </span>
                 </div>
