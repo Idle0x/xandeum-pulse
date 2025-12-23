@@ -480,15 +480,11 @@ export default function Home() {
   }, [sortBy]);
 
   // SMART CARD ROTATION LOGIC
-  // This separate effect ensures the 5s timer resets whenever the user
-  // manually changes the filter (sortBy), preventing cards from rotating 
-  // immediately after a user click.
   useEffect(() => {
     const cycleInterval = setInterval(() => {
       setCycleStep((prev) => prev + 1);
     }, 5000);
     
-    // Cleaning up on `sortBy` change effectively resets the timer
     return () => clearInterval(cycleInterval);
   }, [sortBy]);
 
@@ -537,8 +533,6 @@ export default function Home() {
   const checkIsLatest = (nodeVersion: string | null | undefined) => {
     const cleanVer = (nodeVersion || '').replace(/[^0-9.]/g, '');
     const cleanConsensus = mostCommonVersion.replace(/[^0-9.]/g, '');
-    // Simple semantic check: if cleaned strings match, it's latest.
-    // Also using compareVersions to catch newer versions.
     return cleanVer === cleanConsensus || compareVersions(cleanVer, cleanConsensus) > 0;
   };
 
@@ -672,7 +666,6 @@ export default function Home() {
 
   const shareToTwitter = (node: Node) => {
     const health = node.health || 0;
-    // FIX: Explicit null check on node.credits
     const creditsDisplay = node.credits !== null ? node.credits.toLocaleString() : 'N/A';
     
     const text = `Just checked my pNode status on Xandeum Pulse! ⚡\n\n🟢 Status: ${(node.uptime || 0) > 86400 ? 'Stable' : 'Booting'}\n❤️ Health: ${health}/100\n💰 Credits: ${creditsDisplay}\n\nMonitor here:`;
@@ -692,7 +685,6 @@ export default function Home() {
   const exportCSV = () => {
     const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Health_Score,Country,Last_Seen_ISO,Is_Favorite\n';
     const rows = filteredNodes.map(n => {
-      // FIX: Handle Null Credits for CSV
       const creditVal = n.credits !== null ? n.credits : 'NULL';
       return `${getSafeIp(n)},${n.pubkey || 'Unknown'},${n.rank},${creditVal},${getSafeVersion(n)},${n.uptime},${n.storage_committed},${n.storage_used},${n.health},${n.location?.countryName},${new Date(n.last_seen_timestamp || 0).toISOString()},${favorites.includes(n.address || '')}`;
     });
@@ -1509,7 +1501,7 @@ export default function Home() {
               />
             </div>
 
-            {/* ROTATING TOOLTIPS: Now hidden on mobile (hidden md:block) */}
+            {/* ROTATING TOOLTIPS: Now visible on mobile, tiny font, no gaps */}
             {!zenMode && (
               <div className="mt-1 md:mt-2 w-full text-center pointer-events-none min-h-[16px] md:min-h-[20px] transition-all duration-300 hidden md:block">
                 <p
