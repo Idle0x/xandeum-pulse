@@ -423,7 +423,6 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
-  const [scrolled, setScrolled] = useState(false);
 
   // Network Stats
   const [networkStats, setNetworkStats] = useState({
@@ -498,16 +497,10 @@ export default function Home() {
     
     const dataInterval = setInterval(fetchData, 30000);
     
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 50);
-    };
-    window.addEventListener('scroll', handleScroll);
-    
     return () => {
       clearInterval(cycleInterval);
       clearInterval(tipInterval);
       clearInterval(dataInterval);
-      window.removeEventListener('scroll', handleScroll);
     };
   }, [isSearchFocused]);
 
@@ -662,7 +655,6 @@ export default function Home() {
 
   const shareToTwitter = (node: Node) => {
     const health = node.health || 0;
-    // FIX: Explicit null check on node.credits
     const creditsDisplay = node.credits !== null ? node.credits.toLocaleString() : 'N/A';
     
     const text = `Just checked my pNode status on Xandeum Pulse! ⚡\n\n🟢 Status: ${(node.uptime || 0) > 86400 ? 'Stable' : 'Booting'}\n❤️ Health: ${health}/100\n💰 Credits: ${creditsDisplay}\n\nMonitor here:`;
@@ -682,7 +674,6 @@ export default function Home() {
   const exportCSV = () => {
     const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Health_Score,Country,Last_Seen_ISO,Is_Favorite\n';
     const rows = filteredNodes.map(n => {
-      // FIX: Handle Null Credits for CSV
       const creditVal = n.credits !== null ? n.credits : 'NULL';
       return `${getSafeIp(n)},${n.pubkey || 'Unknown'},${n.rank},${creditVal},${getSafeVersion(n)},${n.uptime},${n.storage_committed},${n.storage_used},${n.health},${n.location?.countryName},${new Date(n.last_seen_timestamp || 0).toISOString()},${favorites.includes(n.address || '')}`;
     });
@@ -835,9 +826,10 @@ export default function Home() {
     const cycleData = getCycleContent(node);
     const isFav = favorites.includes(node.address || '');
     const isVersionSort = sortBy === 'version';
-    
-    // FIX: Use shared helper logic
     const isLatest = checkIsLatest(node.version); 
+    const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' 
+      ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` 
+      : null;
 
     return (
       <div
@@ -855,24 +847,36 @@ export default function Home() {
           View Details <Maximize2 size={8} />
         </div>
         
-        <div className="mb-4 flex justify-between items-start">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="text-[10px] text-zinc-500 uppercase font-bold">NODE IDENTITY</div>
-              {!node.is_public && <Shield size={10} className="text-zinc-600" />}
-            </div>
-            <div className="font-mono text-sm text-zinc-300 truncate w-56">
-              {node.pubkey?.slice(0,16)}...
-            </div>
+        <div className="mb-4">
+          {/* Identity Label */}
+          <div className="flex items-center gap-2 mb-1">
+            <div className="text-[10px] text-zinc-500 uppercase font-bold">NODE IDENTITY</div>
+            {!node.is_public && <Shield size={10} className="text-zinc-600" />}
           </div>
-          <button
-            onClick={(e) => toggleFavorite(e, node.address || '')}
-            className={`p-1.5 rounded-full transition ${
-              isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'
-            }`}
-          >
-            <Star size={16} fill={isFav ? "currentColor" : "none"} />
-          </button>
+          
+          {/* IDENTITY SWAP CONTAINER */}
+          <div className="relative h-6 w-full flex items-center justify-between">
+             {/* Layer 1: PubKey (Default) */}
+             <div className="absolute inset-0 transition-opacity duration-300 group-hover:opacity-0 flex items-center">
+                <span className="font-mono text-sm text-zinc-300 truncate w-56">{node.pubkey?.slice(0,16)}...</span>
+             </div>
+             
+             {/* Layer 2: IP + Flag (Hover) */}
+             <div className="absolute inset-0 transition-opacity duration-300 opacity-0 group-hover:opacity-100 flex items-center gap-2">
+                 {flagUrl && <img src={flagUrl} className="w-4 h-auto rounded-sm" />}
+                 <span className="font-mono text-sm text-blue-400 truncate">{getSafeIp(node)}</span>
+             </div>
+             
+             {/* Star Button (Fixed position right) */}
+             <button
+                onClick={(e) => toggleFavorite(e, node.address || '')}
+                className={`p-1.5 rounded-full transition relative z-10 ${
+                  isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'
+                }`}
+              >
+                <Star size={16} fill={isFav ? "currentColor" : "none"} />
+             </button>
+          </div>
         </div>
         
         <div className="space-y-3">
@@ -1583,36 +1587,24 @@ export default function Home() {
             <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#09090b] to-transparent pointer-events-none md:hidden"></div>
           </div>
         </div>
+        
+        {/* NEW: Distribution Text Row (Inside Header, Bottom) */}
+        <div className="w-full text-center border-t border-zinc-800/50 pt-2 mt-2 pb-1">
+             <span className="text-[10px] md:text-xs text-zinc-500 font-mono tracking-wide">
+                 Nodes distributed by <span className="text-zinc-300 font-bold">{sortBy.toUpperCase()}</span> ({sortOrder === 'asc' ? 'Lowest to Highest' : 'Highest to Lowest'})
+             </span>
+        </div>
       </header>
 
-      {!loading && (
-        <div
-          className={`sticky top-[152px] md:top-[212px] z-[90] flex flex-col transition-all duration-300 ${
-            scrolled ? 'shadow-xl' : ''
-          }`}
-        >
-          <div
-            className={`w-full border-b border-zinc-800/50 py-2 md:py-3 px-6 flex items-center justify-center backdrop-blur-md transition-colors duration-300 ${
-              scrolled ? 'bg-black/95 border-b-zinc-800' : 'bg-[#09090b]/80'
-            }`}
-          >
-            <div className="text-[10px] md:text-sm font-bold font-mono text-zinc-400 uppercase tracking-widest flex items-center gap-1.5 md:gap-2 whitespace-nowrap overflow-hidden">
-              <Activity size={12} className={scrolled ? 'text-blue-500' : 'text-zinc-600'} />
-              <span>Nodes by <span className="text-white">{sortBy.toUpperCase()}</span></span>
-              <span className="text-zinc-600 hidden md:inline">
-                ({sortOrder === 'desc' ? 'High to Low' : 'Low to High'})
-              </span>
-            </div>
-          </div>
+      {/* NEW: Sticky Shadow Trigger (Replaces old sticky bar) */}
+      <div className={`sticky top-0 z-[80] w-full h-1 bg-gradient-to-b from-black/50 to-transparent pointer-events-none transition-opacity duration-300 ${scrolled ? 'opacity-100' : 'opacity-0'}`}></div>
 
-          {searchQuery && (
-            <div className="w-full bg-blue-900/90 border-b border-blue-500/30 py-2 px-6 text-center backdrop-blur-md animate-in slide-in-from-top-1">
-              <div className="text-xs font-mono text-blue-100">
-                Found <span className="font-bold text-white">{filteredNodes.length}</span> matches
-                for <span className="italic">"{searchQuery}"</span>
-              </div>
+      {searchQuery && (
+        <div className="sticky top-[180px] z-[85] w-full bg-blue-900/90 border-b border-blue-500/30 py-2 px-6 text-center backdrop-blur-md animate-in slide-in-from-top-1">
+            <div className="text-xs font-mono text-blue-100">
+            Found <span className="font-bold text-white">{filteredNodes.length}</span> matches
+            for <span className="italic">"{searchQuery}"</span>
             </div>
-          )}
         </div>
       )}
 
@@ -1729,13 +1721,23 @@ export default function Home() {
           </div>
         )}
 
+        {/* NEW: Active Nodes Header */}
+        {!loading && nodes.length > 0 && (
+             <div className="flex items-center gap-2 mb-4 mt-8">
+                <Activity className="text-green-500" size={20} />
+                <h3 className="text-lg font-bold text-white tracking-widest uppercase">
+                    Active Nodes - {filteredNodes.length}
+                </h3>
+            </div>
+        )}
+
         {loading && nodes.length === 0 ? (
           <PulseGraphLoader />
         ) : (
           <div
             className={`grid gap-4 ${
               zenMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:gap-8'
-            } pb-20 mt-6`}
+            } pb-20`}
           >
             {filteredNodes.map((node, i) => {
               if (zenMode) return renderZenCard(node);
