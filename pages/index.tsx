@@ -1749,6 +1749,7 @@ export default function Home() {
             }`}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* -- MODAL HEADER (Responsive Fix) -- */}
             <div
               className={`shrink-0 p-4 md:p-6 border-b flex justify-between items-start ${
                 zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'
@@ -1758,11 +1759,13 @@ export default function Home() {
                 <ModalAvatar node={selectedNode} />
                 <div className="min-w-0">
                   <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
-                    <h2 className="text-lg md:text-2xl font-black font-sans tracking-tight text-white mb-0.5 truncate">
+                    {/* Responsive Font Size */}
+                    <h2 className="text-lg md:text-2xl font-black font-sans tracking-tight text-white mb-0.5">
                       NODE INSPECTOR
                     </h2>
                     <button
                       onClick={(e) => toggleFavorite(e, selectedNode.address || '')}
+                      // UPDATED: Favorites button is now larger with toggle text
                       className={`flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-xl border transition group w-fit ${
                         favorites.includes(selectedNode.address || '') 
                         ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500 hover:bg-yellow-500/20' 
@@ -1820,6 +1823,7 @@ export default function Home() {
               </div>
             </div>
 
+            {/* -- SCROLLABLE CONTENT (Includes Footer Buttons Now) -- */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 relative flex flex-col">
               {compareMode ? (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300 h-full flex flex-col relative">
