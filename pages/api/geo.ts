@@ -2,6 +2,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getNetworkPulse } from '../../lib/xandeum-brain';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // CRASHPROOF: Prevent caching
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  
   try {
     const { nodes, stats } = await getNetworkPulse();
 
@@ -20,9 +23,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         existing.count++;
         existing.totalStorage += storageGB;
         
-        // CRASHPROOF: Only add credits if valid
+        // CRASHPROOF AGGREGATION:
+        // Only add credits if they exist. 
+        // We track if we have ANY valid data for this region.
         if (node.credits !== null) {
-            existing.totalCredits = (existing.totalCredits || 0) + node.credits;
+            existing.totalCredits += node.credits;
+            existing.hasValidCreditData = true; // Mark that we saw real data
         }
 
         existing.healthSum += node.health;
@@ -37,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             existing.bestNodes.storagePk = node.pubkey;
         }
         
-        // CRASHPROOF: Only compare if credits valid
+        // Only update King Credit if data is valid
         if (node.credits !== null && node.credits > existing.bestNodes.creditsVal) {
             existing.bestNodes.creditsVal = node.credits;
             existing.bestNodes.creditsPk = node.pubkey;
@@ -49,6 +55,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
       } else {
+        // Initialize new location
         cityMap.set(key, {
           name: city,
           country: countryName,
@@ -56,7 +63,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           lat, lon,
           count: 1,
           totalStorage: storageGB,
-          totalCredits: node.credits || 0, // Default to 0 if null for new entries
+          totalCredits: node.credits || 0, 
+          // If first node is null, we haven't seen valid data yet
+          hasValidCreditData: node.credits !== null, 
           healthSum: node.health,
           totalUptime: node.uptime || 0,
           publicCount: node.is_public ? 1 : 0,
@@ -72,16 +81,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     const locations = Array.from(cityMap.values()).map(l => {
-        // If totalCredits stayed 0 but nodes exist, it might mean API is down.
-        // We pass 'null' if we suspect the data is actually missing, 
-        // BUT for aggregation, usually 0 is safer unless we track "validCreditCount".
-        // For map visualization, 0 is fine, the frontend handles the "Offline" label based on viewMode.
-        
+        // CRASHPROOF FINAL CHECK:
+        // If we never saw valid credit data for this region, 
+        // force totalCredits to null so the map UI knows to show "Offline/Unknown"
+        // instead of "0 Cr".
+        const finalCredits = l.hasValidCreditData ? l.totalCredits : null;
+
         return {
-          ...l,
+          name: l.name,
+          country: l.country,
+          countryCode: l.countryCode,
+          lat: l.lat,
+          lon: l.lon,
+          count: l.count,
+          totalStorage: l.totalStorage,
+          totalCredits: finalCredits, // Pass Null if needed
           avgHealth: Math.round(l.healthSum / l.count),
           avgUptime: l.totalUptime / l.count,
           publicRatio: (l.publicCount / l.count) * 100,
+          ips: l.ips,
           
           topPks: {
               STORAGE: l.bestNodes.storagePk,
