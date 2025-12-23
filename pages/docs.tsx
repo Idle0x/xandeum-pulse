@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -9,7 +9,7 @@ import {
   LayoutDashboard, GitMerge, Share2, Anchor, Terminal,
   AlertTriangle, Eye, Monitor, Command, AlertOctagon,
   ArrowRight, Minimize2, Maximize2, Camera, Swords, ArrowLeftRight,
-  ClipboardCopy, Link as LinkIcon, RefreshCw, ChevronLeft, ChevronRight
+  ClipboardCopy, Link as LinkIcon, RefreshCw, ChevronLeft, ChevronRight, RotateCcw
 } from 'lucide-react';
 
 export default function DocsPage() {
@@ -122,8 +122,8 @@ export default function DocsPage() {
                     </p>
                 </div>
 
-                {/* THE SIMULATOR APP */}
-                <div className="border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl bg-[#09090b] relative max-w-5xl mx-auto min-h-[600px] flex flex-col">
+                {/* THE SIMULATOR APP - FORCE HEIGHT TO PREVENT COLLAPSE */}
+                <div className="border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl bg-[#09090b] relative max-w-5xl mx-auto h-[600px] flex flex-col">
                     <PulseOS_Simulator />
                 </div>
              </div>
@@ -357,25 +357,23 @@ export default function DocsPage() {
 function PulseOS_Simulator() {
     type ViewState = 'DASH' | 'MODAL' | 'COMPARE' | 'PROOF' | 'MAP' | 'CREDITS';
     const [view, setView] = useState<ViewState>('DASH');
-    const [url, setUrl] = useState('');
-    const [ready, setReady] = useState(false); // Controls glowing cues
-    const [ghost, setGhost] = useState(false); // Controls "simulated" animations (sorting/generating)
+    const [url, setUrl] = useState('https://xandeum-pulse.vercel.app');
+    const [ready, setReady] = useState(false); 
+    const [ghost, setGhost] = useState(false); 
 
     // --- BOOT SEQUENCE ---
     useEffect(() => {
-        const targetUrl = 'https://xandeum-pulse.vercel.app';
-        let i = 0;
-        const typeInterval = setInterval(() => {
-            if (i <= targetUrl.length) {
-                setUrl(targetUrl.slice(0, i));
-                i++;
-            } else {
-                clearInterval(typeInterval);
-                setTimeout(() => setReady(true), 500); // Ready to click Card
-            }
-        }, 30);
-        return () => clearInterval(typeInterval);
+        // Immediate start to prevent blank box issues
+        setTimeout(() => setReady(true), 300);
     }, []);
+
+    // --- REBOOT ---
+    const reboot = () => {
+        setView('DASH');
+        setReady(false);
+        setUrl('https://xandeum-pulse.vercel.app');
+        setTimeout(() => setReady(true), 500);
+    }
 
     // --- NAVIGATION HANDLERS ---
     const nav = (target: ViewState, delay = 0) => {
@@ -398,34 +396,36 @@ function PulseOS_Simulator() {
     };
 
     // --- "GHOST" SIMULATION LOGIC ---
-    // Specifically for COMPARE (Sorting list) and PROOF (Generating)
     const triggerGhostAction = (target: ViewState) => {
         setReady(false);
-        setGhost(true); // Show loader/sorter
+        setGhost(true); 
         setTimeout(() => {
             setView(target);
             setGhost(false);
-            setTimeout(() => setReady(true), 600); // Back button glows now
+            setTimeout(() => setReady(true), 600); 
         }, 1500);
     };
 
     return (
         <div className="w-full h-full flex flex-col font-sans text-sm select-none">
             {/* --- BROWSER BAR --- */}
-            <div className="h-10 bg-[#18181b] border-b border-zinc-800 flex items-center px-4 gap-3">
+            <div className="h-10 bg-[#18181b] border-b border-zinc-800 flex items-center px-4 gap-3 shrink-0">
                 <div className="flex gap-1.5">
                     <div className="w-2.5 h-2.5 rounded-full bg-red-500/50"></div>
                     <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50"></div>
                     <div className="w-2.5 h-2.5 rounded-full bg-green-500/50"></div>
                 </div>
-                <div className="flex-1 bg-black rounded border border-zinc-800 h-6 flex items-center px-3 text-[10px] font-mono text-zinc-400">
-                    <Lock size={8} className="mr-2 text-green-500"/>
-                    {url}<span className="animate-pulse">_</span>
+                <div className="flex-1 bg-black rounded border border-zinc-800 h-6 flex items-center px-3 text-[10px] font-mono text-zinc-400 justify-between group">
+                    <div className="flex items-center">
+                        <Lock size={8} className="mr-2 text-green-500"/>
+                        {url}
+                    </div>
+                    <RotateCcw size={10} className="cursor-pointer hover:text-white" onClick={reboot} title="Reboot System"/>
                 </div>
             </div>
 
             {/* --- VIEWPORT --- */}
-            <div className="flex-1 relative bg-black overflow-hidden">
+            <div className="flex-1 relative bg-black overflow-hidden h-full">
                 
                 {/* === DASHBOARD VIEW === */}
                 {view === 'DASH' && (
@@ -440,16 +440,16 @@ function PulseOS_Simulator() {
                         <div className="grid grid-cols-3 gap-4">
                             {[1,2,3].map(i => (
                                 <div key={i} 
-                                    onClick={() => i === 1 && ready && nav('MODAL')}
+                                    onClick={() => i === 1 && nav('MODAL')}
                                     className={`h-48 border rounded-xl p-4 flex flex-col justify-between transition-all duration-300 
-                                    ${i===1 && ready ? 'border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.4)] bg-zinc-900 cursor-pointer scale-105' : 'border-zinc-800 bg-zinc-900/30 opacity-50'}`}
+                                    ${i===1 ? 'border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.4)] bg-zinc-900 cursor-pointer hover:scale-105' : 'border-zinc-800 bg-zinc-900/30 opacity-50'}`}
                                 >
                                     <div className="flex justify-between">
                                         <span className="text-xs font-bold text-zinc-500">NODE-0{i}</span>
                                         {i===1 && <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>}
                                     </div>
                                     <div className="text-3xl font-bold text-white">{i===1 ? '98%' : '45%'}</div>
-                                    {i===1 && ready && (
+                                    {i===1 && (
                                         <div className="absolute -top-3 -right-3 bg-blue-600 text-white text-[9px] font-bold px-2 py-1 rounded-full animate-bounce">
                                             CLICK HERE
                                         </div>
@@ -476,7 +476,7 @@ function PulseOS_Simulator() {
                                 </button>
                             </div>
 
-                            <div className="flex-1 p-6 grid grid-cols-2 gap-6">
+                            <div className="flex-1 p-6 grid grid-cols-2 gap-6 overflow-y-auto">
                                 {/* Left Col: Interactive Cards */}
                                 <div className="space-y-4">
                                     <div 
@@ -491,7 +491,7 @@ function PulseOS_Simulator() {
                                         {ready && <div className="text-[9px] text-yellow-400 mt-1 animate-pulse">Click to view Leaderboard</div>}
                                     </div>
                                     <div 
-                                        onClick={() => nav('MAP')} // Health goes to Map just for demo variety, or stay
+                                        onClick={() => nav('MAP')}
                                         className={`p-4 rounded-xl border transition-all cursor-pointer ${ready ? 'border-green-500/50 bg-green-900/10 hover:bg-green-900/20' : 'border-zinc-800'}`}
                                     >
                                         <div className="flex justify-between mb-2">
