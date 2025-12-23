@@ -1365,7 +1365,7 @@ export default function Home() {
                             </span>
                         ) : (
                             <span className="text-[9px] font-mono text-zinc-600 font-normal">
-                                (Score: {rawVal})
+                                (Base: {rawVal})
                             </span>
                         )}
                     </span>
@@ -1639,7 +1639,7 @@ export default function Home() {
 
       {/* --- HEADER --- */}
       <header
-        className={`sticky top-0 z-[100] backdrop-blur-md border-b px-6 py-2 md:py-4 flex flex-col gap-2 md:gap-6 transition-all duration-500 ${
+        className={`sticky top-0 z-[100] backdrop-blur-md border-b px-6 py-2 md:py-4 flex flex-col gap-4 md:gap-6 transition-all duration-500 ${
           zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'
         }`}
       >
