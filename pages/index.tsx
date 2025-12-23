@@ -835,6 +835,8 @@ export default function Home() {
     const cycleData = getCycleContent(node);
     const isFav = favorites.includes(node.address || '');
     const isVersionSort = sortBy === 'version';
+    
+    // FIX: Use shared helper logic
     const isLatest = checkIsLatest(node.version); 
 
     return (
@@ -926,6 +928,7 @@ export default function Home() {
   };
 
   const renderZenCard = (node: Node) => {
+    // FIX: Use shared helper logic
     const isLatest = checkIsLatest(node.version);
     const health = node.health || 0;
     const isVersionSort = sortBy === 'version';
@@ -1414,9 +1417,9 @@ export default function Home() {
         ></div>
       )}
 
-      {/* --- HEADER --- */}
+      {/* --- HEADER (MOBILE OPTIMIZED) --- */}
       <header
-        className={`sticky top-0 z-[100] backdrop-blur-md border-b px-6 py-4 flex flex-col gap-6 transition-all duration-500 ${
+        className={`sticky top-0 z-[100] backdrop-blur-md border-b px-4 py-2 md:px-6 md:py-4 flex flex-col gap-3 md:gap-6 transition-all duration-500 ${
           zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'
         }`}
       >
@@ -1424,13 +1427,13 @@ export default function Home() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsMenuOpen(true)}
-              className={`p-3.5 rounded-xl transition ${
+              className={`p-2 md:p-3.5 rounded-xl transition ${
                 zenMode
                   ? 'text-zinc-400 border border-zinc-800'
                   : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white hover:bg-zinc-800'
               }`}
             >
-              <Menu size={28} />
+              <Menu size={24} className="md:w-7 md:h-7" />
             </button>
 
             <div className="hidden md:flex flex-col">
@@ -1446,16 +1449,25 @@ export default function Home() {
                 Last Sync: {lastSync}
               </span>
             </div>
+             {/* Mobile Title Alternative */}
+             <div className="md:hidden flex items-center gap-2">
+                <Activity className={zenMode ? 'text-zinc-500' : 'text-blue-500'} size={20} />
+                <h1 className="text-lg font-extrabold text-white tracking-tight">PULSE</h1>
+             </div>
           </div>
 
-          <div className="flex-1 max-w-xl mx-4 relative overflow-hidden group flex flex-col items-center">
+          <div className="flex-1 max-w-xl mx-2 md:mx-4 relative group flex flex-col items-center">
             <div className="relative w-full">
-              <Search className={`absolute left-3 top-2.5 size-4 z-10 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
+              <Search
+                className={`absolute left-3 top-2 md:top-2.5 size-4 z-10 ${
+                  zenMode ? 'text-zinc-600' : 'text-zinc-500'
+                }`}
+              />
 
               {!searchQuery && !isSearchFocused && (
-                <div className="absolute inset-0 flex items-center pointer-events-none pl-10 pr-4 overflow-hidden z-0">
-                  <div className="whitespace-nowrap animate-marquee text-sm text-zinc-600 font-mono opacity-80">
-                    Search nodes by Version, IP Address, Country, or Public Key...
+                <div className="absolute inset-0 flex items-center pointer-events-none pl-9 md:pl-10 pr-4 overflow-hidden z-0">
+                  <div className="whitespace-nowrap animate-marquee text-xs md:text-sm text-zinc-600 font-mono opacity-80">
+                    Search nodes by Version, IP, Country, or Key...
                   </div>
                 </div>
               )}
@@ -1465,7 +1477,7 @@ export default function Home() {
                 placeholder=""
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full rounded-lg py-2 pl-10 pr-4 text-sm outline-none shadow-inner transition-all relative z-10 bg-transparent ${
+                className={`w-full rounded-lg py-1.5 md:py-2 pl-9 md:pl-10 pr-4 text-xs md:text-sm outline-none shadow-inner transition-all relative z-10 bg-transparent ${
                   zenMode
                     ? 'border border-zinc-800 text-zinc-300 focus:border-zinc-600'
                     : 'border border-zinc-800 text-white focus:border-blue-500'
@@ -1474,34 +1486,6 @@ export default function Home() {
                 onBlur={() => setIsSearchFocused(false)}
               />
             </div>
-
-            {!zenMode && (
-              <div className="mt-2 text-center pointer-events-none w-full min-h-[20px] transition-all duration-300">
-                <p
-                  key={searchTipIndex}
-                  className="text-[10px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 whitespace-normal text-center leading-tight"
-                >
-                  <Info size={12} className="text-blue-500 shrink-0" />
-                  <span>
-                    {isSearchFocused ? 'Type to filter nodes instantly' : searchTips[searchTipIndex]}
-                  </span>
-                </p>
-              </div>
-            )}
-
-            <style jsx>{`
-              @keyframes marquee {
-                0% {
-                  transform: translateX(0);
-                }
-                100% {
-                  transform: translateX(-100%);
-                }
-              }
-              .animate-marquee {
-                animation: marquee 15s linear infinite;
-              }
-            `}</style>
           </div>
 
           <button
@@ -1520,11 +1504,11 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="flex items-center justify-between gap-4 overflow-x-auto pb-2 scrollbar-hide w-full mt-6 border-t border-zinc-800/50 pt-4">
+        <div className="flex items-center justify-between gap-4 w-full mt-1 md:mt-6 border-t border-zinc-800/50 pt-2 md:pt-4 overflow-x-auto scrollbar-hide">
           <button
             onClick={fetchData}
             disabled={loading}
-            className={`flex items-center gap-2 px-6 h-12 rounded-xl transition font-bold text-xs ${
+            className={`flex items-center gap-2 px-4 md:px-6 h-10 md:h-12 rounded-xl transition font-bold text-[10px] md:text-xs shrink-0 ${
               loading
                 ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait'
                 : zenMode
@@ -1532,65 +1516,70 @@ export default function Home() {
                 : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'
             }`}
           >
-            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             {loading ? 'SYNCING...' : 'REFRESH'}
           </button>
-
-          <div className="flex gap-2">
-            {[
-              { id: 'uptime', icon: Clock, label: 'UPTIME' },
-              { id: 'storage', icon: Database, label: 'STORAGE' },
-              { id: 'version', icon: Server, label: 'VERSION' },
-              { id: 'health', icon: HeartPulse, label: 'HEALTH' },
-            ].map((opt) => (
-              <button
-                key={opt.id}
-                onClick={() => {
-                  if (sortBy === opt.id) {
-                    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                  } else {
-                    setSortBy(opt.id as any);
-                  }
-                }}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${
-                  sortBy === opt.id
-                    ? zenMode
-                      ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
-                      : 'bg-blue-500/10 border-blue-500/50 text-blue-400'
-                    : zenMode
-                    ? 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300'
-                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'
-                }`}
-              >
-                <opt.icon size={14} />
-                {opt.label}
-                {sortBy === opt.id &&
-                  (sortOrder === 'asc' ? (
-                    <ArrowUp size={12} className="ml-1" />
-                  ) : (
-                    <ArrowDown size={12} className="ml-1" />
-                  ))}
-              </button>
-            ))}
+          
+          {/* Custom Scrollable Filter List with Fade Effect on Right */}
+          <div className="relative flex-1 overflow-hidden">
+             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+                {[
+                { id: 'uptime', icon: Clock, label: 'UPTIME' },
+                { id: 'storage', icon: Database, label: 'STORAGE' },
+                { id: 'version', icon: Server, label: 'VERSION' },
+                { id: 'health', icon: HeartPulse, label: 'HEALTH' },
+                ].map((opt) => (
+                <button
+                    key={opt.id}
+                    onClick={() => {
+                    if (sortBy === opt.id) {
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                    } else {
+                        setSortBy(opt.id as any);
+                    }
+                    }}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] md:text-xs font-bold transition border whitespace-nowrap ${
+                    sortBy === opt.id
+                        ? zenMode
+                        ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
+                        : 'bg-blue-500/10 border-blue-500/50 text-blue-400'
+                        : zenMode
+                        ? 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300'
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'
+                    }`}
+                >
+                    <opt.icon size={14} />
+                    {opt.label}
+                    {sortBy === opt.id &&
+                    (sortOrder === 'asc' ? (
+                        <ArrowUp size={12} className="ml-1" />
+                    ) : (
+                        <ArrowDown size={12} className="ml-1" />
+                    ))}
+                </button>
+                ))}
+             </div>
+             {/* Right fade to indicate scroll on mobile */}
+             <div className="absolute top-0 right-0 bottom-2 w-8 bg-gradient-to-l from-[#09090b] to-transparent pointer-events-none md:hidden"></div>
           </div>
         </div>
       </header>
 
       {!loading && (
         <div
-          className={`sticky top-[208px] md:top-[212px] z-[90] flex flex-col transition-all duration-300 ${
+          className={`sticky top-[148px] md:top-[212px] z-[90] flex flex-col transition-all duration-300 ${
             scrolled ? 'shadow-xl' : ''
           }`}
         >
           <div
-            className={`w-full border-b border-zinc-800/50 py-3 px-6 flex items-center justify-center backdrop-blur-md transition-colors duration-300 ${
+            className={`w-full border-b border-zinc-800/50 py-2 md:py-3 px-4 md:px-6 flex items-center justify-center backdrop-blur-md transition-colors duration-300 ${
               scrolled ? 'bg-black/95 border-b-zinc-800' : 'bg-[#09090b]/80'
             }`}
           >
-            <div className="text-xs md:text-sm font-bold font-mono text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+            <div className="text-[10px] md:text-sm font-bold font-mono text-zinc-400 uppercase tracking-widest flex items-center gap-2 whitespace-nowrap">
               <Activity size={14} className={scrolled ? 'text-blue-500' : 'text-zinc-600'} />
               Nodes distributed by <span className="text-white">{sortBy.toUpperCase()}</span>{' '}
-              <span className="text-zinc-600">
+              <span className="text-zinc-600 hidden md:inline">
                 ({sortOrder === 'desc' ? 'High to Low' : 'Low to High'})
               </span>
             </div>
@@ -1618,7 +1607,7 @@ export default function Home() {
               <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
                 Network Capacity
               </div>
-              <div className="text-2xl md:text-3xl font-bold text-white mt-1">
+              <div className="text-xl md:text-3xl font-bold text-white mt-1">
                 {formatBytes(totalStorageCommitted)}
               </div>
             </div>
@@ -1685,7 +1674,7 @@ export default function Home() {
               <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
                 Consensus Ver
               </div>
-              <div className="text-2xl md:text-3xl font-bold text-blue-400 mt-1">
+              <div className="text-xl md:text-3xl font-bold text-blue-400 mt-1">
                 {mostCommonVersion}
               </div>
             </div>
@@ -1694,7 +1683,7 @@ export default function Home() {
               <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
                 Active Nodes
               </div>
-              <div className="text-2xl md:text-3xl font-bold text-white mt-1">{nodes.length}</div>
+              <div className="text-xl md:text-3xl font-bold text-white mt-1">{nodes.length}</div>
             </div>
           </div>
         )}
