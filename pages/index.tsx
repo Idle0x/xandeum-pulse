@@ -546,6 +546,7 @@ export default function Home() {
   });
   const [mostCommonVersion, setMostCommonVersion] = useState('N/A');
   const [totalStorageCommitted, setTotalStorageCommitted] = useState(0);
+  const [totalStorageUsed, setTotalStorageUsed] = useState(0);
   const [medianCommitted, setMedianCommitted] = useState(0);
   const [networkHealth, setNetworkHealth] = useState('0.00');
   const [avgNetworkHealth, setAvgNetworkHealth] = useState(0);
@@ -694,7 +695,12 @@ export default function Home() {
         const consensusCount = podList.filter(n => getSafeVersion(n) === stats.consensusVersion).length;
         setNetworkConsensus((consensusCount / podList.length) * 100);
         
-        setTotalStorageCommitted(podList.reduce((sum, n) => sum + (n.storage_committed || 0), 0));
+        const committed = podList.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
+        const used = podList.reduce((sum, n) => sum + (n.storage_used || 0), 0);
+        
+        setTotalStorageCommitted(committed);
+        setTotalStorageUsed(used);
+        
         setLastSync(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
         
         setError('');
@@ -1339,9 +1345,9 @@ export default function Home() {
           </h3>
           <button
             onClick={() => setModalView('overview')}
-            className="text-[10px] font-bold text-zinc-500 hover:text-white flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 transition"
+            className="text-[10px] font-bold text-red-500 hover:text-red-400 flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 transition"
           >
-            <ChevronLeft size={10} /> BACK
+            <ArrowLeft size={10} /> BACK
           </button>
         </div>
 
@@ -1555,7 +1561,7 @@ export default function Home() {
 
       {/* --- HEADER --- */}
       <header
-        className={`sticky top-0 z-[100] backdrop-blur-md border-b px-6 py-2 md:py-4 flex flex-col gap-4 md:gap-6 transition-all duration-500 ${
+        className={`sticky top-0 z-[100] backdrop-blur-md border-b px-6 py-2 md:py-4 flex flex-col gap-2 md:gap-6 transition-all duration-500 ${
           zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'
         }`}
       >
@@ -1619,7 +1625,7 @@ export default function Home() {
               />
             </div>
 
-            {/* ROTATING TOOLTIPS: Now hidden on mobile (hidden md:block) */}
+            {/* ROTATING TOOLTIPS: Hidden on Mobile (hidden md:block) */}
             {!zenMode && (
               <div className="mt-1 md:mt-2 w-full text-center pointer-events-none min-h-[16px] md:min-h-[20px] transition-all duration-300 hidden md:block">
                 <p
@@ -1742,12 +1748,17 @@ export default function Home() {
       >
         {!zenMode && !loading && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
-            <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm">
-              <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
+            <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm flex flex-col justify-between">
+              <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">
                 Network Capacity
               </div>
-              <div className="text-lg md:text-3xl font-bold text-white mt-1">
-                {formatBytes(totalStorageCommitted)}
+              <div>
+                <div className="text-lg md:text-3xl font-bold text-purple-400">
+                  {formatBytes(totalStorageCommitted)}
+                </div>
+                <div className="text-[9px] md:text-xs font-bold text-blue-400 mt-0.5 md:mt-1 flex items-center gap-1">
+                   {formatBytes(totalStorageUsed)} <span className="text-zinc-600 font-normal">Used</span>
+                </div>
               </div>
             </div>
 
