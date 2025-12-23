@@ -54,6 +54,7 @@ import {
 } from 'lucide-react';
 
 // --- TYPES ---
+
 interface Node {
   address?: string;
   pubkey?: string;
@@ -66,7 +67,7 @@ interface Node {
   storage_usage_percentage?: string;
   storage_usage_raw?: number;
   rank?: number;
-  credits: number | null; // Explicitly Nullable
+  credits: number | null; // Nullable
   location?: {
     lat: number;
     lon: number;
@@ -522,6 +523,16 @@ export default function Home() {
     }
   }, [loading, nodes, router.query.open]);
 
+  // --- HELPER FOR LATEST CHECK ---
+  // Fix: This helper is now available to all render functions within Home
+  const checkIsLatest = (nodeVersion: string | null | undefined) => {
+    const cleanVer = (nodeVersion || '').replace(/[^0-9.]/g, '');
+    const cleanConsensus = mostCommonVersion.replace(/[^0-9.]/g, '');
+    // Simple semantic check: if cleaned strings match, it's latest.
+    // Also using compareVersions to catch newer versions.
+    return cleanVer === cleanConsensus || compareVersions(cleanVer, cleanConsensus) > 0;
+  };
+
   // --- DATA FETCHING ---
 
   const fetchData = async () => {
@@ -650,9 +661,9 @@ export default function Home() {
     copyToClipboard(report, 'report');
   };
 
-  // FIX: Line 232 fix
   const shareToTwitter = (node: Node) => {
     const health = node.health || 0;
+    // FIX: Explicit null check on node.credits
     const creditsDisplay = node.credits !== null ? node.credits.toLocaleString() : 'N/A';
     
     const text = `Just checked my pNode status on Xandeum Pulse! ⚡\n\n🟢 Status: ${(node.uptime || 0) > 86400 ? 'Stable' : 'Booting'}\n❤️ Health: ${health}/100\n💰 Credits: ${creditsDisplay}\n\nMonitor here:`;
@@ -788,9 +799,9 @@ export default function Home() {
     const cycleData = getCycleContent(node);
     const isFav = favorites.includes(node.address || '');
     const isVersionSort = sortBy === 'version';
-    const cleanVer = (node.version || '').replace(/[^0-9.]/g, '');
-    const cleanConsensus = mostCommonVersion.replace(/[^0-9.]/g, '');
-    const isLatest = cleanVer === cleanConsensus; 
+    
+    // FIX: Use shared helper logic
+    const isLatest = checkIsLatest(node.version); 
 
     return (
       <div
@@ -881,7 +892,8 @@ export default function Home() {
   };
 
   const renderZenCard = (node: Node) => {
-    const latest = isLatest(getSafeVersion(node));
+    // FIX: Use shared helper logic
+    const isLatest = checkIsLatest(node.version);
     const health = node.health || 0;
     const isVersionSort = sortBy === 'version';
 
@@ -917,7 +929,7 @@ export default function Home() {
           <div>
             <div className="text-[9px] text-zinc-600 uppercase font-bold mb-1">Version</div>
             <div className={`font-mono flex items-center gap-2 ${isVersionSort ? 'text-cyan-400 animate-pulse' : 'text-zinc-300'}`}>
-              {node.version}
+              {node.version} {isLatest && <CheckCircle size={10} className="text-green-500" />}
             </div>
           </div>
           <div>
@@ -938,6 +950,9 @@ export default function Home() {
       { label: 'Node Version', val: getSafeVersion(selectedNode) },
       { label: 'Current Uptime', val: formatUptime(selectedNode?.uptime), color: 'text-orange-400' },
     ];
+    
+    // Use Helper
+    const isLatest = checkIsLatest(selectedNode?.version);
 
     return (
       <div className="animate-in fade-in slide-in-from-right-2 duration-200 h-full flex flex-col">
@@ -986,12 +1001,12 @@ export default function Home() {
           
           <div
             className={`mt-6 p-4 rounded-xl border flex items-center gap-3 ${
-              getSafeVersion(selectedNode) === mostCommonVersion
+              isLatest
                 ? 'bg-green-500/10 border-green-500/30'
                 : 'bg-orange-500/10 border-orange-500/30'
             }`}
           >
-            {getSafeVersion(selectedNode) === mostCommonVersion ? (
+            {isLatest ? (
               <CheckCircle size={20} className="text-green-500" />
             ) : (
               <AlertTriangle size={20} className="text-orange-500" />
@@ -999,12 +1014,12 @@ export default function Home() {
             <div>
               <div
                 className={`text-xs font-bold ${
-                  getSafeVersion(selectedNode) === mostCommonVersion
+                  isLatest
                     ? 'text-green-400'
                     : 'text-orange-400'
                 }`}
               >
-                {getSafeVersion(selectedNode) === mostCommonVersion
+                {isLatest
                   ? 'Node is Up to Date'
                   : 'Update Recommended'}
               </div>
@@ -1281,7 +1296,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- SIDE NAVIGATION --- */}
+      {/* --- SIDE NAVIGATION (Z-INDEX FIXED) --- */}
       <div
         className={`fixed inset-y-0 left-0 w-72 bg-[#09090b] border-r border-zinc-800 z-[200] transform transition-transform duration-300 ease-in-out ${
           isMenuOpen ? 'translate-x-0' : '-translate-x-full'
@@ -1399,11 +1414,7 @@ export default function Home() {
 
           <div className="flex-1 max-w-xl mx-4 relative overflow-hidden group flex flex-col items-center">
             <div className="relative w-full">
-              <Search
-                className={`absolute left-3 top-2.5 size-4 z-10 ${
-                  zenMode ? 'text-zinc-600' : 'text-zinc-500'
-                }`}
-              />
+              <Search className={`absolute left-3 top-2.5 size-4 z-10 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
 
               {!searchQuery && !isSearchFocused && (
                 <div className="absolute inset-0 flex items-center pointer-events-none pl-10 pr-4 overflow-hidden z-0">
@@ -1436,9 +1447,7 @@ export default function Home() {
                 >
                   <Info size={12} className="text-blue-500 shrink-0" />
                   <span>
-                    {isSearchFocused
-                      ? 'Type to filter nodes instantly'
-                      : searchTips[searchTipIndex]}
+                    {isSearchFocused ? 'Type to filter nodes instantly' : searchTips[searchTipIndex]}
                   </span>
                 </p>
               </div>
@@ -1525,7 +1534,7 @@ export default function Home() {
                   ) : (
                     <ArrowDown size={12} className="ml-1" />
                   ))}
-              button>
+              </button>
             ))}
           </div>
         </div>
@@ -1698,11 +1707,12 @@ export default function Home() {
           onClick={closeModal}
         >
           <div
-            className={`border w-full max-w-4xl 2xl:max-w-6xl rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300 ${
+            className={`border w-full max-w-4xl 2xl:max-w-6xl rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh] ${
               zenMode ? 'bg-black border-zinc-800 shadow-none' : 'bg-[#09090b] border-zinc-800'
             }`}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* -- MODAL HEADER (Responsive Fix) -- */}
             <div
               className={`shrink-0 p-4 md:p-6 border-b flex justify-between items-start ${
                 zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'
@@ -1712,15 +1722,17 @@ export default function Home() {
                 <ModalAvatar node={selectedNode} />
                 <div className="min-w-0">
                   <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
-                    <h2 className="text-lg md:text-2xl font-black font-sans tracking-tight text-white mb-0.5 truncate">
+                    {/* Responsive Font Size */}
+                    <h2 className="text-lg md:text-2xl font-black font-sans tracking-tight text-white mb-0.5">
                       NODE INSPECTOR
                     </h2>
                     <button
                       onClick={(e) => toggleFavorite(e, selectedNode.address || '')}
+                      // UPDATED: Favorites button is now larger with toggle text
                       className={`flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-xl border transition group w-fit ${
-                        favorites.includes(selectedNode.address || '')
-                          ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500 hover:bg-yellow-500/20'
-                          : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-400'
+                        favorites.includes(selectedNode.address || '') 
+                        ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500 hover:bg-yellow-500/20' 
+                        : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-400'
                       }`}
                     >
                       <Star
@@ -1732,18 +1744,14 @@ export default function Home() {
                         }
                       />
                       <span className="text-[10px] md:text-xs font-bold uppercase leading-none">
-                        {favorites.includes(selectedNode.address || '')
-                          ? 'REMOVE WATCHLIST'
-                          : 'ADD TO WATCHLIST'}
+                        {favorites.includes(selectedNode.address || '') ? 'REMOVE WATCHLIST' : 'ADD TO WATCHLIST'}
                       </span>
                     </button>
                   </div>
 
                   <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono mt-1">
                     <span className="text-zinc-400 truncate max-w-[120px] md:max-w-none">
-                      {selectedNode.pubkey
-                        ? `${selectedNode.pubkey.slice(0, 12)}...`
-                        : 'Unknown'}
+                      {selectedNode.pubkey ? `${selectedNode.pubkey.slice(0, 12)}...` : 'Unknown'}
                     </span>
                     <Copy
                       size={10}
@@ -1778,6 +1786,7 @@ export default function Home() {
               </div>
             </div>
 
+            {/* -- SCROLLABLE CONTENT (Includes Footer Buttons Now) -- */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 relative flex flex-col">
               {compareMode ? (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300 h-full flex flex-col relative">
@@ -2190,7 +2199,8 @@ export default function Home() {
                               </div>
                               <div className="relative z-10 flex flex-col items-center gap-4">
                                 <Shield size={64} className="text-blue-500 opacity-80" />
-                                {isLatest(getSafeVersion(selectedNode)) ? (
+                                {isLatest
+                                  ? (
                                   <div className="text-[10px] text-green-500 font-bold bg-green-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-green-500/20">
                                     <CheckCircle size={12} />
                                     UP TO DATE
@@ -2413,7 +2423,8 @@ export default function Home() {
                               </div>
 
                               {/* Existing status pill below uptime */}
-                              {isLatest(getSafeVersion(selectedNode)) ? (
+                              {isLatest
+                                ? (
                                 <div className="text-[10px] text-green-500 mt-2 font-bold bg-green-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
                                   <CheckCircle size={10} />
                                   UP TO DATE
