@@ -84,6 +84,102 @@ interface Node {
   };
 }
 
+// --- WELCOME CURTAIN COMPONENT ---
+
+const WelcomeCurtain = () => {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    // Check if user has seen the welcome screen
+    const seen = localStorage.getItem('xandeum_pulse_welcome_v1');
+    if (!seen) {
+      // Small delay to ensure smooth entrance animation
+      setTimeout(() => setShow(true), 100);
+    }
+  }, []);
+
+  const handleEnter = () => {
+    localStorage.setItem('xandeum_pulse_welcome_v1', 'true');
+    setShow(false);
+  };
+
+  if (!show) return null;
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
+      <div className="bg-[#09090b] border border-zinc-800 p-6 md:p-8 rounded-3xl shadow-2xl max-w-md w-full relative overflow-hidden group">
+        
+        {/* Background Ambient Glow */}
+        <div className="absolute top-0 right-0 p-32 bg-blue-500/10 blur-[80px] rounded-full pointer-events-none"></div>
+
+        {/* Icons Visual */}
+        <div className="flex justify-center items-center gap-6 mb-6 relative z-10">
+          <div className="flex flex-col items-center gap-2">
+            <div className="p-3 bg-zinc-900 rounded-xl border border-zinc-800 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+              <Monitor size={32} />
+            </div>
+            <span className="text-[9px] font-bold uppercase tracking-widest text-blue-400">Best Experience</span>
+          </div>
+          <div className="h-px w-8 bg-zinc-800"></div>
+          <div className="flex flex-col items-center gap-2 opacity-60">
+            <div className="p-3 bg-zinc-900 rounded-xl border border-zinc-800 text-zinc-500">
+              <div className="relative">
+                <LayoutDashboard size={24} />
+              </div>
+            </div>
+            <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500">Mobile Optimized</span>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="text-center relative z-10 space-y-2 mb-6">
+          <h2 className="text-xl md:text-2xl font-black text-white tracking-tight">
+            Welcome to Pulse
+          </h2>
+          <p className="text-xs text-zinc-400 leading-relaxed px-4">
+            For the deepest analysis and topology visualization, a desktop display is recommended. However, this interface is fully optimized for quick mobile checks.
+          </p>
+        </div>
+
+        {/* 3 Key Tips */}
+        <div className="space-y-3 text-left relative z-10">
+          <div className="flex items-start gap-3 bg-zinc-900/50 p-3 rounded-xl border border-zinc-800/50">
+             <div className="p-1.5 bg-blue-500/10 rounded-lg shrink-0 text-blue-400 mt-0.5"><Maximize2 size={14}/></div>
+             <div>
+                <span className="text-zinc-200 font-bold text-xs block mb-0.5">Deep Diagnostics</span>
+                <p className="text-[10px] text-zinc-500 leading-tight">Click on any node card to reveal detailed health scores, storage analytics, and identity metrics.</p>
+             </div>
+          </div>
+
+          <div className="flex items-start gap-3 bg-zinc-900/50 p-3 rounded-xl border border-zinc-800/50">
+             <div className="p-1.5 bg-purple-500/10 rounded-lg shrink-0 text-purple-400 mt-0.5"><MapIcon size={14}/></div>
+             <div>
+                <span className="text-zinc-200 font-bold text-xs block mb-0.5">Regional Intelligence</span>
+                <p className="text-[10px] text-zinc-500 leading-tight">Select a region on the Map to compare its performance against the global network average.</p>
+             </div>
+          </div>
+
+          <div className="flex items-start gap-3 bg-zinc-900/50 p-3 rounded-xl border border-zinc-800/50">
+             <div className="p-1.5 bg-yellow-500/10 rounded-lg shrink-0 text-yellow-500 mt-0.5"><Monitor size={14}/></div>
+             <div>
+                <span className="text-zinc-200 font-bold text-xs block mb-0.5">Zen Mode</span>
+                <p className="text-[10px] text-zinc-500 leading-tight">Toggle the monitor icon at any time to reduce visual noise and focus purely on the data.</p>
+             </div>
+          </div>
+        </div>
+
+        {/* Action Button */}
+        <button 
+          onClick={handleEnter}
+          className="mt-6 w-full py-3.5 bg-zinc-100 hover:bg-white text-black rounded-xl font-bold text-sm tracking-wide uppercase transition-all hover:scale-[1.02] active:scale-95 shadow-lg relative z-10"
+        >
+          Initialize Dashboard
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // --- SUB-COMPONENTS ---
 
 const PhysicalLocationBadge = ({ node, zenMode }: { node: Node; zenMode: boolean }) => {
@@ -666,6 +762,7 @@ export default function Home() {
 
   const shareToTwitter = (node: Node) => {
     const health = node.health || 0;
+    // FIX: Explicit null check on node.credits
     const creditsDisplay = node.credits !== null ? node.credits.toLocaleString() : 'N/A';
     
     const text = `Just checked my pNode status on Xandeum Pulse! ⚡\n\n🟢 Status: ${(node.uptime || 0) > 86400 ? 'Stable' : 'Booting'}\n❤️ Health: ${health}/100\n💰 Credits: ${creditsDisplay}\n\nMonitor here:`;
@@ -685,6 +782,7 @@ export default function Home() {
   const exportCSV = () => {
     const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Health_Score,Country,Last_Seen_ISO,Is_Favorite\n';
     const rows = filteredNodes.map(n => {
+      // FIX: Handle Null Credits for CSV
       const creditVal = n.credits !== null ? n.credits : 'NULL';
       return `${getSafeIp(n)},${n.pubkey || 'Unknown'},${n.rank},${creditVal},${getSafeVersion(n)},${n.uptime},${n.storage_committed},${n.storage_used},${n.health},${n.location?.countryName},${new Date(n.last_seen_timestamp || 0).toISOString()},${favorites.includes(n.address || '')}`;
     });
@@ -1346,6 +1444,9 @@ export default function Home() {
       <Head>
         <title>Xandeum Pulse {zenMode ? '[ZEN MODE]' : ''}</title>
       </Head>
+      
+      {/* --- WELCOME CURTAIN --- */}
+      <WelcomeCurtain />
 
       {loading && (
         <div className="fixed top-0 left-0 right-0 z-50">
@@ -1501,7 +1602,7 @@ export default function Home() {
               />
             </div>
 
-            {/* ROTATING TOOLTIPS: Now visible on mobile, tiny font, no gaps */}
+            {/* ROTATING TOOLTIPS: Hidden on Mobile (hidden md:block) */}
             {!zenMode && (
               <div className="mt-1 md:mt-2 w-full text-center pointer-events-none min-h-[16px] md:min-h-[20px] transition-all duration-300 hidden md:block">
                 <p
