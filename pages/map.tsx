@@ -8,7 +8,7 @@ import { scaleSqrt } from 'd3-scale';
 import { 
   ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, 
   MapPin, RotateCcw, Info, X, HelpCircle, Share2, Check, ArrowRight, 
-  AlertOctagon // New Icon for Errors
+  AlertOctagon, AlertCircle, EyeOff // Added AlertCircle & EyeOff
 } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
