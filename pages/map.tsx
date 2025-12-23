@@ -8,13 +8,17 @@ import { scaleSqrt } from 'd3-scale';
 import { 
   ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, 
   MapPin, RotateCcw, Info, X, HelpCircle, Share2, Check, ArrowRight, 
-  AlertOctagon, AlertCircle, EyeOff // Added AlertCircle & EyeOff
+  AlertOctagon, AlertCircle, EyeOff 
 } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
 interface LocationData {
-  name: string; country: string; lat: number; lon: number; count: number;
+  name: string; 
+  country: string; 
+  lat: number; 
+  lon: number; 
+  count: number;
   totalStorage: number; 
   totalCredits: number | null; // Nullable for crash safety
   avgHealth: number;
@@ -30,7 +34,10 @@ interface LocationData {
 }
 
 interface MapStats {
-  totalNodes: number; countries: number; topRegion: string; topRegionMetric: number;
+  totalNodes: number; 
+  countries: number; 
+  topRegion: string; 
+  topRegionMetric: number;
 }
 
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
@@ -53,17 +60,20 @@ const HEALTH_THRESHOLDS = [90, 75, 60, 40];
 
 export default function MapPage() {
   const router = useRouter();
+  
+  // Data State
   const [locations, setLocations] = useState<LocationData[]>([]);
   const [stats, setStats] = useState<MapStats>({ totalNodes: 0, countries: 0, topRegion: 'Scanning...', topRegionMetric: 0 });
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>('STORAGE');
   
+  // View State
+  const [viewMode, setViewMode] = useState<ViewMode>('STORAGE');
   const [isSplitView, setIsSplitView] = useState(false);
   const [activeLocation, setActiveLocation] = useState<string | null>(null);
   const [expandedLocation, setExpandedLocation] = useState<string | null>(null);
 
+  // UI State
   const [toast, setToast] = useState<{ msg: string; type: 'error' | 'info' | 'private' } | null>(null);
-
   const [position, setPosition] = useState({ coordinates: [10, 20], zoom: 1.2 });
   const [copiedCoords, setCopiedCoords] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
@@ -71,11 +81,14 @@ export default function MapPage() {
 
   const listRef = useRef<HTMLDivElement>(null);
   const hasDeepLinked = useRef(false);
+  
+  // Dynamic Calculation State
   const [dynamicThresholds, setDynamicThresholds] = useState<number[]>([0, 0, 0, 0]);
 
   const visibleNodes = useMemo(() => locations.reduce((sum, loc) => sum + loc.count, 0), [locations]);
   const privateNodes = Math.max(0, stats.totalNodes - visibleNodes);
 
+  // --- SCROLL TO ACTIVE ---
   useEffect(() => {
       if (activeLocation && isSplitView) {
           const timer = setTimeout(() => {
@@ -86,6 +99,7 @@ export default function MapPage() {
       }
   }, [viewMode, activeLocation, isSplitView]);
 
+  // --- FETCH LOOP ---
   useEffect(() => {
     const fetchGeo = async () => {
       try {
@@ -123,6 +137,7 @@ export default function MapPage() {
     return () => clearInterval(interval);
   }, [router.isReady, router.query.focus]); 
 
+  // --- THRESHOLD CALCULATION ---
   useEffect(() => {
       if (locations.length === 0) return;
 
@@ -155,6 +170,8 @@ export default function MapPage() {
       ]);
 
   }, [locations, viewMode]);
+
+  // --- HELPERS ---
 
   const getTierIndex = (loc: LocationData): number => {
     let val = 0;
@@ -209,6 +226,7 @@ export default function MapPage() {
 
   const lockTarget = (name: string, lat: number, lon: number) => {
     if (activeLocation === name) {
+        // Already active
     } else {
         setActiveLocation(name);
         setExpandedLocation(name); 
@@ -274,7 +292,7 @@ export default function MapPage() {
         case 'HEALTH': return `${loc.avgHealth}% Health`;
         case 'CREDITS': 
             // Return Safe Message if Null
-            if (loc.totalCredits === null) return "Credits API Offline";
+            if (loc.totalCredits === null) return "API OFFLINE";
             return `${loc.totalCredits.toLocaleString()} Cr`;
     }
   };
@@ -308,7 +326,7 @@ export default function MapPage() {
           if (loc.totalCredits === null) {
               return {
                   labelA: 'Avg Earnings',
-                  valA: <span className="text-red-400 flex items-center justify-center gap-1"><AlertOctagon size={12}/> API OFFLINE</span>,
+                  valA: <span className="text-red-400 flex items-center justify-center gap-1 font-bold"><AlertOctagon size={12}/> API OFFLINE</span>,
                   descA: "Source endpoint is unreachable.",
                   labelB: 'Contribution',
                   valB: <span className="text-zinc-500 italic">Unknown</span>,
@@ -467,14 +485,15 @@ export default function MapPage() {
                     
                     // CRASHPROOF COLOR: If credits are broken/null for this node, show gray
                     const isMissingData = viewMode === 'CREDITS' && loc.totalCredits === null;
-                    const baseColor = isMissingData ? '#52525b' : TIER_COLORS[tier];
+                    const tierColor = isMissingData ? '#52525b' : TIER_COLORS[tier];
                     const opacity = activeLocation && !isActive ? 0.3 : 1;
+                    const pingColor = isMissingData ? '#52525b' : (isActive ? '#22c55e' : tierColor);
 
                     return (
                         <Marker key={loc.name} coordinates={[loc.lon, loc.lat]} onClick={() => lockTarget(loc.name, loc.lat, loc.lon)}>
                         <g className="group cursor-pointer transition-all duration-500" style={{ opacity }}>
-                            <circle r={size * 2.5} fill={isActive ? '#22c55e' : baseColor} className="animate-ping opacity-20" style={{ animationDuration: isActive ? '1s' : '3s' }} />
-                            {isActive ? (<polygon points="0,-12 3,-4 11,-4 5,1 7,9 0,5 -7,9 -5,1 -11,-4 -3,-4" transform={`scale(${size/6})`} fill="#52525b" stroke="#22c55e" strokeWidth={1.5} className="drop-shadow-[0_0_15px_rgba(34,197,94,1)]" />) : (<>{viewMode === 'STORAGE' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} />}{viewMode === 'CREDITS' && <circle r={size} fill={baseColor} stroke="#fff" strokeWidth={1} />}{viewMode === 'HEALTH' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={baseColor} stroke="#fff" strokeWidth={1} className="rotate-45" />}</>)}
+                            <circle r={size * 2.5} fill={pingColor} className="animate-ping opacity-20" style={{ animationDuration: isActive ? '1s' : '3s' }} />
+                            {isActive ? (<polygon points="0,-12 3,-4 11,-4 5,1 7,9 0,5 -7,9 -5,1 -11,-4 -3,-4" transform={`scale(${size/6})`} fill="#52525b" stroke="#22c55e" strokeWidth={1.5} className="drop-shadow-[0_0_15px_rgba(34,197,94,1)]" />) : (<>{viewMode === 'STORAGE' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={tierColor} stroke="#fff" strokeWidth={1} />}{viewMode === 'CREDITS' && <circle r={size} fill={tierColor} stroke="#fff" strokeWidth={1} />}{viewMode === 'HEALTH' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={tierColor} stroke="#fff" strokeWidth={1} className="rotate-45" />}</>)}
                             {isActive && (<g transform={`translate(0, ${-size - 18})`}><rect x="-60" y="-20" width="120" height="24" rx="4" fill="black" fillOpacity="0.8" stroke="#22c55e" strokeWidth="1" className="drop-shadow-lg" /><text y="-4" textAnchor="middle" className="font-mono text-[10px] fill-white font-bold uppercase tracking-widest pointer-events-none dominant-baseline-central">{loc.name}</text><path d="M -5 4 L 0 9 L 5 4" fill="black" stroke="#22c55e" strokeWidth="1" strokeDasharray="0,14,3" /></g>)}
                         </g>
                         </Marker>
