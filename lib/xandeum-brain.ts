@@ -109,13 +109,18 @@ const calculateVitalityScore = (
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
   if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
 
-  // 3. STORAGE
-  const baseStorageScore = calculateLogScore(storageCommitted, medianStorage, 80);
+  // 3. STORAGE (UPDATED LOGIC)
+  // Base score calculated against median, now capable of reaching 100 on its own.
+  const baseStorageScore = calculateLogScore(storageCommitted, medianStorage, 100);
+  
   let utilizationBonus = 0;
   if (storageUsed > 0) {
       const usedGB = storageUsed / (1024 ** 3);
-      utilizationBonus = Math.min(20, 5 * Math.log2(usedGB + 2)); 
+      // Bonus based on usage, capped at 15 points
+      utilizationBonus = Math.min(15, 5 * Math.log2(usedGB + 2)); 
   }
+  
+  // Final Storage Score = Base + Bonus (Clamped at 100)
   const totalStorageScore = Math.min(100, baseStorageScore + utilizationBonus);
 
   // 4. VERSION
