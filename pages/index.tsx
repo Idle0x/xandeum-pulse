@@ -793,6 +793,43 @@ export default function Home() {
     };
   };
 
+  // --- RENDER HELPERS ---
+
+  const renderComparisonRow = (
+    label: string,
+    valA: any,
+    valB: any,
+    format: (v: any) => string,
+    better: 'HIGH' | 'LOW' | 'NONE'
+  ) => {
+    const isABetter =
+      better === 'NONE' ? false : better === 'HIGH' ? valA > valB : valA < valB;
+    const isBBetter =
+      better === 'NONE' ? false : better === 'HIGH' ? valB > valA : valB < valA;
+
+    return (
+      <div className="flex justify-between items-center py-3 border-b border-zinc-800/50 text-xs hover:bg-white/5 px-2 rounded">
+        <div
+          className={`flex-1 text-right font-mono flex items-center justify-end gap-2 ${
+            isABetter ? 'text-green-400 font-bold' : 'text-zinc-400'
+          }`}
+        >
+          {format(valA)} {isABetter && <CheckCircle size={12} />}
+        </div>
+        <div className="px-4 text-[10px] text-zinc-600 uppercase font-bold w-32 text-center">
+          {label}
+        </div>
+        <div
+          className={`flex-1 text-left font-mono flex items-center justify-start gap-2 ${
+            isBBetter ? 'text-green-400 font-bold' : 'text-zinc-400'
+          }`}
+        >
+          {isBBetter && <CheckCircle size={12} />} {format(valB)}
+        </div>
+      </div>
+    );
+  };
+
   // --- RENDERERS ---
 
   const renderNodeCard = (node: Node, i: number) => {
@@ -1712,7 +1749,6 @@ export default function Home() {
             }`}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* -- MODAL HEADER (Responsive Fix) -- */}
             <div
               className={`shrink-0 p-4 md:p-6 border-b flex justify-between items-start ${
                 zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'
@@ -1722,13 +1758,11 @@ export default function Home() {
                 <ModalAvatar node={selectedNode} />
                 <div className="min-w-0">
                   <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
-                    {/* Responsive Font Size */}
-                    <h2 className="text-lg md:text-2xl font-black font-sans tracking-tight text-white mb-0.5">
+                    <h2 className="text-lg md:text-2xl font-black font-sans tracking-tight text-white mb-0.5 truncate">
                       NODE INSPECTOR
                     </h2>
                     <button
                       onClick={(e) => toggleFavorite(e, selectedNode.address || '')}
-                      // UPDATED: Favorites button is now larger with toggle text
                       className={`flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-xl border transition group w-fit ${
                         favorites.includes(selectedNode.address || '') 
                         ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500 hover:bg-yellow-500/20' 
@@ -1786,7 +1820,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* -- SCROLLABLE CONTENT (Includes Footer Buttons Now) -- */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 relative flex flex-col">
               {compareMode ? (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300 h-full flex flex-col relative">
