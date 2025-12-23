@@ -479,23 +479,35 @@ export default function Home() {
     }
   }, [sortBy]);
 
-  // Main Event Loops
+  // SMART CARD ROTATION LOGIC
+  // This separate effect ensures the 5s timer resets whenever the user
+  // manually changes the filter (sortBy), preventing cards from rotating 
+  // immediately after a user click.
   useEffect(() => {
-    fetchData();
-    
-    const saved = localStorage.getItem('xandeum_favorites');
-    if (saved) setFavorites(JSON.parse(saved));
-    
     const cycleInterval = setInterval(() => {
       setCycleStep((prev) => prev + 1);
     }, 5000);
     
+    // Cleaning up on `sortBy` change effectively resets the timer
+    return () => clearInterval(cycleInterval);
+  }, [sortBy]);
+
+  // Tip Rotation Logic
+  useEffect(() => {
     const tipInterval = setInterval(() => {
       if (!isSearchFocused) {
         setSearchTipIndex((prev) => (prev + 1) % searchTips.length);
       }
     }, 9000);
-    
+    return () => clearInterval(tipInterval);
+  }, [isSearchFocused]);
+
+  // Data Loop
+  useEffect(() => {
+    fetchData();
+    const saved = localStorage.getItem('xandeum_favorites');
+    if (saved) setFavorites(JSON.parse(saved));
+
     const dataInterval = setInterval(fetchData, 30000);
     
     const handleScroll = () => {
@@ -504,12 +516,10 @@ export default function Home() {
     window.addEventListener('scroll', handleScroll);
     
     return () => {
-      clearInterval(cycleInterval);
-      clearInterval(tipInterval);
       clearInterval(dataInterval);
       window.removeEventListener('scroll', handleScroll);
     };
-  }, [isSearchFocused]);
+  }, []);
 
   // Deep Linking
   useEffect(() => {
@@ -1499,9 +1509,9 @@ export default function Home() {
               />
             </div>
 
-            {/* ROTATING TOOLTIPS: Now visible on mobile, tiny font, no gaps */}
+            {/* ROTATING TOOLTIPS: Now hidden on mobile (hidden md:block) */}
             {!zenMode && (
-              <div className="mt-1 md:mt-2 w-full text-center pointer-events-none min-h-[16px] md:min-h-[20px] transition-all duration-300 block">
+              <div className="mt-1 md:mt-2 w-full text-center pointer-events-none min-h-[16px] md:min-h-[20px] transition-all duration-300 hidden md:block">
                 <p
                   key={searchTipIndex}
                   className="text-[9px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 whitespace-normal text-center leading-tight"
@@ -1551,7 +1561,7 @@ export default function Home() {
           <button
             onClick={fetchData}
             disabled={loading}
-            className={`flex items-center gap-2 px-4 h-8 md:h-12 rounded-xl transition font-bold text-[10px] md:text-xs ${
+            className={`flex items-center gap-2 px-6 h-9 md:h-12 rounded-xl transition font-bold text-[10px] md:text-xs ${
               loading
                 ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait'
                 : zenMode
