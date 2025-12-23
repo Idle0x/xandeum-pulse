@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -9,8 +9,8 @@ import {
   LayoutDashboard, GitMerge, Share2, Anchor, Terminal,
   AlertTriangle, Eye, Monitor, Command, AlertOctagon,
   ArrowRight, Minimize2, Maximize2, Camera, Swords, ArrowLeftRight,
-  ClipboardCopy, Link as LinkIcon, RefreshCw, ChevronLeft, ChevronRight, RotateCcw,
-  List
+  ClipboardCopy, Link as LinkIcon, RefreshCw, ChevronLeft, ChevronRight,
+  Wallet, MapPin, Star
 } from 'lucide-react';
 
 export default function DocsPage() {
@@ -33,7 +33,7 @@ export default function DocsPage() {
   };
 
   const handleCopyLink = () => {
-    const url = `${window.location.origin}/docs?training=true`;
+    const url = ${window.location.origin}/docs?training=true;
     navigator.clipboard.writeText(url);
     setCopiedShare(true);
     setTimeout(() => setCopiedShare(false), 2000);
@@ -65,7 +65,7 @@ export default function DocsPage() {
                 <button 
                   key={tab} 
                   onClick={() => scrollTo(tab)}
-                  className={`text-xs font-bold uppercase tracking-widest hover:text-white transition-colors ${activeTab === tab ? 'text-blue-400' : 'text-zinc-500'}`}
+                  className={text-xs font-bold uppercase tracking-widest hover:text-white transition-colors ${activeTab === tab ? 'text-blue-400' : 'text-zinc-500'}}
                 >
                   {tab === 'flight' ? 'Flight School' : tab}
                 </button>
@@ -114,18 +114,28 @@ export default function DocsPage() {
              <div className="max-w-6xl mx-auto px-6">
                 <div className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-900/20 border border-blue-500/30 text-blue-400 text-[10px] font-bold uppercase tracking-widest mb-4">
-                        <Terminal size={12} /> Interactive Simulator
+                        <Terminal size={12} /> Interactive Walkthrough
                     </div>
                     <h2 className="text-3xl md:text-5xl font-extrabold text-white">Flight School</h2>
                     <p className="text-zinc-500 mt-4 max-w-lg mx-auto">
-                        Don't just read the manual. Fly the ship. <br/>
-                        Use the <span className="text-blue-400 font-bold animate-pulse">Glowing Cues</span> to navigate the interconnected loop.
+                        Don't just read the manual. Experience the platform. <br/>
+                        Follow the <span className="text-blue-400 font-bold animate-pulse">Glowing Cues</span> to navigate the infinite ecosystem.
                     </p>
                 </div>
 
-                {/* THE SIMULATOR APP - FORCE HEIGHT TO PREVENT COLLAPSE */}
-                <div className="border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl bg-[#09090b] relative max-w-5xl mx-auto h-[600px] flex flex-col select-none">
+                {/* THE COMPREHENSIVE SIMULATOR */}
+                <div className="border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl bg-[#09090b] relative max-w-5xl mx-auto min-h-[700px] flex flex-col">
                     <PulseOS_Simulator />
+                </div>
+                
+                {/* RESET BUTTON OUTSIDE */}
+                <div className="flex justify-center mt-6">
+                    <button 
+                        onClick={() => window.location.reload()}
+                        className="px-6 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-full text-xs font-bold text-zinc-400 hover:text-white transition-all flex items-center gap-2"
+                    >
+                        <RefreshCw size={14} /> RESTART WALKTHROUGH
+                    </button>
                 </div>
              </div>
         </section>
@@ -219,9 +229,9 @@ export default function DocsPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-24">
-                    <FeatureCard icon={Monitor} title="Zen Mode" desc="Toggles a minimalist, high-contrast OLED view (`setZenMode`). Strips gradients and animations for pure data focus." color="emerald" />
-                    <FeatureCard icon={HeartPulse} title="Cyclic Rotation" desc="To save screen space, node cards automatically rotate metrics (Storage -> Uptime -> Health) every 5 seconds, synced with the user's sort preference." color="emerald" />
-                    <FeatureCard icon={Share2} title="Proof of Pulse" desc="A modal that generates a verifiable PNG snapshot (`toPng`) of a node's health, ready for sharing on X (Twitter)." color="emerald" />
+                    <FeatureCard icon={Monitor} title="Zen Mode" desc="Toggles a minimalist, high-contrast OLED view (setZenMode). Strips gradients and animations for pure data focus." color="emerald" />
+                    <FeatureCard icon={HeartPulse} title="Cyclic Rotation" desc="To save screen space, node cards automatically rotate metrics (Storage → Uptime → Health) every 5 seconds, synced with the user's sort preference." color="emerald" />
+                    <FeatureCard icon={Share2} title="Proof of Pulse" desc="A modal that generates a verifiable PNG snapshot (toPng) of a node's health, ready for sharing on X (Twitter)." color="emerald" />
                 </div>
             </div>
         </section>
@@ -352,64 +362,97 @@ export default function DocsPage() {
 
 
 // ==========================================
-// INTERACTIVE PULSE OS SIMULATOR (NEURAL GRAPH)
+// COMPREHENSIVE PULSE OS SIMULATOR
 // ==========================================
 
 function PulseOS_Simulator() {
-    type ViewState = 'DASH' | 'MODAL' | 'COMPARE' | 'PROOF' | 'MAP' | 'CREDITS';
-    const [view, setView] = useState<ViewState>('DASH');
-    const [url, setUrl] = useState('https://xandeum-pulse.vercel.app');
-    const [ready, setReady] = useState(false); 
-    const [ghost, setGhost] = useState(false); 
+    type View = 'BOOT' | 'DASH' | 'MODAL' | 'MAP' | 'CREDITS' | 'COMPARE' | 'PROOF';
     
-    // Internal States for Views
-    const [mapDrawerOpen, setMapDrawerOpen] = useState(false);
+    const [view, setView] = useState<View>('BOOT');
+    const [url, setUrl] = useState('');
+    const [isAnimating, setIsAnimating] = useState(false);
+    const [readyButtons, setReadyButtons] = useState<string[]>([]);
+    
+    // Map-specific state
     const [mapMode, setMapMode] = useState<'STORAGE' | 'HEALTH' | 'CREDITS'>('STORAGE');
+    const [mapExpanded, setMapExpanded] = useState(false);
 
-    // --- BOOT SEQUENCE ---
+    // --- BOOT SEQUENCE (URL Typing) ---
     useEffect(() => {
-        setTimeout(() => setReady(true), 300);
-    }, []);
+        if (view === 'BOOT') {
+            const targetUrl = 'https://xandeum-pulse.vercel.app';
+            let i = 0;
+            const typeInterval = setInterval(() => {
+                if (i <= targetUrl.length) {
+                    setUrl(targetUrl.slice(0, i));
+                    i++;
+                } else {
+                    clearInterval(typeInterval);
+                    setTimeout(() => {
+                        setView('DASH');
+                        setTimeout(() => setReadyButtons(['card-1']), 800);
+                    }, 500);
+                }
+            }, 40);
+            return () => clearInterval(typeInterval);
+        }
+    }, [view]);
 
-    // --- REBOOT ---
-    const reboot = () => {
-        setView('DASH');
-        setReady(false);
-        setUrl('https://xandeum-pulse.vercel.app');
-        setMapDrawerOpen(false);
-        setTimeout(() => setReady(true), 500);
-    }
-
-    // --- NAVIGATION HANDLERS ---
-    const nav = (target: ViewState, delay = 0) => {
-        setReady(false);
-        setGhost(true); // Start transition animation
-        setMapDrawerOpen(false); // Reset internal states
+    // --- NAVIGATION FUNCTION ---
+    const navigate = (target: View, animationDuration = 1000, urlSuffix = '') => {
+        setReadyButtons([]); // Clear all glows
+        setIsAnimating(true);
         
-        // URL Bar Updates
+        // Update URL bar
         let newUrl = 'https://xandeum-pulse.vercel.app';
         if (target === 'MODAL') newUrl += '/?open=8x...2A';
-        if (target === 'MAP') newUrl += '/map?focus=8x...2A';
+        if (target === 'MAP') newUrl += '/map' + urlSuffix;
         if (target === 'CREDITS') newUrl += '/leaderboard?highlight=8x...2A';
         setUrl(newUrl);
 
         setTimeout(() => {
             setView(target);
-            setGhost(false);
-            // Wait for render, then make buttons glow
-            setTimeout(() => setReady(true), 600); 
-        }, delay || 500);
+            setIsAnimating(false);
+            
+            // After content renders, glow appropriate buttons
+            setTimeout(() => {
+                const exits = getExitButtons(target);
+                setReadyButtons(exits);
+            }, 700);
+        }, animationDuration);
     };
 
-    // --- "GHOST" SIMULATION LOGIC ---
-    const triggerGhostAction = (target: ViewState) => {
-        setReady(false);
-        setGhost(true); 
+    // --- SMART EXIT BUTTONS ---
+    const getExitButtons = (currentView: View): string[] => {
+        switch(currentView) {
+            case 'DASH': return ['card-1'];
+            case 'MODAL': return ['btn-credits', 'btn-health', 'btn-compare', 'btn-proof', 'btn-map', 'btn-back-dash'];
+            case 'MAP': return mapExpanded ? ['btn-toggle-storage', 'btn-toggle-health', 'btn-toggle-credits', 'btn-back-modal'] : ['btn-expand-region'];
+            case 'CREDITS': return ['btn-view-map', 'btn-view-modal'];
+            case 'COMPARE': return ['btn-back-modal', 'btn-view-winner-map'];
+            case 'PROOF': return ['btn-back-modal', 'btn-share-credits'];
+            default: return [];
+        }
+    };
+
+    // --- MAP TOGGLE HANDLER ---
+    const handleMapToggle = (mode: 'STORAGE' | 'HEALTH' | 'CREDITS') => {
+        setReadyButtons([]);
+        setMapMode(mode);
+        setIsAnimating(true);
+        
         setTimeout(() => {
-            setView(target);
-            setGhost(false);
-            setTimeout(() => setReady(true), 600); 
-        }, 1500);
+            setIsAnimating(false);
+            
+            // Determine next action based on mode
+            if (mode === 'CREDITS') {
+                // Credits mode → Jump to Credits page
+                setTimeout(() => navigate('CREDITS', 800), 500);
+            } else {
+                // Health/Storage → Back to Modal
+                setTimeout(() => navigate('MODAL', 800), 500);
+            }
+        }, 1200);
     };
 
     return (
@@ -421,45 +464,58 @@ function PulseOS_Simulator() {
                     <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50"></div>
                     <div className="w-2.5 h-2.5 rounded-full bg-green-500/50"></div>
                 </div>
-                <div className="flex-1 bg-black rounded border border-zinc-800 h-6 flex items-center px-3 text-[10px] font-mono text-zinc-400 justify-between group">
-                    <div className="flex items-center">
-                        <Lock size={8} className="mr-2 text-green-500"/>
-                        {url}
-                    </div>
-                    {/* Fixed: wrapped in button to support title prop validly */}
-                    <button onClick={reboot} title="Reboot System" className="cursor-pointer hover:text-white bg-transparent border-none p-0 flex items-center">
-                        <RotateCcw size={10} />
-                    </button>
+                <div className="flex-1 bg-black rounded border border-zinc-800 h-6 flex items-center px-3 text-[10px] font-mono text-zinc-400">
+                    <Lock size={8} className="mr-2 text-green-500"/>
+                    {url}<span className="animate-pulse">_</span>
                 </div>
             </div>
 
             {/* --- VIEWPORT --- */}
-            <div className="flex-1 relative bg-black overflow-hidden h-full">
+            <div className="flex-1 relative bg-black overflow-hidden">
                 
+                {/* === BOOT/LOADING === */}
+                {view === 'BOOT' && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+                            <div className="text-xs font-mono text-zinc-500">INITIALIZING PULSE...</div>
+                        </div>
+                    </div>
+                )}
+
                 {/* === DASHBOARD VIEW === */}
                 {view === 'DASH' && (
-                    <div className="absolute inset-0 p-8 animate-in fade-in duration-500">
-                        <div className="flex justify-between items-center mb-8 border-b border-zinc-800 pb-4">
-                            <div className="text-xl font-bold text-white flex gap-2"><Activity className="text-blue-500"/> DASHBOARD</div>
+                    <div className="absolute inset-0 p-6 md:p-8 animate-in fade-in duration-500">
+                        <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
+                            <div className="text-lg md:text-xl font-bold text-white flex gap-2"><Activity className="text-blue-500"/> DASHBOARD</div>
                             <div className="flex gap-2">
                                 <div className="h-8 w-8 bg-zinc-800 rounded"></div>
-                                <div className="h-8 w-24 bg-zinc-800 rounded"></div>
+                                <div className="h-8 w-20 md:w-24 bg-zinc-800 rounded"></div>
                             </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-4">
-                            {[1,2,3].map(i => (
+
+                        {/* Tip Banner */}
+                        <div className="mb-4 bg-blue-500/10 border border-blue-500/30 rounded-lg p-2 flex items-center gap-2">
+                            <Info size={14} className="text-blue-400 shrink-0"/>
+                            <span className="text-[10px] text-blue-300 font-bold">TIP: Click the glowing node card to open diagnostics</span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+                            {[1,2,3,4,5].map(i => (
                                 <div key={i} 
-                                    onClick={() => i === 1 && nav('MODAL')}
-                                    className={`h-48 border rounded-xl p-4 flex flex-col justify-between transition-all duration-300 
-                                    ${i===1 ? 'border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.4)] bg-zinc-900 cursor-pointer hover:scale-105' : 'border-zinc-800 bg-zinc-900/30 opacity-50'}`}
+                                    onClick={() => i === 1 && readyButtons.includes('card-1') && navigate('MODAL', 800)}
+                                    className={`h-40 md:h-48 border rounded-xl p-4 flex flex-col justify-between transition-all duration-300 relative
+                                    ${i===1 && readyButtons.includes('card-1') ? 'border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.5)] bg-zinc-900 cursor-pointer scale-105' : 'border-zinc-800 bg-zinc-900/30 opacity-40'}`}
                                 >
                                     <div className="flex justify-between">
                                         <span className="text-xs font-bold text-zinc-500">NODE-0{i}</span>
                                         {i===1 && <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>}
                                     </div>
-                                    <div className="text-3xl font-bold text-white">{i===1 ? '98%' : '45%'}</div>
-                                    {i===1 && (
-                                        <div className="absolute -top-3 -right-3 bg-blue-600 text-white text-[9px] font-bold px-2 py-1 rounded-full animate-bounce">
+                                    <div className="text-2xl md:text-3xl font-bold text-white">{i===1 ? '98%' : ${40 + i*5}%}</div>
+                                    <div className="text-[9px] text-zinc-600">Health Score</div>
+                                    
+                                    {i===1 && readyButtons.includes('card-1') && (
+                                        <div className="absolute -top-2 -right-2 bg-blue-600 text-white text-[8px] md:text-[9px] font-bold px-2 py-1 rounded-full animate-bounce shadow-lg">
                                             CLICK HERE
                                         </div>
                                     )}
@@ -469,430 +525,614 @@ function PulseOS_Simulator() {
                     </div>
                 )}
 
-                {/* === MODAL HUB (The Central Node) === */}
+                {/* === MODAL HUB === */}
                 {view === 'MODAL' && (
-                    <div className="absolute inset-0 bg-black/80 z-20 flex items-center justify-center p-8 animate-in zoom-in-95 duration-300">
-                        <div className="w-full h-full max-w-4xl bg-[#09090b] border border-zinc-700 rounded-2xl flex flex-col relative shadow-2xl">
+                    <div className="absolute inset-0 bg-black/90 z-20 flex items-center justify-center p-4 md:p-8 animate-in zoom-in-95 duration-300">
+                        <div className="w-full h-full max-w-4xl bg-[#09090b] border border-zinc-700 rounded-2xl flex flex-col relative shadow-2xl overflow-hidden">
                             {/* Modal Header */}
-                            <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
-                                <span className="font-bold text-white flex items-center gap-2"><Globe size={16}/> 8x...2A</span>
-                                {/* BACK BUTTON: Returns to DASH */}
+                            <div className="p-3 md:p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50 shrink-0">
+                                <span className="font-bold text-white flex items-center gap-2 text-sm md:text-base"><Globe size={16}/> Node 8x...2A</span>
                                 <button 
-                                    onClick={() => nav('DASH')}
-                                    className={`p-2 rounded-lg transition-all duration-500 ${ready ? 'bg-red-500/10 text-red-500 border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)] animate-pulse' : 'text-zinc-600'}`}
+                                    onClick={() => navigate('DASH', 500)}
+                                    className={p-2 rounded-lg transition-all duration-500 ${readyButtons.includes('btn-back-dash') ? 'bg-red-500/20 text-red-400 border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)] animate-pulse' : 'text-zinc-600 hover:text-zinc-400'}}
                                 >
                                     <X size={18}/>
                                 </button>
                             </div>
 
-                            <div className="flex-1 p-6 grid grid-cols-2 gap-6 overflow-y-auto">
-                                {/* Left Col: Interactive Cards */}
-                                <div className="space-y-4">
+                            {/* Tip Banner */}
+                            {!isAnimating && (
+                                <div className="mx-4 md:mx-6 mt-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2 flex items-center gap-2 animate-in fade-in">
+                                    <MousePointer2 size={14} className="text-yellow-400 shrink-0"/>
+                                    <span className="text-[10px] text-yellow-300 font-bold">Click any glowing card or button to explore</span>
+                                </div>
+                            )}
+
+                            <div className="flex-1 p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 overflow-y-auto">
+                                {/* Left Col: Metric Cards */}
+                                <div className="space-y-3 md:space-y-4">
                                     <div 
-                                        onClick={() => nav('CREDITS')}
-                                        className={`p-4 rounded-xl border transition-all cursor-pointer ${ready ? 'border-yellow-500/50 bg-yellow-900/10 hover:bg-yellow-900/20' : 'border-zinc-800'}`}
+                                        onClick={() => readyButtons.includes('btn-credits') && navigate('CREDITS', 1000)}
+                                        className={p-4 rounded-xl border transition-all cursor-pointer ${readyButtons.includes('btn-credits') ? 'border-yellow-500/50 bg-yellow-900/10 hover:bg-yellow-900/20 shadow-[0_0_20px_rgba(234,179,8,0.3)]' : 'border-zinc-800 bg-zinc-900/30'}}
                                     >
-                                        <div className="flex justify-between mb-2">
-                                            <span className="text-xs font-bold text-yellow-500">CREDITS CARD</span>
-                                            <ArrowRight size={14} className="text-yellow-500"/>
+                                        <div className="flex justify-between mb-2 items-center">
+                                            <span className="text-xs font-bold text-yellow-500 flex items-center gap-1"><Wallet size={12}/> REPUTATION</span>
+                                            {readyButtons.includes('btn-credits') && <ArrowRight size={14} className="text-yellow-500 animate-pulse"/>}
                                         </div>
-                                        <div className="text-xl font-bold text-white">5.2M Cr</div>
-                                        {ready && <div className="text-[9px] text-yellow-400 mt-1 animate-pulse">Click to view Leaderboard</div>}
+                                        <div className="text-xl md:text-2xl font-bold text-white">5.2M Cr</div>
+                                        <div className="text-[9px] text-zinc-500 mt-1">Rank #3 Global</div>
                                     </div>
+
                                     <div 
-                                        onClick={() => nav('MAP')}
-                                        className={`p-4 rounded-xl border transition-all cursor-pointer ${ready ? 'border-green-500/50 bg-green-900/10 hover:bg-green-900/20' : 'border-zinc-800'}`}
+                                        onClick={() => readyButtons.includes('btn-health') && navigate('MAP', 1200, '?focus=8x...2A')}
+                                        className={p-4 rounded-xl border transition-all cursor-pointer ${readyButtons.includes('btn-health') ? 'border-green-500/50 bg-green-900/10 hover:bg-green-900/20 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'border-zinc-800 bg-zinc-900/30'}}
                                     >
-                                        <div className="flex justify-between mb-2">
-                                            <span className="text-xs font-bold text-green-500">HEALTH CARD</span>
-                                            <ArrowRight size={14} className="text-green-500"/>
+                                        <div className="flex justify-between mb-2 items-center">
+                                            <span className="text-xs font-bold text-green-500 flex items-center gap-1"><Activity size={12}/> HEALTH</span>
+                                            {readyButtons.includes('btn-health') && <ArrowRight size={14} className="text-green-500 animate-pulse"/>}
                                         </div>
-                                        <div className="text-xl font-bold text-white">98/100</div>
+                                        <div className="text-xl md:text-2xl font-bold text-white">98/100</div>
+                                        <div className="text-[9px] text-zinc-500 mt-1">Optimal Status</div>
+                                    </div>
+
+                                    <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/30">
+                                        <div className="flex justify-between mb-2">
+                                            <span className="text-xs font-bold text-purple-500 flex items-center gap-1"><Database size={12}/> STORAGE</span>
+                                        </div>
+                                        <div className="text-xl md:text-2xl font-bold text-white">1.2 TB</div>
+                                        <div className="text-[9px] text-zinc-500 mt-1">Committed</div>
                                     </div>
                                 </div>
 
-                                {/* Right Col: Actions */}
-                                <div className="space-y-4">
+                                {/* Right Col: Action Buttons */}
+                                <div className="space-y-3 md:space-y-4">
                                     <button 
-                                        onClick={() => triggerGhostAction('COMPARE')}
-                                        className={`w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${ready ? 'border-red-500/30 text-red-400 hover:bg-red-900/10' : 'border-zinc-800 text-zinc-500'}`}
+                                        onClick={() => readyButtons.includes('btn-compare') && navigate('COMPARE', 1500)}
+                                        className={w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${readyButtons.includes('btn-compare') ? 'border-red-500/50 bg-red-900/10 text-red-400 hover:bg-red-900/20 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}}
                                     >
-                                        <Swords size={16}/> Compare Nodes
+                                        <Swords size={16}/> <span className="text-sm font-bold">Compare Nodes</span>
                                     </button>
+
                                     <button 
-                                        onClick={() => triggerGhostAction('PROOF')}
-                                        className={`w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${ready ? 'border-blue-500/30 text-blue-400 hover:bg-blue-900/10' : 'border-zinc-800 text-zinc-500'}`}
+                                        onClick={() => readyButtons.includes('btn-proof') && navigate('PROOF', 1500)}
+                                        className={w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${readyButtons.includes('btn-proof') ? 'border-blue-500/50 bg-blue-900/10 text-blue-400 hover:bg-blue-900/20 shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}}
                                     >
-                                        <Camera size={16}/> Proof of Pulse
+                                        <Camera size={16}/> <span className="text-sm font-bold">Proof of Pulse</span>
                                     </button>
+
                                     <button 
-                                        onClick={() => nav('MAP')}
-                                        className={`w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${ready ? 'border-purple-500/30 text-purple-400 hover:bg-purple-900/10' : 'border-zinc-800 text-zinc-500'}`}
+                                        onClick={() => readyButtons.includes('btn-map') && navigate('MAP', 1200, '?focus=8x...2A')}
+                                        className={w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${readyButtons.includes('btn-map') ? 'border-purple-500/50 bg-purple-900/10 text-purple-400 hover:bg-purple-900/20 shadow-[0_0_20px_rgba(147,51,234,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}}
                                     >
-                                        <MapIcon size={16}/> View on Map
+                                        <MapIcon size={16}/> <span className="text-sm font-bold">View on Map</span>
                                     </button>
+
+                                    <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/20">
+                                        <div className="text-[10px] text-zinc-500 uppercase font-bold mb-2">Location</div>
+                                        <div className="flex items-center gap-2">
+                                            <MapPin size={14} className="text-blue-400"/>
+                                            <span className="text-sm text-white font-mono">Lisbon, PT</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* === COMPARE VIEW (GHOST SIM) === */}
-                {view === 'COMPARE' && (
-                    <div className="absolute inset-0 bg-[#09090b] z-30 flex flex-col animate-in slide-in-from-right duration-500">
-                        {ghost ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500">
-                                <RefreshCw className="animate-spin mb-4 text-blue-500" size={32}/>
-                                <div className="text-xs font-mono">SORTING CANDIDATES...</div>
-                                <div className="mt-4 space-y-2 w-64">
-                                    <div className="h-8 bg-zinc-800 rounded animate-pulse w-full"></div>
-                                    <div className="h-8 bg-zinc-800 rounded animate-pulse w-3/4"></div>
+                {/* === MAP VIEW === */}
+                {view === 'MAP' && (
+                    <div className="absolute inset-0 bg-[#050505] z-30 flex flex-col animate-in zoom-in-90 duration-700">
+                        {/* Map Controls */}
+                        <div className="p-3 md:p-4 bg-black/80 border-b border-zinc-800 flex justify-between items-center shrink-0">
+                            <div className="text-sm font-bold text-white flex items-center gap-2">
+                                <Globe className="text-purple-500"/> GLOBAL MAP
+                            </div>
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={() => readyButtons.includes('btn-toggle-storage') && handleMapToggle('STORAGE')}
+                                    className={px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'STORAGE' ? 'bg-indigo-500 text-white' : readyButtons.includes('btn-toggle-storage') ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}}
+                                >
+                                    STORAGE
+                                </button>
+                                <button 
+                                    onClick={() => readyButtons.includes('btn-toggle-health') && handleMapToggle('HEALTH')}
+                                    className={px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'HEALTH' ? 'bg-green-500 text-white' : readyButtons.includes('btn-toggle-health') ? 'bg-green-500/20 text-green-400 border border-green-500/50 shadow-[0_0_15px_rgba(16,185,129,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}}
+                                >
+                                    HEALTH
+                                </button>
+                                <button 
+                                    onClick={() => readyButtons.includes('btn-toggle-credits') && handleMapToggle('CREDITS')}
+                                    className={px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'CREDITS' ? 'bg-yellow-500 text-black' : readyButtons.includes('btn-toggle-credits') ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}}
+                                >
+                                    CREDITS
+                                </button>
+                            </div>
+                        </div>
+
+                        {isAnimating ? (
+                            <div className="flex-1 flex items-center justify-center">
+                                <div className="text-center">
+                                    <RefreshCw className="animate-spin mb-4 text-purple-500 mx-auto" size={32}/>
+                                    <div className="text-xs font-mono text-zinc-500">
+                                        {mapMode === 'CREDITS' ? 'LOADING ECONOMIC DATA...' : 'RECALCULATING TIERS...'}
+                                    </div>
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex-1 p-8 flex flex-col items-center justify-center">
-                                <div className="flex items-center gap-8 mb-8">
-                                    <div className="text-center">
-                                        <div className="w-16 h-16 bg-zinc-800 rounded-full mb-2 mx-auto"></div>
-                                        <div className="font-bold text-white">Node A</div>
-                                        <div className="text-green-500 font-mono">98%</div>
+                            <>
+                                {/* Map Canvas */}
+                                <div className="flex-1 relative overflow-hidden">
+                                    <div className="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900 via-black to-black"></div>
+                                    
+                                    {/* Green Star Pin (Auto-focused) */}
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-in zoom-in duration-500">
+                                        <Star className="w-6 h-6 text-green-500 fill-green-500 animate-pulse drop-shadow-[0_0_15px_rgba(34,197,94,1)]" />
+                                        <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-black border border-green-500/50 px-3 py-1 rounded text-xs whitespace-nowrap shadow-xl">
+                                            <div className="font-bold text-green-400">Lisbon, PT</div>
+                                            <div className="text-[9px] text-zinc-500">5 Nodes • {mapMode === 'STORAGE' ? '1.2 PB' : mapMode === 'HEALTH' ? '98% Avg' : '5.2M Cr'}</div>
+                                        </div>
                                     </div>
-                                    <div className="text-2xl font-bold text-zinc-600">VS</div>
-                                    <div className="text-center">
-                                        <div className="w-16 h-16 bg-zinc-800 rounded-full mb-2 mx-auto border-2 border-red-500"></div>
-                                        <div className="font-bold text-white">Node B</div>
-                                        <div className="text-red-500 font-mono">45%</div>
-                                    </div>
+
+                                    {/* Expand Button (appears after zoom) */}
+                                    {!mapExpanded && readyButtons.includes('btn-expand-region') && (
+                                        <div className="absolute bottom-1/3 left-1/2 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4">
+                                            <button 
+                                                onClick={() => { setMapExpanded(true); setReadyButtons(['btn-toggle-storage', 'btn-toggle-health', 'btn-toggle-credits']); }}
+                                                className="px-4 py-2 bg-green-500 hover:bg-green-400 text-black rounded-full text-xs font-bold shadow-[0_0_20px_rgba(34,197,94,0.6)] animate-bounce"
+                                            >
+                                                OPEN REGION DETAILS
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-                                <button 
-                                    onClick={() => nav('MODAL')}
-                                    className={`px-8 py-3 rounded-full font-bold transition-all ${ready ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
-                                >
-                                    BACK TO DIAGNOSTICS
-                                </button>
-                            </div>
+
+                                {/* Drawer (Split View) */}
+                                {mapExpanded && (
+                                    <div className="h-1/3 border-t border-zinc-800 bg-black p-4 md:p-6 animate-in slide-in-from-bottom duration-500 overflow-y-auto">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="text-sm font-bold text-white">Lisbon, Portugal</h3>
+                                            <div className="text-xs text-zinc-500 font-mono">{mapMode} Mode Active</div>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-4 text-center text-xs">
+                                            <div className="p-3 bg-zinc-900 rounded-lg">
+                                                <div className="text-zinc-500 mb-1">Nodes</div>
+                                                <div className="text-white font-bold">5</div>
+                                            </div>
+                                            <div className="p-3 bg-zinc-900 rounded-lg">
+                                                <div className="text-zinc-500 mb-1">{mapMode === 'STORAGE' ? 'Total' : mapMode === 'HEALTH' ? 'Avg Score' : 'Credits'}</div>
+                                                <div className="text-white font-bold">{mapMode === 'STORAGE' ? '1.2 PB' : mapMode === 'HEALTH' ? '98/100' : '5.2M'}</div>
+                                            </div>
+                                            <div className="p-3 bg-zinc-900 rounded-lg">
+                                                <div className="text-zinc-500 mb-1">Tier</div>
+                                                <div className="text-yellow-500 font-bold text-[10px]">ELITE</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                                            <div className="text-[10px] text-blue-300 font-bold flex items-center gap-2">
+                                                <Info size={12}/> Try switching modes above to see different metrics
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Back Button */}
+                                {mapExpanded && (
+                                    <div className="p-4 bg-black border-t border-zinc-900 flex justify-center shrink-0">
+                                        <button 
+                                            onClick={() => readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
+                                            className={px-6 py-2 rounded-full font-bold border transition-all ${readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}}
+                                        >
+                                            BACK TO DIAGNOSTICS
+                                        </button>
+                                    </div>
+                                )}
+                            </>
                         )}
-                    </div>
-                )}
-
-                {/* === PROOF VIEW (GHOST SIM) === */}
-                {view === 'PROOF' && (
-                    <div className="absolute inset-0 bg-[#09090b] z-30 flex flex-col animate-in slide-in-from-right duration-500">
-                         {ghost ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500">
-                                <div className="text-xs font-mono mb-2 text-green-500">GENERATING SNAPSHOT...</div>
-                                <div className="w-48 h-64 bg-zinc-900 border border-zinc-700 relative overflow-hidden">
-                                    <div className="absolute inset-0 bg-green-500/20 animate-pulse"></div>
-                                </div>
-                            </div>
-                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center">
-                                <div className="w-48 h-64 bg-zinc-900 border border-green-500/50 rounded-xl mb-8 flex items-center justify-center relative shadow-[0_0_30px_rgba(16,185,129,0.2)]">
-                                    <div className="text-center">
-                                        <Camera className="mx-auto text-green-500 mb-2"/>
-                                        <div className="text-[10px] text-green-400 font-bold">VERIFIED PULSE</div>
-                                    </div>
-                                </div>
-                                <button 
-                                    onClick={() => nav('MODAL')}
-                                    className={`px-8 py-3 rounded-full font-bold transition-all ${ready ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
-                                >
-                                    CLOSE SNAPSHOT
-                                </button>
-                            </div>
-                         )}
-                    </div>
-                )}
-
-                {/* === FULL MAP VIEW (INTERACTIVE STATE MACHINE) === */}
-                {view === 'MAP' && (
-                    <div className="absolute inset-0 bg-[#050505] z-30 flex flex-col animate-in zoom-in-90 duration-700">
-                        <div className="flex-1 relative overflow-hidden">
-                            <div className="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900 via-black to-black"></div>
-                            
-                            {/* Map Toggles */}
-                            <div className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-                                {['STORAGE', 'HEALTH', 'CREDITS'].map(m => (
-                                    <button key={m} onClick={() => setMapMode(m as any)} className={`px-2 py-1 rounded text-[9px] font-bold border transition-all ${mapMode === m ? 'bg-white text-black' : 'bg-black text-zinc-500 border-zinc-700'}`}>{m}</button>
-                                ))}
-                            </div>
-
-                            {/* Simulated Pins */}
-                            <div 
-                                onClick={() => setMapDrawerOpen(true)}
-                                className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform duration-300 ${mapDrawerOpen ? 'scale-125' : 'scale-100 hover:scale-110'}`}
-                            >
-                                <div className={`w-4 h-4 rounded-full animate-ping absolute ${mapMode === 'CREDITS' ? 'bg-yellow-500' : 'bg-blue-500'}`}></div>
-                                <div className={`w-4 h-4 rounded-full relative shadow-[0_0_20px_rgba(59,130,246,1)] ${mapMode === 'CREDITS' ? 'bg-yellow-500' : 'bg-blue-500'}`}></div>
-                                {ready && !mapDrawerOpen && <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-[9px] text-white bg-black px-2 rounded animate-bounce whitespace-nowrap">CLICK ME</div>}
-                            </div>
-                        </div>
-
-                        {/* DRAWER */}
-                        <div className={`bg-zinc-900 border-t border-zinc-800 transition-all duration-300 flex flex-col ${mapDrawerOpen ? 'h-48' : 'h-0 overflow-hidden'}`}>
-                            <div className="p-4 flex justify-between items-start">
-                                <div>
-                                    <div className="text-xs font-bold text-white flex items-center gap-2"><Globe size={12}/> LISBON, PT</div>
-                                    <div className="text-[10px] text-zinc-500">12 Nodes Active</div>
-                                </div>
-                                <X size={14} className="cursor-pointer" onClick={() => setMapDrawerOpen(false)}/>
-                            </div>
-                            <div className="p-4 border-t border-zinc-800/50 bg-black/20 flex gap-2">
-                                <button onClick={() => nav('CREDITS')} className="flex-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-[10px] font-bold py-2 rounded hover:bg-yellow-500/20">
-                                    VIEW TOP EARNER
-                                </button>
-                                <button onClick={() => nav('MODAL')} className="flex-1 bg-blue-500/10 border border-blue-500/20 text-blue-500 text-[10px] font-bold py-2 rounded hover:bg-blue-500/20">
-                                    INSPECT HUB
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="p-4 bg-black border-t border-zinc-900 flex justify-center shrink-0">
-                             <button 
-                                onClick={() => nav('MODAL')}
-                                className={`px-6 py-2 rounded-full font-bold border transition-all ${ready ? 'bg-red-500 text-white border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}
-                            >
-                                BACK TO DIAGNOSTICS
-                            </button>
-                        </div>
                     </div>
                 )}
 
                 {/* === CREDITS VIEW === */}
                 {view === 'CREDITS' && (
                     <div className="absolute inset-0 bg-[#09090b] z-30 flex flex-col animate-in slide-in-from-right duration-500">
-                         <div className="p-4 border-b border-zinc-800 flex justify-between items-center">
-                             <span className="font-bold text-yellow-500">LEADERBOARD</span>
-                         </div>
-                         <div className="flex-1 p-8">
-                             <div className="w-full h-12 bg-zinc-800/50 rounded mb-2"></div>
-                             <div className="w-full h-12 bg-zinc-800/50 rounded mb-2"></div>
-                             {/* Active Row */}
-                             <div className="w-full h-24 bg-yellow-900/20 border-l-4 border-yellow-500 p-4 flex items-center justify-between rounded mb-2 animate-pulse">
-                                 <div>
-                                     <div className="text-yellow-500 font-bold">#3 8x...2A</div>
-                                     <div className="text-xs text-zinc-500">5,200,000 Credits</div>
-                                 </div>
-                                 <div className="flex gap-2">
-                                     <button 
-                                        onClick={() => nav('MAP')}
-                                        className={`px-4 py-2 rounded text-xs font-bold transition-all ${ready ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.5)] animate-bounce' : 'bg-zinc-800 text-zinc-500'}`}
-                                     >
-                                         VIEW ON MAP
-                                     </button>
-                                     <button 
-                                        onClick={() => nav('MODAL')}
-                                        className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded text-xs font-bold"
-                                     >
-                                         DIAGNOSTICS
-                                     </button>
-                                 </div>
-                             </div>
-                             <div className="w-full h-12 bg-zinc-800/50 rounded mb-2"></div>
-                         </div>
+                        <div className="p-3 md:p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50 shrink-0">
+                            <span className="font-bold text-yellow-500 flex items-center gap-2"><Trophy size={16}/> LEADERBOARD</span>
+                        </div>
+
+                        {isAnimating ? (
+                            <div className="flex-1 flex items-center justify-center">
+                                <div className="text-center">
+                                    <RefreshCw className="animate-spin mb-4 text-yellow-500 mx-auto" size={32}/>
+                                    <div className="text-xs font-mono text-zinc-500">LOADING REPUTATION DATA...</div>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex-1 p-4 md:p-8 overflow-y-auto">
+                                    {/* Placeholder rows */}
+                                    {[1,2].map(i => (
+                                        <div key={i} className="w-full h-12 bg-zinc-800/30 rounded mb-2"></div>
+                                    ))}
+
+                                    {/* Active Row (Auto-expanded) */}
+                                    <div className="w-full bg-yellow-900/20 border-l-4 border-yellow-500 p-4 rounded mb-2 animate-in zoom-in duration-500">
+                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                            <div>
+                                                <div className="text-yellow-500 font-bold flex items-center gap-2">
+                                                    <Medal className="w-4 h-4"/> #3 • 8x...2A
+                                                </div>
+                                                <div className="text-xs text-zinc-500 mt-1">5,200,000 Credits</div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button 
+                                                    onClick={() => readyButtons.includes('btn-view-map') && navigate('MAP', 1000, '?focus=8x...2A')}
+                                                    className={px-4 py-2 rounded text-xs font-bold transition-all ${readyButtons.includes('btn-view-map') ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}}
+                                                >
+                                                    VIEW ON MAP
+                                                </button>
+                                                <button 
+                                                    onClick={() => readyButtons.includes('btn-view-modal') && navigate('MODAL', 800)}
+                                                    className={px-4 py-2 rounded text-xs font-bold transition-all ${readyButtons.includes('btn-view-modal') ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}}
+                                                >
+                                                    DIAGNOSTICS
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* More placeholder rows */}
+                                    {[4,5].map(i => (
+                                        <div key={i} className="w-full h-12 bg-zinc-800/30 rounded mb-2"></div>
+                                    ))}
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
 
-            </div>
-        </div>
-    )
+                {/* === COMPARE VIEW === */}
+                {view === 'COMPARE' && (
+                    <div className="absolute inset-0 bg-[#09090b] z-30 flex flex-col animate-in slide-in-from-right duration-500">
+                        {isAnimating ? (
+                            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 px-4">
+                                <RefreshCw className="animate-spin mb-4 text-red-500" size={32}/>
+                                <div className="text-xs font-mono mb-4">SORTING CANDIDATE NODES...</div>
+                                <div className="space-y-2 w-full max-w-xs">
+                                    <div className="h-8 bg-zinc-800 rounded animate-pulse"></div>
+                                    <div className="h-8 bg-zinc-800 rounded animate-pulse w-3/4"></div>
+                                    <div className="h-8 bg-zinc-800 rounded animate-pulse w-1/2"></div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex-1 p-6 md:p-8 flex flex-col items-center justify-center">
+                                <div className="flex flex-col md:flex-row items-center gap-6 md:gap-8 mb-8">
+                                    <div className="text-center">
+                                        <div className="w-16 h-16 bg-green-500/20 border-2 border-green-500 rounded-full mb-2 mx-auto flex items-center justify-center">
+                                            <Check className="text-green-500" size={32}/>
+                                        </div>
+                                        <div className="font-bold text-white mb-1">Node A (Yours)</div>
+                                        <div className="text-green-500 font-mono text-sm">98% Health</div>
+                                        <div className="text-xs text-zinc-500">5.2M Credits</div>
+                                    </div>
+                                    <div className="text-2xl font-bold text-zinc-600">VS</div>
+                                    <div className="text-center">
+                                        <div className="w-16 h-16 bg-red-500/20 border-2 border-red-500 rounded-full mb-2 mx-auto flex items-center justify-center">
+                                            <X className="text-red-500" size={32}/>
+                                        </div>
+                                        <div className="font-bold text-white mb-1">Node B</div>
+                                        <div className="text-red-500 font-mono text-sm">45% Health</div>
+                                        <div className="text-xs text-zinc-500">800K Credits</div>
+                                    </div>
+                                </div>
+
+                                <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-6">
+                                    <div className="text-xs text-zinc-500 uppercase font-bold mb-3 text-center">Comparison Results</div>
+                                    <div className="space-y-2 text-xs">
+                                        <div className="flex justify-between">
+                                            <span className="text-zinc-400">Winner:</span>
+                                            <span className="text-green-500 font-bold">Node A (You)</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-zinc-400">Health Advantage:</span>
+                                            <span className="text-white font-mono">+53%</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-zinc-400">Credits Lead:</span>
+                                            <span className="text-white font-mono">+4.4M</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col md:flex-row gap-3">
+                                    <button 
+                                        onClick={() => readyButtons.includes('btn-view-winner-map') && navigate('MAP', 1000, '?focus=8x...2A')}
+                                        className={px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-view-winner-map') ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(147,51,234,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}}
+                                    >
+                                        VIEW WINNER ON MAP
+                                    </button>
+                                    <button 
+                                        onClick={() => readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
+                                        className={px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}}
+                                    >
+                                        BACK TO DIAGNOSTICS
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* === PROOF VIEW === */}
+                {view === 'PROOF' && (
+                    <div className="absolute inset-0 bg-[#09090b] z-30 flex flex-col animate-in slide-in-from-right duration-500">
+                         {isAnimating ? (
+                            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 px-4">
+                                <div className="text-xs font-mono mb-4 text-green-500">GENERATING SNAPSHOT...</div>
+                                <div className="w-48 h-64 bg-zinc-900 border border-zinc-700 relative overflow-hidden rounded-xl">
+                                    <div className="absolute inset-0 bg-green-500/20 animate-pulse"></div>
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <Camera className="text-green-500/50 animate-bounce" size={48}/>
+                                    </div>
+                                </div>
+                                <div className="mt-4 text-[10px] text-zinc-600 font-mono">Rendering PNG proof...</div>
+                            </div>
+                         ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center p-6">
+                                {/* Generated Proof Card */}
+                                <div className="w-64 md:w-80 bg-zinc-950 border-2 border-green-500/50 rounded-2xl p-6 mb-8 relative shadow-[0_0_40px_rgba(16,185,129,0.3)] animate-in zoom-in duration-500">
+                                    <div className="absolute top-0 right-0 p-20 bg-green-500/10 blur-3xl rounded-full"></div>
+                                    
+                                    <div className="text-center relative z-10">
+                                        <div className="inline-block p-3 bg-zinc-900 rounded-xl mb-4 border border-zinc-800">
+                                            <Activity size={32} className="text-green-500" />
+                                        </div>
+                                        <h3 className="text-xl font-extrabold text-white mb-2">PROOF OF PULSE</h3>
+                                        <div className="text-[10px] font-mono text-zinc-500 mb-6">8x...2A • Verified</div>
+
+                                        <div className="grid grid-cols-2 gap-3 mb-4">
+                                            <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
+                                                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Health</div>
+                                                <div className="text-xl font-extrabold text-green-400">98</div>
+                                            </div>
+                                            <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
+                                                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Credits</div>
+                                                <div className="text-lg font-extrabold text-yellow-500">5.2M</div>
+                                            </div>
+                                            <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
+                                                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Storage</div>
+                                                <div className="text-lg font-extrabold text-purple-400">1.2TB</div>
+                                            </div>
+                                            <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
+                                                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Rank</div>
+                                                <div className="text-lg font-extrabold text-yellow-500">#3</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="text-[9px] text-zinc-600 font-mono flex items-center justify-center gap-1">
+                                            <Shield size={8}/> VERIFIED BY XANDEUM PULSE
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="flex flex-col md:flex-row gap-3">
+                                    <button 
+                                        onClick={() => readyButtons.includes('btn-share-credits') && navigate('CREDITS', 800)}
+                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-share-credits') ? 'bg-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
+                                    >
+                                        SHARE TO LEADERBOARD
+                                    </button>
+                                    <button 
+                                        onClick={() => readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
+                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
+                                    >
+                                        BACK TO DIAGNOSTICS
+                                    </button>
+                                </div>
+
+                                <div className="mt-6 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg max-w-md">
+                                    <div className="text-[10px] text-blue-300 font-bold flex items-center gap-2">
+                                        <Info size={12}/> In the real app, this downloads as PNG
+                                    </div>
+                                </div>
+                            </div>
+                         )}
+                    </div>
+                )}
+
+            </div>
+        </div>
+    );
 }
 
 
-// --- 2. VITALITY SIMULATOR (UPDATED) ---
+// ==========================================
+// SUPPORTING COMPONENTS (UNCHANGED)
+// ==========================================
+
 function VitalitySimulator() {
-    const [uptimeDays, setUptimeDays] = useState(14);
-    const [storageTB, setStorageTB] = useState(2);
-    const [credits, setCredits] = useState(5000);
-    const [versionGap, setVersionGap] = useState(0);
-    const [apiOnline, setApiOnline] = useState(true);
-    
-    // Scores
-    const uScore = Math.min(100, Math.round(100 / (1 + Math.exp(-0.2 * (uptimeDays - 7)))));
-    const sScore = Math.min(100, Math.round(50 * Math.log2((storageTB/1) + 1)));
-    const cScore = apiOnline ? Math.min(100, Math.round((credits / 10000) * 100)) : 0;
-    const vScore = versionGap === 0 ? 100 : versionGap === 1 ? 90 : versionGap === 2 ? 70 : 30;
-    
-    // Weighted Total Logic
-    let totalScore = 0;
-    if (apiOnline) {
-        // Standard: 35% Uptime, 30% Storage, 20% Credits, 15% Version
-        totalScore = Math.round((uScore * 0.35) + (sScore * 0.30) + (cScore * 0.20) + (vScore * 0.15));
-    } else {
-        // Failover: 45% Uptime, 35% Storage, 0% Credits, 20% Version
-        totalScore = Math.round((uScore * 0.45) + (sScore * 0.35) + (vScore * 0.20));
-    }
-    
-    return (
-        <div className="bg-black border border-zinc-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
-            <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r transition-all duration-500 ${apiOnline ? 'from-blue-500 via-purple-500 to-green-500' : 'from-red-500 via-orange-500 to-yellow-500'}`}></div>
-            
-            <div className="flex justify-between items-center mb-6">
-                <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                    <Activity size={14} /> Vitality Engine
-                </span>
-                
-                {/* API TOGGLE */}
-                <button 
-                    onClick={() => setApiOnline(!apiOnline)}
-                    className={`px-3 py-1 rounded-full text-[10px] font-bold border flex items-center gap-2 transition-all ${apiOnline ? 'bg-green-500/10 border-green-500 text-green-400' : 'bg-red-500/10 border-red-500 text-red-400'}`}
-                >
-                    {apiOnline ? <Check size={10}/> : <AlertOctagon size={10}/>}
-                    {apiOnline ? "API ONLINE" : "API DOWN (FAILOVER)"}
-                </button>
-            </div>
+    const [uptimeDays, setUptimeDays] = useState(14);
+    const [storageTB, setStorageTB] = useState(2);
+    const [credits, setCredits] = useState(5000);
+    const [versionGap, setVersionGap] = useState(0);
+    const [apiOnline, setApiOnline] = useState(true);
+    
+    const uScore = Math.min(100, Math.round(100 / (1 + Math.exp(-0.2 * (uptimeDays - 7)))));
+    const sScore = Math.min(100, Math.round(50 * Math.log2((storageTB/1) + 1)));
+    const cScore = apiOnline ? Math.min(100, Math.round((credits / 10000) * 100)) : 0;
+    const vScore = versionGap === 0 ? 100 : versionGap === 1 ? 90 : versionGap === 2 ? 70 : 30;
+    
+    let totalScore = 0;
+    if (apiOnline) {
+        totalScore = Math.round((uScore * 0.35) + (sScore * 0.30) + (cScore * 0.20) + (vScore * 0.15));
+    } else {
+        totalScore = Math.round((uScore * 0.45) + (sScore * 0.35) + (vScore * 0.20));
+    }
+    
+    return (
+        <div className="bg-black border border-zinc-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
+            <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r transition-all duration-500 ${apiOnline ? 'from-blue-500 via-purple-500 to-green-500' : 'from-red-500 via-orange-500 to-yellow-500'}`}></div>
+            
+            <div className="flex justify-between items-center mb-6">
+                <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                    <Activity size={14} /> Vitality Engine
+                </span>
+                
+                <button 
+                    onClick={() => setApiOnline(!apiOnline)}
+                    className={`px-3 py-1 rounded-full text-[10px] font-bold border flex items-center gap-2 transition-all ${apiOnline ? 'bg-green-500/10 border-green-500 text-green-400' : 'bg-red-500/10 border-red-500 text-red-400'}`}
+                >
+                    {apiOnline ? <Check size={10}/> : <AlertOctagon size={10}/>}
+                    {apiOnline ? "API ONLINE" : "API DOWN (FAILOVER)"}
+                </button>
+            </div>
 
-            <div className="text-center mb-8">
-                <div className={`text-6xl font-extrabold transition-colors duration-500 ${totalScore > 80 ? 'text-green-500' : totalScore > 50 ? 'text-yellow-500' : 'text-red-500'}`}>
-                    {totalScore}
-                </div>
-                <div className="text-xs text-zinc-500 mt-2 font-mono">LIVE SCORE CALCULATION</div>
-            </div>
-            
-            <div className="space-y-6">
-                {/* Uptime */}
-                <div>
-                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
-                        <span className="text-blue-400">Uptime ({apiOnline ? '35%' : '45%'})</span>
-                        <span className="text-white">{uScore} pts</span>
-                    </div>
-                    <input type="range" min="0" max="30" value={uptimeDays} onChange={(e) => setUptimeDays(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500"/>
-                </div>
+            <div className="text-center mb-8">
+                <div className={`text-6xl font-extrabold transition-colors duration-500 ${totalScore > 80 ? 'text-green-500' : totalScore > 50 ? 'text-yellow-500' : 'text-red-500'}`}>
+                    {totalScore}
+                </div>
+                <div className="text-xs text-zinc-500 mt-2 font-mono">LIVE SCORE CALCULATION</div>
+            </div>
+            
+            <div className="space-y-6">
+                <div>
+                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
+                        <span className="text-blue-400">Uptime ({apiOnline ? '35%' : '45%'})</span>
+                        <span className="text-white">{uScore} pts</span>
+                    </div>
+                    <input type="range" min="0" max="30" value={uptimeDays} onChange={(e) => setUptimeDays(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500"/>
+                </div>
 
-                {/* Storage */}
-                <div>
-                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
-                        <span className="text-purple-400">Storage ({apiOnline ? '30%' : '35%'})</span>
-                        <span className="text-white">{sScore} pts</span>
-                    </div>
-                    <input type="range" min="0" max="10" step="0.1" value={storageTB} onChange={(e) => setStorageTB(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-purple-500"/>
-                </div>
+                <div>
+                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
+                        <span className="text-purple-400">Storage ({apiOnline ? '30%' : '35%'})</span>
+                        <span className="text-white">{sScore} pts</span>
+                    </div>
+                    <input type="range" min="0" max="10" step="0.1" value={storageTB} onChange={(e) => setStorageTB(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-purple-500"/>
+                </div>
 
-                {/* Credits (Disabled if API Down) */}
-                <div className={`transition-opacity duration-500 ${apiOnline ? 'opacity-100' : 'opacity-30 grayscale'}`}>
-                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
-                        <span className="text-yellow-500">Credits ({apiOnline ? '20%' : '0%'})</span>
-                        <span className="text-white">{apiOnline ? cScore : 'N/A'} pts</span>
-                    </div>
-                    <input disabled={!apiOnline} type="range" min="0" max="20000" value={credits} onChange={(e) => setCredits(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-yellow-500 disabled:cursor-not-allowed"/>
-                    {!apiOnline && <div className="text-[9px] text-red-500 mt-1 font-bold">⚠ SIGNAL LOST: EXCLUDED FROM CALCULATION</div>}
-                </div>
+                <div className={`transition-opacity duration-500 ${apiOnline ? 'opacity-100' : 'opacity-30 grayscale'}`}>
+                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
+                        <span className="text-yellow-500">Credits ({apiOnline ? '20%' : '0%'})</span>
+                        <span className="text-white">{apiOnline ? cScore : 'N/A'} pts</span>
+                    </div>
+                    <input disabled={!apiOnline} type="range" min="0" max="20000" value={credits} onChange={(e) => setCredits(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-yellow-500 disabled:cursor-not-allowed"/>
+                    {!apiOnline && <div className="text-[9px] text-red-500 mt-1 font-bold">⚠ SIGNAL LOST: EXCLUDED FROM CALCULATION</div>}
+                </div>
 
-                {/* Version */}
-                <div>
-                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
-                        <span className="text-green-500">Version ({apiOnline ? '15%' : '20%'})</span>
-                        <span className="text-white">{vScore} pts</span>
-                    </div>
-                    <div className="grid grid-cols-4 gap-2">
-                        {['Latest', '-1', '-2', 'Old'].map((label, i) => (
-                            <button key={i} onClick={() => setVersionGap(i)} className={`py-1 rounded text-[9px] font-bold border ${versionGap === i ? 'bg-green-500/20 border-green-500 text-green-400' : 'bg-zinc-900 border-zinc-800 text-zinc-500'}`}>{label}</button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
+                <div>
+                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
+                        <span className="text-green-500">Version ({apiOnline ? '15%' : '20%'})</span>
+                        <span className="text-white">{vScore} pts</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                        {['Latest', '-1', '-2', 'Old'].map((label, i) => (
+                            <button key={i} onClick={() => setVersionGap(i)} className={`py-1 rounded text-[9px] font-bold border ${versionGap === i ? 'bg-green-500/20 border-green-500 text-green-400' : 'bg-zinc-900 border-zinc-800 text-zinc-500'}`}>{label}</button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
 }
 
-// --- 3. FAILOVER VISUALIZER (Unchanged Logic, refreshed UI) ---
 function FailoverVisualizer() {
-    const [step, setStep] = useState(0);
-    useEffect(() => {
-        const interval = setInterval(() => setStep(prev => (prev + 1) % 5), 1500);
-        return () => clearInterval(interval);
-    }, []);
-    const logs = ["System Idle...", "Connecting Primary [173.x]...", "TIMEOUT (>4000ms)!", "RACE MODE: 3 Backups...", "Winner: Node 2 (80ms)"];
+    const [step, setStep] = useState(0);
+    useEffect(() => {
+        const interval = setInterval(() => setStep(prev => (prev + 1) % 5), 1500);
+        return () => clearInterval(interval);
+    }, []);
+    const logs = ["System Idle...", "Connecting Primary [173.x]...", "TIMEOUT (>4000ms)!", "RACE MODE: 3 Backups...", "Winner: Node 2 (80ms)"];
 
-    return (
-        <div>
-            <div className="mb-6 flex items-center justify-between relative h-24 select-none">
-                <div className="z-10 flex flex-col items-center gap-2">
-                    <div className="w-12 h-12 bg-zinc-900 rounded-full flex items-center justify-center border border-zinc-700 shadow-xl"><Monitor size={20} className="text-white" /></div>
-                    <span className="text-[9px] font-bold uppercase text-zinc-500">Client</span>
-                </div>
-                <div className="absolute top-1/2 left-12 right-12 h-0.5 bg-zinc-800 -translate-y-1/2"></div>
-                {step === 1 && <div className="absolute top-1/2 left-16 w-3 h-3 bg-blue-500 rounded-full -translate-y-1/2 animate-[ping_1s_infinite]"></div>}
-                {step === 2 && <div className="absolute top-1/2 left-1/2 w-4 h-4 bg-red-500 rounded-full -translate-y-1/2"></div>}
-                {step === 3 && <><div className="absolute top-1/3 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><div className="absolute top-1/2 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><div className="absolute top-2/3 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div></>}
-                
-                <div className="z-10 flex flex-col gap-2">
-                    <div className={`px-3 py-1 rounded border text-[10px] font-bold transition-all ${step === 2 ? 'bg-red-500/10 border-red-500 text-red-500' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>Primary</div>
-                    <div className={`px-3 py-1 rounded border text-[10px] font-bold transition-all ${step >= 4 ? 'bg-green-500/10 border-green-500 text-green-500 scale-105' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>Backups</div>
-                </div>
-            </div>
-            <div className="bg-black/80 rounded-lg p-3 font-mono text-[9px] text-zinc-400 border-t-2 border-zinc-800 h-24 flex flex-col justify-end">
-                {logs.map((log, i) => (
-                    <div key={i} className={`transition-opacity duration-300 ${i === step ? 'text-green-400 opacity-100' : i < step ? 'opacity-30' : 'opacity-0'}`}>
-                        <span className="text-zinc-600 mr-2">{`[00:0${i}]`}</span>{log}
-                    </div>
-                ))}
-            </div>
-        </div>
-    )
+    return (
+        <div>
+            <div className="mb-6 flex items-center justify-between relative h-24 select-none">
+                <div className="z-10 flex flex-col items-center gap-2">
+                    <div className="w-12 h-12 bg-zinc-900 rounded-full flex items-center justify-center border border-zinc-700 shadow-xl"><Monitor size={20} className="text-white" /></div>
+                    <span className="text-[9px] font-bold uppercase text-zinc-500">Client</span>
+                </div>
+                <div className="absolute top-1/2 left-12 right-12 h-0.5 bg-zinc-800 -translate-y-1/2"></div>
+                {step === 1 && <div className="absolute top-1/2 left-16 w-3 h-3 bg-blue-500 rounded-full -translate-y-1/2 animate-[ping_1s_infinite]"></div>}
+                {step === 2 && <div className="absolute top-1/2 left-1/2 w-4 h-4 bg-red-500 rounded-full -translate-y-1/2"></div>}
+                {step === 3 && <><div className="absolute top-1/3 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><div className="absolute top-1/2 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><div className="absolute top-2/3 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div></>}
+                
+                <div className="z-10 flex flex-col gap-2">
+                    <div className={`px-3 py-1 rounded border text-[10px] font-bold transition-all ${step === 2 ? 'bg-red-500/10 border-red-500 text-red-500' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>Primary</div>
+                    <div className={`px-3 py-1 rounded border text-[10px] font-bold transition-all ${step >= 4 ? 'bg-green-500/10 border-green-500 text-green-500 scale-105' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>Backups</div>
+                </div>
+            </div>
+            <div className="bg-black/80 rounded-lg p-3 font-mono text-[9px] text-zinc-400 border-t-2 border-zinc-800 h-24 flex flex-col justify-end">
+                {logs.map((log, i) => (
+                    <div key={i} className={`transition-opacity duration-300 ${i === step ? 'text-green-400 opacity-100' : i < step ? 'opacity-30' : 'opacity-0'}`}>
+                        <span className="text-zinc-600 mr-2">{`[00:0${i}]`}</span>{log}
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
 }
 
-// --- 4. X-RAY SIMULATOR (UPDATED with CREDITS) ---
 function XRaySimulator() {
-    const [mode, setMode] = useState<'STORAGE' | 'HEALTH' | 'CREDITS'>('STORAGE');
+    const [mode, setMode] = useState<'STORAGE' | 'HEALTH' | 'CREDITS'>('STORAGE');
 
-    return (
-        <div className="relative">
-            <div className="flex gap-2 mb-8 justify-center">
-                {['STORAGE', 'HEALTH', 'CREDITS'].map(m => (
-                    <button key={m} onClick={() => setMode(m as any)} className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border ${mode === m ? 'bg-white text-black border-white' : 'bg-zinc-900 text-zinc-500 border-zinc-800'}`}>{m}</button>
-                ))}
-            </div>
+    return (
+        <div className="relative">
+            <div className="flex gap-2 mb-8 justify-center">
+                {['STORAGE', 'HEALTH', 'CREDITS'].map(m => (
+                    <button key={m} onClick={() => setMode(m as any)} className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border ${mode === m ? 'bg-white text-black border-white' : 'bg-zinc-900 text-zinc-500 border-zinc-800'}`}>{m}</button>
+                ))}
+            </div>
 
-            <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 transition-all max-w-sm mx-auto shadow-2xl relative overflow-hidden h-64 flex flex-col justify-center">
-                <div className={`absolute top-0 right-0 p-24 blur-[80px] rounded-full opacity-20 transition-colors duration-500 ${mode === 'STORAGE' ? 'bg-indigo-500' : mode === 'HEALTH' ? 'bg-emerald-500' : 'bg-yellow-500'}`}></div>
+            <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 transition-all max-w-sm mx-auto shadow-2xl relative overflow-hidden h-64 flex flex-col justify-center">
+                <div className={`absolute top-0 right-0 p-24 blur-[80px] rounded-full opacity-20 transition-colors duration-500 ${mode === 'STORAGE' ? 'bg-indigo-500' : mode === 'HEALTH' ? 'bg-emerald-500' : 'bg-yellow-500'}`}></div>
 
-                <div className="flex justify-between items-center mb-6 relative z-10">
-                    <div className="font-bold text-white text-lg">Lisbon, PT</div>
-                    <div className={`text-sm font-mono font-bold ${mode === 'STORAGE' ? 'text-indigo-400' : mode === 'HEALTH' ? 'text-emerald-400' : 'text-yellow-500'}`}>
-                        {mode === 'STORAGE' ? '1.2 PB' : mode === 'HEALTH' ? '98% Score' : '5.2M Cr'}
-                    </div>
-                </div>
-                
-                <div className="bg-black/50 p-4 rounded-xl border border-white/5 relative z-10">
-                    <div className="flex justify-center mb-4">
-                        <span className={`text-[10px] uppercase font-bold px-3 py-1.5 rounded border tracking-widest ${mode === 'STORAGE' ? 'text-indigo-400 border-indigo-500/30' : mode === 'HEALTH' ? 'text-emerald-400 border-emerald-500/30' : 'text-yellow-500 border-yellow-500/30'}`}>
-                            {mode === 'STORAGE' ? 'MASSIVE TIER' : mode === 'HEALTH' ? 'FLAWLESS TIER' : 'ELITE EARNER'}
-                        </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 text-center">
-                        <div>
-                            <div className="text-[10px] text-zinc-500 uppercase mb-1 font-bold">
-                                {mode === 'STORAGE' ? 'Avg Density' : mode === 'HEALTH' ? 'Status' : 'Economy'}
-                            </div>
-                            <div className="text-white font-mono text-xs font-bold">
-                                {mode === 'STORAGE' ? '120 TB / Node' : mode === 'HEALTH' ? '5 Up • 0 Down' : '2.1% Share'}
-                            </div>
-                        </div>
-                        <div className="border-l border-zinc-800">
-                            <div className="text-[10px] text-zinc-500 uppercase mb-1 font-bold">
-                                {mode === 'STORAGE' ? 'Global Share' : mode === 'HEALTH' ? 'King Node' : 'Top Earner'}
-                            </div>
-                            <div className="text-white font-mono text-xs font-bold truncate px-2">
-                                {mode === 'STORAGE' ? '12.5%' : '8x...2A'}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
+                <div className="flex justify-between items-center mb-6 relative z-10">
+                    <div className="font-bold text-white text-lg">Lisbon, PT</div>
+                    <div className={`text-sm font-mono font-bold ${mode === 'STORAGE' ? 'text-indigo-400' : mode === 'HEALTH' ? 'text-emerald-400' : 'text-yellow-500'}`}>
+                        {mode === 'STORAGE' ? '1.2 PB' : mode === 'HEALTH' ? '98% Score' : '5.2M Cr'}
+                    </div>
+                </div>
+                
+                <div className="bg-black/50 p-4 rounded-xl border border-white/5 relative z-10">
+                    <div className="flex justify-center mb-4">
+                        <span className={`text-[10px] uppercase font-bold px-3 py-1.5 rounded border tracking-widest ${mode === 'STORAGE' ? 'text-indigo-400 border-indigo-500/30' : mode === 'HEALTH' ? 'text-emerald-400 border-emerald-500/30' : 'text-yellow-500 border-yellow-500/30'}`}>
+                            {mode === 'STORAGE' ? 'MASSIVE TIER' : mode === 'HEALTH' ? 'FLAWLESS TIER' : 'ELITE EARNER'}
+                        </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                            <div className="text-[10px] text-zinc-500 uppercase mb-1 font-bold">
+                                {mode === 'STORAGE' ? 'Avg Density' : mode === 'HEALTH' ? 'Status' : 'Economy'}
+                            </div>
+                            <div className="text-white font-mono text-xs font-bold">
+                                {mode === 'STORAGE' ? '120 TB / Node' : mode === 'HEALTH' ? '5 Up • 0 Down' : '2.1% Share'}
+                            </div>
+                        </div>
+                        <div className="border-l border-zinc-800">
+                            <div className="text-[10px] text-zinc-500 uppercase mb-1 font-bold">
+                                {mode === 'STORAGE' ? 'Global Share' : mode === 'HEALTH' ? 'King Node' : 'Top Earner'}
+                            </div>
+                            <div className="text-white font-mono text-xs font-bold truncate px-2">
+                                {mode === 'STORAGE' ? '12.5%' : '8x...2A'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
 }
 
 function FeatureCard({ icon: Icon, title, desc, color = "blue" }: { icon: any, title: string, desc: string, color?: string }) {
-    return (
-        <div className="p-8 bg-zinc-900/20 border border-zinc-800 rounded-3xl hover:bg-zinc-900/40 transition-all group hover:-translate-y-1">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-6 transition-all bg-zinc-800 text-zinc-400 group-hover:bg-emerald-500/20 group-hover:text-emerald-400`}>
-                <Icon size={24} />
-            </div>
-            <h3 className="text-lg font-bold text-white mb-3">{title}</h3>
-            <p className="text-sm text-zinc-400 leading-relaxed">{desc}</p>
-        </div>
-    )
+    return (
+        <div className="p-8 bg-zinc-900/20 border border-zinc-800 rounded-3xl hover:bg-zinc-900/40 transition-all group hover:-translate-y-1">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-6 transition-all bg-zinc-800 text-zinc-400 group-hover:bg-emerald-500/20 group-hover:text-emerald-400`}>
+                <Icon size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-white mb-3">{title}</h3>
+            <p className="text-sm text-zinc-400 leading-relaxed">{desc}</p>
+        </div>
+    )
 }
