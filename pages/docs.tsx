@@ -450,7 +450,8 @@ function VitalitySimulator() {
                         <span className="text-white">{sScore} pts</span>
                     </div>
                     <input type="range" min="0" max="10" step="0.1" value={storageTB} onChange={(e) => setStorageTB(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-purple-500"/>
-                    <div className="text-[9px] text-zinc-600 mt-1 font-mono">Log Curve: Diminishing returns > 4TB.</div>
+                    {/* FIXED: Replaced > with &gt; */}
+                    <div className="text-[9px] text-zinc-600 mt-1 font-mono">Log Curve: Diminishing returns &gt; 4TB.</div>
                 </div>
 
                 {/* Version */}
