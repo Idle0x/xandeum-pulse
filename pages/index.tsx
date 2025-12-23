@@ -1449,7 +1449,7 @@ export default function Home() {
               <Menu size={24} className="md:w-7 md:h-7" />
             </button>
 
-            <div className="hidden md:flex flex-col">
+            <div className="flex flex-col">
               <h1
                 className={`text-xl font-extrabold tracking-tight flex items-center gap-2 ${
                   zenMode ? 'text-white' : 'text-white'
@@ -1547,7 +1547,7 @@ export default function Home() {
           <button
             onClick={fetchData}
             disabled={loading}
-            className={`flex items-center gap-2 px-6 h-10 md:h-12 rounded-xl transition font-bold text-xs ${
+            className={`flex items-center gap-2 px-6 h-9 md:h-12 rounded-xl transition font-bold text-xs ${
               loading
                 ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait'
                 : zenMode
@@ -1570,7 +1570,7 @@ export default function Home() {
                     setSortBy(opt as any);
                   }
                 }}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap h-9 md:h-auto ${
                   sortBy === opt
                     ? zenMode
                       ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
@@ -1738,6 +1738,14 @@ export default function Home() {
                 <h3 className="text-lg font-bold text-white tracking-widest uppercase">
                     Active Nodes - {filteredNodes.length}
                 </h3>
+                <div className="flex flex-col justify-center ml-1">
+                    <span className="text-[7px] md:text-[10px] font-mono text-zinc-500 uppercase leading-tight">
+                        (Distributed by <span className="text-zinc-300">{sortBy}</span>
+                    </span>
+                    <span className="text-[7px] md:text-[10px] font-mono text-zinc-500 uppercase leading-tight text-center">
+                        {sortOrder === 'asc' ? 'Lowest to Highest' : 'Highest to Lowest'})
+                    </span>
+                </div>
             </div>
         )}
 
