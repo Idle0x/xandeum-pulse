@@ -1120,9 +1120,9 @@ export default function Home() {
           </h3>
           <button
             onClick={() => setModalView('overview')}
-            className="text-[10px] font-bold text-zinc-500 hover:text-white flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 transition"
+            className="text-[10px] font-bold text-red-500 hover:text-red-400 flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 transition"
           >
-            <ChevronLeft size={10} /> BACK
+            <ArrowLeft size={10} /> BACK
           </button>
         </div>
 
@@ -1435,7 +1435,7 @@ export default function Home() {
 
       {/* --- HEADER --- */}
       <header
-        className={`sticky top-0 z-[100] backdrop-blur-md border-b px-6 py-2 md:py-4 flex flex-col gap-2 md:gap-6 transition-all duration-500 ${
+        className={`sticky top-0 z-[100] backdrop-blur-md border-b px-6 py-2 md:py-4 flex flex-col gap-4 md:gap-6 transition-all duration-500 ${
           zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'
         }`}
       >
@@ -1499,7 +1499,7 @@ export default function Home() {
               />
             </div>
 
-            {/* ROTATING TOOLTIPS: Full width on mobile */}
+            {/* ROTATING TOOLTIPS: Now visible on mobile, tiny font, no gaps */}
             {!zenMode && (
               <div className="mt-1 md:mt-2 w-full text-center pointer-events-none min-h-[16px] md:min-h-[20px] transition-all duration-300 block">
                 <p
@@ -1551,7 +1551,7 @@ export default function Home() {
           <button
             onClick={fetchData}
             disabled={loading}
-            className={`flex items-center gap-2 px-6 h-8 md:h-12 rounded-xl transition font-bold text-xs ${
+            className={`flex items-center gap-2 px-4 h-8 md:h-12 rounded-xl transition font-bold text-[10px] md:text-xs ${
               loading
                 ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait'
                 : zenMode
@@ -1603,7 +1603,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* NEW: Sticky Shadow Trigger (Replaces old sticky bar) */}
+      {/* NEW: Sticky Shadow Trigger */}
       <div className={`sticky top-0 z-[80] w-full h-1 bg-gradient-to-b from-black/50 to-transparent pointer-events-none transition-opacity duration-300 ${scrolled ? 'opacity-100' : 'opacity-0'}`}></div>
 
       {searchQuery && (
