@@ -1,16 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { 
   ArrowLeft, Activity, Shield, Zap, Globe, Server, Database, 
-  Trophy, Cpu, Map as MapIcon, BarChart3, Lock, 
-  HeartPulse, Search, Info, Check, X, MousePointer2, Layers, 
-  LayoutDashboard, GitMerge, Share2, Anchor, Terminal,
-  AlertTriangle, Eye, Monitor, Command, AlertOctagon,
-  ArrowRight, Minimize2, Maximize2, Camera, Swords, ArrowLeftRight,
-  ClipboardCopy, Link as LinkIcon, RefreshCw, ChevronLeft, ChevronRight, RotateCcw,
-  Wallet, MapPin, Star
+  Trophy, Cpu, Map as MapIcon, Lock, 
+  HeartPulse, Info, Check, X, MousePointer2, 
+  Share2, Terminal, AlertTriangle, Monitor, AlertOctagon,
+  ArrowRight, Camera, Swords, 
+  ClipboardCopy, RefreshCw, RotateCcw, MapPin, Wallet, Star
 } from 'lucide-react';
 
 export default function DocsPage() {
@@ -33,7 +31,6 @@ export default function DocsPage() {
   };
 
   const handleCopyLink = () => {
-    // FIXED: Added backticks for template literal
     const url = `${window.location.origin}/docs?training=true`;
     navigator.clipboard.writeText(url);
     setCopiedShare(true);
@@ -66,7 +63,6 @@ export default function DocsPage() {
                 <button 
                   key={tab} 
                   onClick={() => scrollTo(tab)}
-                  // FIXED: Added backticks for className logic
                   className={`text-xs font-bold uppercase tracking-widest hover:text-white transition-colors ${activeTab === tab ? 'text-blue-400' : 'text-zinc-500'}`}
                 >
                   {tab === 'flight' ? 'Flight School' : tab}
@@ -98,7 +94,7 @@ export default function DocsPage() {
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[500px] bg-blue-500/10 blur-[120px] rounded-full pointer-events-none"></div>
             
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-zinc-900/80 border border-zinc-800 text-zinc-400 text-[10px] font-bold uppercase tracking-widest mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
-                <Cpu size={12} className="text-blue-500" /> v2.0 Architecture
+                <Cpu size={12} className="text-blue-500" /> v2.2 Architecture
             </div>
             <h1 className="text-5xl md:text-7xl font-extrabold text-white tracking-tight mb-8 leading-tight animate-in fade-in slide-in-from-bottom-4 duration-700">
                 The Nervous System of <br />
@@ -231,9 +227,9 @@ export default function DocsPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-24">
-                    <FeatureCard icon={Monitor} title="Zen Mode" desc="Toggles a minimalist, high-contrast OLED view (setZenMode). Strips gradients and animations for pure data focus." color="emerald" />
-                    <FeatureCard icon={HeartPulse} title="Cyclic Rotation" desc="To save screen space, node cards automatically rotate metrics (Storage → Uptime → Health) every 5 seconds, synced with the user's sort preference." color="emerald" />
-                    <FeatureCard icon={Share2} title="Proof of Pulse" desc="A modal that generates a verifiable PNG snapshot (toPng) of a node's health, ready for sharing on X (Twitter)." color="emerald" />
+                    <FeatureCard icon={Monitor} title="Zen Mode" desc="Toggles a minimalist, high-contrast OLED view (`setZenMode`). Strips gradients and animations for pure data focus." color="emerald" />
+                    <FeatureCard icon={HeartPulse} title="Cyclic Rotation" desc="To save screen space, node cards automatically rotate metrics (Storage -> Uptime -> Health) every 5 seconds, synced with the user's sort preference." color="emerald" />
+                    <FeatureCard icon={Share2} title="Proof of Pulse" desc="A modal that generates a verifiable PNG snapshot (`toPng`) of a node's health, ready for sharing on X (Twitter)." color="emerald" />
                 </div>
             </div>
         </section>
@@ -355,7 +351,7 @@ export default function DocsPage() {
             </span>
         </div>
         <p className="text-zinc-700 text-[10px] uppercase tracking-widest">
-          Pulse v2.0 • 2025
+          Pulse v2.2 • 2025
         </p>
       </footer>
     </div>
@@ -364,14 +360,15 @@ export default function DocsPage() {
 
 
 // ==========================================
-// COMPREHENSIVE PULSE OS SIMULATOR
+// COMPREHENSIVE PULSE OS SIMULATOR (FIXED INIT)
 // ==========================================
 
 function PulseOS_Simulator() {
-    type View = 'BOOT' | 'DASH' | 'MODAL' | 'MAP' | 'CREDITS' | 'COMPARE' | 'PROOF';
+    type View = 'DASH' | 'MODAL' | 'MAP' | 'CREDITS' | 'COMPARE' | 'PROOF';
     
-    const [view, setView] = useState<View>('BOOT');
-    const [url, setUrl] = useState('');
+    // START AT DASHBOARD IMMEDIATELY TO PREVENT BLACK SCREEN
+    const [view, setView] = useState<View>('DASH');
+    const [url, setUrl] = useState('https://xandeum-pulse.vercel.app');
     const [isAnimating, setIsAnimating] = useState(false);
     const [readyButtons, setReadyButtons] = useState<string[]>([]);
     
@@ -379,26 +376,43 @@ function PulseOS_Simulator() {
     const [mapMode, setMapMode] = useState<'STORAGE' | 'HEALTH' | 'CREDITS'>('STORAGE');
     const [mapExpanded, setMapExpanded] = useState(false);
 
-    // --- BOOT SEQUENCE (URL Typing) ---
+    // --- BOOT SEQUENCE (COSMETIC ONLY) ---
     useEffect(() => {
-        if (view === 'BOOT') {
-            const targetUrl = 'https://xandeum-pulse.vercel.app';
-            let i = 0;
-            const typeInterval = setInterval(() => {
-                if (i <= targetUrl.length) {
-                    setUrl(targetUrl.slice(0, i));
-                    i++;
-                } else {
-                    clearInterval(typeInterval);
-                    setTimeout(() => {
-                        setView('DASH');
-                        setTimeout(() => setReadyButtons(['card-1']), 800);
-                    }, 500);
-                }
-            }, 40);
-            return () => clearInterval(typeInterval);
-        }
-    }, [view]);
+        // Only run typing effect on mount
+        const targetUrl = 'https://xandeum-pulse.vercel.app';
+        let i = 0;
+        
+        // Start typing visual
+        const typeInterval = setInterval(() => {
+            if (i <= targetUrl.length) {
+                setUrl(targetUrl.slice(0, i));
+                i++;
+            } else {
+                clearInterval(typeInterval);
+                // Ensure first card is interactive after typing
+                setReadyButtons(['card-1']);
+            }
+        }, 30);
+
+        // Fallback: Ensure interface is usable even if interval hangs
+        setTimeout(() => setReadyButtons(['card-1']), 1500);
+
+        return () => clearInterval(typeInterval);
+    }, []);
+
+    // --- REBOOT ---
+    const reboot = () => {
+        setView('DASH');
+        setReadyButtons([]);
+        setIsAnimating(false);
+        setUrl('');
+        
+        // Retrigger boot logic roughly
+        setTimeout(() => {
+            setUrl('https://xandeum-pulse.vercel.app');
+            setReadyButtons(['card-1']);
+        }, 500);
+    }
 
     // --- NAVIGATION FUNCTION ---
     const navigate = (target: View, animationDuration = 1000, urlSuffix = '') => {
@@ -458,7 +472,7 @@ function PulseOS_Simulator() {
     };
 
     return (
-        <div className="w-full h-full flex flex-col font-sans text-sm select-none">
+        <div className="w-full h-full flex flex-col font-sans text-sm select-none bg-black">
             {/* --- BROWSER BAR --- */}
             <div className="h-10 bg-[#18181b] border-b border-zinc-800 flex items-center px-4 gap-3 shrink-0">
                 <div className="flex gap-1.5">
@@ -466,25 +480,22 @@ function PulseOS_Simulator() {
                     <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50"></div>
                     <div className="w-2.5 h-2.5 rounded-full bg-green-500/50"></div>
                 </div>
-                <div className="flex-1 bg-black rounded border border-zinc-800 h-6 flex items-center px-3 text-[10px] font-mono text-zinc-400">
-                    <Lock size={8} className="mr-2 text-green-500"/>
-                    {url}<span className="animate-pulse">_</span>
+                <div className="flex-1 bg-black rounded border border-zinc-800 h-6 flex items-center px-3 text-[10px] font-mono text-zinc-400 justify-between group">
+                    <div className="flex items-center truncate">
+                        <Lock size={8} className="mr-2 text-green-500"/>
+                        {url}
+                    </div>
+                    {/* Fixed: wrapped in button to validly support title prop */}
+                    <button onClick={reboot} title="Reboot System" className="cursor-pointer hover:text-white bg-transparent border-none p-0 flex items-center">
+                        <RotateCcw size={10} />
+                    </button>
                 </div>
             </div>
 
             {/* --- VIEWPORT --- */}
-            <div className="flex-1 relative bg-black overflow-hidden">
+            {/* Added texture via radial gradient to prevent 'black void' look */}
+            <div className="flex-1 relative bg-black overflow-hidden h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-zinc-900/50 via-black to-black">
                 
-                {/* === BOOT/LOADING === */}
-                {view === 'BOOT' && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-center">
-                            <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
-                            <div className="text-xs font-mono text-zinc-500">INITIALIZING PULSE...</div>
-                        </div>
-                    </div>
-                )}
-
                 {/* === DASHBOARD VIEW === */}
                 {view === 'DASH' && (
                     <div className="absolute inset-0 p-6 md:p-8 animate-in fade-in duration-500">
