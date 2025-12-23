@@ -423,6 +423,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+  const [scrolled, setScrolled] = useState(false);
 
   // Network Stats
   const [networkStats, setNetworkStats] = useState({
@@ -497,10 +498,16 @@ export default function Home() {
     
     const dataInterval = setInterval(fetchData, 30000);
     
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    
     return () => {
       clearInterval(cycleInterval);
       clearInterval(tipInterval);
       clearInterval(dataInterval);
+      window.removeEventListener('scroll', handleScroll);
     };
   }, [isSearchFocused]);
 
@@ -655,6 +662,7 @@ export default function Home() {
 
   const shareToTwitter = (node: Node) => {
     const health = node.health || 0;
+    // FIX: Explicit null check on node.credits
     const creditsDisplay = node.credits !== null ? node.credits.toLocaleString() : 'N/A';
     
     const text = `Just checked my pNode status on Xandeum Pulse! ⚡\n\n🟢 Status: ${(node.uptime || 0) > 86400 ? 'Stable' : 'Booting'}\n❤️ Health: ${health}/100\n💰 Credits: ${creditsDisplay}\n\nMonitor here:`;
@@ -674,6 +682,7 @@ export default function Home() {
   const exportCSV = () => {
     const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Health_Score,Country,Last_Seen_ISO,Is_Favorite\n';
     const rows = filteredNodes.map(n => {
+      // FIX: Handle Null Credits for CSV
       const creditVal = n.credits !== null ? n.credits : 'NULL';
       return `${getSafeIp(n)},${n.pubkey || 'Unknown'},${n.rank},${creditVal},${getSafeVersion(n)},${n.uptime},${n.storage_committed},${n.storage_used},${n.health},${n.location?.countryName},${new Date(n.last_seen_timestamp || 0).toISOString()},${favorites.includes(n.address || '')}`;
     });
@@ -826,7 +835,7 @@ export default function Home() {
     const cycleData = getCycleContent(node);
     const isFav = favorites.includes(node.address || '');
     const isVersionSort = sortBy === 'version';
-    const isLatest = checkIsLatest(node.version); 
+    const isLatest = checkIsLatest(node.version);
     const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' 
       ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` 
       : null;
@@ -1486,13 +1495,14 @@ export default function Home() {
               />
             </div>
 
+            {/* ROTATING TOOLTIPS: Now visible on mobile but smaller font */}
             {!zenMode && (
-              <div className="mt-2 text-center pointer-events-none w-full min-h-[20px] transition-all duration-300 hidden md:block">
+              <div className="mt-1 md:mt-2 text-center pointer-events-none w-full min-h-[16px] md:min-h-[20px] transition-all duration-300 block">
                 <p
                   key={searchTipIndex}
-                  className="text-[10px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 whitespace-normal text-center leading-tight"
+                  className="text-[9px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 whitespace-normal text-center leading-tight"
                 >
-                  <Info size={12} className="text-blue-500 shrink-0" />
+                  <Info size={10} className="text-blue-500 shrink-0 md:w-3 md:h-3" />
                   <span>
                     {isSearchFocused
                       ? 'Type to filter nodes instantly'
@@ -1590,7 +1600,7 @@ export default function Home() {
         
         {/* NEW: Distribution Text Row (Inside Header, Bottom) */}
         <div className="w-full text-center border-t border-zinc-800/50 pt-2 mt-2 pb-1">
-             <span className="text-[10px] md:text-xs text-zinc-500 font-mono tracking-wide">
+             <span className="text-[8px] md:text-xs text-zinc-500 font-mono tracking-wide">
                  Nodes distributed by <span className="text-zinc-300 font-bold">{sortBy.toUpperCase()}</span> ({sortOrder === 'asc' ? 'Lowest to Highest' : 'Highest to Lowest'})
              </span>
         </div>
