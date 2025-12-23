@@ -22,13 +22,18 @@ export interface EnrichedNode {
   is_public: boolean;
   storage_used: number;      
   storage_committed: number; 
-  credits: number | null; // Nullable
+  credits: number | null; 
   health: number;
   healthBreakdown: {
       uptime: number;
       version: number;
       reputation: number | null;
       storage: number;
+  };
+  // NEW: Specific breakdown for the UI
+  storageBreakdown: {
+      base: number;
+      bonus: number;
   };
   location: {
     lat: number;
@@ -87,7 +92,7 @@ const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, so
     return Math.max(0, 10 - (distance - 5)); 
 };
 
-// --- MAIN SCORING LOGIC (Dynamic Re-Weighting) ---
+// --- MAIN SCORING LOGIC ---
 const calculateVitalityScore = (
     storageCommitted: number, 
     storageUsed: number,
@@ -101,7 +106,11 @@ const calculateVitalityScore = (
 ) => {
   // 1. GATEKEEPER
   if (storageCommitted <= 0) {
-      return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
+      return { 
+          total: 0, 
+          breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 },
+          storageDetails: { base: 0, bonus: 0 }
+      };
   }
 
   // 2. UPTIME
@@ -109,18 +118,16 @@ const calculateVitalityScore = (
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
   if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
 
-  // 3. STORAGE (UPDATED LOGIC)
-  // Base score calculated against median, now capable of reaching 100 on its own.
+  // 3. STORAGE
+  // Base score up to 100 based on commitment vs median
   const baseStorageScore = calculateLogScore(storageCommitted, medianStorage, 100);
   
   let utilizationBonus = 0;
   if (storageUsed > 0) {
       const usedGB = storageUsed / (1024 ** 3);
-      // Bonus based on usage, capped at 15 points
+      // Bonus capped at 15
       utilizationBonus = Math.min(15, 5 * Math.log2(usedGB + 2)); 
   }
-  
-  // Final Storage Score = Base + Bonus (Clamped at 100)
   const totalStorageScore = Math.min(100, baseStorageScore + utilizationBonus);
 
   // 4. VERSION
@@ -131,7 +138,6 @@ const calculateVitalityScore = (
   let reputationScore: number | null = null;
 
   if (credits !== null && medianCredits > 0) {
-      // FULL MODE
       reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
       total = Math.round(
           (uptimeScore * 0.35) + 
@@ -140,7 +146,6 @@ const calculateVitalityScore = (
           (versionScore * 0.15)
       );
   } else {
-      // OUTAGE MODE
       total = Math.round(
           (uptimeScore * 0.45) + 
           (totalStorageScore * 0.35) + 
@@ -156,6 +161,11 @@ const calculateVitalityScore = (
           version: Math.round(versionScore),
           reputation: reputationScore,
           storage: Math.round(totalStorageScore) 
+      },
+      // Pass the raw components for the UI
+      storageDetails: {
+          base: Math.round(baseStorageScore),
+          bonus: Math.round(utilizationBonus)
       }
   };
 };
@@ -183,7 +193,7 @@ async function fetchCredits() {
         const res = await axios.get('https://podcredits.xandeum.network/api/pods-credits', { timeout: TIMEOUT_CREDITS });
         return res.data;
     } catch (error) { 
-        return null; // Explicit null for failure
+        return null; 
     }
 }
 
@@ -298,6 +308,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       credits, 
       health: vitality.total,
       healthBreakdown: vitality.breakdown, 
+      storageBreakdown: vitality.storageDetails, // Passed to Frontend
       location: { lat: loc.lat, lon: loc.lon, countryName: loc.country, countryCode: loc.countryCode, city: loc.city }
     };
   });
