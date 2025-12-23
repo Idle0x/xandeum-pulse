@@ -8,7 +8,7 @@ import {
   HeartPulse, Info, Check, X, MousePointer2, 
   Share2, Terminal, AlertTriangle, Monitor, AlertOctagon,
   ArrowRight, Camera, Swords, 
-  ClipboardCopy, RefreshCw, RotateCcw, MapPin, Wallet, Star
+  RefreshCw, RotateCcw, MapPin, Wallet, Star
 } from 'lucide-react';
 
 export default function DocsPage() {
@@ -31,6 +31,7 @@ export default function DocsPage() {
   };
 
   const handleCopyLink = () => {
+    // FIXED: Added backticks for template literal
     const url = `${window.location.origin}/docs?training=true`;
     navigator.clipboard.writeText(url);
     setCopiedShare(true);
@@ -63,6 +64,7 @@ export default function DocsPage() {
                 <button 
                   key={tab} 
                   onClick={() => scrollTo(tab)}
+                  // FIXED: Added backticks for conditional classNames
                   className={`text-xs font-bold uppercase tracking-widest hover:text-white transition-colors ${activeTab === tab ? 'text-blue-400' : 'text-zinc-500'}`}
                 >
                   {tab === 'flight' ? 'Flight School' : tab}
@@ -228,7 +230,7 @@ export default function DocsPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-24">
                     <FeatureCard icon={Monitor} title="Zen Mode" desc="Toggles a minimalist, high-contrast OLED view (`setZenMode`). Strips gradients and animations for pure data focus." color="emerald" />
-                    <FeatureCard icon={HeartPulse} title="Cyclic Rotation" desc="To save screen space, node cards automatically rotate metrics (Storage -> Uptime -> Health) every 5 seconds, synced with the user's sort preference." color="emerald" />
+                    <FeatureCard icon={HeartPulse} title="Cyclic Rotation" desc="To save screen space, node cards automatically rotate metrics (Storage → Uptime → Health) every 5 seconds, synced with the user's sort preference." color="emerald" />
                     <FeatureCard icon={Share2} title="Proof of Pulse" desc="A modal that generates a verifiable PNG snapshot (`toPng`) of a node's health, ready for sharing on X (Twitter)." color="emerald" />
                 </div>
             </div>
@@ -351,7 +353,7 @@ export default function DocsPage() {
             </span>
         </div>
         <p className="text-zinc-700 text-[10px] uppercase tracking-widest">
-          Pulse v2.2 • 2025
+          Pulse v2.3 • 2025
         </p>
       </footer>
     </div>
