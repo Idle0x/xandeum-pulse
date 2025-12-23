@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -660,5 +660,201 @@ function PulseOS_Simulator() {
     )
 }
 
-// ... (Other components: VitalitySimulator, FailoverVisualizer, XRaySimulator, FeatureCard remain exactly as provided in v2.0)
-// Ensure you include them here to make the code complete.
+
+// --- 2. VITALITY SIMULATOR (UPDATED) ---
+function VitalitySimulator() {
+    const [uptimeDays, setUptimeDays] = useState(14);
+    const [storageTB, setStorageTB] = useState(2);
+    const [credits, setCredits] = useState(5000);
+    const [versionGap, setVersionGap] = useState(0);
+    const [apiOnline, setApiOnline] = useState(true);
+    
+    // Scores
+    const uScore = Math.min(100, Math.round(100 / (1 + Math.exp(-0.2 * (uptimeDays - 7)))));
+    const sScore = Math.min(100, Math.round(50 * Math.log2((storageTB/1) + 1)));
+    const cScore = apiOnline ? Math.min(100, Math.round((credits / 10000) * 100)) : 0;
+    const vScore = versionGap === 0 ? 100 : versionGap === 1 ? 90 : versionGap === 2 ? 70 : 30;
+    
+    // Weighted Total Logic
+    let totalScore = 0;
+    if (apiOnline) {
+        // Standard: 35% Uptime, 30% Storage, 20% Credits, 15% Version
+        totalScore = Math.round((uScore * 0.35) + (sScore * 0.30) + (cScore * 0.20) + (vScore * 0.15));
+    } else {
+        // Failover: 45% Uptime, 35% Storage, 0% Credits, 20% Version
+        totalScore = Math.round((uScore * 0.45) + (sScore * 0.35) + (vScore * 0.20));
+    }
+    
+    return (
+        <div className="bg-black border border-zinc-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
+            <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r transition-all duration-500 ${apiOnline ? 'from-blue-500 via-purple-500 to-green-500' : 'from-red-500 via-orange-500 to-yellow-500'}`}></div>
+            
+            <div className="flex justify-between items-center mb-6">
+                <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                    <Activity size={14} /> Vitality Engine
+                </span>
+                
+                {/* API TOGGLE */}
+                <button 
+                    onClick={() => setApiOnline(!apiOnline)}
+                    className={`px-3 py-1 rounded-full text-[10px] font-bold border flex items-center gap-2 transition-all ${apiOnline ? 'bg-green-500/10 border-green-500 text-green-400' : 'bg-red-500/10 border-red-500 text-red-400'}`}
+                >
+                    {apiOnline ? <Check size={10}/> : <AlertOctagon size={10}/>}
+                    {apiOnline ? "API ONLINE" : "API DOWN (FAILOVER)"}
+                </button>
+            </div>
+
+            <div className="text-center mb-8">
+                <div className={`text-6xl font-extrabold transition-colors duration-500 ${totalScore > 80 ? 'text-green-500' : totalScore > 50 ? 'text-yellow-500' : 'text-red-500'}`}>
+                    {totalScore}
+                </div>
+                <div className="text-xs text-zinc-500 mt-2 font-mono">LIVE SCORE CALCULATION</div>
+            </div>
+            
+            <div className="space-y-6">
+                {/* Uptime */}
+                <div>
+                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
+                        <span className="text-blue-400">Uptime ({apiOnline ? '35%' : '45%'})</span>
+                        <span className="text-white">{uScore} pts</span>
+                    </div>
+                    <input type="range" min="0" max="30" value={uptimeDays} onChange={(e) => setUptimeDays(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500"/>
+                </div>
+
+                {/* Storage */}
+                <div>
+                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
+                        <span className="text-purple-400">Storage ({apiOnline ? '30%' : '35%'})</span>
+                        <span className="text-white">{sScore} pts</span>
+                    </div>
+                    <input type="range" min="0" max="10" step="0.1" value={storageTB} onChange={(e) => setStorageTB(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-purple-500"/>
+                </div>
+
+                {/* Credits (Disabled if API Down) */}
+                <div className={`transition-opacity duration-500 ${apiOnline ? 'opacity-100' : 'opacity-30 grayscale'}`}>
+                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
+                        <span className="text-yellow-500">Credits ({apiOnline ? '20%' : '0%'})</span>
+                        <span className="text-white">{apiOnline ? cScore : 'N/A'} pts</span>
+                    </div>
+                    <input disabled={!apiOnline} type="range" min="0" max="20000" value={credits} onChange={(e) => setCredits(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-yellow-500 disabled:cursor-not-allowed"/>
+                    {!apiOnline && <div className="text-[9px] text-red-500 mt-1 font-bold">⚠ SIGNAL LOST: EXCLUDED FROM CALCULATION</div>}
+                </div>
+
+                {/* Version */}
+                <div>
+                    <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
+                        <span className="text-green-500">Version ({apiOnline ? '15%' : '20%'})</span>
+                        <span className="text-white">{vScore} pts</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                        {['Latest', '-1', '-2', 'Old'].map((label, i) => (
+                            <button key={i} onClick={() => setVersionGap(i)} className={`py-1 rounded text-[9px] font-bold border ${versionGap === i ? 'bg-green-500/20 border-green-500 text-green-400' : 'bg-zinc-900 border-zinc-800 text-zinc-500'}`}>{label}</button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// --- 3. FAILOVER VISUALIZER (Unchanged Logic, refreshed UI) ---
+function FailoverVisualizer() {
+    const [step, setStep] = useState(0);
+    useEffect(() => {
+        const interval = setInterval(() => setStep(prev => (prev + 1) % 5), 1500);
+        return () => clearInterval(interval);
+    }, []);
+    const logs = ["System Idle...", "Connecting Primary [173.x]...", "TIMEOUT (>4000ms)!", "RACE MODE: 3 Backups...", "Winner: Node 2 (80ms)"];
+
+    return (
+        <div>
+            <div className="mb-6 flex items-center justify-between relative h-24 select-none">
+                <div className="z-10 flex flex-col items-center gap-2">
+                    <div className="w-12 h-12 bg-zinc-900 rounded-full flex items-center justify-center border border-zinc-700 shadow-xl"><Monitor size={20} className="text-white" /></div>
+                    <span className="text-[9px] font-bold uppercase text-zinc-500">Client</span>
+                </div>
+                <div className="absolute top-1/2 left-12 right-12 h-0.5 bg-zinc-800 -translate-y-1/2"></div>
+                {step === 1 && <div className="absolute top-1/2 left-16 w-3 h-3 bg-blue-500 rounded-full -translate-y-1/2 animate-[ping_1s_infinite]"></div>}
+                {step === 2 && <div className="absolute top-1/2 left-1/2 w-4 h-4 bg-red-500 rounded-full -translate-y-1/2"></div>}
+                {step === 3 && <><div className="absolute top-1/3 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><div className="absolute top-1/2 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><div className="absolute top-2/3 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div></>}
+                
+                <div className="z-10 flex flex-col gap-2">
+                    <div className={`px-3 py-1 rounded border text-[10px] font-bold transition-all ${step === 2 ? 'bg-red-500/10 border-red-500 text-red-500' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>Primary</div>
+                    <div className={`px-3 py-1 rounded border text-[10px] font-bold transition-all ${step >= 4 ? 'bg-green-500/10 border-green-500 text-green-500 scale-105' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>Backups</div>
+                </div>
+            </div>
+            <div className="bg-black/80 rounded-lg p-3 font-mono text-[9px] text-zinc-400 border-t-2 border-zinc-800 h-24 flex flex-col justify-end">
+                {logs.map((log, i) => (
+                    <div key={i} className={`transition-opacity duration-300 ${i === step ? 'text-green-400 opacity-100' : i < step ? 'opacity-30' : 'opacity-0'}`}>
+                        <span className="text-zinc-600 mr-2">{`[00:0${i}]`}</span>{log}
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+// --- 4. X-RAY SIMULATOR (UPDATED with CREDITS) ---
+function XRaySimulator() {
+    const [mode, setMode] = useState<'STORAGE' | 'HEALTH' | 'CREDITS'>('STORAGE');
+
+    return (
+        <div className="relative">
+            <div className="flex gap-2 mb-8 justify-center">
+                {['STORAGE', 'HEALTH', 'CREDITS'].map(m => (
+                    <button key={m} onClick={() => setMode(m as any)} className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border ${mode === m ? 'bg-white text-black border-white' : 'bg-zinc-900 text-zinc-500 border-zinc-800'}`}>{m}</button>
+                ))}
+            </div>
+
+            <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 transition-all max-w-sm mx-auto shadow-2xl relative overflow-hidden h-64 flex flex-col justify-center">
+                <div className={`absolute top-0 right-0 p-24 blur-[80px] rounded-full opacity-20 transition-colors duration-500 ${mode === 'STORAGE' ? 'bg-indigo-500' : mode === 'HEALTH' ? 'bg-emerald-500' : 'bg-yellow-500'}`}></div>
+
+                <div className="flex justify-between items-center mb-6 relative z-10">
+                    <div className="font-bold text-white text-lg">Lisbon, PT</div>
+                    <div className={`text-sm font-mono font-bold ${mode === 'STORAGE' ? 'text-indigo-400' : mode === 'HEALTH' ? 'text-emerald-400' : 'text-yellow-500'}`}>
+                        {mode === 'STORAGE' ? '1.2 PB' : mode === 'HEALTH' ? '98% Score' : '5.2M Cr'}
+                    </div>
+                </div>
+                
+                <div className="bg-black/50 p-4 rounded-xl border border-white/5 relative z-10">
+                    <div className="flex justify-center mb-4">
+                        <span className={`text-[10px] uppercase font-bold px-3 py-1.5 rounded border tracking-widest ${mode === 'STORAGE' ? 'text-indigo-400 border-indigo-500/30' : mode === 'HEALTH' ? 'text-emerald-400 border-emerald-500/30' : 'text-yellow-500 border-yellow-500/30'}`}>
+                            {mode === 'STORAGE' ? 'MASSIVE TIER' : mode === 'HEALTH' ? 'FLAWLESS TIER' : 'ELITE EARNER'}
+                        </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                            <div className="text-[10px] text-zinc-500 uppercase mb-1 font-bold">
+                                {mode === 'STORAGE' ? 'Avg Density' : mode === 'HEALTH' ? 'Status' : 'Economy'}
+                            </div>
+                            <div className="text-white font-mono text-xs font-bold">
+                                {mode === 'STORAGE' ? '120 TB / Node' : mode === 'HEALTH' ? '5 Up • 0 Down' : '2.1% Share'}
+                            </div>
+                        </div>
+                        <div className="border-l border-zinc-800">
+                            <div className="text-[10px] text-zinc-500 uppercase mb-1 font-bold">
+                                {mode === 'STORAGE' ? 'Global Share' : mode === 'HEALTH' ? 'King Node' : 'Top Earner'}
+                            </div>
+                            <div className="text-white font-mono text-xs font-bold truncate px-2">
+                                {mode === 'STORAGE' ? '12.5%' : '8x...2A'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function FeatureCard({ icon: Icon, title, desc, color = "blue" }: { icon: any, title: string, desc: string, color?: string }) {
+    return (
+        <div className="p-8 bg-zinc-900/20 border border-zinc-800 rounded-3xl hover:bg-zinc-900/40 transition-all group hover:-translate-y-1">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-6 transition-all bg-zinc-800 text-zinc-400 group-hover:bg-emerald-500/20 group-hover:text-emerald-400`}>
+                <Icon size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-white mb-3">{title}</h3>
+            <p className="text-sm text-zinc-400 leading-relaxed">{desc}</p>
+        </div>
+    )
+}
