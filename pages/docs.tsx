@@ -420,7 +420,10 @@ function PulseOS_Simulator() {
                         <Lock size={8} className="mr-2 text-green-500"/>
                         {url}
                     </div>
-                    <RotateCcw size={10} className="cursor-pointer hover:text-white" onClick={reboot} title="Reboot System"/>
+                    {/* FIXED: Wrapped in button to validly support title prop */}
+                    <button onClick={reboot} title="Reboot System" className="cursor-pointer hover:text-white bg-transparent border-none p-0 flex items-center">
+                        <RotateCcw size={10} />
+                    </button>
                 </div>
             </div>
 
