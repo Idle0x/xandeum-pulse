@@ -7,7 +7,8 @@ import {
   Trophy, Medal, ArrowLeft, Search, Wallet, X, 
   Activity, Users, BarChart3, HelpCircle, Star, 
   Calculator, Zap, ChevronDown, 
-  ExternalLink, ArrowUpRight, Eye, MapPin, Copy, Check, Share2, ArrowUp, ArrowDown
+  ExternalLink, ArrowUpRight, Eye, MapPin, Copy, Check, Share2, ArrowUp, ArrowDown,
+  AlertOctagon // New error icon
 } from 'lucide-react';
 
 interface RankedNode {
@@ -19,8 +20,7 @@ interface RankedNode {
       countryName: string;
       countryCode: string;
   };
-  // NEW: Trend Data
-  trend: number; // 0 = same, >0 = up, <0 = down
+  trend: number; 
 }
 
 const ERA_BOOSTS = { 'DeepSouth': 16, 'South': 10, 'Main': 7, 'Coal': 3.5, 'Central': 2, 'North': 1.25 };
@@ -30,10 +30,11 @@ export default function Leaderboard() {
   const router = useRouter();
   const [ranking, setRanking] = useState<RankedNode[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creditsOffline, setCreditsOffline] = useState(false); // CRASHPROOF FLAG
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState<string[]>([]);
   
-  // --- SIMULATOR STATE ---
+  // Simulator State
   const [showSim, setShowSim] = useState(false);
   const [showHardwareCalc, setShowHardwareCalc] = useState(false);
   
@@ -47,96 +48,103 @@ export default function Leaderboard() {
   const [simBoosts, setSimBoosts] = useState<number[]>([]); 
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
-  // EXPANDED ROW STATE
+  // Expanded Row
   const [expandedNode, setExpandedNode] = useState<string | null>(null);
   
-  // COPY/SHARE FEEDBACK STATE
+  // Feedback State
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
-  // DEEP LINK REF
   const hasDeepLinked = useRef(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [creditsRes, statsRes] = await Promise.all([
-          axios.get('/api/credits'),
-          axios.get('/api/stats')
+          axios.get('/api/credits').catch(() => ({ data: [] })), // Catch error locally
+          axios.get('/api/stats').catch(() => ({ data: { result: { pods: [] } } }))
         ]);
 
         const metaMap = new Map<string, { address: string, location?: any }>();
-        if (statsRes.data.result?.pods) {
+        if (statsRes.data?.result?.pods) {
             statsRes.data.result.pods.forEach((node: any) => {
                 metaMap.set(node.pubkey, { address: node.address, location: node.location });
             });
         }
 
-        // --- 1. FETCH HISTORICAL RANKS (For Whale Watch) ---
-        const historyRaw = localStorage.getItem('xandeum_rank_history');
-        const history = historyRaw ? JSON.parse(historyRaw) : {};
-        const newHistory: Record<string, number> = {};
-
+        // CRASHPROOF: Detect if credits API returned valid data
+        // If array is empty but we have nodes, it means credits API is likely down
         const rawData = creditsRes.data.pods_credits || creditsRes.data;
-        let parsedList: RankedNode[] = [];
-
-        if (Array.isArray(rawData)) {
-          parsedList = rawData.map((item: any) => {
-            const pKey = item.pod_id || item.pubkey || 'Unknown';
-            const meta = metaMap.get(pKey);
-            return {
-              pubkey: pKey,
-              credits: Number(item.credits || 0),
-              rank: 0, // Calculated below
-              address: meta?.address,
-              location: meta?.location,
-              trend: 0
-            };
-          });
-        }
-
-        // Sort & Rank
-        parsedList.sort((a, b) => b.credits - a.credits);
         
-        let currentRank = 1;
-        for (let i = 0; i < parsedList.length; i++) {
-          if (i > 0 && parsedList[i].credits < parsedList[i - 1].credits) currentRank = i + 1;
-          parsedList[i].rank = currentRank;
-          
-          // --- 2. CALCULATE TREND ---
-          const prevRank = history[parsedList[i].pubkey];
-          if (prevRank) {
-              // If previous rank was 10 and now 5, trend is +5 (Positive is good)
-              parsedList[i].trend = prevRank - currentRank;
-          }
-          // Save current rank for next time
-          newHistory[parsedList[i].pubkey] = currentRank;
+        if (!rawData || !Array.isArray(rawData) || rawData.length === 0) {
+             setCreditsOffline(true);
+             // We can still show nodes, just with 0 credits if we wanted, 
+             // but for a LEADERBOARD, showing 0s is useless.
+             // We'll keep the list empty and show a specific error state below.
+             setRanking([]); 
+        } else {
+            setCreditsOffline(false);
+            
+            // 1. Fetch History
+            let history: Record<string, number> = {};
+            try {
+                const h = localStorage.getItem('xandeum_rank_history');
+                if (h) history = JSON.parse(h);
+            } catch (e) {}
+            
+            const newHistory: Record<string, number> = {};
+
+            // 2. Parse
+            const parsedList: RankedNode[] = rawData.map((item: any) => {
+                const pKey = item.pod_id || item.pubkey || 'Unknown';
+                const meta = metaMap.get(pKey);
+                return {
+                pubkey: pKey,
+                credits: Number(item.credits || 0),
+                rank: 0, 
+                address: meta?.address,
+                location: meta?.location,
+                trend: 0
+                };
+            });
+
+            // 3. Sort & Rank
+            parsedList.sort((a, b) => b.credits - a.credits);
+            
+            let currentRank = 1;
+            for (let i = 0; i < parsedList.length; i++) {
+                if (i > 0 && parsedList[i].credits < parsedList[i - 1].credits) currentRank = i + 1;
+                parsedList[i].rank = currentRank;
+                
+                // Trend
+                const prevRank = history[parsedList[i].pubkey];
+                if (prevRank) parsedList[i].trend = prevRank - currentRank;
+                newHistory[parsedList[i].pubkey] = currentRank;
+            }
+
+            localStorage.setItem('xandeum_rank_history', JSON.stringify(newHistory));
+            setRanking(parsedList);
+            
+            // Deep Link Logic
+            if (router.isReady && router.query.highlight && !hasDeepLinked.current) {
+                const targetKey = router.query.highlight as string;
+                if (parsedList.some(n => n.pubkey === targetKey)) {
+                    hasDeepLinked.current = true;
+                    setTimeout(() => {
+                        setExpandedNode(targetKey);
+                        const el = document.getElementById(`node-${targetKey}`);
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 500);
+                }
+            }
         }
-
-        // Save history back to local storage
-        localStorage.setItem('xandeum_rank_history', JSON.stringify(newHistory));
-
-        setRanking(parsedList);
-        if (parsedList.length > 0 && baseCreditsInput === 0) setBaseCreditsInput(parsedList[0].credits);
 
         const saved = localStorage.getItem('xandeum_favorites');
         if (saved) setFavorites(JSON.parse(saved));
 
-        // --- 3. HANDLE DEEP LINK (Share My Rank) ---
-        if (router.isReady && router.query.highlight && !hasDeepLinked.current) {
-            const targetKey = router.query.highlight as string;
-            if (parsedList.some(n => n.pubkey === targetKey)) {
-                hasDeepLinked.current = true;
-                setTimeout(() => {
-                    setExpandedNode(targetKey);
-                    const el = document.getElementById(`node-${targetKey}`);
-                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 500);
-            }
-        }
-
       } catch (err) {
-        console.error("Leaderboard Error:", err);
+        console.error("Leaderboard Fatal:", err);
+        setCreditsOffline(true);
       } finally {
         setLoading(false);
       }
@@ -178,7 +186,6 @@ export default function Leaderboard() {
       setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  // --- NEW: SHARE URL LOGIC ---
   const handleShareUrl = (e: React.MouseEvent, key: string) => {
       e.stopPropagation();
       const url = `${window.location.origin}/leaderboard?highlight=${key}`;
@@ -220,7 +227,7 @@ export default function Leaderboard() {
         <div className="w-32 hidden md:block"></div>
       </div>
 
-      {/* --- STOINC SIMULATOR WIDGET --- */}
+      {/* --- STOINC SIMULATOR WIDGET (Always visible even if API down) --- */}
       <div className="max-w-5xl mx-auto mb-10 bg-gradient-to-b from-zinc-900 to-black border border-yellow-500/30 rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.1)] transition-all duration-300">
           <div className="p-4 bg-yellow-500/10 border-b border-yellow-500/20 flex justify-between items-center cursor-pointer hover:bg-yellow-500/20 transition" onClick={() => setShowSim(!showSim)}>
               <div className="flex items-center gap-3">
@@ -287,11 +294,19 @@ export default function Leaderboard() {
                           </div>
                           <div className="space-y-4">
                               <div className="flex justify-between items-center border-b border-zinc-800 pb-4 relative"><span className="text-xs text-zinc-400 flex items-center gap-1">Projected Credits</span><span className="font-mono text-2xl font-bold text-yellow-500 text-shadow-glow">{simResult.boosted.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></div>
-                              <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl text-center relative">
-                                  <div className="text-[10px] text-blue-400 font-bold uppercase mb-1 flex items-center justify-center gap-1">Est. Network Share</div>
-                                  <div className="text-2xl font-bold text-white">{ranking.length > 0 ? ((simResult.boosted / (ranking.reduce((a,b)=>a+b.credits, 0) + simResult.boosted)) * 100).toFixed(8) : '0.00'}%</div>
-                                  <div className="text-[9px] text-blue-300/50 mt-1">of Total Epoch Rewards</div>
-                              </div>
+                              {/* If offline, we can't calc share */}
+                              {!creditsOffline ? (
+                                <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl text-center relative">
+                                    <div className="text-[10px] text-blue-400 font-bold uppercase mb-1 flex items-center justify-center gap-1">Est. Network Share</div>
+                                    <div className="text-2xl font-bold text-white">{ranking.length > 0 ? ((simResult.boosted / (ranking.reduce((a,b)=>a+b.credits, 0) + simResult.boosted)) * 100).toFixed(8) : '0.00'}%</div>
+                                    <div className="text-[9px] text-blue-300/50 mt-1">of Total Epoch Rewards</div>
+                                </div>
+                              ) : (
+                                <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-center relative">
+                                    <div className="text-[10px] text-red-400 font-bold uppercase mb-1 flex items-center justify-center gap-1">Network Offline</div>
+                                    <div className="text-xs text-zinc-400">Cannot calculate share</div>
+                                </div>
+                              )}
                           </div>
                       </div>
                   </div>
@@ -300,7 +315,7 @@ export default function Leaderboard() {
       </div>
 
       {/* NETWORK STATS BAR */}
-      {!loading && ranking.length > 0 && (
+      {!loading && !creditsOffline && ranking.length > 0 && (
         <div className="max-w-5xl mx-auto mb-10 grid grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Users size={12}/> Nodes with Credits</div><div className="text-2xl font-bold text-white mt-1">{ranking.length}</div></div>
           <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Wallet size={12}/> Total Credits Issued</div><div className="text-2xl font-bold text-yellow-400 mt-1">{(ranking.reduce((sum, n) => sum + n.credits, 0) / 1000000).toFixed(1)}M</div></div>
@@ -326,12 +341,19 @@ export default function Leaderboard() {
           <div className="col-span-4 text-right">Credits</div>
         </div>
 
+        {/* --- CRASHPROOF ERROR STATE --- */}
         {loading ? (
           <div className="absolute inset-0 flex items-center justify-center">
              <div className="text-center animate-pulse text-zinc-500 font-mono flex flex-col items-center gap-3">
                 <div className="w-8 h-8 border-4 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin"></div>
                 CALCULATING FORTUNES...
              </div>
+          </div>
+        ) : creditsOffline ? (
+          <div className="p-20 text-center flex flex-col items-center justify-center h-full">
+              <AlertOctagon size={48} className="text-red-500 mb-4" />
+              <h3 className="text-lg font-bold text-white mb-2">Credits System Offline</h3>
+              <p className="text-sm text-zinc-500 max-w-sm">The upstream Xandeum Credits API is currently unreachable. Leaderboard rankings are temporarily unavailable.</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="p-20 text-center text-zinc-600"><Search size={48} className="mx-auto mb-4 opacity-50" /><p>No nodes match your search.</p></div>
@@ -375,7 +397,7 @@ export default function Leaderboard() {
                         </div>
                     </div>
 
-                    {/* EXPANDED ACTIONS - UPDATED */}
+                    {/* EXPANDED ACTIONS */}
                     {isExpanded && (
                         <div className="bg-black/40 border-b border-zinc-800/50 p-4 pl-4 md:pl-12 animate-in slide-in-from-top-2 duration-200">
                             <div className="flex flex-col gap-4">
@@ -383,7 +405,7 @@ export default function Leaderboard() {
                                     
                                     {/* ROW 1: ACTIONS */}
                                     <div className="flex gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
-                                        {/* 1. VIEW ON MAP (New) */}
+                                        {/* 1. VIEW ON MAP */}
                                         {node.address && (
                                             <Link href={`/map?focus=${node.address.split(':')[0]}`}>
                                                 <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-blue-900/20 border border-blue-500/30 hover:bg-blue-900/40 text-xs font-bold text-blue-400 transition-all whitespace-nowrap">
@@ -393,7 +415,7 @@ export default function Leaderboard() {
                                             </Link>
                                         )}
 
-                                        {/* 2. VIEW DIAGNOSTICS (Renamed) */}
+                                        {/* 2. VIEW DIAGNOSTICS */}
                                         <Link href={`/?open=${node.pubkey}`}>
                                             <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-xs font-bold text-white transition-all shadow-lg hover:shadow-blue-500/10 whitespace-nowrap">
                                                 <Activity size={14} className="text-green-400" />
@@ -413,7 +435,7 @@ export default function Leaderboard() {
                                         </button>
                                     </div>
 
-                                    {/* ROW 2: UTILS (Copy & Share) */}
+                                    {/* ROW 2: UTILS */}
                                     <div className="flex gap-2 w-full md:w-auto justify-start md:justify-end border-t md:border-t-0 border-white/5 pt-3 md:pt-0">
                                         <button 
                                             onClick={(e) => handleCopyKey(e, node.pubkey)}
@@ -444,7 +466,7 @@ export default function Leaderboard() {
       </div>
 
       {/* FOOTER */}
-      {!loading && (
+      {!loading && !creditsOffline && (
         <div className="max-w-5xl mx-auto mt-6 text-center text-xs text-zinc-600 flex flex-col md:flex-row items-center justify-center gap-2">
           <div className="flex items-center gap-2"><Eye size={12} /><span>Tracking <span className="text-zinc-400 font-bold">{ranking.length}</span> earning nodes. Top 100 displayed.</span></div>
           <span className="hidden md:inline text-zinc-700">•</span><span className="text-zinc-500">(Search to find others)</span>
