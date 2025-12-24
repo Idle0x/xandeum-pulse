@@ -9,7 +9,7 @@ import {
   Share2, Terminal, AlertTriangle, Monitor, AlertOctagon,
   ArrowRight, Camera, Swords, 
   ClipboardCopy, RefreshCw, RotateCcw, MapPin, Wallet, Star,
-  Eye, Search, Sliders, Radio, Grip 
+  Eye, Search, Sliders, Radio, Grip, FileJson, Link as LinkIcon, Hash
 } from 'lucide-react';
 
 export default function DocsPage() {
@@ -66,7 +66,7 @@ export default function DocsPage() {
                   onClick={() => scrollTo(tab)}
                   className={`text-xs font-bold uppercase tracking-widest hover:text-white transition-colors ${activeTab === tab ? 'text-blue-400' : 'text-zinc-500'}`}
                 >
-                  {tab === 'flight' ? 'Flight School' : tab}
+                  {tab === 'flight' ? 'how it works - flight school' : tab === 'manual' ? 'how it works - field manual' : tab}
                 </button>
              ))}
           </div>
@@ -115,7 +115,7 @@ export default function DocsPage() {
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-900/20 border border-blue-500/30 text-blue-400 text-[10px] font-bold uppercase tracking-widest mb-4">
                         <Terminal size={12} /> Interactive Walkthrough
                     </div>
-                    <h2 className="text-3xl md:text-5xl font-extrabold text-white">Flight School</h2>
+                    <h2 className="text-3xl md:text-5xl font-extrabold text-white lowercase">how it works - flight school</h2>
                     <p className="text-zinc-500 mt-4 max-w-lg mx-auto">
                         Don't just read the manual. Experience the platform. <br/>
                         Follow the <span className="text-blue-400 font-bold animate-pulse">Glowing Cues</span> to navigate the infinite ecosystem.
@@ -154,8 +154,8 @@ export default function DocsPage() {
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                         System Access Granted
                     </div>
-                    <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter uppercase">
-                        Field Manual <span className="text-zinc-700">v2.2</span>
+                    <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter lowercase">
+                        how it works - field manual
                     </h2>
                     <p className="text-zinc-400 text-sm md:text-base max-w-2xl mx-auto leading-relaxed font-light">
                         Pulse is not a passive display. It is an active intelligence tool. 
@@ -163,187 +163,131 @@ export default function DocsPage() {
                     </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
-                
-                    {/* --- STICKY NAV (Left Column) --- */}
-                    <div className="md:col-span-4 hidden md:block">
-                        <div className="sticky top-32 space-y-8 border-l border-zinc-800 pl-8">
-                        <div>
-                            <h3 className="text-white font-bold text-lg">Operational Protocols</h3>
-                            <p className="text-zinc-500 text-xs mt-2">Classified tactics for operators.</p>
-                        </div>
-                        <ul className="space-y-4 text-sm font-mono text-zinc-500">
-                            <li className="flex items-center gap-3 text-blue-400"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Surveillance</li>
-                            <li className="flex items-center gap-3 hover:text-zinc-300 transition-colors cursor-pointer">Interrogation</li>
-                            <li className="flex items-center gap-3 hover:text-zinc-300 transition-colors cursor-pointer">Spatial Recon</li>
-                            <li className="flex items-center gap-3 hover:text-zinc-300 transition-colors cursor-pointer">Forecasting</li>
-                            <li className="flex items-center gap-3 hover:text-zinc-300 transition-colors cursor-pointer">Versus Mode</li>
-                            <li className="flex items-center gap-3 hover:text-zinc-300 transition-colors cursor-pointer">The Ledger</li>
-                            <li className="flex items-center gap-3 text-purple-400"><div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-ping"></div> Subspace Echoes</li>
-                        </ul>
-                        </div>
+                {/* --- CONTENT CARDS (Staggered Grid) --- */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+                    
+                    <div className="md:mt-0">
+                        <ManualCard 
+                            type="CYCLIC"
+                            icon={Activity} 
+                            title="Cyclic Metric Rotation" 
+                            color="blue"
+                            tag="UX/UI"
+                            desc="Screen real estate is war. Node Cards automatically cycle their tertiary metric every 5 seconds. Storage → Capacity → Health. Changing the 'Sort By' filter instantly snaps all cards to the relevant metric." 
+                        />
                     </div>
 
-                    {/* --- CONTENT CARDS (Right Column) --- */}
-                    <div className="md:col-span-8 space-y-16">
-
-                        {/* 01. SURVEILLANCE */}
-                        <section className="space-y-6">
-                            <div className="flex items-center gap-4 mb-8">
-                                <span className="text-4xl font-black text-zinc-800">01</span>
-                                <h3 className="text-2xl font-bold text-white uppercase tracking-wider">Surveillance</h3>
-                            </div>
-                            
-                            <ManualCard 
-                                icon={Activity} 
-                                title="Cyclic Metric Rotation" 
-                                color="blue"
-                                tag="UX/UI"
-                                desc="Screen real estate is war. To win it, Node Cards automatically cycle their tertiary metric every 5 seconds. They rotate between Storage → Capacity → Health. Changing the 'Sort By' filter instantly snaps all cards to the relevant metric." 
-                            />
-                            <ManualCard 
-                                icon={Eye} 
-                                title="Zen Mode" 
-                                color="zinc"
-                                tag="OLED"
-                                desc="Visual noise kills focus. Click the Monitor Icon to engage Zen Mode. This strips away all gradients, blurs, and animations, leaving a high-contrast, OLED-black interface designed for 24/7 dedicated status screens." 
-                            />
-                        </section>
-
-                        {/* 02. INTERROGATION */}
-                        <section className="space-y-6">
-                            <div className="flex items-center gap-4 mb-8">
-                                <span className="text-4xl font-black text-zinc-800">02</span>
-                                <h3 className="text-2xl font-bold text-white uppercase tracking-wider">Interrogation</h3>
-                            </div>
-
-                            <ManualCard 
-                                icon={Search} 
-                                title="The Node Inspector" 
-                                color="red"
-                                tag="DIAGNOSTICS"
-                                desc="Clicking any node opens the Inspector. This is the source of truth. It breaks down the 'Vitality Score' into raw components: Uptime (Sigmoid Curve), Storage (Logarithmic Scale), and Consensus Version." 
-                            />
-                            <ManualCard 
-                                icon={Share2} 
-                                title="Proof of Pulse" 
-                                color="green"
-                                tag="SOCIAL"
-                                desc="Trust, but verify. Inside the Inspector, the Camera icon generates a 'Proof of Pulse'. This renders a cryptographic snapshot of that node's specific block-height and health status into a shareable PNG." 
-                            />
-                        </section>
-
-                        {/* 03. SPATIAL RECON */}
-                        <section className="space-y-6">
-                            <div className="flex items-center gap-4 mb-8">
-                                <span className="text-4xl font-black text-zinc-800">03</span>
-                                <h3 className="text-2xl font-bold text-white uppercase tracking-wider">Spatial Recon</h3>
-                            </div>
-
-                            <ManualCard 
-                                icon={MapIcon} 
-                                title="Context-Aware Tiers" 
-                                color="purple"
-                                tag="DYNAMIC"
-                                desc="The map rejects static thresholds. It uses Live Percentiles. A 'Gold' marker always represents the top 10% of nodes, whether the network average is 1TB or 1PB. It adapts as the network grows." 
-                            />
-                            <ManualCard 
-                                icon={AlertTriangle} 
-                                title="Ghost Nodes" 
-                                color="yellow"
-                                tag="PRIVACY"
-                                desc="Nodes running on VPNs or private subnets are tracked in the stats but hidden from the map to prevent geolocation errors. Look for the '⚠ Private Network' warning in the location headers." 
-                            />
-                        </section>
-
-                        {/* 04. ECONOMICS */}
-                        <section className="space-y-6">
-                            <div className="flex items-center gap-4 mb-8">
-                                <span className="text-4xl font-black text-zinc-800">04</span>
-                                <h3 className="text-2xl font-bold text-white uppercase tracking-wider">Forecasting</h3>
-                            </div>
-
-                            <ManualCard 
-                                icon={Zap} 
-                                title="STOINC Simulator" 
-                                color="yellow"
-                                tag="CALCULATOR"
-                                desc="Found on the Leaderboard, this tool forecasts earnings based on hardware. It uses Geometric Stacking—meaning NFT boosts and Era multipliers compound upon each other rather than adding linearly." 
-                            />
-                            <ManualCard 
-                                icon={Shield} 
-                                title="The Identity Bridge" 
-                                color="indigo"
-                                tag="BACKEND"
-                                desc="The Blockchain knows Keys. The Network knows IPs. Pulse acts as the bridge. We perform a 'Dual-Fetch Resolution' to link anonymous wallets to physical nodes, revealing where top earners are located." 
-                            />
-                        </section>
-
-                        {/* 05. VERSUS MODE */}
-                        <section className="space-y-6">
-                            <div className="flex items-center gap-4 mb-8">
-                                <span className="text-4xl font-black text-zinc-800">05</span>
-                                <h3 className="text-2xl font-bold text-white uppercase tracking-wider">Versus Protocols</h3>
-                            </div>
-
-                            <ManualCard 
-                                icon={Swords} 
-                                title="Head-to-Head Engine" 
-                                color="red"
-                                tag="PVP"
-                                desc="Don't just guess which node is better. The 'Compare' button in the modal launches a direct PVP overlay. It highlights differentials in green (advantage) or red (deficit) for Uptime, Version, and Yield." 
-                            />
-                        </section>
-
-                        {/* 06. LEADERBOARD */}
-                        <section className="space-y-6">
-                            <div className="flex items-center gap-4 mb-8">
-                                <span className="text-4xl font-black text-zinc-800">06</span>
-                                <h3 className="text-2xl font-bold text-white uppercase tracking-wider">The Ledger</h3>
-                            </div>
-
-                            <ManualCard 
-                                icon={Trophy} 
-                                title="Whale Watching" 
-                                color="yellow"
-                                tag="TRACKING"
-                                desc="The Leaderboard isn't just a list. It tracks Rank Deltas. A green arrow (▲) means a node is climbing the reputation ladder. A red arrow (▼) means they are losing consensus favor. Use this to spot rising stars." 
-                            />
-                        </section>
-
-                        {/* 07. ABSTRACT */}
-                        <section className="space-y-6">
-                            <div className="flex items-center gap-4 mb-8">
-                                <span className="text-4xl font-black text-zinc-800">07</span>
-                                <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 uppercase tracking-wider">Subspace Echoes</h3>
-                            </div>
-
-                            <div className="p-8 rounded-3xl border border-zinc-800 bg-zinc-900/30 backdrop-blur-md relative overflow-hidden group hover:border-purple-500/50 transition-all duration-500">
-                                <div className="absolute top-0 right-0 p-32 bg-purple-500/10 blur-[100px] rounded-full group-hover:bg-purple-500/20 transition-all"></div>
-                                
-                                <div className="flex items-start gap-6 relative z-10">
-                                    <div className="p-4 bg-black rounded-2xl border border-zinc-800 shadow-2xl shrink-0 group-hover:scale-110 transition-transform duration-500">
-                                        <Radio size={32} className="text-purple-400 animate-pulse" />
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center gap-3 mb-3">
-                                            <h4 className="text-xl font-bold text-white">The Gossip Listener</h4>
-                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase tracking-wide">Abstract</span>
-                                        </div>
-                                        <p className="text-sm text-zinc-400 leading-relaxed">
-                                            The dashboard doesn't just query a database; it listens to the "Gossip Protocol." 
-                                            Like a stethoscope on a machine, the <span className="text-zinc-200">EKG Lines</span> and <span className="text-zinc-200">Pulsing Orbs</span> you see aren't just decorations. 
-                                            They represent actual data packets traversing the network. When the network is quiet, Pulse is quiet. When the network spikes, Pulse glows. 
-                                            <br/><br/>
-                                            It is the visual heartbeat of the Xandeum organism.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-
+                    <div className="md:mt-24">
+                        <ManualCard 
+                            type="ZEN"
+                            icon={Eye} 
+                            title="Zen Mode" 
+                            color="zinc"
+                            tag="OLED"
+                            desc="Visual noise kills focus. Click the Monitor Icon to engage Zen Mode. This strips away all gradients, blurs, and animations, leaving a high-contrast, OLED-black interface designed for 24/7 dedicated status screens." 
+                        />
                     </div>
+
+                    <div className="md:mt-0">
+                        <ManualCard 
+                            type="INSPECTOR"
+                            icon={Search} 
+                            title="The Node Inspector" 
+                            color="red"
+                            tag="DIAGNOSTICS"
+                            desc="Clicking any node opens the Inspector. This is the source of truth. It breaks down the 'Vitality Score' into raw components: Uptime (Sigmoid Curve), Storage (Logarithmic Scale), and Consensus Version." 
+                        />
+                    </div>
+
+                    <div className="md:mt-24">
+                        <ManualCard 
+                            type="PROOF"
+                            icon={Share2} 
+                            title="Proof of Pulse" 
+                            color="green"
+                            tag="SOCIAL"
+                            desc="Trust, but verify. Inside the Inspector, the Camera icon generates a 'Proof of Pulse'. This renders a cryptographic snapshot of that node's specific block-height and health status into a shareable PNG." 
+                        />
+                    </div>
+
+                    <div className="md:mt-0">
+                        <ManualCard 
+                            type="TIERS"
+                            icon={MapIcon} 
+                            title="Context-Aware Tiers" 
+                            color="purple"
+                            tag="DYNAMIC"
+                            desc="The map rejects static thresholds. It uses Live Percentiles. A 'Gold' marker always represents the top 10% of nodes, whether the network average is 1TB or 1PB. It adapts as the network grows." 
+                        />
+                    </div>
+
+                    <div className="md:mt-24">
+                        <ManualCard 
+                            type="GHOST"
+                            icon={AlertTriangle} 
+                            title="Ghost Nodes" 
+                            color="yellow"
+                            tag="PRIVACY"
+                            desc="Nodes running on VPNs or private subnets are tracked in the stats but hidden from the map to prevent geolocation errors. Look for the '⚠ Private Network' warning in the location headers." 
+                        />
+                    </div>
+
+                    <div className="md:mt-0">
+                        <ManualCard 
+                            type="STOINC"
+                            icon={Zap} 
+                            title="STOINC Simulator" 
+                            color="yellow"
+                            tag="CALCULATOR"
+                            desc="Found on the Leaderboard, this tool forecasts earnings based on hardware. It uses Geometric Stacking—meaning NFT boosts and Era multipliers compound upon each other rather than adding linearly." 
+                        />
+                    </div>
+
+                    <div className="md:mt-24">
+                        <ManualCard 
+                            type="IDENTITY"
+                            icon={Shield} 
+                            title="The Identity Bridge" 
+                            color="indigo"
+                            tag="BACKEND"
+                            desc="The Blockchain knows Keys. The Network knows IPs. Pulse acts as the bridge. We perform a 'Dual-Fetch Resolution' to link anonymous wallets to physical nodes, revealing where top earners are located." 
+                        />
+                    </div>
+
+                    <div className="md:mt-0">
+                        <ManualCard 
+                            type="VERSUS"
+                            icon={Swords} 
+                            title="Head-to-Head Engine" 
+                            color="red"
+                            tag="PVP"
+                            desc="Don't just guess which node is better. The 'Compare' button in the modal launches a direct PVP overlay. It highlights differentials in green (advantage) or red (deficit) for Uptime, Version, and Yield." 
+                        />
+                    </div>
+
+                    <div className="md:mt-24">
+                        <ManualCard 
+                            type="WHALE"
+                            icon={Trophy} 
+                            title="Whale Watching" 
+                            color="yellow"
+                            tag="TRACKING"
+                            desc="The Leaderboard isn't just a list. It tracks Rank Deltas. A green arrow (▲) means a node is climbing the reputation ladder. A red arrow (▼) means they are losing consensus favor. Use this to spot rising stars." 
+                        />
+                    </div>
+
                 </div>
+                
+                {/* ABSTRACT FOOTER FOR MANUAL */}
+                <div className="mt-32 max-w-2xl mx-auto text-center relative group cursor-pointer" onClick={() => scrollTo('brain')}>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-purple-500/20 blur-[80px] rounded-full group-hover:bg-purple-500/40 transition-all"></div>
+                    <Radio size={48} className="text-purple-400 mx-auto mb-6 relative z-10 animate-pulse" />
+                    <h4 className="text-2xl font-bold text-white mb-4 relative z-10">Subspace Echoes</h4>
+                    <p className="text-zinc-400 text-sm relative z-10 leading-relaxed">
+                        The dashboard listens to the "Gossip Protocol." Like a stethoscope, the pulsing orbs represent actual data packets traversing the network.
+                    </p>
+                </div>
+
             </div>
         </section>
 
@@ -1425,7 +1369,15 @@ function FeatureCard({ icon: Icon, title, desc, color = "blue" }: { icon: any, t
     )
 }
 
-function ManualCard({ icon: Icon, title, desc, color, tag }: { icon: any, title: string, desc: string, color: string, tag: string }) {
+function ManualCard({ icon: Icon, title, desc, color, tag, type }: { icon: any, title: string, desc: string, color: string, tag: string, type: string }) {
+    const [isActive, setIsActive] = useState(false);
+    const [cyclicIcon, setCyclicIcon] = useState(0);
+
+    const handleClick = () => {
+        setIsActive(true);
+        setTimeout(() => setIsActive(false), 2000); // Auto reset
+    };
+
     const colorStyles = {
         blue: "text-blue-400 bg-blue-500/10 border-blue-500/20 hover:border-blue-500/50 hover:shadow-[0_0_30px_rgba(59,130,246,0.1)]",
         green: "text-green-400 bg-green-500/10 border-green-500/20 hover:border-green-500/50 hover:shadow-[0_0_30px_rgba(34,197,94,0.1)]",
@@ -1436,16 +1388,63 @@ function ManualCard({ icon: Icon, title, desc, color, tag }: { icon: any, title:
         zinc: "text-zinc-400 bg-zinc-500/10 border-zinc-500/20 hover:border-zinc-500/50 hover:shadow-[0_0_30px_rgba(113,113,122,0.1)]",
     }[color] || "";
 
-    // Safely extract styles before rendering to avoid regex errors in JSX
     const hoverBorder = colorStyles.match(/hover:border-\S+/)?.[0] || "";
     const hoverShadow = colorStyles.match(/hover:shadow-\S+/)?.[0] || "";
     const baseClasses = colorStyles.split(' hover')[0] || "";
 
+    // Cyclic Rotation Logic
+    useEffect(() => {
+        if(type === 'CYCLIC' && isActive) {
+            const interval = setInterval(() => {
+                setCyclicIcon(prev => (prev + 1) % 3);
+            }, 300);
+            return () => clearInterval(interval);
+        }
+    }, [isActive, type]);
+
+    const renderIcon = () => {
+        if (type === 'CYCLIC') {
+            return isActive ? (
+                cyclicIcon === 0 ? <Activity size={32} className="animate-bounce" /> :
+                cyclicIcon === 1 ? <Database size={32} className="animate-bounce" /> :
+                <HeartPulse size={32} className="animate-bounce" />
+            ) : <Icon size={32} />;
+        }
+        if (type === 'ZEN') {
+            return isActive ? <Monitor size={32} className="text-white" /> : <Icon size={32} className={isActive ? "animate-pulse" : ""} />;
+        }
+        if (type === 'INSPECTOR') {
+            return <Icon size={32} className={`transition-transform duration-500 ${isActive ? 'scale-150 text-white' : ''}`} />;
+        }
+        if (type === 'PROOF') {
+            return isActive ? <div className="flex gap-1 animate-in fade-in"><FileJson size={16}/><LinkIcon size={16}/><Hash size={16}/></div> : <Icon size={32} />;
+        }
+        if (type === 'GHOST') {
+            return <Icon size={32} className={isActive ? "opacity-20 transition-opacity duration-500" : ""} />;
+        }
+        if (type === 'STOINC') {
+            return isActive ? <span className="text-xl font-black font-mono animate-ping">12x</span> : <Icon size={32} />;
+        }
+        if (type === 'IDENTITY') {
+            return isActive ? <div className="animate-spin"><RefreshCw size={32}/></div> : <Icon size={32} />;
+        }
+        if (type === 'VERSUS') {
+            return <Icon size={32} className={isActive ? "animate-[spin_0.5s_ease-in-out]" : ""} />;
+        }
+        if (type === 'WHALE') {
+            return <Icon size={32} className={`transition-all duration-500 ${isActive ? '-translate-y-4 scale-125' : ''}`} />;
+        }
+        return <Icon size={32} className={isActive ? "animate-bounce" : ""} />;
+    };
+
     return (
-        <div className={`p-6 md:p-8 rounded-3xl border transition-all duration-300 group cursor-default border-zinc-800 bg-zinc-900/20 hover:bg-zinc-900/40 backdrop-blur-sm ${baseClasses} ${hoverBorder} ${hoverShadow}`}>
+        <div 
+            onClick={handleClick}
+            className={`p-6 md:p-8 rounded-3xl border transition-all duration-200 active:scale-95 cursor-pointer border-zinc-800 bg-zinc-900/20 hover:bg-zinc-900/40 backdrop-blur-sm ${baseClasses} ${hoverBorder} ${hoverShadow}`}
+        >
             <div className="flex flex-col md:flex-row gap-6 items-start">
-                <div className={`p-4 rounded-2xl shrink-0 bg-black border border-zinc-800 ${baseClasses}`}>
-                    <Icon size={32} />
+                <div className={`p-4 rounded-2xl shrink-0 bg-black border border-zinc-800 ${baseClasses} flex items-center justify-center w-16 h-16`}>
+                    {renderIcon()}
                 </div>
                 <div>
                     <div className="flex items-center gap-3 mb-3">
