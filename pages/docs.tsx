@@ -8,12 +8,13 @@ import {
   HeartPulse, Info, Check, X, MousePointer2, 
   Share2, Terminal, AlertTriangle, Monitor, AlertOctagon,
   ArrowRight, Camera, Swords, 
-  ClipboardCopy, RefreshCw, RotateCcw, MapPin, Wallet, Star
+  ClipboardCopy, RefreshCw, RotateCcw, MapPin, Wallet, Star,
+  Eye, Search, Sliders, Radio, Grip // Added new icons here
 } from 'lucide-react';
 
 export default function DocsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'flight' | 'brain' | 'telemetry' | 'spatial' | 'economics'>('flight');
+  const [activeTab, setActiveTab] = useState<'flight' | 'manual' | 'brain' | 'telemetry' | 'spatial' | 'economics'>('flight');
   const [copiedShare, setCopiedShare] = useState(false);
 
   useEffect(() => {
@@ -59,7 +60,7 @@ export default function DocsPage() {
           </Link>
           
           <div className="hidden md:flex items-center gap-6">
-             {['flight', 'brain', 'telemetry', 'spatial', 'economics'].map((tab) => (
+             {['flight', 'manual', 'brain', 'telemetry', 'spatial', 'economics'].map((tab) => (
                 <button 
                   key={tab} 
                   onClick={() => scrollTo(tab)}
@@ -122,7 +123,6 @@ export default function DocsPage() {
                 </div>
 
                 {/* THE COMPREHENSIVE SIMULATOR */}
-                {/* CSS FIX: Fixed height prevents collapse of absolute children */}
                 <div className="border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl bg-[#09090b] relative max-w-5xl mx-auto h-[700px] md:h-[800px] flex flex-col">
                     <PulseOS_Simulator />
                 </div>
@@ -137,6 +137,214 @@ export default function DocsPage() {
                     </button>
                 </div>
              </div>
+        </section>
+
+        {/* ==========================================
+            SECTION 1.5: THE FIELD MANUAL
+           ========================================== */}
+        <section id="manual" className="relative py-24 border-t border-zinc-900 bg-[#050505] overflow-hidden">
+            {/* Background Texture - Grid */}
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+            
+            <div className="max-w-6xl mx-auto px-6 relative z-10">
+                
+                {/* HEADER */}
+                <div className="text-center mb-24 space-y-4">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-green-500/30 bg-green-900/10 text-green-400 text-[10px] font-mono font-bold tracking-widest uppercase mb-4 animate-pulse">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        System Access Granted
+                    </div>
+                    <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter uppercase">
+                        Field Manual <span className="text-zinc-700">v2.2</span>
+                    </h2>
+                    <p className="text-zinc-400 text-sm md:text-base max-w-2xl mx-auto leading-relaxed font-light">
+                        Pulse is not a passive display. It is an active intelligence tool. 
+                        Master these <span className="text-white font-bold">7 Protocols</span> to achieve full network visibility.
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
+                
+                    {/* --- STICKY NAV (Left Column) --- */}
+                    <div className="md:col-span-4 hidden md:block">
+                        <div className="sticky top-32 space-y-8 border-l border-zinc-800 pl-8">
+                        <div>
+                            <h3 className="text-white font-bold text-lg">Operational Protocols</h3>
+                            <p className="text-zinc-500 text-xs mt-2">Classified tactics for operators.</p>
+                        </div>
+                        <ul className="space-y-4 text-sm font-mono text-zinc-500">
+                            <li className="flex items-center gap-3 text-blue-400"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Surveillance</li>
+                            <li className="flex items-center gap-3 hover:text-zinc-300 transition-colors cursor-pointer">Interrogation</li>
+                            <li className="flex items-center gap-3 hover:text-zinc-300 transition-colors cursor-pointer">Spatial Recon</li>
+                            <li className="flex items-center gap-3 hover:text-zinc-300 transition-colors cursor-pointer">Forecasting</li>
+                            <li className="flex items-center gap-3 hover:text-zinc-300 transition-colors cursor-pointer">Versus Mode</li>
+                            <li className="flex items-center gap-3 hover:text-zinc-300 transition-colors cursor-pointer">The Ledger</li>
+                            <li className="flex items-center gap-3 text-purple-400"><div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-ping"></div> Subspace Echoes</li>
+                        </ul>
+                        </div>
+                    </div>
+
+                    {/* --- CONTENT CARDS (Right Column) --- */}
+                    <div className="md:col-span-8 space-y-16">
+
+                        {/* 01. SURVEILLANCE */}
+                        <section className="space-y-6">
+                            <div className="flex items-center gap-4 mb-8">
+                                <span className="text-4xl font-black text-zinc-800">01</span>
+                                <h3 className="text-2xl font-bold text-white uppercase tracking-wider">Surveillance</h3>
+                            </div>
+                            
+                            <ManualCard 
+                                icon={Activity} 
+                                title="Cyclic Metric Rotation" 
+                                color="blue"
+                                tag="UX/UI"
+                                desc="Screen real estate is war. To win it, Node Cards automatically cycle their tertiary metric every 5 seconds. They rotate between Storage → Capacity → Health. Changing the 'Sort By' filter instantly snaps all cards to the relevant metric." 
+                            />
+                            <ManualCard 
+                                icon={Eye} 
+                                title="Zen Mode" 
+                                color="zinc"
+                                tag="OLED"
+                                desc="Visual noise kills focus. Click the Monitor Icon to engage Zen Mode. This strips away all gradients, blurs, and animations, leaving a high-contrast, OLED-black interface designed for 24/7 dedicated status screens." 
+                            />
+                        </section>
+
+                        {/* 02. INTERROGATION */}
+                        <section className="space-y-6">
+                            <div className="flex items-center gap-4 mb-8">
+                                <span className="text-4xl font-black text-zinc-800">02</span>
+                                <h3 className="text-2xl font-bold text-white uppercase tracking-wider">Interrogation</h3>
+                            </div>
+
+                            <ManualCard 
+                                icon={Search} 
+                                title="The Node Inspector" 
+                                color="red"
+                                tag="DIAGNOSTICS"
+                                desc="Clicking any node opens the Inspector. This is the source of truth. It breaks down the 'Vitality Score' into raw components: Uptime (Sigmoid Curve), Storage (Logarithmic Scale), and Consensus Version." 
+                            />
+                            <ManualCard 
+                                icon={Share2} 
+                                title="Proof of Pulse" 
+                                color="green"
+                                tag="SOCIAL"
+                                desc="Trust, but verify. Inside the Inspector, the Camera icon generates a 'Proof of Pulse'. This renders a cryptographic snapshot of that node's specific block-height and health status into a shareable PNG." 
+                            />
+                        </section>
+
+                        {/* 03. SPATIAL RECON */}
+                        <section className="space-y-6">
+                            <div className="flex items-center gap-4 mb-8">
+                                <span className="text-4xl font-black text-zinc-800">03</span>
+                                <h3 className="text-2xl font-bold text-white uppercase tracking-wider">Spatial Recon</h3>
+                            </div>
+
+                            <ManualCard 
+                                icon={MapIcon} 
+                                title="Context-Aware Tiers" 
+                                color="purple"
+                                tag="DYNAMIC"
+                                desc="The map rejects static thresholds. It uses Live Percentiles. A 'Gold' marker always represents the top 10% of nodes, whether the network average is 1TB or 1PB. It adapts as the network grows." 
+                            />
+                            <ManualCard 
+                                icon={AlertTriangle} 
+                                title="Ghost Nodes" 
+                                color="yellow"
+                                tag="PRIVACY"
+                                desc="Nodes running on VPNs or private subnets are tracked in the stats but hidden from the map to prevent geolocation errors. Look for the '⚠ Private Network' warning in the location headers." 
+                            />
+                        </section>
+
+                        {/* 04. ECONOMICS */}
+                        <section className="space-y-6">
+                            <div className="flex items-center gap-4 mb-8">
+                                <span className="text-4xl font-black text-zinc-800">04</span>
+                                <h3 className="text-2xl font-bold text-white uppercase tracking-wider">Forecasting</h3>
+                            </div>
+
+                            <ManualCard 
+                                icon={Zap} 
+                                title="STOINC Simulator" 
+                                color="yellow"
+                                tag="CALCULATOR"
+                                desc="Found on the Leaderboard, this tool forecasts earnings based on hardware. It uses Geometric Stacking—meaning NFT boosts and Era multipliers compound upon each other rather than adding linearly." 
+                            />
+                            <ManualCard 
+                                icon={Shield} 
+                                title="The Identity Bridge" 
+                                color="indigo"
+                                tag="BACKEND"
+                                desc="The Blockchain knows Keys. The Network knows IPs. Pulse acts as the bridge. We perform a 'Dual-Fetch Resolution' to link anonymous wallets to physical nodes, revealing where top earners are located." 
+                            />
+                        </section>
+
+                        {/* 05. VERSUS MODE */}
+                        <section className="space-y-6">
+                            <div className="flex items-center gap-4 mb-8">
+                                <span className="text-4xl font-black text-zinc-800">05</span>
+                                <h3 className="text-2xl font-bold text-white uppercase tracking-wider">Versus Protocols</h3>
+                            </div>
+
+                            <ManualCard 
+                                icon={Swords} 
+                                title="Head-to-Head Engine" 
+                                color="red"
+                                tag="PVP"
+                                desc="Don't just guess which node is better. The 'Compare' button in the modal launches a direct PVP overlay. It highlights differentials in green (advantage) or red (deficit) for Uptime, Version, and Yield." 
+                            />
+                        </section>
+
+                        {/* 06. LEADERBOARD */}
+                        <section className="space-y-6">
+                            <div className="flex items-center gap-4 mb-8">
+                                <span className="text-4xl font-black text-zinc-800">06</span>
+                                <h3 className="text-2xl font-bold text-white uppercase tracking-wider">The Ledger</h3>
+                            </div>
+
+                            <ManualCard 
+                                icon={Trophy} 
+                                title="Whale Watching" 
+                                color="yellow"
+                                tag="TRACKING"
+                                desc="The Leaderboard isn't just a list. It tracks Rank Deltas. A green arrow (▲) means a node is climbing the reputation ladder. A red arrow (▼) means they are losing consensus favor. Use this to spot rising stars." 
+                            />
+                        </section>
+
+                        {/* 07. ABSTRACT */}
+                        <section className="space-y-6">
+                            <div className="flex items-center gap-4 mb-8">
+                                <span className="text-4xl font-black text-zinc-800">07</span>
+                                <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 uppercase tracking-wider">Subspace Echoes</h3>
+                            </div>
+
+                            <div className="p-8 rounded-3xl border border-zinc-800 bg-zinc-900/30 backdrop-blur-md relative overflow-hidden group hover:border-purple-500/50 transition-all duration-500">
+                                <div className="absolute top-0 right-0 p-32 bg-purple-500/10 blur-[100px] rounded-full group-hover:bg-purple-500/20 transition-all"></div>
+                                
+                                <div className="flex items-start gap-6 relative z-10">
+                                    <div className="p-4 bg-black rounded-2xl border border-zinc-800 shadow-2xl shrink-0 group-hover:scale-110 transition-transform duration-500">
+                                        <Radio size={32} className="text-purple-400 animate-pulse" />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <h4 className="text-xl font-bold text-white">The Gossip Listener</h4>
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase tracking-wide">Abstract</span>
+                                        </div>
+                                        <p className="text-sm text-zinc-400 leading-relaxed">
+                                            The dashboard doesn't just query a database; it listens to the "Gossip Protocol." 
+                                            Like a stethoscope on a machine, the <span className="text-zinc-200">EKG Lines</span> and <span className="text-zinc-200">Pulsing Orbs</span> you see aren't just decorations. 
+                                            They represent actual data packets traversing the network. When the network is quiet, Pulse is quiet. When the network spikes, Pulse glows. 
+                                            <br/><br/>
+                                            It is the visual heartbeat of the Xandeum organism.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                    </div>
+                </div>
+            </div>
         </section>
 
         {/* ==========================================
@@ -361,7 +569,7 @@ export default function DocsPage() {
 
 
 // ==========================================
-// COMPREHENSIVE PULSE OS SIMULATOR (V4.0 - MAP REDESIGN)
+// COMPREHENSIVE PULSE OS SIMULATOR (V5.0 - RESTORED FULL ANIMATIONS)
 // ==========================================
 
 function PulseOS_Simulator() {
@@ -373,12 +581,7 @@ function PulseOS_Simulator() {
     const [isAnimating, setIsAnimating] = useState(false);
     const [readyButtons, setReadyButtons] = useState<string[]>([]);
     
-    // --- NEW MAP STATE ---
-    // IDLE: Showing pins, waiting for click
-    // SELECTED: Pin turned to star
-    // DRAWER_OPEN: Drawer slides up
-    // SCROLLING: Simulating list scroll
-    // EXPANDED: Target node expanded, tabs active
+    // --- MAP STATE ---
     type MapStage = 'IDLE' | 'SELECTED' | 'DRAWER_OPEN' | 'SCROLLING' | 'EXPANDED';
     const [mapStage, setMapStage] = useState<MapStage>('IDLE');
     const [drawerTab, setDrawerTab] = useState<'CREDITS' | 'HEALTH' | 'STORAGE'>('CREDITS');
@@ -461,7 +664,7 @@ function PulseOS_Simulator() {
                  setDrawerTab('CREDITS');
             }
 
-            // 4. STANDARD VIEWS
+            // 4. STANDARD VIEWS (COMPARE/PROOF)
             else {
                 setTimeout(() => {
                     const exits = getExitButtons(target);
@@ -485,19 +688,12 @@ function PulseOS_Simulator() {
 
     // --- MAP INTERACTION SEQUENCE ---
     const handleMapPinClick = () => {
-        // 1. Change Pin to Star
         setMapStage('SELECTED');
-        
         setTimeout(() => {
-            // 2. Open Drawer
             setMapStage('DRAWER_OPEN');
-            
             setTimeout(() => {
-                // 3. Scroll List
                 setMapStage('SCROLLING');
-                
                 setTimeout(() => {
-                    // 4. Expand Item
                     setMapStage('EXPANDED');
                     setReadyButtons(['btn-back-dash-map']);
                 }, 1000); // Wait for scroll
@@ -925,8 +1121,111 @@ function PulseOS_Simulator() {
                 {/* === COMPARE & PROOF VIEWS === */}
                 {(view === 'COMPARE' || view === 'PROOF') && (
                     <div className="absolute inset-0 bg-[#09090b] z-30 flex flex-col items-center justify-center p-8 text-center animate-in slide-in-from-right">
-                         <div className="text-zinc-500 mb-4">Simulation Placeholder</div>
-                         <button onClick={() => navigate('MODAL', 500)} className="px-6 py-2 bg-zinc-800 text-white rounded-full text-xs">Return</button>
+                         {isAnimating ? (
+                            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 px-4">
+                                <RefreshCw className="animate-spin mb-4 text-red-500" size={32}/>
+                                <div className="text-xs font-mono mb-4">{view === 'COMPARE' ? 'SORTING CANDIDATE NODES...' : 'GENERATING SNAPSHOT...'}</div>
+                                <div className="space-y-2 w-full max-w-xs">
+                                    <div className="h-8 bg-zinc-800 rounded animate-pulse"></div>
+                                    <div className="h-8 bg-zinc-800 rounded animate-pulse w-3/4"></div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex-1 p-6 md:p-8 flex flex-col items-center justify-center w-full">
+                                {view === 'COMPARE' ? (
+                                    <>
+                                        <div className="flex flex-col md:flex-row items-center gap-6 md:gap-8 mb-8">
+                                            <div className="text-center">
+                                                <div className="w-16 h-16 bg-green-500/20 border-2 border-green-500 rounded-full mb-2 mx-auto flex items-center justify-center">
+                                                    <Check className="text-green-500" size={32}/>
+                                                </div>
+                                                <div className="font-bold text-white mb-1">Node A (Yours)</div>
+                                                <div className="text-green-500 font-mono text-sm">98% Health</div>
+                                                <div className="text-xs text-zinc-500">5.2M Credits</div>
+                                            </div>
+                                            <div className="text-2xl font-bold text-zinc-600">VS</div>
+                                            <div className="text-center">
+                                                <div className="w-16 h-16 bg-red-500/20 border-2 border-red-500 rounded-full mb-2 mx-auto flex items-center justify-center">
+                                                    <X className="text-red-500" size={32}/>
+                                                </div>
+                                                <div className="font-bold text-white mb-1">Node B</div>
+                                                <div className="text-red-500 font-mono text-sm">45% Health</div>
+                                                <div className="text-xs text-zinc-500">800K Credits</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-6">
+                                            <div className="text-xs text-zinc-500 uppercase font-bold mb-3 text-center">Comparison Results</div>
+                                            <div className="space-y-2 text-xs">
+                                                <div className="flex justify-between">
+                                                    <span className="text-zinc-400">Winner:</span>
+                                                    <span className="text-green-500 font-bold">Node A (You)</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-zinc-400">Health Advantage:</span>
+                                                    <span className="text-white font-mono">+53%</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-zinc-400">Credits Lead:</span>
+                                                    <span className="text-white font-mono">+4.4M</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        {/* Generated Proof Card */}
+                                        <div className="w-64 md:w-80 bg-zinc-950 border-2 border-green-500/50 rounded-2xl p-6 mb-8 relative shadow-[0_0_40px_rgba(16,185,129,0.3)] animate-in zoom-in duration-500">
+                                            <div className="absolute top-0 right-0 p-20 bg-green-500/10 blur-3xl rounded-full"></div>
+                                            
+                                            <div className="text-center relative z-10">
+                                                <div className="inline-block p-3 bg-zinc-900 rounded-xl mb-4 border border-zinc-800">
+                                                    <Activity size={32} className="text-green-500" />
+                                                </div>
+                                                <h3 className="text-xl font-extrabold text-white mb-2">PROOF OF PULSE</h3>
+                                                <div className="text-[10px] font-mono text-zinc-500 mb-6">8x...2A • Verified</div>
+
+                                                <div className="grid grid-cols-2 gap-3 mb-4">
+                                                    <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
+                                                        <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Health</div>
+                                                        <div className="text-xl font-extrabold text-green-400">98</div>
+                                                    </div>
+                                                    <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
+                                                        <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Credits</div>
+                                                        <div className="text-lg font-extrabold text-yellow-500">5.2M</div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="text-[9px] text-zinc-600 font-mono flex items-center justify-center gap-1">
+                                                    <Shield size={8}/> VERIFIED BY XANDEUM PULSE
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                <div className="flex flex-col md:flex-row gap-3">
+                                    <button 
+                                        onClick={() => readyButtons.includes('btn-view-winner-map') && navigate('MAP', 1000)}
+                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-view-winner-map') ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(147,51,234,0.5)] animate-pulse' : view === 'COMPARE' ? 'bg-zinc-800 text-zinc-500' : 'hidden'}`}
+                                    >
+                                        VIEW WINNER ON MAP
+                                    </button>
+                                    <button 
+                                        onClick={() => readyButtons.includes('btn-share-credits') && navigate('LEADERBOARD_SIM', 800)}
+                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-share-credits') ? 'bg-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.5)] animate-pulse' : view === 'PROOF' ? 'bg-zinc-800 text-zinc-500' : 'hidden'}`}
+                                    >
+                                        SHARE TO LEADERBOARD
+                                    </button>
+                                    <button 
+                                        onClick={() => readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
+                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
+                                    >
+                                        BACK TO DIAGNOSTICS
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1125,3 +1424,17 @@ function FeatureCard({ icon: Icon, title, desc, color = "blue" }: { icon: any, t
         </div>
     )
 }
+
+function ManualCard({ icon: Icon, title, desc, color, tag }: { icon: any, title: string, desc: string, color: string, tag: string }) {
+    const colors = {
+        blue: "text-blue-400 bg-blue-500/10 border-blue-500/20 hover:border-blue-500/50 hover:shadow-[0_0_30px_rgba(59,130,246,0.1)]",
+        green: "text-green-400 bg-green-500/10 border-green-500/20 hover:border-green-500/50 hover:shadow-[0_0_30px_rgba(34,197,94,0.1)]",
+        red: "text-red-400 bg-red-500/10 border-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_30px_rgba(239,68,68,0.1)]",
+        purple: "text-purple-400 bg-purple-500/10 border-purple-500/20 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(168,85,247,0.1)]",
+        yellow: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20 hover:border-yellow-500/50 hover:shadow-[0_0_30px_rgba(234,179,8,0.1)]",
+        indigo: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20 hover:border-indigo-500/50 hover:shadow-[0_0_30px_rgba(99,102,241,0.1)]",
+        zinc: "text-zinc-400 bg-zinc-500/10 border-zinc-500/20 hover:border-zinc-500/50 hover:shadow-[0_0_30px_rgba(113,113,122,0.1)]",
+    }[color] || "";
+
+    return (
+        <div className={`p-6 md:p-8 rounded-3xl border transition-all duration-300 group cursor-default ${colors.split(' hover')[0]} border-zinc-800 bg-zinc-900/20 hover:bg-zinc-900/40 backdrop-blur-sm ${colors.match(/hover:border-\S+/)?.[0]} ${colors.match(/hover:
