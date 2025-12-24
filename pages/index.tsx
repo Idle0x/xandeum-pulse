@@ -2720,7 +2720,7 @@ export default function Home() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <Link href="/leaderboard">
+                          <Link href={`/leaderboard?highlight=${selectedNode?.pubkey || ''}`}
                             <div
                               className={`h-40 p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${
                                 zenMode
