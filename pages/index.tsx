@@ -982,16 +982,20 @@ export default function Home() {
                </div>
             </div>
           </div>
-          
-          {/* Star Button - Pushed to the right by flex justify-between */}
+
+          {/* Watchlist icon*/}
           <button
             onClick={(e) => toggleFavorite(e, node.address || '')}
-            className={`p-1.5 rounded-full transition shrink-0 ${
-              isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-700 hover:text-yellow-500'
+            className={`p-3 rounded-full transition-all duration-200 shrink-0 active:scale-90 ${
+              isFav 
+                ? 'text-yellow-500 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.2)]' 
+                : 'text-zinc-600 hover:text-yellow-500 hover:bg-zinc-800'
             }`}
+            style={{ minWidth: '44px', minHeight: '44px' }} // Ensures minimum touch target size
           >
-            <Star size={16} fill={isFav ? "currentColor" : "none"} />
+            <Star size={24} strokeWidth={isFav ? 2.5 : 2} fill={isFav ? "currentColor" : "none"} />
           </button>
+
         </div>
         
         <div className="space-y-1.5 md:space-y-3">
