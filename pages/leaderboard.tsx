@@ -58,9 +58,10 @@ export default function Leaderboard() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
-  const hasDeepLinked = useRef(false);
+  // FIX: Track the specific key we have already handled to prevent loops
+  const lastProcessedHighlight = useRef<string | null>(null);
 
-  // --- 1. DATA FETCHING ONLY ---
+  // --- 1. DATA FETCHING ---
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -137,23 +138,24 @@ export default function Leaderboard() {
     };
 
     fetchData();
-  }, []); // Run once on mount
+  }, []);
 
-  // --- 2. DEEP LINK / SCROLL LOGIC (SEPARATED) ---
-  // This watches for when Data AND Router are both ready
+  // --- 2. DEEP LINK / SCROLL LOGIC (FIXED) ---
   useEffect(() => {
+      // Basic checks: Router ready? Highlight param exists? Data loaded?
       if (!router.isReady || !router.query.highlight || ranking.length === 0) return;
 
       const targetKey = router.query.highlight as string;
       
-      // If we already highlighted this specific key, don't do it again (prevents jumpiness)
-      // But if the user clicked a NEW link, we allow it.
-      if (hasDeepLinked.current && expandedNode === targetKey) return;
+      // CRITICAL FIX: Only run if we haven't processed this specific key yet.
+      // This allows you to click other nodes afterwards without it snapping back.
+      if (lastProcessedHighlight.current === targetKey) return;
 
       const targetIndex = ranking.findIndex(n => n.pubkey === targetKey);
 
       if (targetIndex !== -1) {
-          hasDeepLinked.current = true;
+          // Mark as processed immediately so it doesn't run again
+          lastProcessedHighlight.current = targetKey;
 
           // A. Force the list to grow if the target is hidden
           if (targetIndex >= visibleCount) {
@@ -171,8 +173,7 @@ export default function Leaderboard() {
               }
           }, 300); 
       }
-  }, [router.isReady, router.query.highlight, ranking, visibleCount, expandedNode]);
-
+  }, [router.isReady, router.query.highlight, ranking]); // Removed visibleCount and expandedNode from dependencies
 
   // Hardware Calc Logic
   useEffect(() => {
@@ -186,7 +187,7 @@ export default function Leaderboard() {
       }
   }, [simNodes, simStorageVal, simStorageUnit, simStake, simPerf, showHardwareCalc]);
 
-  // OPTIMIZATION: Memoize filtering to keep interactions snappy
+  // OPTIMIZATION: Memoize filtering
   const filtered = useMemo(() => {
     return ranking.filter(n => n.pubkey.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [ranking, searchQuery]);
