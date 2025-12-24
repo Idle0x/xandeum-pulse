@@ -9,6 +9,8 @@ Real-time network monitor and analytics dashboard for the Xandeum distributed st
 
 **check it out:** https://xandeum-pulse.vercel.app
 
+![Main Dashboard](https://private-user-images.githubusercontent.com/140549997/529937748-e5f273fc-8468-4da1-a01b-fa1dcf6f81b2.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY1NjUxOTcsIm5iZiI6MTc2NjU2NDg5NywicGF0aCI6Ii8xNDA1NDk5OTcvNTI5OTM3NzQ4LWU1ZjI3M2ZjLTg0NjgtNGRhMS1hMDFiLWZhMWRjZjZmODFiMi5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI0JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyNFQwODI4MTdaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT02OTZiZmEzYTYzYmJkZjlhMjMxYTZhMTdiNDI5OTI0NTk0Mzk5NWExNzA0M2NlNzU4NzAwMGRjZWVmMjdjNjU0JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.jBVP9vuR60L4GwKjjklkGX2Y-8yKA-hbR5mRa-CpBXc)
+
 ---
 
 ## What is this?
@@ -114,6 +116,8 @@ Clicking any node opens a granular diagnostic modal designed for detailed analys
 - See `handleDownloadProof()` - [Lines 622-636](pages/index.tsx#L622-L636) & `UI Render` - [Line 1530-1640](pages/index.tsx#L1530-L1640) - (proof generation)
 - See renderStorageAnalysis - [Line 1083-1195](pages/index.tsx#L1083-L1195) - (storage calculation)
 
+![Inspector Modal](https://private-user-images.githubusercontent.com/140549997/529940088-cae31cd7-fd73-46b6-8868-92895a72db3b.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY1NjU2OTcsIm5iZiI6MTc2NjU2NTM5NywicGF0aCI6Ii8xNDA1NDk5OTcvNTI5OTQwMDg4LWNhZTMxY2Q3LWZkNzMtNDZiNi04ODY4LTkyODk1YTcyZGIzYi5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI0JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyNFQwODM2MzdaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1lYzkzYjQxMWE2YWI4ODUxMTYyNDdjMTFhN2Q5MTE5YWQ3NDAyZWNhOGQ3YmY4NjQ2OTVmMzk2NGRhYWQ0OWU4JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.aiY7lezl-qh0GWDWKj2wSEQfOrPdceLwnLdWce9Xezk)
+
 ### 3. Geographic Map
 
 Visualizes the physical distribution of network infrastructure.
@@ -126,6 +130,8 @@ Visualizes the physical distribution of network infrastructure.
 - See `useEffect()` - [Lines 150-175](pages/map.tsx#L150-L175) - (percentile calculation)
 - See `getXRayStats()` - [Lines 265-315](pages/map.tsx#L265-L315) - (region inspector)
 
+![Network Topology](https://private-user-images.githubusercontent.com/140549997/529941528-4a440bb3-8981-466e-b850-64db2f44891f.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY1NjYzMTUsIm5iZiI6MTc2NjU2NjAxNSwicGF0aCI6Ii8xNDA1NDk5OTcvNTI5OTQxNTI4LTRhNDQwYmIzLTg5ODEtNDY2ZS1iODUwLTY0ZGIyZjQ0ODkxZi5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI0JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyNFQwODQ2NTVaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT0yOGQ0NzllZTEzMDgzZmVlYTkwNTY4ZmViMmUyMmY3YTM2NDJlMjExZmUyNmE5YzMwYjE3NmMxY2U4NjBlOWQyJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.Wh_7b4VEuvbKOtC1zTLzoqI9-ik4Yc2m-xzi90d2Nls)
+
 ### 4. Leaderboard
 
 Reputation tracking and earnings forecasting.
@@ -137,6 +143,8 @@ Reputation tracking and earnings forecasting.
 **Code:** [`pages/leaderboard.tsx`](pages/leaderboard.tsx)
 - See `calculateFinal()` - [Lines 163-167](pages/leaderboard.tsx#L163-L167) – (simulator logic)
 - See `useEffect()` - [Lines 117-124](pages/leaderboard.tsx#L117-L124) – (multiplier staking)
+
+![Credits & Reputation](https://private-user-images.githubusercontent.com/140549997/529942809-728163b2-79be-42ae-8ce8-1325ad83072e.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY1NjYzMjksIm5iZiI6MTc2NjU2NjAyOSwicGF0aCI6Ii8xNDA1NDk5OTcvNTI5OTQyODA5LTcyODE2M2IyLTc5YmUtNDJhZS04Y2U4LTEzMjVhZDgzMDcyZS5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI0JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyNFQwODQ3MDlaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1jNzA1ZjMwMWNiZjZjNjdhNDUwNWVjZjNmZTkxMzNjZmY4MWJlOTYzODk0ZmE0MzQzODQ5Njc3ZDY1M2VmMGIzJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.YnFpWMvtKkELo-ryBjzwjjs_dJndwDNj0dcNcV8Bdj0)
 
 ---
 
@@ -286,14 +294,14 @@ This doubles the processing time. Instead, the API returns raw data + context, a
 
 ---
 
-## Features
-
 ### Graceful Degradation
 
 When external dependencies fail, the UI adapts rather than breaking:
 
 - **Credits API failure detection:** Instead of showing stale data or "N/A", the interface displays "CREDITS API OFFLINE" with a warning icon, making it clear the issue is upstream, not with Pulse itself
 - **Automatic score re-weighting:** When credits data is unavailable, the Vitality Score algorithm redistributes the 20% reputation weight to other components, ensuring nodes aren't penalized for API downtime
+
+![API Limitations](https://private-user-images.githubusercontent.com/140549997/529943132-2d6d0352-ec13-4dfe-8646-3a89ef045ddb.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY1NjYzOTIsIm5iZiI6MTc2NjU2NjA5MiwicGF0aCI6Ii8xNDA1NDk5OTcvNTI5OTQzMTMyLTJkNmQwMzUyLWVjMTMtNGRmZS04NjQ2LTNhODllZjA0NWRkYi5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI0JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyNFQwODQ4MTJaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT00ZjI3NGY1ODNkZjExMjAwZjNmZmFmNDU5ZGZlNDk3OGU1MTE1MDVlNTIyODRmYWVlNmY4NzVmODUwZDM1YTYyJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.4oZKtKtrsehfX0tSDMfzBdIh6381yS741D5qKsr5Vwo)
 
 ### Known Limitations
 
