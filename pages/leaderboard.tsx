@@ -60,6 +60,7 @@ export default function Leaderboard() {
 
   const hasDeepLinked = useRef(false);
 
+  // --- 1. DATA FETCHING ONLY ---
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -122,33 +123,6 @@ export default function Leaderboard() {
 
             localStorage.setItem('xandeum_rank_history', JSON.stringify(newHistory));
             setRanking(parsedList);
-            
-            // --- UPDATED DEEP LINK LOGIC (Fixes Modal Scroll) ---
-            if (router.isReady && router.query.highlight && !hasDeepLinked.current) {
-                const targetKey = router.query.highlight as string;
-                const targetIndex = parsedList.findIndex(n => n.pubkey === targetKey);
-
-                if (targetIndex !== -1) {
-                    hasDeepLinked.current = true;
-
-                    // 1. Force the list to grow if the target is hidden
-                    if (targetIndex >= 100) {
-                        setVisibleCount(targetIndex + 20);
-                    }
-
-                    // 2. Expand and Scroll (Delayed to allow render)
-                    setTimeout(() => {
-                        setExpandedNode(targetKey);
-                        
-                        setTimeout(() => {
-                            const el = document.getElementById(`node-${targetKey}`);
-                            if (el) {
-                                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            }
-                        }, 100); 
-                    }, 600);
-                }
-            }
         }
 
         const saved = localStorage.getItem('xandeum_favorites');
@@ -163,7 +137,42 @@ export default function Leaderboard() {
     };
 
     fetchData();
-  }, [router.isReady, router.query.highlight]);
+  }, []); // Run once on mount
+
+  // --- 2. DEEP LINK / SCROLL LOGIC (SEPARATED) ---
+  // This watches for when Data AND Router are both ready
+  useEffect(() => {
+      if (!router.isReady || !router.query.highlight || ranking.length === 0) return;
+
+      const targetKey = router.query.highlight as string;
+      
+      // If we already highlighted this specific key, don't do it again (prevents jumpiness)
+      // But if the user clicked a NEW link, we allow it.
+      if (hasDeepLinked.current && expandedNode === targetKey) return;
+
+      const targetIndex = ranking.findIndex(n => n.pubkey === targetKey);
+
+      if (targetIndex !== -1) {
+          hasDeepLinked.current = true;
+
+          // A. Force the list to grow if the target is hidden
+          if (targetIndex >= visibleCount) {
+              setVisibleCount(targetIndex + 20);
+          }
+
+          // B. Expand
+          setExpandedNode(targetKey);
+          
+          // C. Scroll (Delayed to ensure DOM render)
+          setTimeout(() => {
+              const el = document.getElementById(`node-${targetKey}`);
+              if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+          }, 300); 
+      }
+  }, [router.isReady, router.query.highlight, ranking, visibleCount, expandedNode]);
+
 
   // Hardware Calc Logic
   useEffect(() => {
