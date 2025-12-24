@@ -50,7 +50,6 @@ interface MapStats {
 
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
-// UPDATED: Storage is now Violet to match your UI
 const MODE_COLORS = {
     STORAGE: { hex: '#8b5cf6', tailwind: 'text-violet-400', bg: 'bg-violet-600', border: 'border-violet-500/50' },
     HEALTH:  { hex: '#10b981', tailwind: 'text-emerald-500', bg: 'bg-emerald-600', border: 'border-emerald-500/50' },
@@ -294,7 +293,6 @@ export default function MapPage() {
           const avgPerNode = loc.totalStorage / loc.count;
           return {
               labelA: 'Avg Density',
-              // UPDATED: Use Violet text color to match Storage Mode
               valA: <span className="text-violet-400">{formatStorage(avgPerNode)} per Node</span>,
               descA: "Average committed storage per node in this region.",
               labelB: 'Global Share',
