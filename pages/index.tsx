@@ -1941,7 +1941,7 @@ export default function Home() {
              <div className="flex items-center gap-2 mb-4 mt-8">
                 <Activity className="text-green-500" size={20} />
                 <h3 className="text-lg font-bold text-white tracking-widest uppercase">
-                    Active Nodes - {filteredNodes.length}
+                    Total Nodes - {filteredNodes.length}
                 </h3>
                 <div className="flex flex-col justify-center ml-2 leading-none">
                     <span className="text-[7px] md:text-[9px] font-mono text-zinc-500 uppercase">
