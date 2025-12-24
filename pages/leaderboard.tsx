@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Head from 'next/head';
 import axios from 'axios';
 import Link from 'next/link';
@@ -8,7 +8,7 @@ import {
   Activity, Users, BarChart3, HelpCircle, Star, 
   Calculator, Zap, ChevronDown, 
   ExternalLink, ArrowUpRight, Eye, MapPin, Copy, Check, Share2, ArrowUp, ArrowDown,
-  AlertOctagon // New error icon
+  AlertOctagon, ChevronDown as ChevronIcon // Renamed for clarity
 } from 'lucide-react';
 
 interface RankedNode {
@@ -30,10 +30,13 @@ export default function Leaderboard() {
   const router = useRouter();
   const [ranking, setRanking] = useState<RankedNode[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creditsOffline, setCreditsOffline] = useState(false); // CRASHPROOF FLAG
+  const [creditsOffline, setCreditsOffline] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState<string[]>([]);
   
+  // --- PAGINATION STATE ---
+  const [visibleCount, setVisibleCount] = useState(100);
+
   // Simulator State
   const [showSim, setShowSim] = useState(false);
   const [showHardwareCalc, setShowHardwareCalc] = useState(false);
@@ -61,7 +64,7 @@ export default function Leaderboard() {
     const fetchData = async () => {
       try {
         const [creditsRes, statsRes] = await Promise.all([
-          axios.get('/api/credits').catch(() => ({ data: [] })), // Catch error locally
+          axios.get('/api/credits').catch(() => ({ data: [] })), 
           axios.get('/api/stats').catch(() => ({ data: { result: { pods: [] } } }))
         ]);
 
@@ -72,15 +75,10 @@ export default function Leaderboard() {
             });
         }
 
-        // CRASHPROOF: Detect if credits API returned valid data
-        // If array is empty but we have nodes, it means credits API is likely down
         const rawData = creditsRes.data.pods_credits || creditsRes.data;
         
         if (!rawData || !Array.isArray(rawData) || rawData.length === 0) {
              setCreditsOffline(true);
-             // We can still show nodes, just with 0 credits if we wanted, 
-             // but for a LEADERBOARD, showing 0s is useless.
-             // We'll keep the list empty and show a specific error state below.
              setRanking([]); 
         } else {
             setCreditsOffline(false);
@@ -165,7 +163,10 @@ export default function Leaderboard() {
       }
   }, [simNodes, simStorageVal, simStorageUnit, simStake, simPerf, showHardwareCalc]);
 
-  const filtered = ranking.filter(n => n.pubkey.toLowerCase().includes(searchQuery.toLowerCase()));
+  // OPTIMIZATION: Memoize filtering to keep interactions snappy
+  const filtered = useMemo(() => {
+    return ranking.filter(n => n.pubkey.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [ranking, searchQuery]);
 
   const handleRowClick = (node: RankedNode) => {
       setBaseCreditsInput(node.credits);
@@ -194,6 +195,10 @@ export default function Leaderboard() {
       setTimeout(() => setCopiedLink(null), 2000);
   };
 
+  const handleLoadMore = () => {
+      setVisibleCount(prev => prev + 100);
+  };
+
   const calculateFinal = () => {
       let multiplier = 1;
       if (simBoosts.length > 0) multiplier = simBoosts.reduce((a, b) => a * b, 1);
@@ -213,7 +218,7 @@ export default function Leaderboard() {
 
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-4 md:p-8 selection:bg-yellow-500/30">
-      <Head><title>Xandeum Pulse - Reputation & Earnings</title></Head>
+      <Head><title>Xandeum Pulse - Credits & Reputation</title></Head>
 
       {/* HEADER */}
       <div className="max-w-5xl mx-4 md:mx-auto mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
@@ -221,13 +226,14 @@ export default function Leaderboard() {
           <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back to Monitor
         </Link>
         <div className="text-center">
-          <h1 className="text-3xl font-extrabold flex items-center gap-3 text-yellow-500 justify-center"><Trophy size={32} /> REPUTATION LEDGER</h1>
+          {/* UPDATED TITLE */}
+          <h1 className="text-3xl font-extrabold flex items-center gap-3 text-yellow-500 justify-center"><Trophy size={32} /> CREDITS & REPUTATION</h1>
           <p className="text-xs text-zinc-500 mt-1 font-mono tracking-wide uppercase">The definitive registry of node reputation and network contribution</p>
         </div>
         <div className="w-32 hidden md:block"></div>
       </div>
 
-      {/* --- STOINC SIMULATOR WIDGET (Always visible even if API down) --- */}
+      {/* --- STOINC SIMULATOR WIDGET --- */}
       <div className="max-w-5xl mx-auto mb-10 bg-gradient-to-b from-zinc-900 to-black border border-yellow-500/30 rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.1)] transition-all duration-300">
           <div className="p-4 bg-yellow-500/10 border-b border-yellow-500/20 flex justify-between items-center cursor-pointer hover:bg-yellow-500/20 transition" onClick={() => setShowSim(!showSim)}>
               <div className="flex items-center gap-3">
@@ -317,7 +323,7 @@ export default function Leaderboard() {
       {/* NETWORK STATS BAR */}
       {!loading && !creditsOffline && ranking.length > 0 && (
         <div className="max-w-5xl mx-auto mb-10 grid grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Users size={12}/> Nodes with Credits</div><div className="text-2xl font-bold text-white mt-1">{ranking.length}</div></div>
+          <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Users size={12}/> Nodes with Credits</div><div className="text-2xl font-bold text-white">{ranking.length}</div></div>
           <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Wallet size={12}/> Total Credits Issued</div><div className="text-2xl font-bold text-yellow-400 mt-1">{(ranking.reduce((sum, n) => sum + n.credits, 0) / 1000000).toFixed(1)}M</div></div>
           <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Activity size={12}/> Avg Credits</div><div className="text-2xl font-bold text-white mt-1">{Math.round(ranking.reduce((sum, n) => sum + n.credits, 0) / ranking.length).toLocaleString()}</div></div>
           <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><BarChart3 size={12}/> Top 10 Dominance</div><div className="text-2xl font-bold text-blue-400 mt-1">{(() => { const total = ranking.reduce((sum, n) => sum + n.credits, 0); const top10 = ranking.slice(0, 10).reduce((sum, n) => sum + n.credits, 0); return total > 0 ? ((top10 / total) * 100).toFixed(1) : 0; })()}%</div></div>
@@ -359,7 +365,8 @@ export default function Leaderboard() {
           <div className="p-20 text-center text-zinc-600"><Search size={48} className="mx-auto mb-4 opacity-50" /><p>No nodes match your search.</p></div>
         ) : (
           <div className="divide-y divide-zinc-800/50">
-            {filtered.slice(0, 100).map((node) => {
+            {/* RENDER LOGIC: Filter first, then Slice */}
+            {filtered.slice(0, visibleCount).map((node) => {
               const isMyNode = node.address && favorites.includes(node.address);
               const isExpanded = expandedNode === node.pubkey;
               const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
@@ -461,6 +468,22 @@ export default function Leaderboard() {
                 </div>
               );
             })}
+            
+            {/* LOAD MORE BUTTON */}
+            {visibleCount < filtered.length ? (
+                <div className="p-4 flex justify-center border-t border-zinc-800">
+                    <button 
+                        onClick={handleLoadMore}
+                        className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs rounded-xl transition-all"
+                    >
+                        <ChevronIcon size={16} /> LOAD NEXT 100 NODES
+                    </button>
+                </div>
+            ) : filtered.length > 0 && (
+                <div className="p-4 text-center border-t border-zinc-800 text-xs text-zinc-600 font-mono uppercase">
+                    --- END OF LIST ---
+                </div>
+            )}
           </div>
         )}
       </div>
@@ -468,8 +491,11 @@ export default function Leaderboard() {
       {/* FOOTER */}
       {!loading && !creditsOffline && (
         <div className="max-w-5xl mx-auto mt-6 text-center text-xs text-zinc-600 flex flex-col md:flex-row items-center justify-center gap-2">
-          <div className="flex items-center gap-2"><Eye size={12} /><span>Tracking <span className="text-zinc-400 font-bold">{ranking.length}</span> earning nodes. Top 100 displayed.</span></div>
-          <span className="hidden md:inline text-zinc-700">•</span><span className="text-zinc-500">(Search to find others)</span>
+          {/* UPDATED FOOTER STATS */}
+          <div className="flex items-center gap-2"><Eye size={12} />
+              <span>Showing <span className="text-zinc-400 font-bold">{Math.min(visibleCount, filtered.length)}</span> of <span className="text-zinc-400 font-bold">{filtered.length}</span> nodes.</span>
+          </div>
+          <span className="hidden md:inline text-zinc-700">•</span><span className="text-zinc-500">(Scroll or search to find others)</span>
         </div>
       )}
     </div>
