@@ -8,7 +8,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { nodes, stats } = await getNetworkPulse();
 
-    // Aggregation Logic for Map Page
     const cityMap = new Map<string, any>();
 
     nodes.forEach(node => {
@@ -23,12 +22,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         existing.count++;
         existing.totalStorage += storageGB;
         
-        // CRASHPROOF AGGREGATION:
-        // Only add credits if they exist. 
-        // We track if we have ANY valid data for this region.
         if (node.credits !== null) {
             existing.totalCredits += node.credits;
-            existing.hasValidCreditData = true; // Mark that we saw real data
+            existing.hasValidCreditData = true;
         }
 
         existing.healthSum += node.health;
@@ -37,25 +33,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         existing.ips.push(node.address.split(':')[0]);
 
-        // Track "King" nodes
+        // --- TRACKING KINGS (Updated to track Values) ---
         if (storageGB > existing.bestNodes.storageVal) {
             existing.bestNodes.storageVal = storageGB;
             existing.bestNodes.storagePk = node.pubkey;
         }
         
-        // Only update King Credit if data is valid
         if (node.credits !== null && node.credits > existing.bestNodes.creditsVal) {
             existing.bestNodes.creditsVal = node.credits;
             existing.bestNodes.creditsPk = node.pubkey;
         }
         
+        // For Health, we also grab the Uptime of the healthiest node for display
         if (node.health > existing.bestNodes.healthVal) {
             existing.bestNodes.healthVal = node.health;
             existing.bestNodes.healthPk = node.pubkey;
+            existing.bestNodes.healthUptime = node.uptime || 0; // Capture specific uptime
         }
 
       } else {
-        // Initialize new location
         cityMap.set(key, {
           name: city,
           country: countryName,
@@ -64,27 +60,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           count: 1,
           totalStorage: storageGB,
           totalCredits: node.credits || 0, 
-          // If first node is null, we haven't seen valid data yet
           hasValidCreditData: node.credits !== null, 
           healthSum: node.health,
           totalUptime: node.uptime || 0,
           publicCount: node.is_public ? 1 : 0,
           ips: [node.address.split(':')[0]],
           
+          // Initial Best Nodes
           bestNodes: {
               storageVal: storageGB, storagePk: node.pubkey,
               creditsVal: node.credits || 0, creditsPk: node.pubkey,
-              healthVal: node.health, healthPk: node.pubkey
+              healthVal: node.health, healthPk: node.pubkey, healthUptime: node.uptime || 0
           }
         });
       }
     });
 
     const locations = Array.from(cityMap.values()).map(l => {
-        // CRASHPROOF FINAL CHECK:
-        // If we never saw valid credit data for this region, 
-        // force totalCredits to null so the map UI knows to show "Offline/Unknown"
-        // instead of "0 Cr".
         const finalCredits = l.hasValidCreditData ? l.totalCredits : null;
 
         return {
@@ -95,16 +87,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           lon: l.lon,
           count: l.count,
           totalStorage: l.totalStorage,
-          totalCredits: finalCredits, // Pass Null if needed
+          totalCredits: finalCredits,
           avgHealth: Math.round(l.healthSum / l.count),
           avgUptime: l.totalUptime / l.count,
           publicRatio: (l.publicCount / l.count) * 100,
           ips: l.ips,
           
-          topPks: {
-              STORAGE: l.bestNodes.storagePk,
-              CREDITS: l.bestNodes.creditsPk,
-              HEALTH: l.bestNodes.healthPk
+          // UPDATED STRUCTURE: Sending Objects instead of just Strings
+          topPerformers: {
+              STORAGE: { pk: l.bestNodes.storagePk, val: l.bestNodes.storageVal },
+              CREDITS: { pk: l.bestNodes.creditsPk, val: l.bestNodes.creditsVal },
+              // Health includes the uptime sub-value
+              HEALTH: { pk: l.bestNodes.healthPk, val: l.bestNodes.healthVal, subVal: l.bestNodes.healthUptime }
           }
         };
     });
