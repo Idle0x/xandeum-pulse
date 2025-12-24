@@ -113,7 +113,7 @@ Clicking any node opens a granular diagnostic modal designed for detailed analys
 
 **Code:** [`pages/index.tsx`](pages/index.tsx)
 - See `renderComparisonRow` - [Line 900-933](pages/index.tsx#L900-L933) - (versus Mode)
-- See `handleDownloadProof()` - [Lines 800-814](pages/index.tsx#L800-L814) & `UI Render` - [Line 1530-1640](pages/index.tsx#L1530-L1640) - (proof generation)
+- See `handleDownloadProof()` - [Lines 800-814](pages/index.tsx#L800-L814) - (proof generation)
 - See renderStorageAnalysis - [Line 1395-1521](pages/index.tsx#L1395-L1521) - (storage calculation)
 
 ![Inspector Modal](https://private-user-images.githubusercontent.com/140549997/529940088-cae31cd7-fd73-46b6-8868-92895a72db3b.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY1NjU2OTcsIm5iZiI6MTc2NjU2NTM5NywicGF0aCI6Ii8xNDA1NDk5OTcvNTI5OTQwMDg4LWNhZTMxY2Q3LWZkNzMtNDZiNi04ODY4LTkyODk1YTcyZGIzYi5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI0JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyNFQwODM2MzdaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1lYzkzYjQxMWE2YWI4ODUxMTYyNDdjMTFhN2Q5MTE5YWQ3NDAyZWNhOGQ3YmY4NjQ2OTVmMzk2NGRhYWQ0OWU4JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.aiY7lezl-qh0GWDWKj2wSEQfOrPdceLwnLdWce9Xezk)
