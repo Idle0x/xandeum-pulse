@@ -48,21 +48,20 @@ interface MapStats {
 
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
-// STORAGE kept as INDIGO per previous request
 const MODE_COLORS = {
     STORAGE: { hex: '#6366f1', tailwind: 'text-indigo-500', bg: 'bg-indigo-600', border: 'border-indigo-500/50' },
     HEALTH:  { hex: '#10b981', tailwind: 'text-emerald-500', bg: 'bg-emerald-600', border: 'border-emerald-500/50' },
     CREDITS: { hex: '#f97316', tailwind: 'text-orange-500', bg: 'bg-orange-600', border: 'border-orange-500/50' }
 };
 
-// UPDATED: New High-Contrast Legend Hierarchy
+// UPDATED: New Rank Hierarchy (Gold -> Pink -> Cyan -> Blue -> Lilac)
 const TIER_COLORS = [
-    "#fbbf24", // 1. Gold/Orange (Top)
-    "#f472b6", // 2. Hot Pink
-    "#00ced1", // 3. Cyan
-    "#3b82f6", // 4. Blue
-    "#c084fc"  // 5. Bright Lavender (Copper Alt - Readable on Dark)
-]; 
+    "#f59e0b", // Gold/Orange (Massive/Legendary)
+    "#ec4899", // Hot Pink (Major/Elite)
+    "#00ced1", // Cyan (Standard/Proven) - Distinct from Blue
+    "#00bfff", // Deep Sky Blue (Entry/Active) - Better visibility than pale blue
+    "#d8b4fe"  // Bright Lilac (Micro/New) - Adjusted for visibility on black
+];
 
 const TIER_LABELS = {
     STORAGE: ['Massive Hub', 'Major Zone', 'Standard', 'Entry Level', 'Micro Node'],
