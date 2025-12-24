@@ -1908,7 +1908,7 @@ export default function Home() {
 
             <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm">
               <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
-                Active Nodes
+                Total Nodes
               </div>
               <div className="text-lg md:text-3xl font-bold text-white mt-1">{nodes.length}</div>
             </div>
