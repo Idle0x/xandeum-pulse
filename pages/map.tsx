@@ -1,523 +1,593 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Head from 'next/head';
-import axios from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import axios from 'axios';
+import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
+import { scaleSqrt } from 'd3-scale';
 import { 
-  Trophy, Medal, ArrowLeft, Search, Wallet, X, 
-  Activity, Users, BarChart3, HelpCircle, Star, 
-  Calculator, Zap, ChevronDown, 
-  ExternalLink, ArrowUpRight, Eye, MapPin, Copy, Check, Share2, ArrowUp, ArrowDown,
-  AlertOctagon, ChevronDown as ChevronIcon 
+  ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, 
+  MapPin, RotateCcw, Info, X, HelpCircle, Share2, Check, ArrowRight, 
+  AlertOctagon, AlertCircle, EyeOff 
 } from 'lucide-react';
 
-interface RankedNode {
-  rank: number;
-  pubkey: string;
-  credits: number;
-  address?: string;
-  location?: {
-      countryName: string;
-      countryCode: string;
-  };
-  trend: number; 
+const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+
+interface TopPerformerData {
+    pk: string;
+    val: number;
+    subVal?: number; 
 }
 
-const ERA_BOOSTS = { 'DeepSouth': 16, 'South': 10, 'Main': 7, 'Coal': 3.5, 'Central': 2, 'North': 1.25 };
-const NFT_BOOSTS = { 'Titan': 11, 'Dragon': 4, 'Coyote': 2.5, 'Rabbit': 1.5, 'Cricket': 1.1, 'XENO': 1.1 };
+interface LocationData {
+  name: string; 
+  country: string; 
+  lat: number; 
+  lon: number; 
+  count: number;
+  totalStorage: number; 
+  totalCredits: number | null; 
+  avgHealth: number;
+  avgUptime: number;
+  publicRatio: number;
+  ips?: string[];
+  countryCode?: string;
+  topPerformers?: {
+      STORAGE: TopPerformerData;
+      CREDITS: TopPerformerData;
+      HEALTH: TopPerformerData;
+  };
+}
 
-export default function Leaderboard() {
+interface MapStats {
+  totalNodes: number; 
+  countries: number; 
+  topRegion: string; 
+  topRegionMetric: number;
+}
+
+type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
+
+const MODE_COLORS = {
+    STORAGE: { hex: '#6366f1', tailwind: 'text-indigo-500', bg: 'bg-indigo-600', border: 'border-indigo-500/50' },
+    HEALTH:  { hex: '#10b981', tailwind: 'text-emerald-500', bg: 'bg-emerald-600', border: 'border-emerald-500/50' },
+    CREDITS: { hex: '#f97316', tailwind: 'text-orange-500', bg: 'bg-orange-600', border: 'border-orange-500/50' }
+};
+
+const TIER_COLORS = [
+    "#f59e0b", // Gold/Orange (Massive/Legendary)
+    "#ec4899", // Hot Pink (Major/Elite)
+    "#00ced1", // Cyan (Standard/Proven) - Distinct from Blue
+    "#00bfff", // Deep Sky Blue (Entry/Active) - Better visibility than pale blue
+    "#d8b4fe"  // Bright Lilac (Micro/New) - Adjusted for visibility on black
+];
+
+const TIER_LABELS = {
+    STORAGE: ['Massive Hub', 'Major Zone', 'Standard', 'Entry Level', 'Micro Node'],
+    CREDITS: ['Legendary', 'Elite', 'Proven', 'Active', 'New Entry'],
+    HEALTH:  ['Flawless', 'Robust', 'Fair', 'Shaky', 'Critical']
+};
+
+const HEALTH_THRESHOLDS = [90, 75, 60, 40];
+
+export default function MapPage() {
   const router = useRouter();
-  const [ranking, setRanking] = useState<RankedNode[]>([]);
+  
+  // Data State
+  const [locations, setLocations] = useState<LocationData[]>([]);
+  const [stats, setStats] = useState<MapStats>({ totalNodes: 0, countries: 0, topRegion: 'Scanning...', topRegionMetric: 0 });
   const [loading, setLoading] = useState(true);
-  const [creditsOffline, setCreditsOffline] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [favorites, setFavorites] = useState<string[]>([]);
   
-  // --- PAGINATION STATE ---
-  const [visibleCount, setVisibleCount] = useState(100);
+  // View State
+  const [viewMode, setViewMode] = useState<ViewMode>('STORAGE');
+  const [isSplitView, setIsSplitView] = useState(false);
+  const [activeLocation, setActiveLocation] = useState<string | null>(null);
+  const [expandedLocation, setExpandedLocation] = useState<string | null>(null);
 
-  // Simulator State
-  const [showSim, setShowSim] = useState(false);
-  const [showHardwareCalc, setShowHardwareCalc] = useState(false);
-  
-  // Inputs
-  const [baseCreditsInput, setBaseCreditsInput] = useState<number>(0);
-  const [simNodes, setSimNodes] = useState<number>(1);
-  const [simStorageVal, setSimStorageVal] = useState<number>(1);
-  const [simStorageUnit, setSimStorageUnit] = useState<'MB' | 'GB' | 'TB' | 'PB'>('TB');
-  const [simStake, setSimStake] = useState<number>(1000); 
-  const [simPerf, setSimPerf] = useState(0.95);
-  const [simBoosts, setSimBoosts] = useState<number[]>([]); 
-  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
-
-  // Expanded Row
-  const [expandedNode, setExpandedNode] = useState<string | null>(null);
-  
-  // Feedback State
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  // UI State
+  const [toast, setToast] = useState<{ msg: string; type: 'error' | 'info' | 'private' } | null>(null);
+  const [position, setPosition] = useState({ coordinates: [10, 20], zoom: 1.2 });
+  const [copiedCoords, setCopiedCoords] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
+  const listRef = useRef<HTMLDivElement>(null);
   const hasDeepLinked = useRef(false);
+  
+  const [dynamicThresholds, setDynamicThresholds] = useState<number[]>([0, 0, 0, 0]);
 
+  const visibleNodes = useMemo(() => locations.reduce((sum, loc) => sum + loc.count, 0), [locations]);
+  const privateNodes = Math.max(0, stats.totalNodes - visibleNodes);
+
+  // --- SCROLL TO ACTIVE ---
   useEffect(() => {
-    const fetchData = async () => {
+      if (activeLocation && isSplitView) {
+          const timer = setTimeout(() => {
+              const item = document.getElementById(`list-item-${activeLocation}`);
+              if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 150); 
+          return () => clearTimeout(timer);
+      }
+  }, [viewMode, activeLocation, isSplitView]);
+
+  // --- FETCH LOOP ---
+  useEffect(() => {
+    const fetchGeo = async () => {
       try {
-        const [creditsRes, statsRes] = await Promise.all([
-          axios.get('/api/credits').catch(() => ({ data: [] })), 
-          axios.get('/api/stats').catch(() => ({ data: { result: { pods: [] } } }))
-        ]);
-
-        const metaMap = new Map<string, { address: string, location?: any }>();
-        if (statsRes.data?.result?.pods) {
-            statsRes.data.result.pods.forEach((node: any) => {
-                metaMap.set(node.pubkey, { address: node.address, location: node.location });
-            });
+        const res = await axios.get('/api/geo');
+        if (res.data) {
+          setLocations(res.data.locations || []);
+          setStats(res.data.stats || { totalNodes: 0, countries: 0, topRegion: 'Unknown', topRegionMetric: 0 });
+          
+          if (router.isReady && router.query.focus && !hasDeepLinked.current) {
+              hasDeepLinked.current = true;
+              const targetIP = router.query.focus as string;
+              if (res.data.locations && res.data.locations.length > 0) {
+                  const targetLoc = res.data.locations.find((l: LocationData) => l.ips && l.ips.includes(targetIP));
+                  if (targetLoc) {
+                      setTimeout(() => { lockTarget(targetLoc.name, targetLoc.lat, targetLoc.lon); }, 500);
+                  } else {
+                      setToast({ msg: `Node ${targetIP} uses a Masked IP (VPN/CGNAT). Geolocation unavailable.`, type: 'private' });
+                      setTimeout(() => setToast(null), 6000);
+                  }
+              }
+          }
         }
-
-        const rawData = creditsRes.data.pods_credits || creditsRes.data;
-        
-        if (!rawData || !Array.isArray(rawData) || rawData.length === 0) {
-             setCreditsOffline(true);
-             setRanking([]); 
-        } else {
-            setCreditsOffline(false);
-            
-            // 1. Fetch History
-            let history: Record<string, number> = {};
-            try {
-                const h = localStorage.getItem('xandeum_rank_history');
-                if (h) history = JSON.parse(h);
-            } catch (e) {}
-            
-            const newHistory: Record<string, number> = {};
-
-            // 2. Parse
-            const parsedList: RankedNode[] = rawData.map((item: any) => {
-                const pKey = item.pod_id || item.pubkey || 'Unknown';
-                const meta = metaMap.get(pKey);
-                return {
-                pubkey: pKey,
-                credits: Number(item.credits || 0),
-                rank: 0, 
-                address: meta?.address,
-                location: meta?.location,
-                trend: 0
-                };
-            });
-
-            // 3. Sort & Rank
-            parsedList.sort((a, b) => b.credits - a.credits);
-            
-            let currentRank = 1;
-            for (let i = 0; i < parsedList.length; i++) {
-                if (i > 0 && parsedList[i].credits < parsedList[i - 1].credits) currentRank = i + 1;
-                parsedList[i].rank = currentRank;
-                
-                // Trend
-                const prevRank = history[parsedList[i].pubkey];
-                if (prevRank) parsedList[i].trend = prevRank - currentRank;
-                newHistory[parsedList[i].pubkey] = currentRank;
-            }
-
-            localStorage.setItem('xandeum_rank_history', JSON.stringify(newHistory));
-            setRanking(parsedList);
-            
-            // Deep Link Logic
-            if (router.isReady && router.query.highlight && !hasDeepLinked.current) {
-                const targetKey = router.query.highlight as string;
-                if (parsedList.some(n => n.pubkey === targetKey)) {
-                    hasDeepLinked.current = true;
-                    setTimeout(() => {
-                        setExpandedNode(targetKey);
-                        const el = document.getElementById(`node-${targetKey}`);
-                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }, 500);
-                }
-            }
-        }
-
-        const saved = localStorage.getItem('xandeum_favorites');
-        if (saved) setFavorites(JSON.parse(saved));
-
-      } catch (err) {
-        console.error("Leaderboard Fatal:", err);
-        setCreditsOffline(true);
-      } finally {
-        setLoading(false);
-      }
+      } catch (err) { console.error(err); } finally { setLoading(false); }
     };
+    
+    fetchGeo();
+    const interval = setInterval(fetchGeo, 10000);
+    return () => clearInterval(interval);
+  }, [router.isReady, router.query.focus]); 
 
-    fetchData();
-  }, [router.isReady, router.query.highlight]);
-
-  // Hardware Calc Logic
+  // --- THRESHOLD CALCULATION ---
   useEffect(() => {
-      if (showHardwareCalc) {
-          let storageInGB = simStorageVal;
-          if (simStorageUnit === 'MB') storageInGB = simStorageVal / 1000;
-          if (simStorageUnit === 'TB') storageInGB = simStorageVal * 1000;
-          if (simStorageUnit === 'PB') storageInGB = simStorageVal * 1000000;
-          const calculated = simNodes * storageInGB * simPerf * simStake;
-          setBaseCreditsInput(calculated);
+      if (locations.length === 0) return;
+      if (viewMode === 'HEALTH') {
+          setDynamicThresholds(HEALTH_THRESHOLDS);
+          return;
       }
-  }, [simNodes, simStorageVal, simStorageUnit, simStake, simPerf, showHardwareCalc]);
+      const values = locations
+        .map(l => viewMode === 'STORAGE' ? l.totalStorage : (l.totalCredits || 0))
+        .sort((a, b) => a - b);
+      
+      const getQuantile = (q: number) => {
+          const pos = (values.length - 1) * q;
+          const base = Math.floor(pos);
+          const rest = pos - base;
+          if ((values[base + 1] !== undefined)) {
+              return values[base] + rest * (values[base + 1] - values[base]);
+          } else {
+              return values[base];
+          }
+      };
+      setDynamicThresholds([getQuantile(0.90), getQuantile(0.75), getQuantile(0.50), getQuantile(0.25)]);
+  }, [locations, viewMode]);
 
-  // OPTIMIZATION: Memoize filtering to keep interactions snappy
-  const filtered = useMemo(() => {
-    return ranking.filter(n => n.pubkey.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [ranking, searchQuery]);
+  // --- HELPERS ---
+  const getTierIndex = (loc: LocationData): number => {
+    let val = 0;
+    if (viewMode === 'STORAGE') val = loc.totalStorage;
+    else if (viewMode === 'CREDITS') {
+        if (loc.totalCredits === null) return -1;
+        val = loc.totalCredits;
+    }
+    else val = loc.avgHealth;
 
-  const handleRowClick = (node: RankedNode) => {
-      setBaseCreditsInput(node.credits);
-      setShowHardwareCalc(false);
-      setExpandedNode(expandedNode === node.pubkey ? null : node.pubkey);
+    if (val >= dynamicThresholds[0]) return 0;
+    if (val >= dynamicThresholds[1]) return 1;
+    if (val >= dynamicThresholds[2]) return 2;
+    if (val >= dynamicThresholds[3]) return 3;
+    return 4;
   };
 
-  const handleUseInSim = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setShowSim(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+  const formatStorage = (gb: number) => {
+    if (gb >= 1000) return `${(gb / 1024).toFixed(1)} TB`;
+    return `${Math.round(gb)} GB`;
   };
 
-  const handleCopyKey = (e: React.MouseEvent, key: string) => {
-      e.stopPropagation();
-      navigator.clipboard.writeText(key);
-      setCopiedKey(key);
-      setTimeout(() => setCopiedKey(null), 2000);
+  const formatCredits = (cr: number | null) => {
+      if (cr === null) return "N/A";
+      if (cr >= 1000000) return `${(cr/1000000).toFixed(1)}M`;
+      if (cr >= 1000) return `${(cr/1000).toFixed(0)}k`;
+      return cr.toString();
   };
 
-  const handleShareUrl = (e: React.MouseEvent, key: string) => {
+  const formatUptime = (seconds: number) => {
+      const d = Math.floor(seconds / 86400);
+      const h = Math.floor((seconds % 86400) / 3600);
+      if(d > 0) return `${d}d ${h}h`;
+      return `${h}h`;
+  };
+
+  // Helper for Top Performer Stats
+  const getPerformerStats = (pkData: TopPerformerData) => {
+      if (viewMode === 'STORAGE') {
+          // Reverted to Indigo
+          return <span className="text-indigo-400 font-bold">{formatStorage(pkData.val)} Committed</span>;
+      }
+      if (viewMode === 'CREDITS') {
+          return <span className="text-yellow-500 font-bold">{pkData.val.toLocaleString()} Cr Earned</span>;
+      }
+      if (viewMode === 'HEALTH') {
+          const score = pkData.val;
+          const uptime = pkData.subVal || 0;
+          const color = score >= 80 ? 'text-green-400' : score >= 50 ? 'text-yellow-400' : 'text-red-400';
+          
+          return (
+            <span className={`font-bold flex items-center gap-2 ${color}`}>
+                 {score}% <span className="text-zinc-600">|</span> <span className="text-blue-300">{formatUptime(uptime)} Up</span>
+            </span>
+          );
+      }
+  };
+
+  const getLegendLabels = () => {
+      if (viewMode === 'HEALTH') return ['> 90%', '75-90%', '60-75%', '40-60%', '< 40%'];
+      const format = (v: number) => viewMode === 'STORAGE' ? formatStorage(v) : formatCredits(v);
+      return [`> ${format(dynamicThresholds[0])}`, `${format(dynamicThresholds[1])} - ${format(dynamicThresholds[0])}`, `${format(dynamicThresholds[2])} - ${format(dynamicThresholds[1])}`, `${format(dynamicThresholds[3])} - ${format(dynamicThresholds[2])}`, `< ${format(dynamicThresholds[3])}`];
+  };
+
+  const lockTarget = (name: string, lat: number, lon: number) => {
+    if (activeLocation !== name) {
+        setActiveLocation(name);
+        setExpandedLocation(name); 
+        setPosition({ coordinates: [lon, lat], zoom: 3 });
+        setIsSplitView(true);
+    }
+    if (listRef.current) {
+         setTimeout(() => {
+             const item = document.getElementById(`list-item-${name}`);
+             if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+         }, 300);
+    }
+  };
+
+  const toggleExpansion = (name: string, lat: number, lon: number) => {
+      if (expandedLocation === name) resetView(); else lockTarget(name, lat, lon);
+  };
+
+  const resetView = () => {
+    setActiveLocation(null);
+    setExpandedLocation(null);
+    setPosition({ coordinates: [10, 20], zoom: 1.2 });
+  };
+
+  const handleCloseDrawer = () => { setIsSplitView(false); resetView(); };
+  const handleCopyCoords = (lat: number, lon: number, name: string) => {
+    const text = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+    navigator.clipboard.writeText(text);
+    setCopiedCoords(name);
+    setTimeout(() => setCopiedCoords(null), 2000);
+  };
+
+  const handleShareLink = (e: React.MouseEvent, ip: string, name: string) => {
       e.stopPropagation();
-      const url = `${window.location.origin}/leaderboard?highlight=${key}`;
+      const url = `${window.location.origin}/map?focus=${ip}`;
       navigator.clipboard.writeText(url);
-      setCopiedLink(key);
+      setCopiedLink(name);
       setTimeout(() => setCopiedLink(null), 2000);
   };
-
-  const handleLoadMore = () => {
-      setVisibleCount(prev => prev + 100);
-  };
-
-  const calculateFinal = () => {
-      let multiplier = 1;
-      if (simBoosts.length > 0) multiplier = simBoosts.reduce((a, b) => a * b, 1);
-      return { boosted: baseCreditsInput * multiplier, multiplier };
-  };
-
-  const simResult = calculateFinal();
   
-  const toggleBoost = (val: number) => {
-      if (simBoosts.includes(val)) setSimBoosts(simBoosts.filter(b => b !== val));
-      else setSimBoosts([...simBoosts, val]);
+  const handleZoomIn = () => { if (position.zoom < 5) setPosition(pos => ({ ...pos, zoom: pos.zoom * 1.5 })); };
+  const handleZoomOut = () => { if (position.zoom > 1) setPosition(pos => ({ ...pos, zoom: pos.zoom / 1.5 })); };
+  const handleMoveEnd = (pos: any) => setPosition(pos);
+
+  const sizeScale = useMemo(() => {
+    const maxVal = Math.max(...locations.map(d => d.count), 0);
+    return scaleSqrt().domain([0, maxVal]).range([5, 12]);
+  }, [locations]);
+
+  const getMetricText = (loc: LocationData) => {
+    switch (viewMode) {
+        case 'STORAGE': return formatStorage(loc.totalStorage);
+        case 'HEALTH': return `${loc.avgHealth}% Health`;
+        case 'CREDITS': return loc.totalCredits === null ? "API OFFLINE" : `${loc.totalCredits.toLocaleString()} Cr`;
+    }
   };
 
-  const toggleTooltip = (id: string) => {
-      setActiveTooltip(activeTooltip === id ? null : id);
+  const getXRayStats = (loc: LocationData, index: number, tierColor: string) => {
+      const globalShare = ((loc.count / stats.totalNodes) * 100).toFixed(1);
+      const rawPercentile = ((locations.length - index) / locations.length) * 100;
+      const topPercent = 100 - rawPercentile;
+      let rankText = `Top < 0.01%`;
+      if (topPercent >= 0.01) rankText = `Top ${topPercent.toFixed(2)}% Tier`;
+
+      if (viewMode === 'STORAGE') {
+          const avgPerNode = loc.totalStorage / loc.count;
+          return {
+              labelA: 'Avg Density',
+              // UPDATED: Reverted to Indigo
+              valA: <span className="text-indigo-400">{formatStorage(avgPerNode)} per Node</span>,
+              descA: "Average committed storage per node in this region.",
+              labelB: 'Global Share',
+              valB: `${globalShare}% of Network`,
+              descB: "Percentage of total network nodes located here.",
+              labelC: 'Tier Rank',
+              valC: <span style={{ color: tierColor }}>{rankText}</span>,
+              descC: "Performance tier relative to other regions."
+          };
+      }
+      if (viewMode === 'CREDITS') {
+          if (loc.totalCredits === null) {
+              return {
+                  labelA: 'Avg Earnings',
+                  valA: <span className="text-red-400 flex items-center justify-center gap-1 font-bold"><AlertOctagon size={12}/> API OFFLINE</span>,
+                  descA: "Source endpoint is unreachable.",
+                  labelB: 'Contribution',
+                  valB: <span className="text-zinc-500 italic">Unknown</span>,
+                  descB: "Data unavailable.",
+                  labelC: 'Tier Rank',
+                  valC: <span className="text-zinc-500 italic">Unknown</span>,
+                  descC: "Cannot calculate rank without data."
+              };
+          }
+          const avgCred = Math.round(loc.totalCredits / loc.count);
+          return {
+              labelA: 'Avg Earnings',
+              valA: <span className="text-yellow-500">{avgCred.toLocaleString()} Cr per Node</span>,
+              descA: "Average reputation credits earned per node here.",
+              labelB: 'Contribution',
+              valB: `${globalShare}% of Economy`,
+              descB: "Share of total network reputation credits.",
+              labelC: 'Tier Rank',
+              valC: <span style={{ color: tierColor }}>{rankText}</span>,
+              descC: "Earning power tier relative to other regions."
+          };
+      }
+      return {
+          labelA: 'Reliability',
+          valA: <span className="text-green-400">{formatUptime(loc.avgUptime)} Avg Uptime</span>,
+          descA: "Average continuous uptime of nodes in this region.",
+          labelB: 'Node Count',
+          valB: `${globalShare}% of Network`,
+          descB: "Share of active physical nodes.",
+          labelC: 'Tier Rank',
+          valC: <span style={{ color: tierColor }}>{rankText}</span>,
+          descC: "Stability tier relative to other regions."
+      };
   };
+
+  const sortedLocations = useMemo(() => {
+    return [...locations].sort((a, b) => {
+        if (viewMode === 'STORAGE') return b.totalStorage - a.totalStorage;
+        if (viewMode === 'CREDITS') return (b.totalCredits || 0) - (a.totalCredits || 0);
+        return b.avgHealth - a.avgHealth;
+    });
+  }, [locations, viewMode]);
+
+  const leadingRegion = sortedLocations[0];
+
+  const getDynamicTitle = () => {
+    if (loading) return "Calibrating Global Sensors...";
+    if (!leadingRegion) return "Waiting for Node Telemetry...";
+    const { country } = leadingRegion;
+    const colorClass = MODE_COLORS[viewMode].tailwind; 
+    switch (viewMode) {
+        case 'STORAGE': return <><span className={colorClass}>{country}</span> Leads Storage Capacity</>;
+        case 'CREDITS': return <><span className={colorClass}>{country}</span> Tops Network Earnings</>;
+        case 'HEALTH': return <><span className={colorClass}>{country}</span> Sets Vitality Standard</>;
+    }
+  };
+
+  const getDynamicSubtitle = () => {
+     if (!leadingRegion) return "Analyzing network topology...";
+     const { name, totalStorage, totalCredits, avgHealth, count } = leadingRegion;
+     switch (viewMode) {
+        case 'STORAGE': return `The largest hub, ${name}, is currently providing ${formatStorage(totalStorage)}.`;
+        case 'CREDITS': 
+            if (totalCredits === null) return "Network credits data is currently unavailable from the endpoint.";
+            return `Operators in ${name} have generated a total of ${totalCredits.toLocaleString()} Cr.`;
+        case 'HEALTH': return `${name} is performing optimally with an average health score of ${avgHealth}% across ${count} nodes.`;
+     }
+  };
+
+  const getLegendContext = () => {
+      switch(viewMode) {
+          case 'STORAGE': return "Visualizing global committed disk space.";
+          case 'HEALTH': return "Monitoring uptime, version consensus, and stability.";
+          case 'CREDITS': return "Tracking accumulated node rewards and reputation.";
+      }
+  }
+
+  const locationsForMap = useMemo(() => {
+    if (!activeLocation) return locations;
+    const others = locations.filter(l => l.name !== activeLocation);
+    const active = locations.find(l => l.name === activeLocation);
+    return active ? [...others, active] : others;
+  }, [locations, activeLocation]);
+
+  const ViewToggles = ({ className = "" }: { className?: string }) => (
+    <div className={`flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-700/50 rounded-xl ${className}`}>
+        {(['STORAGE', 'HEALTH', 'CREDITS'] as ViewMode[]).map((mode) => {
+            let Icon = Database;
+            if (mode === 'HEALTH') Icon = Activity;
+            if (mode === 'CREDITS') Icon = Zap;
+            const active = viewMode === mode;
+            const activeColorBg = MODE_COLORS[mode].bg;
+            return (
+                <button key={mode} onClick={(e) => { e.stopPropagation(); setViewMode(mode); }} className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${active ? `${activeColorBg} text-white shadow-md` : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}`}>
+                    <Icon size={14} className={active ? "text-white" : "text-zinc-500"} />
+                    <span className="text-[10px] md:text-xs font-bold tracking-wide">{mode}</span>
+                </button>
+            )
+        })}
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-4 md:p-8 selection:bg-yellow-500/30">
-      <Head><title>Xandeum Pulse - Credits & Reputation</title></Head>
+    <div className="fixed inset-0 bg-black text-white font-sans overflow-hidden flex flex-col">
+      <Head>
+        <title>Xandeum Command Center</title>
+        <style>{`@supports (padding: max(0px)) { .pb-safe { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); } }`}</style>
+      </Head>
 
-      {/* HEADER */}
-      <div className="max-w-5xl mx-4 md:mx-auto mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
-        <Link href="/" className="flex items-center gap-2 text-zinc-500 hover:text-white transition text-sm font-bold uppercase tracking-wider group">
-          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back to Monitor
-        </Link>
-        <div className="text-center">
-          {/* UPDATED TITLE */}
-          <h1 className="text-3xl font-extrabold flex items-center gap-3 text-yellow-500 justify-center"><Trophy size={32} /> CREDITS & REPUTATION</h1>
-          <p className="text-xs text-zinc-500 mt-1 font-mono tracking-wide uppercase">The definitive registry of node reputation and network contribution</p>
-        </div>
-        <div className="w-32 hidden md:block"></div>
-      </div>
-
-      {/* --- STOINC SIMULATOR WIDGET --- */}
-      <div className="max-w-5xl mx-auto mb-10 bg-gradient-to-b from-zinc-900 to-black border border-yellow-500/30 rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.1)] transition-all duration-300">
-          <div className="p-4 bg-yellow-500/10 border-b border-yellow-500/20 flex justify-between items-center cursor-pointer hover:bg-yellow-500/20 transition" onClick={() => setShowSim(!showSim)}>
-              <div className="flex items-center gap-3">
-                  <div className="p-2 bg-yellow-500 text-black rounded-lg animate-pulse"><Calculator size={20} /></div>
-                  <div>
-                      <h2 className="font-bold text-yellow-500 text-sm uppercase tracking-widest">STOINC Simulator</h2>
-                      <p className="text-[10px] text-zinc-400">Estimate forecasted earnings based on official Xandeum calculations</p>
-                  </div>
+      {toast && (
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100] animate-in zoom-in-95 duration-300 w-[90%] max-w-sm pointer-events-none">
+              <div className={`flex items-start gap-3 px-5 py-4 rounded-2xl border shadow-2xl backdrop-blur-xl ${toast.type === 'error' ? 'bg-red-500/10 border-red-500/50 text-red-200' : toast.type === 'private' ? 'bg-zinc-900/90 border-zinc-600 text-zinc-200' : 'bg-zinc-800 border-zinc-700 text-white'}`}>
+                  {toast.type === 'error' ? <AlertCircle size={20} className="text-red-500 mt-0.5 shrink-0" /> : toast.type === 'private' ? <EyeOff size={20} className="text-zinc-400 mt-0.5 shrink-0" /> : <Info size={20} className="text-blue-500 mt-0.5 shrink-0" />}
+                  <div className="flex-1"><p className="text-sm font-bold leading-tight">{toast.msg}</p></div>
               </div>
-              {showSim ? <ChevronDown size={20} className="rotate-180 text-yellow-500 transition-transform" /> : <ChevronDown size={20} className="text-zinc-500 transition-transform" />}
           </div>
-
-          {showSim && (
-              <div className="p-6 md:p-8 animate-in slide-in-from-top-4 duration-500">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                      <div className="space-y-8">
-                          <div className={`relative ${showHardwareCalc ? 'hidden' : 'block'}`}>
-                              <div className="flex justify-between items-end mb-2">
-                                  <div className="flex items-center gap-2 text-zinc-400"><span className="text-xs font-bold uppercase tracking-wider text-white">Base Reputation Credits</span><HelpCircle size={12} className="cursor-help hover:text-white" onClick={() => toggleTooltip('base_input')} /></div>
-                                  <button onClick={() => setShowHardwareCalc(true)} className="text-[10px] text-blue-400 hover:text-blue-300 underline underline-offset-2 flex items-center gap-1">Don't know? Calculate from Hardware</button>
-                              </div>
-                              {activeTooltip === 'base_input' && <div className="absolute z-10 bg-zinc-800 border border-zinc-700 p-3 rounded text-[10px] text-zinc-300 w-full -top-12 left-0 shadow-xl">The raw score derived from (Nodes × Storage × Stake). Select a node below to auto-fill, or type a hypothetical value.</div>}
-                              <div className="flex items-center bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden focus-within:border-yellow-500 transition-all">
-                                  <input type="number" min="0" value={baseCreditsInput} onChange={(e) => setBaseCreditsInput(Number(e.target.value))} className="w-full bg-transparent p-4 text-white text-2xl font-mono font-bold outline-none" placeholder="0" />
-                                  <span className="pr-6 text-xs font-bold text-zinc-600">CREDITS</span>
-                              </div>
-                          </div>
-
-                          {showHardwareCalc && (
-                              <div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-top-2 relative">
-                                  <div className="flex justify-between items-center mb-2">
-                                      <div className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Hardware Specs Calculator</div>
-                                      <button onClick={() => setShowHardwareCalc(false)} className="text-[10px] text-zinc-500 hover:text-white underline">Hide Calculator</button>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-4">
-                                      <div><label className="text-[9px] text-zinc-500 uppercase font-bold block mb-1">Fleet Size</label><input type="number" min="1" value={simNodes} onChange={(e) => setSimNodes(Math.max(1, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-white text-xs font-mono outline-none focus:border-blue-500"/></div>
-                                      <div><label className="text-[9px] text-zinc-500 uppercase font-bold block mb-1">XAND Stake</label><input type="number" min="0" value={simStake} onChange={(e) => setSimStake(Math.max(0, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-white text-xs font-mono outline-none focus:border-blue-500"/></div>
-                                  </div>
-                                  <div>
-                                      <label className="text-[9px] text-zinc-500 uppercase font-bold block mb-1">Total Storage</label>
-                                      <div className="flex gap-2">
-                                          <input type="number" min="1" value={simStorageVal} onChange={(e) => setSimStorageVal(Math.max(0, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded p-2 text-white text-xs font-mono outline-none focus:border-blue-500"/>
-                                          <select value={simStorageUnit} onChange={(e) => setSimStorageUnit(e.target.value as any)} className="bg-zinc-900 border border-zinc-700 rounded p-2 text-zinc-300 text-xs font-bold outline-none"><option>MB</option><option>GB</option><option>TB</option><option>PB</option></select>
-                                      </div>
-                                  </div>
-                              </div>
-                          )}
-
-                          <div className="relative pt-4 border-t border-zinc-800">
-                              <div className="flex items-center gap-2 mb-3 text-zinc-400"><span className="text-xs font-bold uppercase tracking-wider">Apply Boosts (NFTs / Eras)</span><HelpCircle size={12} className="cursor-help hover:text-white" onClick={() => toggleTooltip('boost')} /></div>
-                              {activeTooltip === 'boost' && <div className="absolute z-10 bg-zinc-800 border border-zinc-700 p-3 rounded text-[10px] text-zinc-300 w-64 -top-12 left-0 shadow-xl">Multipliers from NFTs and pNode Eras. Stacks geometrically.</div>}
-                              <div className="flex flex-wrap gap-2">
-                                  {Object.entries({...ERA_BOOSTS, ...NFT_BOOSTS}).map(([name, val]) => (
-                                      <button key={name} onClick={() => toggleBoost(val)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${simBoosts.includes(val) ? 'bg-yellow-500 text-black border-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.3)]' : 'bg-zinc-900 text-zinc-500 border-zinc-700 hover:border-zinc-500'}`}>{name} <span className="opacity-60">x{val}</span></button>
-                                  ))}
-                              </div>
-                          </div>
-                      </div>
-
-                      <div className="bg-zinc-900 rounded-xl p-6 border border-zinc-800 flex flex-col justify-center space-y-6 relative">
-                          <div className="text-center relative">
-                              <div className="text-xs font-bold text-zinc-500 uppercase mb-1 flex items-center justify-center gap-1">Total Boost Factor</div>
-                              <div className="text-4xl font-extrabold text-white flex items-center justify-center gap-2"><Zap size={24} className={simResult.multiplier > 1 ? "text-yellow-500 fill-yellow-500" : "text-zinc-700"} />{simResult.multiplier.toLocaleString(undefined, { maximumFractionDigits: 4 })}x</div>
-                          </div>
-                          <div className="space-y-4">
-                              <div className="flex justify-between items-center border-b border-zinc-800 pb-4 relative"><span className="text-xs text-zinc-400 flex items-center gap-1">Projected Credits</span><span className="font-mono text-2xl font-bold text-yellow-500 text-shadow-glow">{simResult.boosted.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></div>
-                              {/* If offline, we can't calc share */}
-                              {!creditsOffline ? (
-                                <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl text-center relative">
-                                    <div className="text-[10px] text-blue-400 font-bold uppercase mb-1 flex items-center justify-center gap-1">Est. Network Share</div>
-                                    <div className="text-2xl font-bold text-white">{ranking.length > 0 ? ((simResult.boosted / (ranking.reduce((a,b)=>a+b.credits, 0) + simResult.boosted)) * 100).toFixed(8) : '0.00'}%</div>
-                                    <div className="text-[9px] text-blue-300/50 mt-1">of Total Epoch Rewards</div>
-                                </div>
-                              ) : (
-                                <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-center relative">
-                                    <div className="text-[10px] text-red-400 font-bold uppercase mb-1 flex items-center justify-center gap-1">Network Offline</div>
-                                    <div className="text-xs text-zinc-400">Cannot calculate share</div>
-                                </div>
-                              )}
-                          </div>
-                      </div>
-                  </div>
-              </div>
-          )}
-      </div>
-
-      {/* NETWORK STATS BAR */}
-      {!loading && !creditsOffline && ranking.length > 0 && (
-        <div className="max-w-5xl mx-auto mb-10 grid grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Users size={12}/> Nodes Fetched</div><div className="text-2xl font-bold text-white">{ranking.length}</div></div>
-          <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Wallet size={12}/> Total Credits Issued</div><div className="text-2xl font-bold text-yellow-400 mt-1">{(ranking.reduce((sum, n) => sum + n.credits, 0) / 1000000).toFixed(1)}M</div></div>
-          <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Activity size={12}/> Avg Credits</div><div className="text-2xl font-bold text-white mt-1">{Math.round(ranking.reduce((sum, n) => sum + n.credits, 0) / ranking.length).toLocaleString()}</div></div>
-          <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><BarChart3 size={12}/> Top 10 Dominance</div><div className="text-2xl font-bold text-blue-400 mt-1">{(() => { const total = ranking.reduce((sum, n) => sum + n.credits, 0); const top10 = ranking.slice(0, 10).reduce((sum, n) => sum + n.credits, 0); return total > 0 ? ((top10 / total) * 100).toFixed(1) : 0; })()}%</div></div>
-        </div>
       )}
 
-      {/* SEARCH & TIPS */}
-      <div className="max-w-5xl mx-auto mb-6 relative space-y-3">
-        <div className="relative">
-            <Search className="absolute left-4 top-3.5 text-zinc-500" size={20} />
-            <input type="text" placeholder="Find node by public key..." className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-12 pr-10 text-white focus:border-yellow-500 outline-none transition placeholder-zinc-600" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-            {searchQuery && (<button onClick={() => setSearchQuery('')} className="absolute right-4 top-3.5 text-zinc-500 hover:text-white"><X size={20} /></button>)}
+      <div className="shrink-0 w-full z-50 flex flex-col gap-3 px-4 md:px-6 py-3 bg-[#09090b] border-b border-zinc-800/30">
+        <div className="flex items-center justify-between w-full">
+            <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all cursor-pointer">
+                <ArrowLeft size={12} className="text-zinc-400 group-hover:text-white" />
+                <span className="text-zinc-500 group-hover:text-zinc-300 text-[10px] font-bold uppercase tracking-widest">Dashboard</span>
+            </Link>
+            <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full animate-pulse`} style={{ backgroundColor: MODE_COLORS[viewMode].hex }}></div>
+                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{viewMode} Mode</span>
+                </div>
+                {!loading && (
+                    <button onClick={() => { setToast({ msg: `${privateNodes} nodes are running on Private Networks/VPNs, preventing public geolocation. Their data is tracked, but their map pin is hidden.`, type: 'private' }); setTimeout(() => setToast(null), 6000); }} className="hidden md:flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors cursor-help">
+                        <HelpCircle size={12} className="text-zinc-500" />
+                        <span className="text-xs md:text-sm font-bold tracking-tight">Tracking {visibleNodes} <span className="text-zinc-600">/ {stats.totalNodes} Nodes</span></span>
+                    </button>
+                )}
+            </div>
         </div>
+        <div><h1 className="text-lg md:text-2xl font-bold tracking-tight text-white leading-tight">{getDynamicTitle()}</h1><p className="text-xs text-zinc-400 leading-relaxed mt-1 max-w-2xl">{getDynamicSubtitle()}</p></div>
       </div>
 
-      {/* TABLE */}
-      <div className="max-w-5xl mx-auto bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-visible backdrop-blur-sm relative min-h-[400px]">
-        <div className="grid grid-cols-12 gap-4 p-4 border-b border-zinc-800 text-xs font-bold text-zinc-500 uppercase tracking-widest sticky top-0 bg-zinc-900/95 backdrop-blur-sm z-10 rounded-t-2xl">
-          <div className="col-span-2 md:col-span-1 text-center">Rank</div>
-          <div className="col-span-6 md:col-span-7">Node Public Key</div>
-          <div className="col-span-4 text-right">Credits</div>
-        </div>
+      <div className={`relative w-full bg-[#080808] ${isSplitView ? 'h-[40vh] shrink-0' : 'flex-1 basis-0 min-h-0'}`}>
+            {loading ? (
+                <div className="absolute inset-0 flex items-center justify-center z-20"><Globe className="animate-pulse text-blue-500" /></div>
+            ) : (
+                <ComposableMap projectionConfig={{ scale: 170 }} className="w-full h-full" style={{ width: "100%", height: "100%" }}>
+                <ZoomableGroup zoom={position.zoom} center={position.coordinates as [number, number]} onMoveEnd={handleMoveEnd} maxZoom={5}>
+                    <Geographies geography={GEO_URL}>
+                    {({ geographies }: { geographies: any }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#1f1f1f" stroke="#333" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { fill: "#333", outline: "none" }, pressed: { outline: "none" }}} />))}
+                    </Geographies>
+                    {locationsForMap.map((loc) => {
+                    const size = sizeScale(loc.count);
+                    const isActive = activeLocation === loc.name;
+                    const tier = getTierIndex(loc);
+                    const isMissingData = viewMode === 'CREDITS' && loc.totalCredits === null;
+                    const tierColor = isMissingData ? '#52525b' : TIER_COLORS[tier];
+                    const opacity = activeLocation && !isActive ? 0.3 : 1;
+                    const pingColor = isMissingData ? '#52525b' : (isActive ? '#22c55e' : tierColor);
 
-        {/* --- CRASHPROOF ERROR STATE --- */}
-        {loading ? (
-          <div className="absolute inset-0 flex items-center justify-center">
-             <div className="text-center animate-pulse text-zinc-500 font-mono flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-4 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin"></div>
-                CALCULATING FORTUNES...
-             </div>
-          </div>
-        ) : creditsOffline ? (
-          <div className="p-20 text-center flex flex-col items-center justify-center h-full">
-              <AlertOctagon size={48} className="text-red-500 mb-4" />
-              <h3 className="text-lg font-bold text-white mb-2">Credits System Offline</h3>
-              <p className="text-sm text-zinc-500 max-w-sm">The upstream Xandeum Credits API is currently unreachable. Leaderboard rankings are temporarily unavailable.</p>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="p-20 text-center text-zinc-600"><Search size={48} className="mx-auto mb-4 opacity-50" /><p>No nodes match your search.</p></div>
-        ) : (
-          <div className="divide-y divide-zinc-800/50 space-y-1">
-            {/* RENDER LOGIC: Filter first, then Slice */}
-            {filtered.slice(0, visibleCount).map((node) => {
-              const isMyNode = node.address && favorites.includes(node.address);
-              const isExpanded = expandedNode === node.pubkey;
-              const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
+                    return (
+                        <Marker key={loc.name} coordinates={[loc.lon, loc.lat]} onClick={() => lockTarget(loc.name, loc.lat, loc.lon)}>
+                        <g className="group cursor-pointer transition-all duration-500" style={{ opacity }}>
+                            <circle r={size * 2.5} fill={pingColor} className="animate-ping opacity-20" style={{ animationDuration: isActive ? '1s' : '3s' }} />
+                            {isActive ? (<polygon points="0,-12 3,-4 11,-4 5,1 7,9 0,5 -7,9 -5,1 -11,-4 -3,-4" transform={`scale(${size/6})`} fill="#52525b" stroke="#22c55e" strokeWidth={1.5} className="drop-shadow-[0_0_15px_rgba(34,197,94,1)]" />) : (<>{viewMode === 'STORAGE' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={tierColor} stroke="#fff" strokeWidth={1} />}{viewMode === 'CREDITS' && <circle r={size} fill={tierColor} stroke="#fff" strokeWidth={1} />}{viewMode === 'HEALTH' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={tierColor} stroke="#fff" strokeWidth={1} className="rotate-45" />}</>)}
+                            {isActive && (<g transform={`translate(0, ${-size - 18})`}><rect x="-60" y="-20" width="120" height="24" rx="4" fill="black" fillOpacity="0.8" stroke="#22c55e" strokeWidth="1" className="drop-shadow-lg" /><text y="-4" textAnchor="middle" className="font-mono text-[10px] fill-white font-bold uppercase tracking-widest pointer-events-none dominant-baseline-central">{loc.name}</text><path d="M -5 4 L 0 9 L 5 4" fill="black" stroke="#22c55e" strokeWidth="1" strokeDasharray="0,14,3" /></g>)}
+                        </g>
+                        </Marker>
+                    );
+                    })}
+                </ZoomableGroup>
+                </ComposableMap>
+            )}
+            <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-30">
+                <button onClick={handleZoomIn} className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Plus size={16} /></button>
+                <button onClick={handleZoomOut} className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Minus size={16} /></button>
+                {(position.zoom > 1.2 || activeLocation) && <button onClick={resetView} className="p-2 md:p-3 bg-red-900/80 border border-red-500/50 text-red-200 rounded-xl hover:text-white"><RotateCcw size={16} /></button>}
+            </div>
+      </div>
 
-              return (
-                <div 
-                    key={node.pubkey} 
-                    id={`node-${node.pubkey}`} 
-                    className={`
-                        relative transition-all duration-300 ease-out border rounded-xl overflow-hidden
-                        ${isExpanded 
-                            ? 'z-20 scale-[1.02] bg-zinc-900 border-cyan-500/50 shadow-[0_0_30px_rgba(6,182,212,0.15)] my-4' 
-                            : isMyNode 
-                                ? 'z-0 border-yellow-500/50 bg-yellow-500/5' 
-                                : 'z-0 hover:scale-[1.02] hover:bg-zinc-800/50 border-transparent hover:border-zinc-700'
-                        }
-                    `}
-                    onClick={() => handleRowClick(node)}
-                >
-                    <div className="grid grid-cols-12 gap-4 p-4 items-center cursor-pointer relative">
-                        
-                        {/* RANK */}
-                        <div className="col-span-2 md:col-span-1 flex flex-col justify-center items-center gap-1 relative">
-                            <div className="flex items-center gap-1">
-                                {node.rank === 1 && <Trophy size={16} className="text-yellow-400" />}
-                                {node.rank > 1 && node.rank <= 3 && <Medal size={16} className={node.rank === 2 ? "text-zinc-300" : "text-amber-600"} />}
-                                <span className={`text-sm font-bold ${node.rank <= 3 ? 'text-white' : 'text-zinc-500'}`}>#{node.rank}</span>
-                            </div>
-                            
-                            {/* WHALE WATCH TREND */}
-                            {node.trend !== 0 && (
-                                <div className={`text-[9px] font-bold flex items-center ${node.trend > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                    {node.trend > 0 ? <ArrowUp size={8} /> : <ArrowDown size={8} />} {Math.abs(node.trend)}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* PUBKEY & ADDRESS */}
-                        <div className="col-span-6 md:col-span-7 font-mono text-sm text-zinc-300 truncate group-hover:text-white transition flex items-center justify-between pr-4">
-                            <span>{node.pubkey}</span>
-                            <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180 text-yellow-500' : 'text-zinc-600 group-hover:text-zinc-400'}`}><ChevronDown size={16} /></div>
-                        </div>
-
-                        {/* CREDITS */}
-                        <div className="col-span-4 text-right font-bold font-mono text-yellow-500 flex items-center justify-end gap-2">
-                            {node.credits.toLocaleString()}
-                            <Wallet size={14} className="text-zinc-600 group-hover:text-yellow-500 transition hidden md:block" />
-                        </div>
+      <div className={`shrink-0 bg-[#09090b] relative z-50 flex flex-col ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
+            <div className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4 ${isSplitView ? 'hidden' : 'flex'}`}>
+                <div className="w-full md:w-auto flex justify-center md:justify-start"><ViewToggles /></div>
+                <div className="w-full md:w-auto bg-zinc-900/30 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3">
+                    <div className="flex flex-col gap-2 max-w-xl">
+                        <div className="flex items-start gap-2"><Info size={12} className="text-blue-400 mt-0.5 shrink-0" /><p className="text-[10px] text-zinc-400 leading-tight"><strong className="text-zinc-200">{getLegendContext()}</strong> {viewMode === 'STORAGE' || viewMode === 'CREDITS' ? "Thresholds are dynamic (percentile-based)." : "Thresholds are fixed."}</p></div>
                     </div>
+                    <div className="grid grid-cols-3 md:grid-cols-5 gap-3 w-full">
+                        {getLegendLabels().map((label, idx) => (<div key={idx} className="flex flex-col items-center gap-1.5"><div className="w-8 h-1.5 rounded-full" style={{ backgroundColor: TIER_COLORS[idx] }}></div><span className="text-[9px] font-mono text-zinc-500 font-bold whitespace-nowrap">{label}</span></div>))}
+                    </div>
+                </div>
+            </div>
 
-                    {/* EXPANDED ACTIONS */}
-                    {isExpanded && (
-                        <div className="bg-black/40 border-t border-cyan-500/20 p-4 pl-4 md:pl-12 animate-in slide-in-from-top-2 duration-300">
-                            <div className="flex flex-col gap-4">
-                                <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                                    
-                                    {/* ROW 1: ACTIONS */}
-                                    <div className="flex gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
-                                        {/* 1. VIEW ON MAP */}
-                                        {node.address && (
-                                            <Link href={`/map?focus=${node.address.split(':')[0]}`}>
-                                                <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-blue-900/20 border border-blue-500/30 hover:bg-blue-900/40 text-xs font-bold text-blue-400 transition-all whitespace-nowrap">
-                                                    {flagUrl ? <img src={flagUrl} className="w-4 rounded-sm" alt="flag"/> : <MapPin size={14} />}
-                                                    VIEW ON MAP
-                                                </button>
+            <div className={`flex flex-col h-full overflow-hidden ${isSplitView ? 'flex' : 'hidden'}`}>
+                 <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-zinc-800/30 bg-[#09090b]">
+                    <div className="flex items-center gap-3"><h2 className="text-sm font-bold text-white flex items-center gap-2"><Activity size={14} className="text-green-500" /> Live Data</h2><div className="hidden md:block scale-90 origin-left"><ViewToggles /></div></div>
+                    <div className="flex items-center gap-2">
+                        <div className="md:hidden scale-75 origin-right"><ViewToggles /></div>
+                        <button onClick={handleCloseDrawer} className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg"><X size={20} /></button>
+                    </div>
+                 </div>
+
+                 <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar bg-[#09090b]">
+                    {sortedLocations.map((loc, i) => {
+                        const tier = getTierIndex(loc);
+                        const isMissingData = viewMode === 'CREDITS' && loc.totalCredits === null;
+                        const tierColor = isMissingData ? '#71717a' : TIER_COLORS[tier];
+                        const isExpanded = expandedLocation === loc.name;
+                        const xray = getXRayStats(loc, i, tierColor);
+                        const sampleIp = loc.ips && loc.ips.length > 0 ? loc.ips[0] : null;
+                        const topData = loc.topPerformers ? loc.topPerformers[viewMode] : null;
+
+                        return (
+                            <div id={`list-item-${loc.name}`} key={loc.name} onClick={(e) => { e.stopPropagation(); toggleExpansion(loc.name, loc.lat, loc.lon); }} className={`group rounded-2xl border transition-all cursor-pointer overflow-hidden ${activeLocation === loc.name ? 'bg-zinc-800 border-green-500/50' : 'bg-zinc-900/50 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800'}`}>
+                                <div className="p-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`flex items-center justify-center w-8 h-8 rounded-full font-mono text-xs font-bold ${activeLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'}`}>{i + 1}</div>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-zinc-200 group-hover:text-white flex items-center gap-2">{loc.countryCode && <img src={`https://flagcdn.com/w20/${loc.countryCode.toLowerCase()}.png`} className="w-4 h-auto rounded-sm" />}{loc.name}, {loc.country}</span>
+                                            <span onClick={(e) => { e.stopPropagation(); handleCopyCoords(loc.lat, loc.lon, loc.name); }} className="text-[10px] text-zinc-500 flex items-center gap-1 hover:text-blue-400 cursor-copy transition-colors"><MapPin size={10} /> {copiedCoords === loc.name ? <span className="text-green-500 font-bold">Copied!</span> : `${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}`}</span>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className={`text-sm font-mono font-bold ${isMissingData ? 'text-red-400' : ''}`} style={isMissingData ? {} : { color: tierColor }}>{getMetricText(loc)}</div>
+                                        <div className="text-[10px] text-zinc-500">{loc.count} Nodes</div>
+                                    </div>
+                                </div>
+                                {isExpanded && (
+                                    <div className="bg-black/30 border-t border-white/5 p-4 animate-in slide-in-from-top-2 duration-300">
+                                        <div className="flex justify-between items-center mb-4"><div className="text-[10px] md:text-sm font-bold uppercase tracking-widest px-3 py-1 rounded border bg-black/50" style={{ color: tierColor, borderColor: `${tierColor}40` }}>{isMissingData ? 'UNKNOWN' : TIER_LABELS[viewMode][tier]} TIER</div><div className="flex gap-2">{sampleIp && (<button onClick={(e) => handleShareLink(e, sampleIp, loc.name)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold hover:bg-blue-500/20 transition">{copiedLink === loc.name ? <Check size={12} /> : <Share2 size={12} />}{copiedLink === loc.name ? 'Link Copied' : 'Share Region'}</button>)}</div></div>
+                                        <div className="grid grid-cols-3 gap-2 text-xs md:text-sm text-center mb-4">
+                                            <div className="flex flex-col items-center group/stat"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1 flex items-center gap-1">{xray.labelA}<HelpCircle size={8} className="cursor-help opacity-50"/><div className="absolute bottom-1/2 mb-2 hidden group-hover/stat:block bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-50 w-32">{xray.descA}</div></div><div className="font-mono font-bold">{xray.valA}</div></div>
+                                            <div className="flex flex-col items-center border-l border-zinc-800/50 group/stat"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1 flex items-center gap-1">{xray.labelB}<HelpCircle size={8} className="cursor-help opacity-50"/><div className="absolute bottom-1/2 mb-2 hidden group-hover/stat:block bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-50 w-32">{xray.descB}</div></div><div className="text-white font-mono font-bold">{xray.valB}</div></div>
+                                            <div className="flex flex-col items-center border-l border-zinc-800/50 group/stat"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1 flex items-center gap-1">{xray.labelC}<HelpCircle size={8} className="cursor-help opacity-50"/><div className="absolute bottom-1/2 mb-2 hidden group-hover/stat:block bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-50 w-32">{xray.descC}</div></div><div className="font-mono font-bold">{xray.valC}</div></div>
+                                        </div>
+                                        {topData && (
+                                            <Link href={viewMode === 'CREDITS' ? `/leaderboard?highlight=${topData.pk}` : `/?open=${topData.pk}`}>
+                                                <div className="w-full bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl p-3 flex items-center justify-between cursor-pointer group/card transition-all">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`p-2 rounded-lg ${MODE_COLORS[viewMode].bg} text-white`}>
+                                                            {viewMode === 'STORAGE' ? <Database size={14} /> : viewMode === 'CREDITS' ? <Zap size={14} /> : <Activity size={14} />}
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Region's Top Performer</div>
+                                                            {/* Desktop Layout: Stat and Key inline */}
+                                                            <div className="flex items-center gap-3">
+                                                                {/* Shows PK on all screens, truncates more on desktop to fit stat */}
+                                                                <div className="text-xs font-mono text-white truncate w-32 md:w-24 lg:w-32">{topData.pk.slice(0, 16)}...</div>
+                                                                
+                                                                {/* Desktop Only Stat */}
+                                                                <div className="hidden md:block text-xs">
+                                                                    {getPerformerStats(topData)}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 text-[10px] font-bold text-blue-400 group-hover/card:translate-x-1 transition-transform whitespace-nowrap">
+                                                        VIEW DETAILS <ArrowRight size={12} />
+                                                    </div>
+                                                </div>
                                             </Link>
                                         )}
-
-                                        {/* 2. VIEW DIAGNOSTICS */}
-                                        <Link href={`/?open=${node.pubkey}`}>
-                                            <button className="flex items-center gap-2 px-5 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-xs font-bold text-white transition-all shadow-lg hover:shadow-blue-500/10 whitespace-nowrap">
-                                                <Activity size={14} className="text-green-400" />
-                                                VIEW DIAGNOSTICS
-                                                <ExternalLink size={10} className="text-zinc-500" />
-                                            </button>
-                                        </Link>
-
-                                        {/* 3. CALCULATE */}
-                                        <button 
-                                            onClick={handleUseInSim}
-                                            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/20 text-xs font-bold text-yellow-500 transition-all shadow-lg hover:shadow-yellow-500/10 whitespace-nowrap"
-                                        >
-                                            <Calculator size={14} />
-                                            CALC
-                                            <ArrowUpRight size={10} className="text-yellow-500/50" />
-                                        </button>
+                                        <div className="w-full h-1 bg-zinc-800 rounded-full mt-4 overflow-hidden"><div className="h-full bg-white/20" style={{ width: `${(loc.count / stats.totalNodes) * 100}%` }}></div></div>
                                     </div>
-
-                                    {/* ROW 2: UTILS */}
-                                    <div className="flex gap-2 w-full md:w-auto justify-start md:justify-end border-t md:border-t-0 border-white/5 pt-3 md:pt-0">
-                                        <button 
-                                            onClick={(e) => handleCopyKey(e, node.pubkey)}
-                                            className="flex items-center gap-2 px-3 py-2 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg text-[10px] font-mono text-zinc-400 hover:text-white transition"
-                                        >
-                                            {copiedKey === node.pubkey ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
-                                            {copiedKey === node.pubkey ? 'COPIED KEY' : 'COPY KEY'}
-                                        </button>
-
-                                        {/* SHARE RANK BUTTON */}
-                                        <button 
-                                            onClick={(e) => handleShareUrl(e, node.pubkey)}
-                                            className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg text-[10px] font-bold text-blue-400 transition"
-                                        >
-                                            {copiedLink === node.pubkey ? <Check size={12} /> : <Share2 size={12} />}
-                                            {copiedLink === node.pubkey ? 'LINK COPIED' : 'SHARE RANK'}
-                                        </button>
-                                    </div>
-                                </div>
+                                )}
                             </div>
-                        </div>
-                    )}
+                        );
+                    })}
                 </div>
-              );
-            })}
-            
-            {/* LOAD MORE BUTTON */}
-            {visibleCount < filtered.length ? (
-                <div className="p-4 flex justify-center border-t border-zinc-800">
-                    <button 
-                        onClick={handleLoadMore}
-                        className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs rounded-xl transition-all"
-                    >
-                        <ChevronIcon size={16} /> LOAD NEXT 100 NODES
-                    </button>
-                </div>
-            ) : filtered.length > 0 && (
-                <div className="p-4 text-center border-t border-zinc-800 text-xs text-zinc-600 font-mono uppercase">
-                    --- END OF LIST ---
+            </div>
+
+            {!isSplitView && (
+                <div className="shrink-0 p-3 md:px-6 md:py-4 bg-[#09090b] border-t border-zinc-800/30 z-50">
+                    <button onClick={() => setIsSplitView(true)} className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 px-6 py-3 bg-zinc-900/80 hover:bg-zinc-800 border border-blue-500/30 hover:border-blue-500/60 rounded-xl transition-all group shadow-[0_0_20px_rgba(59,130,246,0.15)] hover:shadow-[0_0_30px_rgba(59,130,246,0.3)] animate-[pulse_3s_infinite]"><Activity size={16} className="text-blue-400 group-hover:scale-110 transition-transform animate-pulse" /><span className="text-xs md:text-sm font-bold uppercase tracking-widest text-blue-100 group-hover:text-white">Open Live Stats</span><ChevronUp size={16} className="text-blue-500/50 group-hover:-translate-y-1 transition-transform" /></button>
                 </div>
             )}
-          </div>
-        )}
       </div>
-
-      {/* FOOTER */}
-      {!loading && !creditsOffline && (
-        <div className="max-w-5xl mx-auto mt-6 text-center text-xs text-zinc-600 flex flex-col md:flex-row items-center justify-center gap-2">
-          {/* UPDATED FOOTER STATS */}
-          <div className="flex items-center gap-2"><Eye size={12} />
-              <span>Showing <span className="text-zinc-400 font-bold">{Math.min(visibleCount, filtered.length)}</span> of <span className="text-zinc-400 font-bold">{filtered.length}</span> nodes.</span>
-          </div>
-          <span className="hidden md:inline text-zinc-700">•</span>
-          <span className="text-zinc-500">(Scroll or search to find others)</span>
-          
-          {/* NEW ADDITION */}
-          <span className="hidden md:inline text-zinc-700">•</span>
-          <span className="text-zinc-600">
-            Data sourced directly from the <a href="https://podcredits.xandeum.network/api/pods-credits" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-white underline underline-offset-2 transition-colors">podcredits API</a>.
-          </span>
-        </div>
-      )}
     </div>
   );
 }
