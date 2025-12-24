@@ -96,13 +96,25 @@ The primary monitoring interface for node operators.
 
 - **Cyclic metrics:** Cards rotate between Storage → Uptime → Health every 5 seconds to maximize data density without clutter
 - **Visual mode toggle:** "Zen Mode" strips gradients/animations for OLED displays in 24/7 monitoring environments
-- **Head-to-head comparison:** Select two nodes to see side-by-side performance differentials
 
 **Code:** [`pages/index.tsx`](pages/index.tsx)
 - See `renderZenCard()` - [Lines 833-875](pages/index.tsx#L833-L875) - (zen mode toggle)
-- See `handleDownloadProof()` - [Lines 622-636](pages/index.tsx#L622-L636) - (proof generation)
 
-### 2. Geographic Map
+### 2. Deep Node Inspection
+
+Clicking any node opens a granular diagnostic modal designed for detailed analysis.
+ * Health Diagnostics: Breaks down the Vitality Score into its weighted components, overlaid with network average benchmarks.
+ * Storage Analytics: Visualizes committed capacity against the network median, highlighting surplus or deficit gaps.
+ * Head to Head Comparison: Evaluates two nodes side-by-side to identify performance differentials.
+ * Proof of Pulse: Generates a PNG snapshot of the node’s current metrics for social sharing.
+ * Identity Panel: Exposes full metadata including RPC endpoints, public keys, and version consensus status.
+
+**Code:** [`pages/index.tsx`](pages/index.tsx)
+- See `renderComparisonRow` - [Line 1334-1530](pages/index.tsx#L1334-L1530) - (versus Mode)
+- See `handleDownloadProof()` - [Lines 622-636](pages/index.tsx#L622-L636) & `UI Render` - [Line 1530-1640](pages/index.tsx#L1530-L1640) - (proof generation)
+- See renderStorageAnalysis - [Line 1083-1195](pages/index.tsx#L1083-L1195) - (storage calculation)
+
+### 3. Geographic Map
 
 Visualizes the physical distribution of network infrastructure.
 
@@ -114,7 +126,7 @@ Visualizes the physical distribution of network infrastructure.
 - See `useEffect()` - [Lines 150-175](pages/map.tsx#L150-L175) - (percentile calculation)
 - See `getXRayStats()` - [Lines 265-315](pages/map.tsx#L265-L315) - (region inspector)
 
-### 3. Leaderboard
+### 4. Leaderboard
 
 Reputation tracking and earnings forecasting.
 
