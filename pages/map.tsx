@@ -51,7 +51,7 @@ interface MapStats {
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
 const MODE_COLORS = {
-    STORAGE: { hex: '#6366f1', tailwind: 'text-indigo-500', bg: 'bg-indigo-600', border: 'border-indigo-500/50' },
+    STORAGE: { hex: '#8b5cf6', tailwind: 'text-violet-400', bg: 'bg-violet-600', border: 'border-violet-500/50' },
     HEALTH:  { hex: '#10b981', tailwind: 'text-emerald-500', bg: 'bg-emerald-600', border: 'border-emerald-500/50' },
     CREDITS: { hex: '#f97316', tailwind: 'text-orange-500', bg: 'bg-orange-600', border: 'border-orange-500/50' }
 };
