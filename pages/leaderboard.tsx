@@ -8,7 +8,7 @@ import {
   Activity, Users, BarChart3, HelpCircle, Star, 
   Calculator, Zap, ChevronDown, 
   ExternalLink, ArrowUpRight, Eye, MapPin, Copy, Check, Share2, ArrowUp, ArrowDown,
-  AlertOctagon, ChevronDown as ChevronIcon // Renamed for clarity
+  AlertOctagon, ChevronDown as ChevronIcon 
 } from 'lucide-react';
 
 interface RankedNode {
@@ -226,7 +226,6 @@ export default function Leaderboard() {
           <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back to Monitor
         </Link>
         <div className="text-center">
-          {/* UPDATED TITLE */}
           <h1 className="text-3xl font-extrabold flex items-center gap-3 text-yellow-500 justify-center"><Trophy size={32} /> CREDITS & REPUTATION</h1>
           <p className="text-xs text-zinc-500 mt-1 font-mono tracking-wide uppercase">The definitive registry of node reputation and network contribution</p>
         </div>
@@ -323,7 +322,7 @@ export default function Leaderboard() {
       {/* NETWORK STATS BAR */}
       {!loading && !creditsOffline && ranking.length > 0 && (
         <div className="max-w-5xl mx-auto mb-10 grid grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Users size={12}/> Nodes Fetched/div><div className="text-2xl font-bold text-white">{ranking.length}</div></div>
+          <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Users size={12}/> Nodes Fetched</div><div className="text-2xl font-bold text-white">{ranking.length}</div></div>
           <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Wallet size={12}/> Total Credits Issued</div><div className="text-2xl font-bold text-yellow-400 mt-1">{(ranking.reduce((sum, n) => sum + n.credits, 0) / 1000000).toFixed(1)}M</div></div>
           <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Activity size={12}/> Avg Credits</div><div className="text-2xl font-bold text-white mt-1">{Math.round(ranking.reduce((sum, n) => sum + n.credits, 0) / ranking.length).toLocaleString()}</div></div>
           <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl backdrop-blur-sm"><div className="text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><BarChart3 size={12}/> Top 10 Dominance</div><div className="text-2xl font-bold text-blue-400 mt-1">{(() => { const total = ranking.reduce((sum, n) => sum + n.credits, 0); const top10 = ranking.slice(0, 10).reduce((sum, n) => sum + n.credits, 0); return total > 0 ? ((top10 / total) * 100).toFixed(1) : 0; })()}%</div></div>
@@ -495,7 +494,14 @@ export default function Leaderboard() {
           <div className="flex items-center gap-2"><Eye size={12} />
               <span>Showing <span className="text-zinc-400 font-bold">{Math.min(visibleCount, filtered.length)}</span> of <span className="text-zinc-400 font-bold">{filtered.length}</span> nodes.</span>
           </div>
-          <span className="hidden md:inline text-zinc-700">•</span><span className="text-zinc-500">(Scroll or search to find others)</span>
+          <span className="hidden md:inline text-zinc-700">•</span>
+          <span className="text-zinc-500">(Scroll or search to find others)</span>
+          
+          {/* NEW ADDITION */}
+          <span className="hidden md:inline text-zinc-700">•</span>
+          <span className="text-zinc-600">
+            Data sourced directly from the <a href="https://podcredits.xandeum.network/api/pods-credits" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-white underline underline-offset-2 transition-colors">podcredits API</a>.
+          </span>
         </div>
       )}
     </div>
