@@ -9,7 +9,7 @@ import {
   Share2, Terminal, AlertTriangle, Monitor, AlertOctagon,
   ArrowRight, Camera, Swords, 
   ClipboardCopy, RefreshCw, RotateCcw, MapPin, Wallet, Star,
-  Eye, Search, Sliders, Radio, Grip, FileJson, Link as LinkIcon, Hash
+  Eye, Search, Sliders, Radio, Grip, FileJson, Link as LinkIcon, Hash, Hand
 } from 'lucide-react';
 
 export default function DocsPage() {
@@ -66,7 +66,7 @@ export default function DocsPage() {
                   onClick={() => scrollTo(tab)}
                   className={`text-xs font-bold uppercase tracking-widest hover:text-white transition-colors ${activeTab === tab ? 'text-blue-400' : 'text-zinc-500'}`}
                 >
-                  {tab === 'flight' ? 'how it works - flight school' : tab === 'manual' ? 'how it works - field manual' : tab}
+                  {tab === 'flight' ? 'Flight School' : tab === 'manual' ? 'Field Manual' : tab}
                 </button>
              ))}
           </div>
@@ -111,12 +111,15 @@ export default function DocsPage() {
            ========================================== */}
         <section id="flight" className="relative py-24 md:py-32 border-t border-zinc-900 bg-[#050505]">
              <div className="max-w-6xl mx-auto px-6">
-                <div className="text-center mb-16">
+                {/* ALIGNED LEFT */}
+                <div className="text-left mb-16">
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-900/20 border border-blue-500/30 text-blue-400 text-[10px] font-bold uppercase tracking-widest mb-4">
                         <Terminal size={12} /> Interactive Walkthrough
                     </div>
-                    <h2 className="text-3xl md:text-5xl font-extrabold text-white lowercase">how it works - flight school</h2>
-                    <p className="text-zinc-500 mt-4 max-w-lg mx-auto">
+                    <h2 className="text-xl md:text-5xl font-extrabold text-white tracking-tighter whitespace-nowrap">
+                        How it Works: Flight School 🛫
+                    </h2>
+                    <p className="text-zinc-500 mt-4 max-w-lg text-sm md:text-base leading-relaxed">
                         Don't just read the manual. Experience the platform. <br/>
                         Follow the <span className="text-blue-400 font-bold animate-pulse">Glowing Cues</span> to navigate the infinite ecosystem.
                     </p>
@@ -148,16 +151,16 @@ export default function DocsPage() {
             
             <div className="max-w-6xl mx-auto px-6 relative z-10">
                 
-                {/* HEADER */}
-                <div className="text-center mb-24 space-y-4">
+                {/* HEADER - ALIGNED RIGHT */}
+                <div className="text-right mb-24 space-y-4 flex flex-col items-end">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-green-500/30 bg-green-900/10 text-green-400 text-[10px] font-mono font-bold tracking-widest uppercase mb-4 animate-pulse">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                         System Access Granted
                     </div>
-                    <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter lowercase">
-                        how it works - field manual
+                    <h2 className="text-xl md:text-6xl font-black text-white tracking-tighter whitespace-nowrap">
+                        How it Works: Field Manual 📑
                     </h2>
-                    <p className="text-zinc-400 text-sm md:text-base max-w-2xl mx-auto leading-relaxed font-light">
+                    <p className="text-zinc-400 text-sm md:text-base max-w-2xl leading-relaxed font-light">
                         Pulse is not a passive display. It is an active intelligence tool. 
                         Master these <span className="text-white font-bold">7 Protocols</span> to achieve full network visibility.
                     </p>
@@ -403,7 +406,8 @@ export default function DocsPage() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-24">
-                    <div className="bg-black border border-zinc-800 rounded-3xl p-8 relative shadow-2xl">
+                    {/* UPDATED: Increased height for XRaySimulator to allow drawer animation */}
+                    <div className="bg-black border border-zinc-800 rounded-3xl p-8 relative shadow-2xl h-[500px] flex flex-col justify-center overflow-hidden">
                         <XRaySimulator />
                     </div>
                     
@@ -1211,13 +1215,19 @@ function VitalitySimulator() {
                     <Activity size={14} /> Vitality Engine
                 </span>
                 
-                <button 
-                    onClick={() => setApiOnline(!apiOnline)}
-                    className={`px-3 py-1 rounded-full text-[10px] font-bold border flex items-center gap-2 transition-all ${apiOnline ? 'bg-green-500/10 border-green-500 text-green-400' : 'bg-red-500/10 border-red-500 text-red-400'}`}
-                >
-                    {apiOnline ? <Check size={10}/> : <AlertOctagon size={10}/>}
-                    {apiOnline ? "API ONLINE" : "API DOWN (FAILOVER)"}
-                </button>
+                <div className="relative">
+                    {/* Bouncing Label */}
+                    <div className="absolute -top-8 right-0 bg-blue-600 text-white text-[9px] font-bold px-2 py-1 rounded-full animate-bounce whitespace-nowrap shadow-lg z-10">
+                        CLICK TO TEST FAILOVER
+                    </div>
+                    {/* The Switch */}
+                    <div 
+                        onClick={() => setApiOnline(!apiOnline)}
+                        className={`w-14 h-8 rounded-full flex items-center p-1 cursor-pointer transition-all duration-300 ${apiOnline ? 'bg-green-500 shadow-[0_0_20px_rgba(34,197,94,0.6)]' : 'bg-zinc-800 border border-zinc-700'}`}
+                    >
+                        <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 ${apiOnline ? 'translate-x-6' : 'translate-x-0'}`} />
+                    </div>
+                </div>
             </div>
 
             <div className="text-center mb-8">
@@ -1230,10 +1240,21 @@ function VitalitySimulator() {
             <div className="space-y-6">
                 <div>
                     <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
-                        <span className="text-blue-400">Uptime ({apiOnline ? '35%' : '45%'})</span>
+                        <span className="text-blue-400 flex items-center gap-2">
+                            Uptime 
+                            <span className="bg-zinc-800 text-zinc-400 px-1.5 rounded text-[8px] border border-zinc-700 flex items-center gap-1">
+                                <Hand size={8} /> DRAG TO SIMULATE
+                            </span>
+                        </span>
                         <span className="text-white">{uScore} pts</span>
                     </div>
-                    <input type="range" min="0" max="30" value={uptimeDays} onChange={(e) => setUptimeDays(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500"/>
+                    <div className="relative group">
+                        {/* Ghost Hand Animation */}
+                        <div className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                             <Hand className="text-white animate-[ping_1.5s_infinite]" size={16} />
+                        </div>
+                        <input type="range" min="0" max="30" value={uptimeDays} onChange={(e) => setUptimeDays(Number(e.target.value))} className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500 relative z-20"/>
+                    </div>
                 </div>
 
                 <div>
@@ -1306,50 +1327,129 @@ function FailoverVisualizer() {
 }
 
 function XRaySimulator() {
-    const [mode, setMode] = useState<'STORAGE' | 'HEALTH' | 'CREDITS'>('STORAGE');
+    // --- REDESIGNED INTERACTIVE XRAY SIMULATOR (V2) ---
+    const [phase, setPhase] = useState<'MAP' | 'DRAWER_OPEN' | 'SCROLLING' | 'EXPANDED'>('MAP');
+    const [activeTab, setActiveTab] = useState<'STORAGE' | 'HEALTH' | 'CREDITS'>('STORAGE');
+
+    // Sequence when clicked
+    const startSequence = () => {
+        if (phase !== 'MAP') return;
+        setPhase('DRAWER_OPEN');
+        setTimeout(() => setPhase('SCROLLING'), 600);
+        setTimeout(() => setPhase('EXPANDED'), 1600);
+    };
+
+    const reset = () => {
+        setPhase('MAP');
+        setActiveTab('STORAGE');
+    };
 
     return (
-        <div className="relative">
-            <div className="flex gap-2 mb-8 justify-center">
-                {['STORAGE', 'HEALTH', 'CREDITS'].map(m => (
-                    <button key={m} onClick={() => setMode(m as any)} className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition-all border ${mode === m ? 'bg-white text-black border-white' : 'bg-zinc-900 text-zinc-500 border-zinc-800'}`}>{m}</button>
-                ))}
+        <div className="w-full h-full relative overflow-hidden bg-[#0a0a0a]">
+            {/* Map Background */}
+            <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_#1e1b4b_0%,_transparent_70%)] pointer-events-none"></div>
+            
+            {/* --- MAP CONTENT (Top Half) --- */}
+            <div className={`absolute left-0 right-0 top-0 transition-all duration-700 ease-in-out ${phase === 'MAP' ? 'h-full' : 'h-[45%]'}`}>
+                {/* Pins */}
+                <div className="relative w-full h-full">
+                    {/* Lisbon Pin */}
+                    <div 
+                        onClick={startSequence}
+                        className={`absolute top-[35%] left-[45%] transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-500 z-10
+                        ${phase === 'MAP' ? 'scale-100 hover:scale-110' : 'scale-125'}`}
+                    >
+                        {phase === 'MAP' ? (
+                            <>
+                                <div className="w-4 h-4 bg-yellow-500 rounded-full animate-ping absolute opacity-75"></div>
+                                <div className="w-4 h-4 bg-yellow-500 rounded-full relative border-2 border-black shadow-[0_0_15px_rgba(234,179,8,1)]"></div>
+                                <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[9px] font-bold px-2 py-1 rounded-full animate-bounce whitespace-nowrap shadow-lg">CLICK TO X-RAY</div>
+                            </>
+                        ) : (
+                            <Star size={32} className="text-green-500 fill-green-500 drop-shadow-[0_0_20px_rgba(34,197,94,1)]" />
+                        )}
+                    </div>
+
+                    {/* Dummy Pins */}
+                    <div className="absolute top-[32%] left-[22%] w-2 h-2 rounded-full bg-pink-500 opacity-40"></div>
+                    <div className="absolute top-[70%] left-[30%] w-2 h-2 rounded-full bg-cyan-500 opacity-40"></div>
+                    <div className="absolute top-[32%] left-[85%] w-2 h-2 rounded-full bg-purple-500 opacity-40"></div>
+                </div>
             </div>
 
-            <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 transition-all max-w-sm mx-auto shadow-2xl relative overflow-hidden h-64 flex flex-col justify-center">
-                <div className={`absolute top-0 right-0 p-24 blur-[80px] rounded-full opacity-20 transition-colors duration-500 ${mode === 'STORAGE' ? 'bg-indigo-500' : mode === 'HEALTH' ? 'bg-emerald-500' : 'bg-yellow-500'}`}></div>
-
-                <div className="flex justify-between items-center mb-6 relative z-10">
-                    <div className="font-bold text-white text-lg">Lisbon, PT</div>
-                    <div className={`text-sm font-mono font-bold ${mode === 'STORAGE' ? 'text-indigo-400' : mode === 'HEALTH' ? 'text-emerald-400' : 'text-yellow-500'}`}>
-                        {mode === 'STORAGE' ? '1.2 PB' : mode === 'HEALTH' ? '98% Score' : '5.2M Cr'}
+            {/* --- DRAWER (Bottom Half) --- */}
+            <div className={`absolute bottom-0 left-0 right-0 bg-[#09090b] border-t border-zinc-800 transition-all duration-700 ease-in-out flex flex-col
+                ${phase === 'MAP' ? 'translate-y-full h-0' : 'translate-y-0 h-[55%]'}`}
+            >
+                {/* LIST VIEW (Before Expand) */}
+                <div className={`absolute inset-0 p-4 transition-all duration-500 ${phase === 'EXPANDED' ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'}`}>
+                    <div className="text-xs font-bold text-zinc-500 mb-4 uppercase tracking-wider">Locating Region...</div>
+                    <div className={`space-y-2 transition-transform duration-1000 ease-in-out ${phase === 'SCROLLING' ? '-translate-y-[120px]' : 'translate-y-0'}`}>
+                        {[1,2,3,4,5].map(i => (
+                            <div key={i} className="flex items-center justify-between p-3 rounded bg-zinc-900/50 border border-zinc-800/50 opacity-50">
+                                <div className="w-24 h-3 bg-zinc-800 rounded"></div>
+                                <div className="w-12 h-3 bg-zinc-800 rounded"></div>
+                            </div>
+                        ))}
+                        {/* Target */}
+                        <div className={`flex items-center justify-between p-3 rounded border transition-all duration-300 ${phase === 'SCROLLING' ? 'bg-green-900/20 border-green-500/50 scale-105' : 'bg-zinc-900/50 border-zinc-800/50'}`}>
+                            <span className="text-green-400 font-bold">Lisbon, Portugal</span>
+                            <span className="text-xs text-zinc-500">Found</span>
+                        </div>
                     </div>
                 </div>
-                
-                <div className="bg-black/50 p-4 rounded-xl border border-white/5 relative z-10">
-                    <div className="flex justify-center mb-4">
-                        <span className={`text-[10px] uppercase font-bold px-3 py-1.5 rounded border tracking-widest ${mode === 'STORAGE' ? 'text-indigo-400 border-indigo-500/30' : mode === 'HEALTH' ? 'text-emerald-400 border-emerald-500/30' : 'text-yellow-500 border-yellow-500/30'}`}>
-                            {mode === 'STORAGE' ? 'MASSIVE TIER' : mode === 'HEALTH' ? 'FLAWLESS TIER' : 'ELITE EARNER'}
-                        </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 text-center">
+
+                {/* EXPANDED VIEW (Final) */}
+                <div className={`absolute inset-0 p-6 bg-[#09090b] flex flex-col transition-all duration-500 delay-300 ${phase === 'EXPANDED' ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}>
+                    {/* Header */}
+                    <div className="flex justify-between items-start mb-6">
                         <div>
-                            <div className="text-[10px] text-zinc-500 uppercase mb-1 font-bold">
-                                {mode === 'STORAGE' ? 'Avg Density' : mode === 'HEALTH' ? 'Status' : 'Economy'}
+                            <div className="flex items-center gap-2 mb-1">
+                                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-[10px] text-black font-bold">PT</div>
+                                <h2 className="text-xl font-bold text-white">Lisbon, Portugal</h2>
                             </div>
-                            <div className="text-white font-mono text-xs font-bold">
-                                {mode === 'STORAGE' ? '120 TB / Node' : mode === 'HEALTH' ? '5 Up • 0 Down' : '2.1% Share'}
-                            </div>
+                            <div className="text-xs text-zinc-500">Region ID: eu-west-3 • 9 Nodes Active</div>
                         </div>
-                        <div className="border-l border-zinc-800">
-                            <div className="text-[10px] text-zinc-500 uppercase mb-1 font-bold">
-                                {mode === 'STORAGE' ? 'Global Share' : mode === 'HEALTH' ? 'King Node' : 'Top Earner'}
-                            </div>
-                            <div className="text-white font-mono text-xs font-bold truncate px-2">
-                                {mode === 'STORAGE' ? '12.5%' : '8x...2A'}
-                            </div>
-                        </div>
+                        <button onClick={reset} className="text-xs text-zinc-500 hover:text-white flex items-center gap-1"><RotateCcw size={12}/> RESET</button>
+                    </div>
+
+                    {/* Bouncing Toggles */}
+                    <div className="flex gap-2 mb-6 justify-center">
+                        {(['STORAGE', 'HEALTH', 'CREDITS'] as const).map(t => (
+                            <button 
+                                key={t}
+                                onClick={() => setActiveTab(t)}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border animate-bounce ${activeTab === t ? 'bg-white text-black border-white' : 'bg-zinc-900 text-zinc-500 border-zinc-800 hover:text-white'}`}
+                                style={{ animationDelay: t === 'HEALTH' ? '100ms' : t === 'CREDITS' ? '200ms' : '0ms' }}
+                            >
+                                {t}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Dynamic Content */}
+                    <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 flex-1 flex flex-col justify-center items-center text-center animate-in fade-in zoom-in duration-300" key={activeTab}>
+                        {activeTab === 'STORAGE' && (
+                            <>
+                                <div className="text-[10px] text-zinc-500 uppercase font-bold mb-2">Avg Density</div>
+                                <div className="text-3xl font-bold text-white mb-1">1.2 PB</div>
+                                <div className="text-xs text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded border border-indigo-500/30">MASSIVE TIER</div>
+                            </>
+                        )}
+                        {activeTab === 'HEALTH' && (
+                            <>
+                                <div className="text-[10px] text-zinc-500 uppercase font-bold mb-2">Region Status</div>
+                                <div className="text-3xl font-bold text-green-500 mb-1">98%</div>
+                                <div className="text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded border border-green-500/30">FLAWLESS</div>
+                            </>
+                        )}
+                        {activeTab === 'CREDITS' && (
+                            <>
+                                <div className="text-[10px] text-zinc-500 uppercase font-bold mb-2">Total Earnings</div>
+                                <div className="text-3xl font-bold text-yellow-500 mb-1">5.2M Cr</div>
+                                <div className="text-xs text-yellow-400 bg-yellow-500/10 px-2 py-1 rounded border border-yellow-500/30">ELITE SHARE</div>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
