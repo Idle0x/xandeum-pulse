@@ -13,6 +13,13 @@ import {
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
+// UPDATED INTERFACES FOR NEW API DATA
+interface TopPerformerData {
+    pk: string;
+    val: number;
+    subVal?: number; // For Uptime in health mode
+}
+
 interface LocationData {
   name: string; 
   country: string; 
@@ -20,16 +27,17 @@ interface LocationData {
   lon: number; 
   count: number;
   totalStorage: number; 
-  totalCredits: number | null; // Nullable for crash safety
+  totalCredits: number | null; 
   avgHealth: number;
   avgUptime: number;
   publicRatio: number;
   ips?: string[];
   countryCode?: string;
-  topPks?: {
-      STORAGE: string;
-      CREDITS: string;
-      HEALTH: string;
+  // New Structure
+  topPerformers?: {
+      STORAGE: TopPerformerData;
+      CREDITS: TopPerformerData;
+      HEALTH: TopPerformerData;
   };
 }
 
@@ -77,12 +85,10 @@ export default function MapPage() {
   const [position, setPosition] = useState({ coordinates: [10, 20], zoom: 1.2 });
   const [copiedCoords, setCopiedCoords] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
-  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
   const listRef = useRef<HTMLDivElement>(null);
   const hasDeepLinked = useRef(false);
   
-  // Dynamic Calculation State
   const [dynamicThresholds, setDynamicThresholds] = useState<number[]>([0, 0, 0, 0]);
 
   const visibleNodes = useMemo(() => locations.reduce((sum, loc) => sum + loc.count, 0), [locations]);
@@ -111,19 +117,12 @@ export default function MapPage() {
           if (router.isReady && router.query.focus && !hasDeepLinked.current) {
               hasDeepLinked.current = true;
               const targetIP = router.query.focus as string;
-              
               if (res.data.locations && res.data.locations.length > 0) {
                   const targetLoc = res.data.locations.find((l: LocationData) => l.ips && l.ips.includes(targetIP));
-                  
                   if (targetLoc) {
-                      setTimeout(() => {
-                          lockTarget(targetLoc.name, targetLoc.lat, targetLoc.lon);
-                      }, 500);
+                      setTimeout(() => { lockTarget(targetLoc.name, targetLoc.lat, targetLoc.lon); }, 500);
                   } else {
-                      setToast({ 
-                          msg: `Node ${targetIP} uses a Masked IP (VPN/CGNAT). Geolocation unavailable.`, 
-                          type: 'private' 
-                      });
+                      setToast({ msg: `Node ${targetIP} uses a Masked IP (VPN/CGNAT). Geolocation unavailable.`, type: 'private' });
                       setTimeout(() => setToast(null), 6000);
                   }
               }
@@ -140,13 +139,10 @@ export default function MapPage() {
   // --- THRESHOLD CALCULATION ---
   useEffect(() => {
       if (locations.length === 0) return;
-
       if (viewMode === 'HEALTH') {
           setDynamicThresholds(HEALTH_THRESHOLDS);
           return;
       }
-
-      // Safe Map handling for potentially null values
       const values = locations
         .map(l => viewMode === 'STORAGE' ? l.totalStorage : (l.totalCredits || 0))
         .sort((a, b) => a - b);
@@ -161,25 +157,15 @@ export default function MapPage() {
               return values[base];
           }
       };
-
-      setDynamicThresholds([
-          getQuantile(0.90),
-          getQuantile(0.75),
-          getQuantile(0.50),
-          getQuantile(0.25)
-      ]);
-
+      setDynamicThresholds([getQuantile(0.90), getQuantile(0.75), getQuantile(0.50), getQuantile(0.25)]);
   }, [locations, viewMode]);
 
   // --- HELPERS ---
-
   const getTierIndex = (loc: LocationData): number => {
     let val = 0;
-    
-    // CRASHPROOF: Handle missing data for tiering
     if (viewMode === 'STORAGE') val = loc.totalStorage;
     else if (viewMode === 'CREDITS') {
-        if (loc.totalCredits === null) return -1; // Special "Unknown" tier
+        if (loc.totalCredits === null) return -1;
         val = loc.totalCredits;
     }
     else val = loc.avgHealth;
@@ -206,34 +192,44 @@ export default function MapPage() {
   const formatUptime = (seconds: number) => {
       const d = Math.floor(seconds / 86400);
       const h = Math.floor((seconds % 86400) / 3600);
-      return d > 0 ? `${d}d ${h}h` : `${h}h`;
+      if(d > 0) return `${d}d ${h}h`;
+      return `${h}h`;
+  };
+
+  // Helper for Top Performer Stats
+  const getPerformerStats = (pkData: TopPerformerData) => {
+      if (viewMode === 'STORAGE') {
+          return <span className="text-purple-400 font-bold">{formatStorage(pkData.val)} Committed</span>;
+      }
+      if (viewMode === 'CREDITS') {
+          return <span className="text-yellow-500 font-bold">{pkData.val.toLocaleString()} Cr Earned</span>;
+      }
+      if (viewMode === 'HEALTH') {
+          const score = pkData.val;
+          const uptime = pkData.subVal || 0;
+          const color = score >= 80 ? 'text-green-400' : score >= 50 ? 'text-yellow-400' : 'text-red-400';
+          
+          return (
+            <span className={`font-bold flex items-center gap-2 ${color}`}>
+                 {score}% <span className="text-zinc-600">|</span> <span className="text-blue-300">{formatUptime(uptime)} Up</span>
+            </span>
+          );
+      }
   };
 
   const getLegendLabels = () => {
       if (viewMode === 'HEALTH') return ['> 90%', '75-90%', '60-75%', '40-60%', '< 40%'];
-      
-      // Formatting helper that handles potential 0/nulls gracefully in legend
       const format = (v: number) => viewMode === 'STORAGE' ? formatStorage(v) : formatCredits(v);
-      
-      return [
-          `> ${format(dynamicThresholds[0])}`,
-          `${format(dynamicThresholds[1])} - ${format(dynamicThresholds[0])}`,
-          `${format(dynamicThresholds[2])} - ${format(dynamicThresholds[1])}`,
-          `${format(dynamicThresholds[3])} - ${format(dynamicThresholds[2])}`,
-          `< ${format(dynamicThresholds[3])}`
-      ];
+      return [`> ${format(dynamicThresholds[0])}`, `${format(dynamicThresholds[1])} - ${format(dynamicThresholds[0])}`, `${format(dynamicThresholds[2])} - ${format(dynamicThresholds[1])}`, `${format(dynamicThresholds[3])} - ${format(dynamicThresholds[2])}`, `< ${format(dynamicThresholds[3])}`];
   };
 
   const lockTarget = (name: string, lat: number, lon: number) => {
-    if (activeLocation === name) {
-        // Already active
-    } else {
+    if (activeLocation !== name) {
         setActiveLocation(name);
         setExpandedLocation(name); 
         setPosition({ coordinates: [lon, lat], zoom: 3 });
         setIsSplitView(true);
     }
-    
     if (listRef.current) {
          setTimeout(() => {
              const item = document.getElementById(`list-item-${name}`);
@@ -243,11 +239,7 @@ export default function MapPage() {
   };
 
   const toggleExpansion = (name: string, lat: number, lon: number) => {
-      if (expandedLocation === name) {
-          resetView(); 
-      } else {
-          lockTarget(name, lat, lon);
-      }
+      if (expandedLocation === name) resetView(); else lockTarget(name, lat, lon);
   };
 
   const resetView = () => {
@@ -256,11 +248,7 @@ export default function MapPage() {
     setPosition({ coordinates: [10, 20], zoom: 1.2 });
   };
 
-  const handleCloseDrawer = () => {
-      setIsSplitView(false);
-      resetView();
-  };
-
+  const handleCloseDrawer = () => { setIsSplitView(false); resetView(); };
   const handleCopyCoords = (lat: number, lon: number, name: string) => {
     const text = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
     navigator.clipboard.writeText(text);
@@ -285,23 +273,16 @@ export default function MapPage() {
     return scaleSqrt().domain([0, maxVal]).range([5, 12]);
   }, [locations]);
 
-  // --- CRASHPROOF: GET METRIC TEXT ---
   const getMetricText = (loc: LocationData) => {
     switch (viewMode) {
         case 'STORAGE': return formatStorage(loc.totalStorage);
         case 'HEALTH': return `${loc.avgHealth}% Health`;
-        case 'CREDITS': 
-            // Return Safe Message if Null
-            if (loc.totalCredits === null) return "API OFFLINE";
-            return `${loc.totalCredits.toLocaleString()} Cr`;
+        case 'CREDITS': return loc.totalCredits === null ? "API OFFLINE" : `${loc.totalCredits.toLocaleString()} Cr`;
     }
   };
 
-  // --- CRASHPROOF: X-RAY STATS ---
   const getXRayStats = (loc: LocationData, index: number, tierColor: string) => {
       const globalShare = ((loc.count / stats.totalNodes) * 100).toFixed(1);
-      
-      // Calculate Percentile
       const rawPercentile = ((locations.length - index) / locations.length) * 100;
       const topPercent = 100 - rawPercentile;
       let rankText = `Top < 0.01%`;
@@ -322,7 +303,6 @@ export default function MapPage() {
           };
       }
       if (viewMode === 'CREDITS') {
-          // --- ERROR HANDLING FOR CREDITS ---
           if (loc.totalCredits === null) {
               return {
                   labelA: 'Avg Earnings',
@@ -336,7 +316,6 @@ export default function MapPage() {
                   descC: "Cannot calculate rank without data."
               };
           }
-
           const avgCred = Math.round(loc.totalCredits / loc.count);
           return {
               labelA: 'Avg Earnings',
@@ -350,7 +329,6 @@ export default function MapPage() {
               descC: "Earning power tier relative to other regions."
           };
       }
-      
       return {
           labelA: 'Reliability',
           valA: <span className="text-green-400">{formatUptime(loc.avgUptime)} Avg Uptime</span>,
@@ -367,7 +345,7 @@ export default function MapPage() {
   const sortedLocations = useMemo(() => {
     return [...locations].sort((a, b) => {
         if (viewMode === 'STORAGE') return b.totalStorage - a.totalStorage;
-        if (viewMode === 'CREDITS') return (b.totalCredits || 0) - (a.totalCredits || 0); // Sort nulls to bottom
+        if (viewMode === 'CREDITS') return (b.totalCredits || 0) - (a.totalCredits || 0);
         return b.avgHealth - a.avgHealth;
     });
   }, [locations, viewMode]);
@@ -451,7 +429,7 @@ export default function MapPage() {
         <div className="flex items-center justify-between w-full">
             <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all cursor-pointer">
                 <ArrowLeft size={12} className="text-zinc-400 group-hover:text-white" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-300">Dashboard</span>
+                <span className="text-zinc-500 group-hover:text-zinc-300 text-[10px] font-bold uppercase tracking-widest">Dashboard</span>
             </Link>
             <div className="flex flex-col items-end gap-1">
                 <div className="flex items-center gap-2">
@@ -482,8 +460,6 @@ export default function MapPage() {
                     const size = sizeScale(loc.count);
                     const isActive = activeLocation === loc.name;
                     const tier = getTierIndex(loc);
-                    
-                    // CRASHPROOF COLOR: If credits are broken/null for this node, show gray
                     const isMissingData = viewMode === 'CREDITS' && loc.totalCredits === null;
                     const tierColor = isMissingData ? '#52525b' : TIER_COLORS[tier];
                     const opacity = activeLocation && !isActive ? 0.3 : 1;
@@ -534,14 +510,12 @@ export default function MapPage() {
                  <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar bg-[#09090b]">
                     {sortedLocations.map((loc, i) => {
                         const tier = getTierIndex(loc);
-                        // CRASHPROOF: Gray out text/borders if data is missing for this mode
                         const isMissingData = viewMode === 'CREDITS' && loc.totalCredits === null;
                         const tierColor = isMissingData ? '#71717a' : TIER_COLORS[tier];
-                        
                         const isExpanded = expandedLocation === loc.name;
                         const xray = getXRayStats(loc, i, tierColor);
                         const sampleIp = loc.ips && loc.ips.length > 0 ? loc.ips[0] : null;
-                        const topPk = loc.topPks ? loc.topPks[viewMode] : null;
+                        const topData = loc.topPerformers ? loc.topPerformers[viewMode] : null;
 
                         return (
                             <div id={`list-item-${loc.name}`} key={loc.name} onClick={(e) => { e.stopPropagation(); toggleExpansion(loc.name, loc.lat, loc.lon); }} className={`group rounded-2xl border transition-all cursor-pointer overflow-hidden ${activeLocation === loc.name ? 'bg-zinc-800 border-green-500/50' : 'bg-zinc-900/50 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800'}`}>
@@ -554,7 +528,6 @@ export default function MapPage() {
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        {/* CRASHPROOF: Dynamic Color for Metric Text */}
                                         <div className={`text-sm font-mono font-bold ${isMissingData ? 'text-red-400' : ''}`} style={isMissingData ? {} : { color: tierColor }}>{getMetricText(loc)}</div>
                                         <div className="text-[10px] text-zinc-500">{loc.count} Nodes</div>
                                     </div>
@@ -567,7 +540,33 @@ export default function MapPage() {
                                             <div className="flex flex-col items-center border-l border-zinc-800/50 group/stat"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1 flex items-center gap-1">{xray.labelB}<HelpCircle size={8} className="cursor-help opacity-50"/><div className="absolute bottom-1/2 mb-2 hidden group-hover/stat:block bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-50 w-32">{xray.descB}</div></div><div className="text-white font-mono font-bold">{xray.valB}</div></div>
                                             <div className="flex flex-col items-center border-l border-zinc-800/50 group/stat"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1 flex items-center gap-1">{xray.labelC}<HelpCircle size={8} className="cursor-help opacity-50"/><div className="absolute bottom-1/2 mb-2 hidden group-hover/stat:block bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-50 w-32">{xray.descC}</div></div><div className="font-mono font-bold">{xray.valC}</div></div>
                                         </div>
-                                        {topPk && (<Link href={viewMode === 'CREDITS' ? `/leaderboard?highlight=${topPk}` : `/?open=${topPk}`}><div className="w-full bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl p-3 flex items-center justify-between cursor-pointer group/card transition-all"><div className="flex items-center gap-3"><div className={`p-2 rounded-lg ${MODE_COLORS[viewMode].bg} text-white`}>{viewMode === 'STORAGE' ? <Database size={14} /> : viewMode === 'CREDITS' ? <Zap size={14} /> : <Activity size={14} />}</div><div><div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Region's Top Performer</div><div className="text-xs font-mono text-white truncate w-32">{topPk.slice(0, 16)}...</div></div></div><div className="flex items-center gap-1 text-[10px] font-bold text-blue-400 group-hover/card:translate-x-1 transition-transform">VIEW DETAILS <ArrowRight size={12} /></div></div></Link>)}
+                                        {topData && (
+                                            <Link href={viewMode === 'CREDITS' ? `/leaderboard?highlight=${topData.pk}` : `/?open=${topData.pk}`}>
+                                                <div className="w-full bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl p-3 flex items-center justify-between cursor-pointer group/card transition-all">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`p-2 rounded-lg ${MODE_COLORS[viewMode].bg} text-white`}>
+                                                            {viewMode === 'STORAGE' ? <Database size={14} /> : viewMode === 'CREDITS' ? <Zap size={14} /> : <Activity size={14} />}
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Region's Top Performer</div>
+                                                            {/* Desktop Layout: Stat and Key inline */}
+                                                            <div className="flex items-center gap-3">
+                                                                {/* Shows PK on all screens, truncates more on desktop to fit stat */}
+                                                                <div className="text-xs font-mono text-white truncate w-32 md:w-24 lg:w-32">{topData.pk.slice(0, 16)}...</div>
+                                                                
+                                                                {/* Desktop Only Stat */}
+                                                                <div className="hidden md:block text-xs">
+                                                                    {getPerformerStats(topData)}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 text-[10px] font-bold text-blue-400 group-hover/card:translate-x-1 transition-transform whitespace-nowrap">
+                                                        VIEW DETAILS <ArrowRight size={12} />
+                                                    </div>
+                                                </div>
+                                            </Link>
+                                        )}
                                         <div className="w-full h-1 bg-zinc-800 rounded-full mt-4 overflow-hidden"><div className="h-full bg-white/20" style={{ width: `${(loc.count / stats.totalNodes) * 100}%` }}></div></div>
                                     </div>
                                 )}
