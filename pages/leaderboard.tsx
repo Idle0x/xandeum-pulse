@@ -226,6 +226,7 @@ export default function Leaderboard() {
           <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back to Monitor
         </Link>
         <div className="text-center">
+          {/* UPDATED TITLE */}
           <h1 className="text-3xl font-extrabold flex items-center gap-3 text-yellow-500 justify-center"><Trophy size={32} /> CREDITS & REPUTATION</h1>
           <p className="text-xs text-zinc-500 mt-1 font-mono tracking-wide uppercase">The definitive registry of node reputation and network contribution</p>
         </div>
@@ -363,7 +364,7 @@ export default function Leaderboard() {
         ) : filtered.length === 0 ? (
           <div className="p-20 text-center text-zinc-600"><Search size={48} className="mx-auto mb-4 opacity-50" /><p>No nodes match your search.</p></div>
         ) : (
-          <div className="divide-y divide-zinc-800/50">
+          <div className="divide-y divide-zinc-800/50 space-y-1">
             {/* RENDER LOGIC: Filter first, then Slice */}
             {filtered.slice(0, visibleCount).map((node) => {
               const isMyNode = node.address && favorites.includes(node.address);
@@ -371,8 +372,21 @@ export default function Leaderboard() {
               const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
 
               return (
-                <div key={node.pubkey} id={`node-${node.pubkey}`} className="group transition-all duration-300">
-                    <div className={`grid grid-cols-12 gap-4 p-4 hover:bg-white/5 items-center cursor-pointer relative ${isExpanded ? 'bg-white/5 border-l-4 border-yellow-500' : isMyNode ? 'bg-yellow-500/5 border-l-4 border-yellow-500' : 'border-l-4 border-transparent'}`} onClick={() => handleRowClick(node)}>
+                <div 
+                    key={node.pubkey} 
+                    id={`node-${node.pubkey}`} 
+                    className={`
+                        relative transition-all duration-300 ease-out border rounded-xl overflow-hidden
+                        ${isExpanded 
+                            ? 'z-20 scale-[1.02] bg-zinc-900 border-cyan-500/50 shadow-[0_0_30px_rgba(6,182,212,0.15)] my-4' 
+                            : isMyNode 
+                                ? 'z-0 border-yellow-500/50 bg-yellow-500/5' 
+                                : 'z-0 hover:scale-[1.02] hover:bg-zinc-800/50 border-transparent hover:border-zinc-700'
+                        }
+                    `}
+                    onClick={() => handleRowClick(node)}
+                >
+                    <div className="grid grid-cols-12 gap-4 p-4 items-center cursor-pointer relative">
                         
                         {/* RANK */}
                         <div className="col-span-2 md:col-span-1 flex flex-col justify-center items-center gap-1 relative">
@@ -393,7 +407,7 @@ export default function Leaderboard() {
                         {/* PUBKEY & ADDRESS */}
                         <div className="col-span-6 md:col-span-7 font-mono text-sm text-zinc-300 truncate group-hover:text-white transition flex items-center justify-between pr-4">
                             <span>{node.pubkey}</span>
-                            <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180 text-white' : 'text-zinc-600 group-hover:text-zinc-400'}`}><ChevronDown size={16} /></div>
+                            <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180 text-yellow-500' : 'text-zinc-600 group-hover:text-zinc-400'}`}><ChevronDown size={16} /></div>
                         </div>
 
                         {/* CREDITS */}
@@ -405,7 +419,7 @@ export default function Leaderboard() {
 
                     {/* EXPANDED ACTIONS */}
                     {isExpanded && (
-                        <div className="bg-black/40 border-b border-zinc-800/50 p-4 pl-4 md:pl-12 animate-in slide-in-from-top-2 duration-200">
+                        <div className="bg-black/40 border-t border-cyan-500/20 p-4 pl-4 md:pl-12 animate-in slide-in-from-top-2 duration-300">
                             <div className="flex flex-col gap-4">
                                 <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                                     
