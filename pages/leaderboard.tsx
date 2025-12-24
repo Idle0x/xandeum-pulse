@@ -123,19 +123,35 @@ export default function Leaderboard() {
             localStorage.setItem('xandeum_rank_history', JSON.stringify(newHistory));
             setRanking(parsedList);
             
-            // Deep Link Logic
+                        // Deep Link Logic
             if (router.isReady && router.query.highlight && !hasDeepLinked.current) {
                 const targetKey = router.query.highlight as string;
-                if (parsedList.some(n => n.pubkey === targetKey)) {
+                const targetIndex = parsedList.findIndex(n => n.pubkey === targetKey);
+
+                if (targetIndex !== -1) {
                     hasDeepLinked.current = true;
+
+                    // 1. Force the list to grow if the target is hidden
+                    // We simply set visibleCount to the target's index + a buffer (e.g. 20)
+                    if (targetIndex >= 100) {
+                        setVisibleCount(targetIndex + 20);
+                    }
+
+                    // 2. Expand and Scroll (Delayed to allow render)
                     setTimeout(() => {
                         setExpandedNode(targetKey);
-                        const el = document.getElementById(`node-${targetKey}`);
-                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }, 500);
+                        
+                        // Second timeout ensures the DOM has updated with the new visibleCount
+                        setTimeout(() => {
+                            const el = document.getElementById(`node-${targetKey}`);
+                            if (el) {
+                                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                        }, 100); 
+                    }, 600);
                 }
             }
-        }
+
 
         const saved = localStorage.getItem('xandeum_favorites');
         if (saved) setFavorites(JSON.parse(saved));
