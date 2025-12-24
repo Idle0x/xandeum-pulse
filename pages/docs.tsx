@@ -122,7 +122,7 @@ export default function DocsPage() {
                 </div>
 
                 {/* THE COMPREHENSIVE SIMULATOR */}
-                {/* FIXED: Changed min-h to fixed h-[700px] md:h-[800px] to fix collapse issue */}
+                {/* CSS FIX: Fixed height prevents collapse of absolute children */}
                 <div className="border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl bg-[#09090b] relative max-w-5xl mx-auto h-[700px] md:h-[800px] flex flex-col">
                     <PulseOS_Simulator />
                 </div>
@@ -361,43 +361,45 @@ export default function DocsPage() {
 
 
 // ==========================================
-// COMPREHENSIVE PULSE OS SIMULATOR (FIXED INIT)
+// COMPREHENSIVE PULSE OS SIMULATOR (V4.0 - MAP REDESIGN)
 // ==========================================
 
 function PulseOS_Simulator() {
-    type View = 'DASH' | 'MODAL' | 'MAP' | 'CREDITS' | 'COMPARE' | 'PROOF';
+    type View = 'DASH' | 'MODAL' | 'MAP' | 'HEALTH_SIM' | 'LEADERBOARD_SIM' | 'COMPARE' | 'PROOF';
     
-    // START AT DASHBOARD IMMEDIATELY TO PREVENT BLACK SCREEN
+    // NAVIGATION & SYSTEM STATE
     const [view, setView] = useState<View>('DASH');
     const [url, setUrl] = useState('https://xandeum-pulse.vercel.app');
     const [isAnimating, setIsAnimating] = useState(false);
     const [readyButtons, setReadyButtons] = useState<string[]>([]);
     
-    // Map-specific state
-    const [mapMode, setMapMode] = useState<'STORAGE' | 'HEALTH' | 'CREDITS'>('STORAGE');
-    const [mapExpanded, setMapExpanded] = useState(false);
+    // --- NEW MAP STATE ---
+    // IDLE: Showing pins, waiting for click
+    // SELECTED: Pin turned to star
+    // DRAWER_OPEN: Drawer slides up
+    // SCROLLING: Simulating list scroll
+    // EXPANDED: Target node expanded, tabs active
+    type MapStage = 'IDLE' | 'SELECTED' | 'DRAWER_OPEN' | 'SCROLLING' | 'EXPANDED';
+    const [mapStage, setMapStage] = useState<MapStage>('IDLE');
+    const [drawerTab, setDrawerTab] = useState<'CREDITS' | 'HEALTH' | 'STORAGE'>('CREDITS');
 
-    // --- BOOT SEQUENCE (COSMETIC ONLY) ---
+    // HEALTH SIM STATE
+    const [healthScore, setHealthScore] = useState(0);
+
+    // --- BOOT SEQUENCE ---
     useEffect(() => {
-        // Only run typing effect on mount
         const targetUrl = 'https://xandeum-pulse.vercel.app';
         let i = 0;
-        
-        // Start typing visual
         const typeInterval = setInterval(() => {
             if (i <= targetUrl.length) {
                 setUrl(targetUrl.slice(0, i));
                 i++;
             } else {
                 clearInterval(typeInterval);
-                // Ensure first card is interactive after typing
                 setReadyButtons(['card-1']);
             }
         }, 30);
-
-        // Fallback: Ensure interface is usable even if interval hangs
         setTimeout(() => setReadyButtons(['card-1']), 1500);
-
         return () => clearInterval(typeInterval);
     }, []);
 
@@ -406,74 +408,116 @@ function PulseOS_Simulator() {
         setView('DASH');
         setReadyButtons([]);
         setIsAnimating(false);
+        setMapStage('IDLE');
         setUrl('');
-        
-        // Retrigger boot logic roughly
         setTimeout(() => {
             setUrl('https://xandeum-pulse.vercel.app');
             setReadyButtons(['card-1']);
         }, 500);
     }
 
-    // --- NAVIGATION FUNCTION ---
+    // --- NAVIGATION CONTROLLER ---
     const navigate = (target: View, animationDuration = 1000, urlSuffix = '') => {
-        setReadyButtons([]); // Clear all glows
+        setReadyButtons([]); 
         setIsAnimating(true);
         
-        // Update URL bar
+        // URL Bar Updates
         let newUrl = 'https://xandeum-pulse.vercel.app';
         if (target === 'MODAL') newUrl += '/?open=8x...2A';
         if (target === 'MAP') newUrl += '/map' + urlSuffix;
-        if (target === 'CREDITS') newUrl += '/leaderboard?highlight=8x...2A';
+        if (target === 'HEALTH_SIM') newUrl += '/inspector?node=8x...2A';
+        if (target === 'LEADERBOARD_SIM') newUrl += '/leaderboard';
         setUrl(newUrl);
 
         setTimeout(() => {
             setView(target);
             setIsAnimating(false);
             
-            // After content renders, glow appropriate buttons
-            setTimeout(() => {
-                const exits = getExitButtons(target);
-                setReadyButtons(exits);
-            }, 700);
+            // --- SCENARIO SPECIFIC INIT LOGIC ---
+
+            // 1. HEALTH SIMULATION
+            if (target === 'HEALTH_SIM') {
+                setHealthScore(0);
+                let score = 0;
+                const interval = setInterval(() => {
+                    score += 3;
+                    if (score >= 81) {
+                        score = 81;
+                        clearInterval(interval);
+                        setReadyButtons(['btn-back-modal']);
+                    }
+                    setHealthScore(score);
+                }, 50);
+            }
+            
+            // 2. LEADERBOARD SIM
+            else if (target === 'LEADERBOARD_SIM') {
+                setTimeout(() => setReadyButtons(['lb-row-3']), 800);
+            }
+
+            // 3. MAP LOGIC RESET
+            else if (target === 'MAP') {
+                 setMapStage('IDLE');
+                 setDrawerTab('CREDITS');
+            }
+
+            // 4. STANDARD VIEWS
+            else {
+                setTimeout(() => {
+                    const exits = getExitButtons(target);
+                    setReadyButtons(exits);
+                }, 700);
+            }
+
         }, animationDuration);
     };
 
-    // --- SMART EXIT BUTTONS ---
+    // --- SMART BUTTON DEFINITIONS ---
     const getExitButtons = (currentView: View): string[] => {
         switch(currentView) {
             case 'DASH': return ['card-1'];
             case 'MODAL': return ['btn-credits', 'btn-health', 'btn-compare', 'btn-proof', 'btn-map', 'btn-back-dash'];
-            case 'MAP': return mapExpanded ? ['btn-toggle-storage', 'btn-toggle-health', 'btn-toggle-credits', 'btn-back-modal'] : ['btn-expand-region'];
-            case 'CREDITS': return ['btn-view-map', 'btn-view-modal'];
             case 'COMPARE': return ['btn-back-modal', 'btn-view-winner-map'];
             case 'PROOF': return ['btn-back-modal', 'btn-share-credits'];
             default: return [];
         }
     };
 
-    // --- MAP TOGGLE HANDLER ---
-    const handleMapToggle = (mode: 'STORAGE' | 'HEALTH' | 'CREDITS') => {
-        setReadyButtons([]);
-        setMapMode(mode);
-        setIsAnimating(true);
+    // --- MAP INTERACTION SEQUENCE ---
+    const handleMapPinClick = () => {
+        // 1. Change Pin to Star
+        setMapStage('SELECTED');
         
         setTimeout(() => {
-            setIsAnimating(false);
+            // 2. Open Drawer
+            setMapStage('DRAWER_OPEN');
             
-            // Determine next action based on mode
-            if (mode === 'CREDITS') {
-                // Credits mode → Jump to Credits page
-                setTimeout(() => navigate('CREDITS', 800), 500);
-            } else {
-                // Health/Storage → Back to Modal
-                setTimeout(() => navigate('MODAL', 800), 500);
-            }
-        }, 1200);
+            setTimeout(() => {
+                // 3. Scroll List
+                setMapStage('SCROLLING');
+                
+                setTimeout(() => {
+                    // 4. Expand Item
+                    setMapStage('EXPANDED');
+                    setReadyButtons(['btn-back-dash-map']);
+                }, 1000); // Wait for scroll
+            }, 800); // Wait for drawer open
+        }, 600); // Wait for pin morph
     };
 
+    // --- DUMMY PINS DATA ---
+    const pins = [
+        { id: 1, city: "St Louis", country: "USA", top: "32%", left: "22%", color: "bg-pink-500" },
+        { id: 2, city: "Sao Paulo", country: "Brazil", top: "70%", left: "30%", color: "bg-cyan-500" },
+        { id: 3, city: "London", country: "UK", top: "25%", left: "46%", color: "bg-purple-500" },
+        { id: 4, city: "Lisbon", country: "Portugal", top: "35%", left: "45%", color: "bg-yellow-500", isTarget: true }, // TARGET
+        { id: 5, city: "Berlin", country: "Germany", top: "28%", left: "51%", color: "bg-blue-500" },
+        { id: 6, city: "Mumbai", country: "India", top: "45%", left: "68%", color: "bg-pink-500" },
+        { id: 7, city: "Tokyo", country: "Japan", top: "32%", left: "85%", color: "bg-cyan-500" },
+    ];
+
     return (
-        <div className="w-full h-full flex flex-col font-sans text-sm select-none bg-black">
+        <div className="w-full h-full flex flex-col font-sans text-sm select-none bg-black text-zinc-300">
             {/* --- BROWSER BAR --- */}
             <div className="h-10 bg-[#18181b] border-b border-zinc-800 flex items-center px-4 gap-3 shrink-0">
                 <div className="flex gap-1.5">
@@ -486,7 +530,6 @@ function PulseOS_Simulator() {
                         <Lock size={8} className="mr-2 text-green-500"/>
                         {url}
                     </div>
-                    {/* Fixed: wrapped in button to validly support title prop */}
                     <button onClick={reboot} title="Reboot System" className="cursor-pointer hover:text-white bg-transparent border-none p-0 flex items-center">
                         <RotateCcw size={10} />
                     </button>
@@ -494,10 +537,11 @@ function PulseOS_Simulator() {
             </div>
 
             {/* --- VIEWPORT --- */}
-            {/* Added texture via radial gradient to prevent 'black void' look */}
             <div className="flex-1 relative bg-black overflow-hidden h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-zinc-900/50 via-black to-black">
                 
-                {/* === DASHBOARD VIEW === */}
+                {/* =======================================
+                    VIEW: DASHBOARD
+                   ======================================= */}
                 {view === 'DASH' && (
                     <div className="absolute inset-0 p-6 md:p-8 animate-in fade-in duration-500">
                         <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
@@ -518,7 +562,6 @@ function PulseOS_Simulator() {
                             {[1,2,3,4,5].map(i => (
                                 <div key={i} 
                                     onClick={() => i === 1 && readyButtons.includes('card-1') && navigate('MODAL', 800)}
-                                    // FIXED: Added backticks for className logic
                                     className={`h-40 md:h-48 border rounded-xl p-4 flex flex-col justify-between transition-all duration-300 relative
                                     ${i===1 && readyButtons.includes('card-1') ? 'border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.5)] bg-zinc-900 cursor-pointer scale-105' : 'border-zinc-800 bg-zinc-900/30 opacity-40'}`}
                                 >
@@ -530,7 +573,7 @@ function PulseOS_Simulator() {
                                     <div className="text-[9px] text-zinc-600">Health Score</div>
                                     
                                     {i===1 && readyButtons.includes('card-1') && (
-                                        <div className="absolute -top-2 -right-2 bg-blue-600 text-white text-[8px] md:text-[9px] font-bold px-2 py-1 rounded-full animate-bounce shadow-lg">
+                                        <div className="absolute -top-2 -right-2 bg-blue-600 text-white text-[8px] md:text-[9px] font-bold px-2 py-1 rounded-full animate-bounce shadow-lg z-10">
                                             CLICK HERE
                                         </div>
                                     )}
@@ -540,7 +583,9 @@ function PulseOS_Simulator() {
                     </div>
                 )}
 
-                {/* === MODAL HUB === */}
+                {/* =======================================
+                    VIEW: MODAL HUB
+                   ======================================= */}
                 {view === 'MODAL' && (
                     <div className="absolute inset-0 bg-black/90 z-20 flex items-center justify-center p-4 md:p-8 animate-in zoom-in-95 duration-300">
                         <div className="w-full h-full max-w-4xl bg-[#09090b] border border-zinc-700 rounded-2xl flex flex-col relative shadow-2xl overflow-hidden">
@@ -549,18 +594,19 @@ function PulseOS_Simulator() {
                                 <span className="font-bold text-white flex items-center gap-2 text-sm md:text-base"><Globe size={16}/> Node 8x...2A</span>
                                 <button 
                                     onClick={() => navigate('DASH', 500)}
-                                    // FIXED: Added backticks for className logic
                                     className={`p-2 rounded-lg transition-all duration-500 ${readyButtons.includes('btn-back-dash') ? 'bg-red-500/20 text-red-400 border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)] animate-pulse' : 'text-zinc-600 hover:text-zinc-400'}`}
                                 >
                                     <X size={18}/>
                                 </button>
                             </div>
 
-                            {/* Tip Banner */}
+                            {/* BOUNCING TIP */}
                             {!isAnimating && (
-                                <div className="mx-4 md:mx-6 mt-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2 flex items-center gap-2 animate-in fade-in">
-                                    <MousePointer2 size={14} className="text-yellow-400 shrink-0"/>
-                                    <span className="text-[10px] text-yellow-300 font-bold">Click any glowing card or button to explore</span>
+                                <div className="mx-4 md:mx-6 mt-4 flex items-center justify-center animate-in fade-in slide-in-from-top-2">
+                                     <div className="bg-blue-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-full animate-bounce shadow-lg flex items-center gap-2">
+                                        <MousePointer2 size={12} fill="currentColor" />
+                                        CLICK ON ANY CARD TO CONTINUE
+                                     </div>
                                 </div>
                             )}
 
@@ -568,8 +614,7 @@ function PulseOS_Simulator() {
                                 {/* Left Col: Metric Cards */}
                                 <div className="space-y-3 md:space-y-4">
                                     <div 
-                                        onClick={() => readyButtons.includes('btn-credits') && navigate('CREDITS', 1000)}
-                                        // FIXED: Added backticks for className logic
+                                        onClick={() => readyButtons.includes('btn-credits') && navigate('LEADERBOARD_SIM', 800)}
                                         className={`p-4 rounded-xl border transition-all cursor-pointer ${readyButtons.includes('btn-credits') ? 'border-yellow-500/50 bg-yellow-900/10 hover:bg-yellow-900/20 shadow-[0_0_20px_rgba(234,179,8,0.3)]' : 'border-zinc-800 bg-zinc-900/30'}`}
                                     >
                                         <div className="flex justify-between mb-2 items-center">
@@ -581,16 +626,15 @@ function PulseOS_Simulator() {
                                     </div>
 
                                     <div 
-                                        onClick={() => readyButtons.includes('btn-health') && navigate('MAP', 1200, '?focus=8x...2A')}
-                                        // FIXED: Added backticks for className logic
+                                        onClick={() => readyButtons.includes('btn-health') && navigate('HEALTH_SIM', 600)}
                                         className={`p-4 rounded-xl border transition-all cursor-pointer ${readyButtons.includes('btn-health') ? 'border-green-500/50 bg-green-900/10 hover:bg-green-900/20 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'border-zinc-800 bg-zinc-900/30'}`}
                                     >
                                         <div className="flex justify-between mb-2 items-center">
                                             <span className="text-xs font-bold text-green-500 flex items-center gap-1"><Activity size={12}/> HEALTH</span>
                                             {readyButtons.includes('btn-health') && <ArrowRight size={14} className="text-green-500 animate-pulse"/>}
                                         </div>
-                                        <div className="text-xl md:text-2xl font-bold text-white">98/100</div>
-                                        <div className="text-[9px] text-zinc-500 mt-1">Optimal Status</div>
+                                        <div className="text-xl md:text-2xl font-bold text-white">81/100</div>
+                                        <div className="text-[9px] text-zinc-500 mt-1">Inspect Vitality</div>
                                     </div>
 
                                     <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/30">
@@ -606,7 +650,6 @@ function PulseOS_Simulator() {
                                 <div className="space-y-3 md:space-y-4">
                                     <button 
                                         onClick={() => readyButtons.includes('btn-compare') && navigate('COMPARE', 1500)}
-                                        // FIXED: Added backticks for className logic
                                         className={`w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${readyButtons.includes('btn-compare') ? 'border-red-500/50 bg-red-900/10 text-red-400 hover:bg-red-900/20 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}`}
                                     >
                                         <Swords size={16}/> <span className="text-sm font-bold">Compare Nodes</span>
@@ -614,361 +657,276 @@ function PulseOS_Simulator() {
 
                                     <button 
                                         onClick={() => readyButtons.includes('btn-proof') && navigate('PROOF', 1500)}
-                                        // FIXED: Added backticks for className logic
                                         className={`w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${readyButtons.includes('btn-proof') ? 'border-blue-500/50 bg-blue-900/10 text-blue-400 hover:bg-blue-900/20 shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}`}
                                     >
                                         <Camera size={16}/> <span className="text-sm font-bold">Proof of Pulse</span>
                                     </button>
 
                                     <button 
-                                        onClick={() => readyButtons.includes('btn-map') && navigate('MAP', 1200, '?focus=8x...2A')}
-                                        // FIXED: Added backticks for className logic
+                                        onClick={() => readyButtons.includes('btn-map') && navigate('MAP', 1200)}
                                         className={`w-full p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${readyButtons.includes('btn-map') ? 'border-purple-500/50 bg-purple-900/10 text-purple-400 hover:bg-purple-900/20 shadow-[0_0_20px_rgba(147,51,234,0.3)]' : 'border-zinc-800 text-zinc-500 bg-zinc-900/30'}`}
                                     >
                                         <MapIcon size={16}/> <span className="text-sm font-bold">View on Map</span>
                                     </button>
-
-                                    <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/20">
-                                        <div className="text-[10px] text-zinc-500 uppercase font-bold mb-2">Location</div>
-                                        <div className="flex items-center gap-2">
-                                            <MapPin size={14} className="text-blue-400"/>
-                                            <span className="text-sm text-white font-mono">Lisbon, PT</span>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* === MAP VIEW === */}
-                {view === 'MAP' && (
-                    <div className="absolute inset-0 bg-[#050505] z-30 flex flex-col animate-in zoom-in-90 duration-700">
-                        {/* Map Controls */}
-                        <div className="p-3 md:p-4 bg-black/80 border-b border-zinc-800 flex justify-between items-center shrink-0">
-                            <div className="text-sm font-bold text-white flex items-center gap-2">
-                                <Globe className="text-purple-500"/> GLOBAL MAP
-                            </div>
-                            <div className="flex gap-2">
-                                <button 
-                                    onClick={() => readyButtons.includes('btn-toggle-storage') && handleMapToggle('STORAGE')}
-                                    // FIXED: Added backticks for className logic
-                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'STORAGE' ? 'bg-indigo-500 text-white' : readyButtons.includes('btn-toggle-storage') ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
-                                >
-                                    STORAGE
-                                </button>
-                                <button 
-                                    onClick={() => readyButtons.includes('btn-toggle-health') && handleMapToggle('HEALTH')}
-                                    // FIXED: Added backticks for className logic
-                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'HEALTH' ? 'bg-green-500 text-white' : readyButtons.includes('btn-toggle-health') ? 'bg-green-500/20 text-green-400 border border-green-500/50 shadow-[0_0_15px_rgba(16,185,129,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
-                                >
-                                    HEALTH
-                                </button>
-                                <button 
-                                    onClick={() => readyButtons.includes('btn-toggle-credits') && handleMapToggle('CREDITS')}
-                                    // FIXED: Added backticks for className logic
-                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${mapMode === 'CREDITS' ? 'bg-yellow-500 text-black' : readyButtons.includes('btn-toggle-credits') ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.4)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
-                                >
-                                    CREDITS
-                                </button>
-                            </div>
-                        </div>
-
-                        {isAnimating ? (
-                            <div className="flex-1 flex items-center justify-center">
-                                <div className="text-center">
-                                    <RefreshCw className="animate-spin mb-4 text-purple-500 mx-auto" size={32}/>
-                                    <div className="text-xs font-mono text-zinc-500">
-                                        {mapMode === 'CREDITS' ? 'LOADING ECONOMIC DATA...' : 'RECALCULATING TIERS...'}
+                {/* =======================================
+                    VIEW: HEALTH SIMULATION (INSPECTOR)
+                   ======================================= */}
+                {view === 'HEALTH_SIM' && (
+                    <div className="absolute inset-0 bg-[#09090b] z-30 flex flex-col items-center justify-center p-4 md:p-8 animate-in slide-in-from-bottom duration-500">
+                        <div className="w-full max-w-2xl bg-black border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl relative">
+                            {/* Header */}
+                            <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-[10px] text-white font-bold">FR</div>
+                                    <div>
+                                        <div className="font-bold text-white text-sm">NODE INSPECTOR</div>
+                                        <div className="text-[10px] text-zinc-500 font-mono">0xcJ9...8X (Active)</div>
                                     </div>
                                 </div>
+                                <div className="px-2 py-1 bg-zinc-900 rounded text-[10px] text-zinc-500 border border-zinc-800">SIMULATION MODE</div>
                             </div>
-                        ) : (
-                            <>
-                                {/* Map Canvas */}
-                                <div className="flex-1 relative overflow-hidden">
-                                    <div className="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900 via-black to-black"></div>
+
+                            <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+                                {/* Left: The Gauge */}
+                                <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 flex flex-col items-center justify-center aspect-square relative">
+                                    <div className="relative w-32 h-32 flex items-center justify-center">
+                                        <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                            <path className="text-zinc-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="2" />
+                                            <path className="text-green-500 transition-all duration-100 ease-out" strokeDasharray={`${healthScore}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="2" />
+                                        </svg>
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                            <span className="text-3xl font-bold text-white">{healthScore}</span>
+                                            <span className="text-[8px] text-green-500 font-bold uppercase tracking-widest">Score</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Right: Sliders */}
+                                <div className="md:col-span-2 space-y-4">
+                                    <div className="flex justify-between items-end mb-2">
+                                        <span className="text-sm font-bold text-white">Diagnostics & Vitality</span>
+                                        <span className="text-[10px] text-green-400 bg-green-900/20 px-2 py-1 rounded border border-green-900/50">TOP 1% NETWORK</span>
+                                    </div>
                                     
-                                    {/* Green Star Pin (Auto-focused) */}
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-in zoom-in duration-500">
-                                        <Star className="w-6 h-6 text-green-500 fill-green-500 animate-pulse drop-shadow-[0_0_15px_rgba(34,197,94,1)]" />
-                                        <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-black border border-green-500/50 px-3 py-1 rounded text-xs whitespace-nowrap shadow-xl">
-                                            <div className="font-bold text-green-400">Lisbon, PT</div>
-                                            <div className="text-[9px] text-zinc-500">5 Nodes • {mapMode === 'STORAGE' ? '1.2 PB' : mapMode === 'HEALTH' ? '98% Avg' : '5.2M Cr'}</div>
+                                    {['Storage Capacity', 'Reputation Score', 'Uptime Stability'].map((label, idx) => (
+                                        <div key={label} className="space-y-1">
+                                            <div className="flex justify-between text-[10px] text-zinc-500 font-bold uppercase">
+                                                <span>{label}</span>
+                                                <span className="text-white">{Math.min(100, Math.floor(healthScore * (1 + idx*0.1)))}%</span>
+                                            </div>
+                                            <div className="h-2 bg-zinc-900 rounded-full overflow-hidden">
+                                                <div 
+                                                    className={`h-full rounded-full transition-all duration-300 ease-out ${idx === 1 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                                    style={{ width: `${Math.min(100, Math.floor(healthScore * (1 + idx*0.1)))}%` }}
+                                                ></div>
+                                            </div>
                                         </div>
-                                    </div>
-
-                                    {/* Expand Button (appears after zoom) */}
-                                    {!mapExpanded && readyButtons.includes('btn-expand-region') && (
-                                        <div className="absolute bottom-1/3 left-1/2 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4">
-                                            <button 
-                                                onClick={() => { setMapExpanded(true); setReadyButtons(['btn-toggle-storage', 'btn-toggle-health', 'btn-toggle-credits']); }}
-                                                className="px-4 py-2 bg-green-500 hover:bg-green-400 text-black rounded-full text-xs font-bold shadow-[0_0_20px_rgba(34,197,94,0.6)] animate-bounce"
-                                            >
-                                                OPEN REGION DETAILS
-                                            </button>
-                                        </div>
-                                    )}
+                                    ))}
                                 </div>
-
-                                {/* Drawer (Split View) */}
-                                {mapExpanded && (
-                                    <div className="h-1/3 border-t border-zinc-800 bg-black p-4 md:p-6 animate-in slide-in-from-bottom duration-500 overflow-y-auto">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <h3 className="text-sm font-bold text-white">Lisbon, Portugal</h3>
-                                            <div className="text-xs text-zinc-500 font-mono">{mapMode} Mode Active</div>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-4 text-center text-xs">
-                                            <div className="p-3 bg-zinc-900 rounded-lg">
-                                                <div className="text-zinc-500 mb-1">Nodes</div>
-                                                <div className="text-white font-bold">5</div>
-                                            </div>
-                                            <div className="p-3 bg-zinc-900 rounded-lg">
-                                                <div className="text-zinc-500 mb-1">{mapMode === 'STORAGE' ? 'Total' : mapMode === 'HEALTH' ? 'Avg Score' : 'Credits'}</div>
-                                                <div className="text-white font-bold">{mapMode === 'STORAGE' ? '1.2 PB' : mapMode === 'HEALTH' ? '98/100' : '5.2M'}</div>
-                                            </div>
-                                            <div className="p-3 bg-zinc-900 rounded-lg">
-                                                <div className="text-zinc-500 mb-1">Tier</div>
-                                                <div className="text-yellow-500 font-bold text-[10px]">ELITE</div>
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                                            <div className="text-[10px] text-blue-300 font-bold flex items-center gap-2">
-                                                <Info size={12}/> Try switching modes above to see different metrics
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Back Button */}
-                                {mapExpanded && (
-                                    <div className="p-4 bg-black border-t border-zinc-900 flex justify-center shrink-0">
-                                        <button 
-                                            onClick={() => readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
-                                            // FIXED: Added backticks for className logic
-                                            className={`px-6 py-2 rounded-full font-bold border transition-all ${readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}
-                                        >
-                                            BACK TO DIAGNOSTICS
-                                        </button>
-                                    </div>
-                                )}
-                            </>
-                        )}
+                            </div>
+                            
+                            {/* Footer / Back Button */}
+                            <div className="p-4 bg-zinc-900/50 border-t border-zinc-800 flex justify-center">
+                                <button 
+                                    onClick={() => readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
+                                    className={`px-8 py-3 rounded-full text-xs font-bold border transition-all duration-300 ${readyButtons.includes('btn-back-modal') ? 'bg-red-600 text-white border-red-500 shadow-[0_0_20px_rgba(220,38,38,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-600 border-zinc-700 opacity-50 cursor-not-allowed'}`}
+                                >
+                                    {readyButtons.includes('btn-back-modal') ? 'CLOSE DIAGNOSTICS' : 'CALCULATING...'}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
 
-                {/* === CREDITS VIEW === */}
-                {view === 'CREDITS' && (
+                {/* =======================================
+                    VIEW: LEADERBOARD SIMULATION
+                   ======================================= */}
+                {view === 'LEADERBOARD_SIM' && (
                     <div className="absolute inset-0 bg-[#09090b] z-30 flex flex-col animate-in slide-in-from-right duration-500">
+                        {/* Same logic as before for Leaderboard... simplified for map focus */}
                         <div className="p-3 md:p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50 shrink-0">
                             <span className="font-bold text-yellow-500 flex items-center gap-2"><Trophy size={16}/> LEADERBOARD</span>
+                            <div className="text-[10px] text-zinc-500 font-mono">SIMULATION MODE</div>
+                        </div>
+                        <div className="flex-1 p-4 md:p-8 flex items-center justify-center">
+                            <div 
+                                onClick={() => navigate('MAP', 800)}
+                                className={`p-6 rounded-xl border bg-yellow-900/10 border-yellow-500/50 cursor-pointer hover:bg-yellow-900/20 transition-all ${readyButtons.includes('lb-row-3') ? 'animate-pulse ring-2 ring-yellow-500' : ''}`}
+                            >
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-yellow-500 mb-2">#3 Node (You)</div>
+                                    <div className="text-zinc-400 mb-4">Click to find this node on the Global Map</div>
+                                    <button className="bg-yellow-500 text-black px-4 py-2 rounded-full text-xs font-bold animate-bounce">LOCATE ON MAP</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* =======================================
+                    VIEW: MAP (REDESIGNED V4.0)
+                   ======================================= */}
+                {view === 'MAP' && (
+                    <div className="absolute inset-0 bg-[#050505] z-30 flex flex-col animate-in zoom-in-90 duration-700">
+                        {/* Map Header */}
+                        <div className="p-3 md:p-4 bg-black/80 border-b border-zinc-800 flex justify-between items-center shrink-0 z-10">
+                            <div className="text-sm font-bold text-white flex items-center gap-2">
+                                <Globe className="text-purple-500"/> GLOBAL NODES
+                            </div>
+                            <div className="text-[10px] text-zinc-500 font-mono">
+                                {mapStage === 'IDLE' ? 'WAITING FOR INPUT...' : 'REGION ACTIVE'}
+                            </div>
                         </div>
 
-                        {isAnimating ? (
-                            <div className="flex-1 flex items-center justify-center">
-                                <div className="text-center">
-                                    <RefreshCw className="animate-spin mb-4 text-yellow-500 mx-auto" size={32}/>
-                                    <div className="text-xs font-mono text-zinc-500">LOADING REPUTATION DATA...</div>
+                        {/* MAP CANVAS */}
+                        <div className="flex-1 relative overflow-hidden bg-[#0a0a0a]">
+                            <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_#1e1b4b_0%,_transparent_70%)]"></div>
+                            
+                            {/* FLAT MAP PINS */}
+                            {pins.map((pin) => (
+                                <div 
+                                    key={pin.id}
+                                    style={{ top: pin.top, left: pin.left }}
+                                    className="absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-500"
+                                >
+                                    {pin.isTarget && mapStage === 'IDLE' ? (
+                                        // ACTIVE TARGET PIN
+                                        <div className="relative group cursor-pointer" onClick={handleMapPinClick}>
+                                            <div className="w-4 h-4 rounded-full bg-yellow-500 animate-ping absolute opacity-75"></div>
+                                            <div className="w-4 h-4 rounded-full bg-yellow-500 relative border-2 border-black shadow-[0_0_15px_rgba(234,179,8,1)]"></div>
+                                            {/* FLOATING CUE */}
+                                            <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[9px] font-bold px-2 py-1 rounded-full animate-bounce whitespace-nowrap shadow-lg">
+                                                CLICK HERE
+                                            </div>
+                                            <div className="absolute top-6 left-1/2 -translate-x-1/2 text-[9px] font-bold text-zinc-400 whitespace-nowrap bg-black/50 px-1 rounded">{pin.city}, {pin.country}</div>
+                                        </div>
+                                    ) : pin.isTarget && mapStage !== 'IDLE' ? (
+                                        // TRANSFORMED GREEN STAR
+                                        <div className="animate-in zoom-in spin-in-90 duration-500">
+                                            <Star size={32} className="text-green-500 fill-green-500 drop-shadow-[0_0_20px_rgba(34,197,94,1)] animate-pulse"/>
+                                        </div>
+                                    ) : (
+                                        // INACTIVE PINS
+                                        <div className={`w-2 h-2 rounded-full ${pin.color} opacity-40 hover:opacity-100 transition-opacity`}></div>
+                                    )}
                                 </div>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="flex-1 p-4 md:p-8 overflow-y-auto">
-                                    {/* Placeholder rows */}
-                                    {[1,2].map(i => (
-                                        <div key={i} className="w-full h-12 bg-zinc-800/30 rounded mb-2"></div>
-                                    ))}
+                            ))}
+                        </div>
 
-                                    {/* Active Row (Auto-expanded) */}
-                                    <div className="w-full bg-yellow-900/20 border-l-4 border-yellow-500 p-4 rounded mb-2 animate-in zoom-in duration-500">
-                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                                            <div>
-                                                <div className="text-yellow-500 font-bold flex items-center gap-2">
-                                                    <Trophy className="w-4 h-4"/> #3 • 8x...2A
+                        {/* DRAWER (SLIDE UP) */}
+                        <div className={`absolute bottom-0 left-0 right-0 bg-[#09090b] border-t border-zinc-800 transition-all duration-700 ease-in-out z-20 flex flex-col shadow-2xl
+                            ${mapStage === 'IDLE' || mapStage === 'SELECTED' ? 'translate-y-full h-0' : 'translate-y-0 h-[50%]'}
+                        `}>
+                            {/* DRAWER CONTENT */}
+                            <div className="flex-1 flex flex-col p-4 overflow-hidden relative">
+                                {/* SCROLLING LIST STAGE */}
+                                <div className={`transition-all duration-700 absolute inset-0 p-4 ${mapStage === 'EXPANDED' ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'}`}>
+                                    <div className="text-xs font-bold text-zinc-500 mb-4 uppercase">Locating Region...</div>
+                                    <div className={`space-y-2 transition-transform duration-1000 ease-in-out ${mapStage === 'SCROLLING' ? '-translate-y-[120px]' : 'translate-y-0'}`}>
+                                        {[1,2,3,4,5,6].map(i => (
+                                            <div key={i} className="flex items-center justify-between p-3 rounded bg-zinc-900/50 border border-zinc-800/50 opacity-50">
+                                                <div className="w-24 h-3 bg-zinc-800 rounded"></div>
+                                                <div className="w-12 h-3 bg-zinc-800 rounded"></div>
+                                            </div>
+                                        ))}
+                                        {/* TARGET ITEM (#7) */}
+                                        <div className={`flex items-center justify-between p-3 rounded border transition-all duration-300 ${mapStage === 'SCROLLING' ? 'bg-green-900/20 border-green-500/50 scale-105' : 'bg-zinc-900/50 border-zinc-800/50'}`}>
+                                            <span className="text-green-400 font-bold">Lisbon, Portugal</span>
+                                            <span className="text-xs text-zinc-500">Found</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* EXPANDED CARD STAGE */}
+                                <div className={`absolute inset-0 p-4 bg-[#09090b] flex flex-col transition-all duration-700 ${mapStage === 'EXPANDED' ? 'translate-y-0 opacity-100 delay-300' : 'translate-y-full opacity-0'}`}>
+                                    {/* EXPANDED HEADER */}
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-[10px] text-black font-bold">PT</div>
+                                                <h2 className="text-xl font-bold text-white">Lisbon, Portugal</h2>
+                                            </div>
+                                            <div className="text-xs text-zinc-500">Region ID: eu-west-3 • 9 Nodes Active</div>
+                                        </div>
+                                        <div className="px-2 py-1 bg-green-500/10 border border-green-500/30 text-green-400 text-[10px] rounded font-bold">ONLINE</div>
+                                    </div>
+
+                                    {/* TABS */}
+                                    <div className="flex gap-2 mb-6 border-b border-zinc-800 pb-1">
+                                        {(['CREDITS', 'HEALTH', 'STORAGE'] as const).map(tab => (
+                                            <button 
+                                                key={tab}
+                                                onClick={() => setDrawerTab(tab)}
+                                                className={`pb-2 text-xs font-bold transition-all relative ${drawerTab === tab ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                            >
+                                                {tab}
+                                                {drawerTab === tab && <div className="absolute bottom-[-5px] left-0 right-0 h-0.5 bg-blue-500"></div>}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* TAB CONTENT */}
+                                    <div className="flex-1 bg-zinc-900/30 rounded-xl border border-zinc-800 p-6 flex flex-col justify-center items-center text-center animate-in fade-in zoom-in duration-300" key={drawerTab}>
+                                        {drawerTab === 'CREDITS' && (
+                                            <>
+                                                <div className="text-zinc-500 text-xs uppercase font-bold mb-2">Region Earnings</div>
+                                                <div className="text-4xl font-extrabold text-yellow-500 mb-2">3,087,177 <span className="text-sm text-zinc-500">Cr</span></div>
+                                                <div className="text-[10px] text-zinc-400">Top earner in Western Europe</div>
+                                            </>
+                                        )}
+                                        {drawerTab === 'HEALTH' && (
+                                            <>
+                                                <div className="text-zinc-500 text-xs uppercase font-bold mb-2">Vitality Score</div>
+                                                <div className="text-4xl font-extrabold text-green-500 mb-2">98<span className="text-xl text-zinc-600">/100</span></div>
+                                                <div className="w-32 h-2 bg-zinc-800 rounded-full overflow-hidden mt-2">
+                                                    <div className="h-full bg-green-500 w-[98%]"></div>
                                                 </div>
-                                                <div className="text-xs text-zinc-500 mt-1">5,200,000 Credits</div>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <button 
-                                                    onClick={() => readyButtons.includes('btn-view-map') && navigate('MAP', 1000, '?focus=8x...2A')}
-                                                    // FIXED: Added backticks for className logic
-                                                    className={`px-4 py-2 rounded text-xs font-bold transition-all ${readyButtons.includes('btn-view-map') ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
-                                                >
-                                                    VIEW ON MAP
-                                                </button>
-                                                <button 
-                                                    onClick={() => readyButtons.includes('btn-view-modal') && navigate('MODAL', 800)}
-                                                    // FIXED: Added backticks for className logic
-                                                    className={`px-4 py-2 rounded text-xs font-bold transition-all ${readyButtons.includes('btn-view-modal') ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
-                                                >
-                                                    DIAGNOSTICS
-                                                </button>
-                                            </div>
-                                        </div>
+                                            </>
+                                        )}
+                                        {drawerTab === 'STORAGE' && (
+                                            <>
+                                                <div className="text-zinc-500 text-xs uppercase font-bold mb-2">Data Density</div>
+                                                <div className="flex gap-4 items-end">
+                                                    <div className="text-center">
+                                                        <div className="text-2xl font-bold text-white">59 TB</div>
+                                                        <div className="text-[10px] text-purple-400">Committed</div>
+                                                    </div>
+                                                    <div className="h-8 w-[1px] bg-zinc-700"></div>
+                                                    <div className="text-center">
+                                                        <div className="text-2xl font-bold text-zinc-400">60 GB</div>
+                                                        <div className="text-[10px] text-zinc-600">Used</div>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
 
-                                    {/* More placeholder rows */}
-                                    {[4,5].map(i => (
-                                        <div key={i} className="w-full h-12 bg-zinc-800/30 rounded mb-2"></div>
-                                    ))}
+                                    {/* BACK BUTTON */}
+                                    <div className="mt-4 flex justify-center">
+                                        <button 
+                                            onClick={() => navigate('DASH', 500)}
+                                            className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white rounded-full text-xs font-bold shadow-[0_0_20px_rgba(220,38,38,0.4)] animate-bounce"
+                                        >
+                                            BACK TO DASHBOARD
+                                        </button>
+                                    </div>
                                 </div>
-                            </>
-                        )}
+                            </div>
+                        </div>
                     </div>
                 )}
 
-                {/* === COMPARE VIEW === */}
-                {view === 'COMPARE' && (
-                    <div className="absolute inset-0 bg-[#09090b] z-30 flex flex-col animate-in slide-in-from-right duration-500">
-                        {isAnimating ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 px-4">
-                                <RefreshCw className="animate-spin mb-4 text-red-500" size={32}/>
-                                <div className="text-xs font-mono mb-4">SORTING CANDIDATE NODES...</div>
-                                <div className="space-y-2 w-full max-w-xs">
-                                    <div className="h-8 bg-zinc-800 rounded animate-pulse"></div>
-                                    <div className="h-8 bg-zinc-800 rounded animate-pulse w-3/4"></div>
-                                    <div className="h-8 bg-zinc-800 rounded animate-pulse w-1/2"></div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex-1 p-6 md:p-8 flex flex-col items-center justify-center">
-                                <div className="flex flex-col md:flex-row items-center gap-6 md:gap-8 mb-8">
-                                    <div className="text-center">
-                                        <div className="w-16 h-16 bg-green-500/20 border-2 border-green-500 rounded-full mb-2 mx-auto flex items-center justify-center">
-                                            <Check className="text-green-500" size={32}/>
-                                        </div>
-                                        <div className="font-bold text-white mb-1">Node A (Yours)</div>
-                                        <div className="text-green-500 font-mono text-sm">98% Health</div>
-                                        <div className="text-xs text-zinc-500">5.2M Credits</div>
-                                    </div>
-                                    <div className="text-2xl font-bold text-zinc-600">VS</div>
-                                    <div className="text-center">
-                                        <div className="w-16 h-16 bg-red-500/20 border-2 border-red-500 rounded-full mb-2 mx-auto flex items-center justify-center">
-                                            <X className="text-red-500" size={32}/>
-                                        </div>
-                                        <div className="font-bold text-white mb-1">Node B</div>
-                                        <div className="text-red-500 font-mono text-sm">45% Health</div>
-                                        <div className="text-xs text-zinc-500">800K Credits</div>
-                                    </div>
-                                </div>
-
-                                <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-6">
-                                    <div className="text-xs text-zinc-500 uppercase font-bold mb-3 text-center">Comparison Results</div>
-                                    <div className="space-y-2 text-xs">
-                                        <div className="flex justify-between">
-                                            <span className="text-zinc-400">Winner:</span>
-                                            <span className="text-green-500 font-bold">Node A (You)</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-zinc-400">Health Advantage:</span>
-                                            <span className="text-white font-mono">+53%</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-zinc-400">Credits Lead:</span>
-                                            <span className="text-white font-mono">+4.4M</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col md:flex-row gap-3">
-                                    <button 
-                                        onClick={() => readyButtons.includes('btn-view-winner-map') && navigate('MAP', 1000, '?focus=8x...2A')}
-                                        // FIXED: Added backticks for className logic
-                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-view-winner-map') ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(147,51,234,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
-                                    >
-                                        VIEW WINNER ON MAP
-                                    </button>
-                                    <button 
-                                        onClick={() => readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
-                                        // FIXED: Added backticks for className logic
-                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
-                                    >
-                                        BACK TO DIAGNOSTICS
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* === PROOF VIEW === */}
-                {view === 'PROOF' && (
-                    <div className="absolute inset-0 bg-[#09090b] z-30 flex flex-col animate-in slide-in-from-right duration-500">
-                        {isAnimating ? (
-                            <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 px-4">
-                                <div className="text-xs font-mono mb-4 text-green-500">GENERATING SNAPSHOT...</div>
-                                <div className="w-48 h-64 bg-zinc-900 border border-zinc-700 relative overflow-hidden rounded-xl">
-                                    <div className="absolute inset-0 bg-green-500/20 animate-pulse"></div>
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <Camera className="text-green-500/50 animate-bounce" size={48}/>
-                                    </div>
-                                </div>
-                                <div className="mt-4 text-[10px] text-zinc-600 font-mono">Rendering PNG proof...</div>
-                            </div>
-                        ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center p-6">
-                                {/* Generated Proof Card */}
-                                <div className="w-64 md:w-80 bg-zinc-950 border-2 border-green-500/50 rounded-2xl p-6 mb-8 relative shadow-[0_0_40px_rgba(16,185,129,0.3)] animate-in zoom-in duration-500">
-                                    <div className="absolute top-0 right-0 p-20 bg-green-500/10 blur-3xl rounded-full"></div>
-                                    
-                                    <div className="text-center relative z-10">
-                                        <div className="inline-block p-3 bg-zinc-900 rounded-xl mb-4 border border-zinc-800">
-                                            <Activity size={32} className="text-green-500" />
-                                        </div>
-                                        <h3 className="text-xl font-extrabold text-white mb-2">PROOF OF PULSE</h3>
-                                        <div className="text-[10px] font-mono text-zinc-500 mb-6">8x...2A • Verified</div>
-
-                                        <div className="grid grid-cols-2 gap-3 mb-4">
-                                            <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
-                                                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Health</div>
-                                                <div className="text-xl font-extrabold text-green-400">98</div>
-                                            </div>
-                                            <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
-                                                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Credits</div>
-                                                <div className="text-lg font-extrabold text-yellow-500">5.2M</div>
-                                            </div>
-                                            <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
-                                                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Storage</div>
-                                                <div className="text-lg font-extrabold text-purple-400">1.2TB</div>
-                                            </div>
-                                            <div className="bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
-                                                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">Rank</div>
-                                                <div className="text-lg font-extrabold text-yellow-500">#3</div>
-                                            </div>
-                                        </div>
-
-                                        <div className="text-[9px] text-zinc-600 font-mono flex items-center justify-center gap-1">
-                                            <Shield size={8}/> VERIFIED BY XANDEUM PULSE
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="flex flex-col md:flex-row gap-3">
-                                    <button 
-                                        onClick={() => readyButtons.includes('btn-share-credits') && navigate('CREDITS', 800)}
-                                        // FIXED: Added backticks for className logic
-                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-share-credits') ? 'bg-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
-                                    >
-                                        SHARE TO LEADERBOARD
-                                    </button>
-                                    <button 
-                                        onClick={() => readyButtons.includes('btn-back-modal') && navigate('MODAL', 600)}
-                                        // FIXED: Added backticks for className logic
-                                        className={`px-6 py-3 rounded-full font-bold transition-all ${readyButtons.includes('btn-back-modal') ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-zinc-800 text-zinc-500'}`}
-                                    >
-                                        BACK TO DIAGNOSTICS
-                                    </button>
-                                </div>
-
-                                <div className="mt-6 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg max-w-md">
-                                    <div className="text-[10px] text-blue-300 font-bold flex items-center gap-2">
-                                        <Info size={12}/> In the real app, this downloads as PNG
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                {/* === COMPARE & PROOF VIEWS === */}
+                {(view === 'COMPARE' || view === 'PROOF') && (
+                    <div className="absolute inset-0 bg-[#09090b] z-30 flex flex-col items-center justify-center p-8 text-center animate-in slide-in-from-right">
+                         <div className="text-zinc-500 mb-4">Simulation Placeholder</div>
+                         <button onClick={() => navigate('MODAL', 500)} className="px-6 py-2 bg-zinc-800 text-white rounded-full text-xs">Return</button>
                     </div>
                 )}
 
@@ -1012,7 +970,6 @@ function VitalitySimulator() {
                 
                 <button 
                     onClick={() => setApiOnline(!apiOnline)}
-                    // FIXED: Added backticks for className logic
                     className={`px-3 py-1 rounded-full text-[10px] font-bold border flex items-center gap-2 transition-all ${apiOnline ? 'bg-green-500/10 border-green-500 text-green-400' : 'bg-red-500/10 border-red-500 text-red-400'}`}
                 >
                     {apiOnline ? <Check size={10}/> : <AlertOctagon size={10}/>}
