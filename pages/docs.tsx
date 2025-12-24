@@ -9,7 +9,7 @@ import {
   Share2, Terminal, AlertTriangle, Monitor, AlertOctagon,
   ArrowRight, Camera, Swords, 
   ClipboardCopy, RefreshCw, RotateCcw, MapPin, Wallet, Star,
-  Eye, Search, Sliders, Radio, Grip // Added new icons here
+  Eye, Search, Sliders, Radio, Grip 
 } from 'lucide-react';
 
 export default function DocsPage() {
@@ -1426,7 +1426,7 @@ function FeatureCard({ icon: Icon, title, desc, color = "blue" }: { icon: any, t
 }
 
 function ManualCard({ icon: Icon, title, desc, color, tag }: { icon: any, title: string, desc: string, color: string, tag: string }) {
-    const colors = {
+    const colorStyles = {
         blue: "text-blue-400 bg-blue-500/10 border-blue-500/20 hover:border-blue-500/50 hover:shadow-[0_0_30px_rgba(59,130,246,0.1)]",
         green: "text-green-400 bg-green-500/10 border-green-500/20 hover:border-green-500/50 hover:shadow-[0_0_30px_rgba(34,197,94,0.1)]",
         red: "text-red-400 bg-red-500/10 border-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_30px_rgba(239,68,68,0.1)]",
@@ -1436,5 +1436,27 @@ function ManualCard({ icon: Icon, title, desc, color, tag }: { icon: any, title:
         zinc: "text-zinc-400 bg-zinc-500/10 border-zinc-500/20 hover:border-zinc-500/50 hover:shadow-[0_0_30px_rgba(113,113,122,0.1)]",
     }[color] || "";
 
+    // Safely extract styles before rendering to avoid regex errors in JSX
+    const hoverBorder = colorStyles.match(/hover:border-\S+/)?.[0] || "";
+    const hoverShadow = colorStyles.match(/hover:shadow-\S+/)?.[0] || "";
+    const baseClasses = colorStyles.split(' hover')[0] || "";
+
     return (
-        <div className={`p-6 md:p-8 rounded-3xl border transition-all duration-300 group cursor-default ${colors.split(' hover')[0]} border-zinc-800 bg-zinc-900/20 hover:bg-zinc-900/40 backdrop-blur-sm ${colors.match(/hover:border-\S+/)?.[0]} ${colors.match(/hover:
+        <div className={`p-6 md:p-8 rounded-3xl border transition-all duration-300 group cursor-default border-zinc-800 bg-zinc-900/20 hover:bg-zinc-900/40 backdrop-blur-sm ${baseClasses} ${hoverBorder} ${hoverShadow}`}>
+            <div className="flex flex-col md:flex-row gap-6 items-start">
+                <div className={`p-4 rounded-2xl shrink-0 bg-black border border-zinc-800 ${baseClasses}`}>
+                    <Icon size={32} />
+                </div>
+                <div>
+                    <div className="flex items-center gap-3 mb-3">
+                        <h4 className="text-lg md:text-xl font-bold text-white group-hover:translate-x-1 transition-transform">{title}</h4>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold border border-white/10 bg-white/5 text-zinc-400 uppercase tracking-wide">{tag}</span>
+                    </div>
+                    <p className="text-sm text-zinc-400 leading-relaxed group-hover:text-zinc-300 transition-colors">
+                        {desc}
+                    </p>
+                </div>
+            </div>
+        </div>
+    )
+}
