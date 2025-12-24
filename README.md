@@ -1,5 +1,10 @@
 # Xandeum Pulse
 
+![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)
+![Tailwind](https://img.shields.io/badge/Tailwind-CSS-38bdf8?style=flat-square&logo=tailwind-css)
+![Status](https://img.shields.io/badge/Status-Live-green?style=flat-square)
+
 Real-time network monitor and analytics dashboard for the Xandeum distributed storage protocol.
 
 **check it out:** https://xandeum-pulse.vercel.app
@@ -95,7 +100,7 @@ The primary monitoring interface for node operators.
 
 **Code:** [`pages/index.tsx`](pages/index.tsx)
 - See `renderZenCard()` - [Lines 833-875](pages/index.tsx#L833-L875) - (zen mode toggle)
-- See `handleDownloadProof()` - [Lines 622-636](pages/index.tsx#L622-L636) - proof generation
+- See `handleDownloadProof()` - [Lines 622-636](pages/index.tsx#L622-L636) - (proof generation)
 
 ### 2. Geographic Map
 
@@ -230,8 +235,9 @@ No environment variables required – RPC endpoints are configured in `lib/xande
 
 - **Framework:** Next.js 14 (App Router)
 - **Styling:** Tailwind CSS
-- **Maps:** react-simple-maps + d3-scale
+- **Maps:** React Simple Maps + D3 Scale
 - **Charts:** Recharts
+- **Imaging:** html-to-image (Snapshot generation)
 - **Data fetching:** Axios with Promise-based failover
 - **Deployment:** Vercel (serverless functions)
 
