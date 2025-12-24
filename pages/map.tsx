@@ -50,13 +50,15 @@ interface MapStats {
 
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
+// UPDATED: Storage is now Violet to match your UI
 const MODE_COLORS = {
     STORAGE: { hex: '#8b5cf6', tailwind: 'text-violet-400', bg: 'bg-violet-600', border: 'border-violet-500/50' },
     HEALTH:  { hex: '#10b981', tailwind: 'text-emerald-500', bg: 'bg-emerald-600', border: 'border-emerald-500/50' },
     CREDITS: { hex: '#f97316', tailwind: 'text-orange-500', bg: 'bg-orange-600', border: 'border-orange-500/50' }
 };
 
-const TIER_COLORS = ["#f59e0b", "#ec4899", "#a855f7", "#3b82f6", "#22d3ee"]; 
+// UPDATED: 3rd Tier (Index 2) is now Brown (#3B0D0D)
+const TIER_COLORS = ["#f59e0b", "#ec4899", "#3B0D0D", "#3b82f6", "#22d3ee"]; 
 
 const TIER_LABELS = {
     STORAGE: ['Massive Hub', 'Major Zone', 'Standard', 'Entry Level', 'Micro Node'],
@@ -199,7 +201,7 @@ export default function MapPage() {
   // Helper for Top Performer Stats
   const getPerformerStats = (pkData: TopPerformerData) => {
       if (viewMode === 'STORAGE') {
-          return <span className="text-purple-400 font-bold">{formatStorage(pkData.val)} Committed</span>;
+          return <span className="text-violet-400 font-bold">{formatStorage(pkData.val)} Committed</span>;
       }
       if (viewMode === 'CREDITS') {
           return <span className="text-yellow-500 font-bold">{pkData.val.toLocaleString()} Cr Earned</span>;
@@ -292,7 +294,8 @@ export default function MapPage() {
           const avgPerNode = loc.totalStorage / loc.count;
           return {
               labelA: 'Avg Density',
-              valA: <span className="text-indigo-400">{formatStorage(avgPerNode)} per Node</span>,
+              // UPDATED: Use Violet text color to match Storage Mode
+              valA: <span className="text-violet-400">{formatStorage(avgPerNode)} per Node</span>,
               descA: "Average committed storage per node in this region.",
               labelB: 'Global Share',
               valB: `${globalShare}% of Network`,
