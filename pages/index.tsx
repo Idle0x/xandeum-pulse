@@ -1583,7 +1583,7 @@ export default function Home() {
               </div>
             </Link>
 
-            <Link href={`/leaderboard?highlight=${selectedNode?.pubkey || ''}`}>
+            <Link href={selectedNode?.pubkey ? `/leaderboard?highlight=${selectedNode.pubkey}` : '/leaderboard'}>
               <div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer">
                 <Trophy size={18} />
                 <span className="text-sm font-bold">Leaderboard</span>
