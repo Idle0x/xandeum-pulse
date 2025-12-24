@@ -100,7 +100,7 @@ The primary monitoring interface for node operators.
 - **Visual mode toggle:** "Zen Mode" strips gradients/animations for OLED displays in 24/7 monitoring environments
 
 **Code:** [`pages/index.tsx`](pages/index.tsx)
-- See `renderZenCard()` - [Lines 833-875](pages/index.tsx#L833-L875) - (zen mode toggle)
+- See `renderZenCard()` - [Lines 1049-1097](pages/index.tsx#L1049-L1097) - (zen mode toggle)
 
 ### 2. Deep Node Inspection
 
@@ -112,9 +112,9 @@ Clicking any node opens a granular diagnostic modal designed for detailed analys
  * Identity Panel: Exposes full metadata including RPC endpoints, public keys, and version consensus status.
 
 **Code:** [`pages/index.tsx`](pages/index.tsx)
-- See `renderComparisonRow` - [Line 1334-1530](pages/index.tsx#L1334-L1530) - (versus Mode)
-- See `handleDownloadProof()` - [Lines 622-636](pages/index.tsx#L622-L636) & `UI Render` - [Line 1530-1640](pages/index.tsx#L1530-L1640) - (proof generation)
-- See renderStorageAnalysis - [Line 1083-1195](pages/index.tsx#L1083-L1195) - (storage calculation)
+- See `renderComparisonRow` - [Line 900-933](pages/index.tsx#L900-L933) - (versus Mode)
+- See `handleDownloadProof()` - [Lines 800-814](pages/index.tsx#L800-L814) & `UI Render` - [Line 1530-1640](pages/index.tsx#L1530-L1640) - (proof generation)
+- See renderStorageAnalysis - [Line 1395-1521](pages/index.tsx#L1395-L1521) - (storage calculation)
 
 ![Inspector Modal](https://private-user-images.githubusercontent.com/140549997/529940088-cae31cd7-fd73-46b6-8868-92895a72db3b.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY1NjU2OTcsIm5iZiI6MTc2NjU2NTM5NywicGF0aCI6Ii8xNDA1NDk5OTcvNTI5OTQwMDg4LWNhZTMxY2Q3LWZkNzMtNDZiNi04ODY4LTkyODk1YTcyZGIzYi5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI0JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyNFQwODM2MzdaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1lYzkzYjQxMWE2YWI4ODUxMTYyNDdjMTFhN2Q5MTE5YWQ3NDAyZWNhOGQ3YmY4NjQ2OTVmMzk2NGRhYWQ0OWU4JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.aiY7lezl-qh0GWDWKj2wSEQfOrPdceLwnLdWce9Xezk)
 
@@ -127,8 +127,8 @@ Visualizes the physical distribution of network infrastructure.
 - **Marker density:** Pin sizes scale with the number of nodes in each city
 
 **Code:** [`pages/map.tsx`](pages/map.tsx)
-- See `useEffect()` - [Lines 150-175](pages/map.tsx#L150-L175) - (percentile calculation)
-- See `getXRayStats()` - [Lines 265-315](pages/map.tsx#L265-L315) - (region inspector)
+- See `useEffect()` - [Lines 103-172](pages/map.tsx#L103-L172) - (percentile calculation & spatial intelligence)
+- See `getXRayStats()` - [Lines 301-365](pages/map.tsx#L301-L365) - (region inspector)
 
 ![Network Topology](https://private-user-images.githubusercontent.com/140549997/529941528-4a440bb3-8981-466e-b850-64db2f44891f.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY1NjYzMTUsIm5iZiI6MTc2NjU2NjAxNSwicGF0aCI6Ii8xNDA1NDk5OTcvNTI5OTQxNTI4LTRhNDQwYmIzLTg5ODEtNDY2ZS1iODUwLTY0ZGIyZjQ0ODkxZi5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI0JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyNFQwODQ2NTVaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT0yOGQ0NzllZTEzMDgzZmVlYTkwNTY4ZmViMmUyMmY3YTM2NDJlMjExZmUyNmE5YzMwYjE3NmMxY2U4NjBlOWQyJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.Wh_7b4VEuvbKOtC1zTLzoqI9-ik4Yc2m-xzi90d2Nls)
 
@@ -141,8 +141,8 @@ Reputation tracking and earnings forecasting.
 - **Identity bridging:** Merges anonymous blockchain addresses with physical node IPs by cross-referencing two separate APIs
 
 **Code:** [`pages/leaderboard.tsx`](pages/leaderboard.tsx)
-- See `calculateFinal()` - [Lines 163-167](pages/leaderboard.tsx#L163-L167) – (simulator logic)
-- See `useEffect()` - [Lines 117-124](pages/leaderboard.tsx#L117-L124) – (multiplier staking)
+- See `calculateFinal()` - [Lines 197-201](pages/leaderboard.tsx#L163-L167) – (simulator logic)
+- See `useEffect()` - [Lines 61-151](pages/leaderboard.tsx#L61-L151) – (logic & algorithm)
 
 ![Credits & Reputation](https://private-user-images.githubusercontent.com/140549997/529942809-728163b2-79be-42ae-8ce8-1325ad83072e.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY1NjYzMjksIm5iZiI6MTc2NjU2NjAyOSwicGF0aCI6Ii8xNDA1NDk5OTcvNTI5OTQyODA5LTcyODE2M2IyLTc5YmUtNDJhZS04Y2U4LTEzMjVhZDgzMDcyZS5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI0JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyNFQwODQ3MDlaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1jNzA1ZjMwMWNiZjZjNjdhNDUwNWVjZjNmZTkxMzNjZmY4MWJlOTYzODk0ZmE0MzQzODQ5Njc3ZDY1M2VmMGIzJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.YnFpWMvtKkELo-ryBjzwjjs_dJndwDNj0dcNcV8Bdj0)
 
