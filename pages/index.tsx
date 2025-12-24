@@ -520,6 +520,7 @@ export default function Home() {
   
   // Cycle: Default to 1 (Committed Storage)
   const [cycleStep, setCycleStep] = useState(1);
+  const [cycleReset, setCycleReset] = useState(0); // NEW: To trigger timer reset
 
   // UI State
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -572,26 +573,14 @@ export default function Home() {
 
   // --- EFFECTS ---
 
-  // Jump-to-View Logic for Cycle
-  useEffect(() => {
-    let targetStep = -1;
-    if (sortBy === 'storage') targetStep = 1; 
-    else if (sortBy === 'health') targetStep = 2; 
-    else if (sortBy === 'uptime') targetStep = 3; 
-    
-    if (targetStep !== -1) {
-        setCycleStep(targetStep);
-    }
-  }, [sortBy]);
-
-  // SMART CARD ROTATION LOGIC
+  // SMART CARD ROTATION LOGIC (UPDATED: 9 Seconds, Depends on cycleReset)
   useEffect(() => {
     const cycleInterval = setInterval(() => {
       setCycleStep((prev) => prev + 1);
-    }, 5000);
+    }, 9000); // CHANGED: 5000 -> 9000
     
     return () => clearInterval(cycleInterval);
-  }, [sortBy]);
+  }, [cycleReset]); // Reset interval when button clicked
 
   // Tip Rotation Logic
   useEffect(() => {
@@ -1772,11 +1761,21 @@ export default function Home() {
               <button
                 key={opt}
                 onClick={() => {
+                  // 1. Sort Logic
                   if (sortBy === opt) {
                     setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
                   } else {
                     setSortBy(opt as any);
                   }
+
+                  // 2. Force View Logic
+                  let targetStep = cycleStep; // Default to current
+                  if (opt === 'storage') targetStep = 1;
+                  else if (opt === 'health') targetStep = 2;
+                  else if (opt === 'uptime') targetStep = 3;
+                  
+                  setCycleStep(targetStep);
+                  setCycleReset(prev => prev + 1); // 3. Reset Timer
                 }}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg text-[10px] md:text-xs font-bold transition border whitespace-nowrap h-8 md:h-auto ${
                   sortBy === opt
