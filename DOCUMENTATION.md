@@ -4,14 +4,15 @@
 
 1. [System Overview](#system-overview)
 2. [Architecture](#architecture)
-3. [Core Mathematics](#core-mathematics)
-4. [Health Score Algorithm](#health-score-algorithm)
-5. [Data Pipeline](#data-pipeline)
-6. [API Reference](#api-reference)
-7. [UI/UX Design Principles](#uiux-design-principles)
-8. [Platform Walkthrough](#platform-walkthrough)
-9. [Performance & Optimization](#performance--optimization)
-10. [Error Handling & Resilience](#error-handling--resilience)
+3. [Vitality Score Model](#vitality-score-model)
+4. [Core Mathematics](#core-mathematics)
+5. [Health Score Algorithm](#health-score-algorithm)
+6. [Data Pipeline](#data-pipeline)
+7. [API Reference](#api-reference)
+8. [UI/UX Design Principles](#uiux-design-principles)
+9. [Platform Walkthrough](#platform-walkthrough)
+10. [Performance & Optimization](#performance--optimization)
+11. [Error Handling & Resilience](#error-handling--resilience)
 
 ---
 
@@ -83,6 +84,143 @@ Xandeum Pulse is a real-time network monitoring dashboard for the Xandeum blockc
 - **Data Fetching**: Multi-source failover (primary + 6 backup nodes)
 - **Enrichment Pipeline**: Geolocation, health scoring, rank calculation
 - **Mathematical Engine**: Implements all scoring algorithms
+
+---
+
+## Vitality Score Model
+
+The **Vitality Score (Health)** represents a node’s overall contribution,
+reliability, and protocol alignment within the Xandeum network.
+
+Rather than starting from a perfect score and subtracting penalties,
+the system **builds the score upward from zero** using a weighted
+multi-factor model.
+
+This design rewards *earned trust* rather than assuming it.
+
+---
+
+### 🚨 Gatekeeper Rule (Hard Constraint)
+
+```
+IF storage_committed <= 0
+THEN Vitality Score = 0
+```
+
+**Rationale:**  
+Xandeum is a storage network.  
+A node that commits **0 GB** provides zero utility, regardless of uptime,
+version, or historical reputation. Such a node is considered *non-participatory*.
+
+This rule is applied **before all other calculations**.
+
+---
+
+### 1️⃣ Uptime Score — Stability & Reliability (Weight: 30%)
+
+**Metric:**  
+Node uptime (seconds → days)
+
+**Conceptual Bands:**
+
+- > 30 days → 100 points (Perfect stability)
+- 7–30 days → 70–100 points (Trusted)
+- 1–7 days → 40–70 points (Proving)
+- < 24 hours → 0–40 points (New / volatile)
+
+**Intent:**  
+Frequent restarts endanger data availability.  
+New nodes must *earn* trust over time.
+
+---
+
+### 2️⃣ Reputation Score — Proven Contribution (Weight: 25%)
+
+**Metric:**  
+Node credits compared against **network median credits**
+
+**Relative Performance Scaling:**
+
+- > 2× median → 100 points (Network leader)
+- 1×–2× median → 75–100 points
+- 0.5×–1× median → 50–75 points
+- 0.1×–0.5× median → 25–50 points
+- < 10% of median → Scales toward 0
+
+**Intent:**  
+Using the **median** keeps the score adaptive.  
+As the network matures, expectations rise automatically.
+
+---
+
+### 3️⃣ Capacity Score — Network Utility (Weight: 25%)
+
+**Metric:**  
+Committed storage (GB)
+
+**Capacity Tiers:**
+
+- > 1 TB → 100 points (High-capacity hub)
+- 100 GB–1 TB → 70–100 points
+- 10 GB–100 GB → 40–70 points
+- < 10 GB → 0–40 points
+
+**Intent:**  
+More committed storage increases redundancy,
+resilience, and long-term network health.
+
+---
+
+### 4️⃣ Version Score — Security & Consensus (Weight: 20%)
+
+**Metric:**  
+Node version relative to the **network consensus version**
+(most common active release)
+
+**Scoring Logic:**
+
+- Same or newer → 100 points
+- 1–2 minor versions behind → 80 points
+- > 2 minor versions behind → 60 points
+- Major version behind → 30 points (Critical risk)
+
+**Intent:**  
+Outdated software increases fork risk and security exposure.
+
+---
+
+### 🧮 Weighted Composition
+
+The final Vitality Score is calculated as a **weighted sum** of the four components:
+
+```
+Vitality = (Uptime × 0.30)
+         + (Reputation × 0.25)
+         + (Capacity × 0.25)
+         + (Version × 0.20)
+```
+
+Scores are clamped to **0–100** after aggregation.
+
+---
+
+### 📊 Example
+
+A node with:
+
+- 15 days uptime
+- 500 GB committed storage
+- Average network credits
+- Latest software version
+
+**Result:**
+
+- Uptime: ~80 × 0.30 = 24
+- Reputation: ~60 × 0.25 = 15
+- Capacity: ~85 × 0.25 = 21.25
+- Version: 100 × 0.20 = 20
+
+**Total:** 80.25 → **80 (Green / Good Health)**
 
 ---
 
