@@ -87,134 +87,105 @@ Xandeum Pulse is a real-time network monitoring dashboard for the Xandeum blockc
 
 ---
 
-## Vitality Score Algorithm (v2.0)
+## Vitality Score Model
 
-The **Vitality Score (Health)** represents a node’s overall contribution,
-stability, and protocol alignment within the Xandeum network.
+### Vitality Score Algorithm (v2.0)
 
-This version introduces **Dynamic Re-Weighting**, ensuring that the score
-remains fair and meaningful even when external data sources (such as the
-Credits API) are temporarily unavailable.
+The Vitality Score (Health) represents a node's overall contribution, stability, and protocol alignment within the Xandeum network.
 
-Instead of penalizing nodes from a perfect score, the system **builds the
-score upward from zero** using weighted components.
+This version introduces **Dynamic Re-Weighting**, ensuring that the score remains fair and meaningful even when external data sources (such as the Credits API) are temporarily unavailable.
 
----
+Instead of penalizing nodes from a perfect score, the system builds the score upward from zero using weighted components.
 
-## ⛔ Gatekeeper Rule (Hard Constraint)
+#### ⛔ Gatekeeper Rule (Hard Constraint)
 
 ```
 IF storage_committed <= 0
 THEN Vitality Score = 0
 ```
 
-**Reason:**  
-Xandeum is a storage network.  
-A node that commits **0 GB** provides zero utility, regardless of uptime,
-version, or historical performance. It is therefore considered
-*non-participatory*.
+**Reason:** Xandeum is a storage network. A node that commits 0 GB provides zero utility, regardless of uptime, version, or historical performance. It is therefore considered non-participatory.
 
-This rule is evaluated **before all other scoring logic**.
+This rule is evaluated before all other scoring logic.
 
----
+#### 1️⃣ Uptime Score — Stability & Reliability
 
-## 1️⃣ Uptime Score — Stability & Reliability
+**Goal:** Measure node stability using a smooth, trust-building curve.
 
-**Goal:**  
-Measure node stability using a smooth, trust-building curve.
+**Metric:** `node.uptime` (seconds → days)
 
-**Metric:**  
-`node.uptime` (seconds → days)
-
-**Weight:**  
-- **35%** (Standard Mode)  
-- **45%** (Fallback Mode)
+**Weight:**
+- 35% (Standard Mode)
+- 45% (Fallback Mode)
 
 **Logic (Sigmoid Curve):**
-- Uses a smooth **S-curve (logistic function)** centered at **7 days**
-- < 24 hours → **Hard cap at 20 points**
+- Uses a smooth S-curve (logistic function) centered at 7 days
+- < 24 hours → Hard cap at 20 points (Penalty for instability/new nodes)
 - ~7 days → ~50 points
 - > 14 days → Rapidly approaches 100 points
 
-**Why:**  
-A smooth curve captures *gradual trust*.  
-A node with 6 days uptime is meaningfully more reliable than one with 1 day,
-and the score reflects that difference more accurately than rigid tiers.
+**Why:** A smooth curve captures gradual trust. A node with 6 days uptime is meaningfully more reliable than one with 1 day, and the score reflects that difference more accurately than rigid tiers.
 
----
+#### 2️⃣ Storage Score — Capacity + Utilization
 
-## 2️⃣ Storage Score — Capacity + Utilization
+**Goal:** Reward both promised utility (commitment) and real usage (data stored).
 
-**Goal:**  
-Reward both promised utility (**commitment**) and real usage (**data stored**).
-
-**Metrics:**  
+**Metrics:**
 - `node.storage_committed` vs `medianStorage`
 - `node.storage_used` (GB)
 
-**Weight:**  
-- **30%** (Standard Mode)  
-- **35%** (Fallback Mode)
+**Weight:**
+- 30% (Standard Mode)
+- 35% (Fallback Mode)
 
 **Logic (Logarithmic Growth):**
-- **Base Score:**  
-  Calculated using a logarithmic scale relative to the network median.
-  Matching the median yields a strong baseline score.
-- **Utilization Bonus:**  
-  Additional points (up to **+15**) based on actual data stored.
-- **Total Storage Score:**  
+- **Base Score:** Calculated using a logarithmic scale relative to the Network Median. Matching the median yields a strong baseline score (50+).
+- **Utilization Bonus:** Additional points (up to +15) based on actual data stored (`storage_used`).
+- **Total Storage Score:**
   ```
   Storage Score = Base Score + Utilization Bonus
   ```
 
-**Why:**  
-This prevents “empty” nodes with large commitments from ranking above nodes
-that are actively serving data.
+**Why:** This prevents "empty" nodes with large commitments from ranking above nodes that are actively serving data. The utilization bonus directly rewards network activity.
 
----
+#### 3️⃣ Reputation Score — Historical Contribution
 
-## 3️⃣ Reputation Score — Historical Contribution
+**Goal:** Measure proven contribution relative to the network's middle standard.
 
-**Goal:**  
-Measure proven contribution relative to the rest of the network.
+**Metric:** `node.credits` vs `medianCredits`
 
-**Metric:**  
-`node.credits` vs `medianCredits`
-
-**Weight:**  
-- **20%** (Standard Mode)  
-- **0%** (Fallback Mode)
+**Weight:**
+- 20% (Standard Mode)
+- 0% (Fallback Mode)
 
 **Logic:**
-- **Standard Mode:**  
+- **Standard Mode:**
   ```
   Reputation = min(100, (Credits / (MedianCredits × 2)) × 100)
   ```
-- **Fallback Mode (Credits API Offline):**  
-  - Reputation score becomes `null`
+
+- **Why Median?**
+  - **Whale Protection:** The Xandeum reward system includes massive multipliers (up to 16x for Eras/NFTs). Using the Mean (Average) would allow a few "Whale" nodes to skew the target so high (e.g., 200k+) that a normal node could never achieve a good score.
+  - **Filters Noise:** The Median effectively ignores broken or inactive nodes (with 0 credits) that drag the Average down, ensuring the benchmark represents a functioning node.
+
+- **Fallback Mode (Credits API Offline):**
+  - Reputation score becomes null
   - Its 20% weight is redistributed:
     - +10% → Uptime
     - +5% → Storage
     - +5% → Version
 
-**Why:**  
-This ensures that a node’s health score does not collapse simply because an
-external API is temporarily unavailable.
+**Why:** This ensures that a node's health score does not collapse simply because an external API is temporarily unavailable.
 
----
+#### 4️⃣ Version Score — Security & Consensus Alignment
 
-## 4️⃣ Version Score — Security & Consensus Alignment
+**Goal:** Measure protocol safety and consensus participation.
 
-**Goal:**  
-Measure protocol safety and consensus participation.
+**Metric:** `node.version` vs `consensusVersion` (the most common active version on the network)
 
-**Metric:**  
-`node.version` vs `consensusVersion`
-(the most common active version on the network)
-
-**Weight:**  
-- **15%** (Standard Mode)  
-- **20%** (Fallback Mode)
+**Weight:**
+- 15% (Standard Mode)
+- 20% (Fallback Mode)
 
 **Logic (Distance-Based Decay):**
 
@@ -227,13 +198,9 @@ Measure protocol safety and consensus participation.
 | 4 versions      | 30    |
 | 5+ versions     | 10    |
 
-**Why:**  
-Being slightly behind is tolerable, but falling several versions back poses
-real security and consensus risks.
+**Why:** Being slightly behind is tolerable, but falling several versions back poses real security and consensus risks.
 
----
-
-## 🧮 Final Formula (Standard Mode)
+#### 🧮 Final Formula (Standard Mode)
 
 ```
 Vitality Score =
@@ -243,42 +210,31 @@ Vitality Score =
   (Version × 0.15)
 ```
 
-Scores are clamped to **0–100** after aggregation.
+Scores are clamped to 0–100 after aggregation.
 
----
-
-## 📊 Example Calculation
+#### 📊 Example Calculation
 
 **Node Profile:**
-- 8 days uptime
-- Median storage committed
-- 0 GB storage used
-- 0 credits (new node)
-- Latest version
+- Uptime: 15 Days
+- Storage: 500 GB Committed (Median is ~100GB)
+- Credits: "Average" (Node has ~38k, Median is ~42k)
+- Version: Latest
 
 **Breakdown:**
-- Uptime (~8 days):  
-  ~60 × 0.35 = 21
-- Storage (Median, no usage):  
-  ~75 × 0.30 = 22.5
-- Reputation (0 credits):  
-  0 × 0.20 = 0
-- Version (Latest):  
-  100 × 0.15 = 15
+- Uptime (15 days): 83 pts × 0.35 = 29.05
+- Storage (500 GB vs 100 GB Median): 100 pts (High cap) × 0.30 = 30.0
+- Version (Latest): 100 pts × 0.15 = 15.0
+- Reputation (~0.9x Median): ~70 pts × 0.20 = 14.0
 
-**Total:**  
-21 + 22.5 + 0 + 15 = **58.5 → 59 (Fair Health)**
+**Total Score:** 29.05 + 30.0 + 15.0 + 14.0 = 88.05 → **88 (Excellent Health)**
 
----
+#### 🔁 Dynamic Re-Weighting (Fallback Mode)
 
-## 🔁 Dynamic Re-Weighting (Fallback Mode)
-
-If the **Reputation / Credits API is offline**, weights automatically shift to:
-
-- **Uptime:** 45%
-- **Storage:** 35%
-- **Version:** 20%
-- **Reputation:** 0%
+If the Reputation / Credits API is offline, weights automatically shift to:
+- Uptime: 45%
+- Storage: 35%
+- Version: 20%
+- Reputation: 0%
 
 This guarantees continuity and fair ranking during upstream outages.
 
