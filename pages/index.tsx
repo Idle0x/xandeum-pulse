@@ -1038,9 +1038,21 @@ export default function Home() {
           
           <div className="pt-1 md:pt-2">
             <div className="text-[9px] md:text-[10px] text-zinc-600 uppercase font-bold mb-1">Network Rewards</div>
-            <div className="flex justify-between items-center text-[10px] md:text-xs p-1.5 md:p-2 rounded-lg border bg-black/40 border-zinc-800/50">
-               {/* CRASHPROOF UI: Check Null Credits */}
-               {node.credits !== null ? (
+                        <div 
+                 onClick={(e) => handleLeaderboardNav(e, node)}
+                 className={`flex justify-between items-center text-[10px] md:text-xs p-1.5 md:p-2 rounded-lg border transition-colors cursor-pointer ${
+                   (node as any).isUntracked 
+                     ? 'bg-zinc-900/50 border-zinc-800 hover:bg-zinc-800' 
+                     : 'bg-black/40 border-zinc-800/50 hover:border-yellow-500/30 hover:bg-yellow-500/5'
+                 }`}
+            >
+               {/* CASE 1: UNTRACKED GHOST NODE */}
+               {(node as any).isUntracked ? (
+                   <div className="flex items-center gap-2 text-zinc-500 w-full justify-center font-bold text-[9px] md:text-[10px] tracking-wide">
+                     <AlertTriangle size={10} className="text-zinc-600"/> NOT FOUND ON API
+                   </div>
+               ) : node.credits !== null ? (
+                   /* CASE 2: NORMAL TRACKED NODE */
                    <>
                        <div className="flex items-center gap-1.5">
                          <Medal size={10} className={node.rank===1?'text-yellow-400':'text-zinc-500'} />
@@ -1052,6 +1064,7 @@ export default function Home() {
                        </div>
                    </>
                ) : (
+                   /* CASE 3: FULL API OUTAGE */
                    <div className="flex items-center gap-2 text-red-400 w-full justify-center font-bold italic text-[9px] md:text-[10px]">
                      <AlertOctagon size={10}/> CREDITS API OFFLINE
                    </div>
