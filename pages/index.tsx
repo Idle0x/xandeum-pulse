@@ -558,6 +558,16 @@ export default function Home() {
   // User Prefs
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  // --- TOAST STATE ---
+  const [toast, setToast] = useState<{visible: boolean, msg: string} | null>(null);
+  const toastTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const showToast = (msg: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ visible: true, msg });
+    toastTimer.current = setTimeout(() => setToast(null), 15000); // 15 Seconds
+  };
   
   const proofRef = useRef<HTMLDivElement>(null);
   const timeAgo = useTimeAgo(selectedNode?.last_seen_timestamp);
@@ -732,6 +742,20 @@ export default function Home() {
     }
   };
 
+    const handleLeaderboardNav = (e: React.MouseEvent, node: Node) => {
+    e.stopPropagation();
+    
+    // GHOST NODE BLOCKER
+    if ((node as any).isUntracked) {
+       showToast("This node is visible on the network but it is not found on the rewards/credits API.");
+       return;
+    }
+
+    // Normal Navigation
+    const url = node.pubkey ? `/leaderboard?highlight=${node.pubkey}` : '/leaderboard';
+    router.push(url);
+  };
+  
   const handleCardToggle = (view: 'health' | 'storage' | 'identity') => {
     if (modalView === view) {
       setModalView('overview');
