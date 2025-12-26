@@ -2769,8 +2769,8 @@ export default function Home() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <Link href={selectedNode?.pubkey ? `/leaderboard?highlight=${selectedNode.pubkey}` : '/leaderboard'}>
-                            <div
+                          <div
+                              onClick={(e) => handleLeaderboardNav(e, selectedNode)}
                               className={`h-40 p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${
                                 zenMode
                                   ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
@@ -2814,7 +2814,7 @@ export default function Home() {
                                 <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">
                                   Global Rank{' '}
                                   <span className="text-white text-lg ml-1">
-                                    #{selectedNode?.rank || '-'}
+                                    {(selectedNode as any).isUntracked ? '---' : `#${selectedNode?.rank || '-'}`}
                                   </span>
                                 </div>
                                 <div className="bg-zinc-800 shadow-[0_4px_0_0_rgba(0,0,0,0.3)] rounded-lg p-3 mt-2 border-b border-white/5">
@@ -2822,22 +2822,21 @@ export default function Home() {
                                     <span className="text-[10px] text-zinc-500 font-mono uppercase">
                                       Credits Earned
                                     </span>
-                                    <span className="text-yellow-500 font-mono font-bold text-xs">
-                                      {selectedNode?.credits !== null
-                                        ? selectedNode.credits.toLocaleString()
-                                        : 'N/A'}
+                                    <span className={`${(selectedNode as any).isUntracked ? 'text-zinc-500' : 'text-yellow-500'} font-mono font-bold text-xs`}>
+                                      {(selectedNode as any).isUntracked 
+                                        ? 'NOT TRACKED' 
+                                        : (selectedNode?.credits !== null ? selectedNode.credits.toLocaleString() : 'N/A')}
                                     </span>
                                   </div>
                                 </div>
                               </div>
 
                               <div className="mt-3 flex justify-end">
-                                <span className="text-[9px] font-bold uppercase tracking-widest text-yellow-500/80 animate-pulse group-hover:text-yellow-300 transition-colors flex items-center gap-1">
+                                <span className={`text-[9px] font-bold uppercase tracking-widest ${(selectedNode as any).isUntracked ? 'text-zinc-600' : 'text-yellow-500/80 animate-pulse group-hover:text-yellow-300'} transition-colors flex items-center gap-1`}>
                                   OPEN LEADERBOARD <ExternalLink size={8} />
                                 </span>
                               </div>
                             </div>
-                          </Link>
 
                           <Link href={`/map?focus=${getSafeIp(selectedNode)}`}>
                             <div
