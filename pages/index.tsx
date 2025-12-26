@@ -1846,6 +1846,19 @@ export default function Home() {
         </div>
       )}
 
+      {/* --- TOAST NOTIFICATION --- */}
+      {toast && toast.visible && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-top-4 duration-300 w-full max-w-md px-4 pointer-events-none">
+            <div className="bg-zinc-900 border border-yellow-500/30 text-zinc-200 px-4 py-3 rounded-xl shadow-2xl flex items-start gap-3 pointer-events-auto">
+               <AlertTriangle size={20} className="text-yellow-500 shrink-0 mt-0.5" />
+               <div className="text-xs font-bold leading-relaxed">
+                  {toast.msg}
+               </div>
+               <button onClick={() => setToast(null)} className="text-zinc-500 hover:text-white ml-auto"><X size={16}/></button>
+            </div>
+        </div>
+      )}
+
       <main
         className={`p-4 md:p-8 ${
           zenMode ? 'max-w-full' : 'max-w-7xl 2xl:max-w-[1800px] mx-auto'
