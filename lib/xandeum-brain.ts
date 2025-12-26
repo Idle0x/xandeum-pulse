@@ -308,10 +308,16 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       storage_committed: storageCommitted, 
       storage_used: storageUsed,           
       credits, 
+      isUntracked,
       health: vitality.total,
       healthBreakdown: vitality.breakdown, 
-      location: { lat: loc.lat, lon: loc.lon, countryName: loc.country, countryCode: loc.countryCode, city: loc.city }
-      isUntracked,
+      location: { 
+          lat: loc.lat, 
+          lon: loc.lon, 
+          countryName: loc.country, 
+          countryCode: loc.countryCode, 
+          city: loc.city 
+      }
     };
   });
 
