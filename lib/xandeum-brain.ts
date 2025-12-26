@@ -276,6 +276,13 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
     const storageCommitted = Number(pod.storage_committed) || 0;
     const storageUsed = Number(pod.storage_used) || 0;
     const uptime = Number(pod.uptime) || 0;
+
+    // Ghost Node Logic
+    
+    const isUntracked = creditsSystemOnline && !creditsMap.has(nodeKey);
+    const credits = isUntracked ? null : (creditsSystemOnline ? (creditsMap.get(nodeKey) || 0) : null);
+    
+    const vitality = calculateVitalityScore(
     
     const nodeKey = pod.pubkey || pod.public_key;
     const credits = creditsSystemOnline ? (creditsMap.get(nodeKey) || 0) : null;
@@ -307,6 +314,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       health: vitality.total,
       healthBreakdown: vitality.breakdown, 
       location: { lat: loc.lat, lon: loc.lon, countryName: loc.country, countryCode: loc.countryCode, city: loc.city }
+      isUntracked,
     };
   });
 
