@@ -20,6 +20,7 @@ export interface EnrichedNode {
   uptime: number;
   last_seen_timestamp: number;
   is_public: boolean;
+  isUntracked?: boolean;
   storage_used: number;      
   storage_committed: number; 
   credits: number | null; // Nullable
