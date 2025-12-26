@@ -1038,12 +1038,11 @@ export default function Home() {
           
           <div className="pt-1 md:pt-2">
             <div className="text-[9px] md:text-[10px] text-zinc-600 uppercase font-bold mb-1">Network Rewards</div>
-                        <div 
-                 onClick={(e) => handleLeaderboardNav(e, node)}
-                 className={`flex justify-between items-center text-[10px] md:text-xs p-1.5 md:p-2 rounded-lg border transition-colors cursor-pointer ${
+              <div 
+                 className={`flex justify-between items-center text-[10px] md:text-xs p-1.5 md:p-2 rounded-lg border transition-colors ${
                    (node as any).isUntracked 
-                     ? 'bg-zinc-900/50 border-zinc-800 hover:bg-zinc-800' 
-                     : 'bg-black/40 border-zinc-800/50 hover:border-yellow-500/30 hover:bg-yellow-500/5'
+                     ? 'bg-zinc-900/50 border-zinc-800' 
+                     : 'bg-black/40 border-zinc-800/50'
                  }`}
             >
                {/* CASE 1: UNTRACKED GHOST NODE */}
