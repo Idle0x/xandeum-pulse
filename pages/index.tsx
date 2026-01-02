@@ -50,7 +50,7 @@ import {
   Minimize2,
   Image as ImageIcon,
   ArrowLeft,
-  AlertOctagon
+  AlertOctagon,
   PlayCircle
 } from 'lucide-react';
 
