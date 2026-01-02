@@ -51,6 +51,7 @@ import {
   Image as ImageIcon,
   ArrowLeft,
   AlertOctagon
+  PlayCircle
 } from 'lucide-react';
 
 // --- TYPES ---
