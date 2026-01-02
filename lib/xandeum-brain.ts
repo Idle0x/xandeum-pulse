@@ -2,18 +2,20 @@ import axios from 'axios';
 import geoip from 'geoip-lite'; 
 
 // --- CONFIGURATION ---
-const PRIMARY_NODE = '173.212.203.145';
-const BACKUP_NODES = [
+
+// SHARED RPC NODES (Serve both Mainnet & Devnet gossip)
+const RPC_NODES = [
+  '173.212.203.145', // Primary
   '161.97.97.41', '192.190.136.36', '192.190.136.38',
   '207.244.255.1', '192.190.136.28', '192.190.136.29'
 ];
-const TIMEOUT_PRIMARY = 4000;
-const TIMEOUT_BACKUP = 6000;
-const TIMEOUT_CREDITS = 4000; 
 
-// API ENDPOINTS
-const API_MAINNET = 'https://podcredits.xandeum.network/api/pods-credits';
-const API_DEVNET = 'https://podcredits.xandeum.network/devnet/api/pods-credits'; // Assumed path based on devnet base
+const TIMEOUT_RPC = 4000;
+const TIMEOUT_CREDITS = 5000; 
+
+// SEPARATE CREDIT APIS
+const API_CREDITS_MAINNET = 'https://podcredits.xandeum.network/api/pods-credits';
+const API_CREDITS_DEVNET  = 'https://podcredits.xandeum.network/devnet/api/pods-credits';
 
 const geoCache = new Map<string, { lat: number; lon: number; country: string; countryCode: string; city: string }>();
 
@@ -25,7 +27,7 @@ export interface EnrichedNode {
   last_seen_timestamp: number;
   is_public: boolean;
   isUntracked?: boolean;
-  network?: 'MAINNET' | 'DEVNET' | 'UNKNOWN'; // New Field
+  network: 'MAINNET' | 'DEVNET' | 'UNKNOWN'; // Tag
   storage_used: number;      
   storage_committed: number; 
   credits: number | null; 
@@ -46,52 +48,29 @@ export interface EnrichedNode {
   rank?: number;
 }
 
-// ... [KEEP ALL MATH HELPERS AND VERSION LOGIC EXACTLY THE SAME] ...
-// (cleanSemver, compareVersions, calculateSigmoidScore, calculateLogScore, getVersionScoreByRank, calculateVitalityScore)
-// Paste them here if you are copying the whole file, otherwise leave them as is.
-
-// --- MATH HELPERS ---
+// --- MATH HELPERS (Standard) ---
 const cleanSemver = (v: string) => (v || '0.0.0').replace(/[^0-9.]/g, '');
-
 const compareVersions = (v1: string, v2: string) => {
-  const s1 = cleanSemver(v1);
-  const s2 = cleanSemver(v2);
-  const p1 = s1.split('.').map(Number);
-  const p2 = s2.split('.').map(Number);
+  const p1 = cleanSemver(v1).split('.').map(Number);
+  const p2 = cleanSemver(v2).split('.').map(Number);
   for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
-    const n1 = p1[i] || 0;
-    const n2 = p2[i] || 0;
-    if (n1 > n2) return 1;
-    if (n1 < n2) return -1;
+    if ((p1[i]||0) > (p2[i]||0)) return 1;
+    if ((p1[i]||0) < (p2[i]||0)) return -1;
   }
   return 0;
 };
-
-const calculateSigmoidScore = (value: number, midpoint: number, steepness: number) => {
-    return 100 / (1 + Math.exp(-steepness * (value - midpoint)));
-};
-
+const calculateSigmoidScore = (value: number, midpoint: number, steepness: number) => 100 / (1 + Math.exp(-steepness * (value - midpoint)));
 const calculateLogScore = (value: number, median: number, maxScore: number = 100) => {
     if (median === 0) return value > 0 ? maxScore : 0;
-    const ratio = value / median;
-    return Math.min(maxScore, (maxScore / 2) * Math.log2(ratio + 1));
+    return Math.min(maxScore, (maxScore / 2) * Math.log2((value / median) + 1));
 };
-
 const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedUniqueVersions: string[]) => {
     if (compareVersions(nodeVersion, consensusVersion) >= 0) return 100;
-    const consensusIndex = sortedUniqueVersions.indexOf(consensusVersion);
-    const nodeIndex = sortedUniqueVersions.indexOf(nodeVersion);
-    if (nodeIndex === -1) return 0;
-    const distance = nodeIndex - consensusIndex;
-    if (distance <= 0) return 100;
-    if (distance === 1) return 90; 
-    if (distance === 2) return 70; 
-    if (distance === 3) return 50; 
-    if (distance === 4) return 30; 
-    if (distance === 5) return 10; 
-    return Math.max(0, 10 - (distance - 5)); 
+    const distance = sortedUniqueVersions.indexOf(nodeVersion) - sortedUniqueVersions.indexOf(consensusVersion);
+    return distance <= 0 ? 100 : Math.max(0, 10 - (distance - 5)); 
 };
 
+// --- VITALITY SCORING ---
 const calculateVitalityScore = (
     storageCommitted: number, 
     storageUsed: number,
@@ -110,12 +89,9 @@ const calculateVitalityScore = (
   if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
 
   const baseStorageScore = calculateLogScore(storageCommitted, medianStorage, 100);
-  let utilizationBonus = 0;
-  if (storageUsed > 0) {
-      const usedGB = storageUsed / (1024 ** 3);
-      utilizationBonus = Math.min(15, 5 * Math.log2(usedGB + 2)); 
-  }
+  const utilizationBonus = storageUsed > 0 ? Math.min(15, 5 * Math.log2((storageUsed / (1024 ** 3)) + 2)) : 0;
   const totalStorageScore = baseStorageScore + utilizationBonus;
+
   const versionScore = getVersionScoreByRank(version, consensusVersion, sortedUniqueVersions);
 
   let total = 0;
@@ -123,11 +99,9 @@ const calculateVitalityScore = (
 
   if (credits !== null && medianCredits > 0) {
       reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
-      const rawTotal = ((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15));
-      total = Math.round(rawTotal);
+      total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15));
   } else {
-      const rawTotal = ((uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20));
-      total = Math.round(rawTotal);
+      total = Math.round((uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20));
       reputationScore = null; 
   }
 
@@ -146,39 +120,39 @@ const calculateVitalityScore = (
 
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
+  
+  // Try Primary First
   try {
-    const res = await axios.post(`http://${PRIMARY_NODE}:6000/rpc`, payload, { timeout: TIMEOUT_PRIMARY });
-    if (res.data?.result?.pods) return res.data.result.pods;
-  } catch (e) { /* failover */ }
+      const res = await axios.post(`http://${RPC_NODES[0]}:6000/rpc`, payload, { timeout: TIMEOUT_RPC });
+      if (res.data?.result?.pods) return res.data.result.pods;
+  } catch (e) { /* fallthrough */ }
 
-  const shuffled = BACKUP_NODES.sort(() => 0.5 - Math.random()).slice(0, 3);
+  // Shuffle Backups
+  const shuffled = RPC_NODES.slice(1).sort(() => 0.5 - Math.random()).slice(0, 3);
   try {
-    const winner = await Promise.any(shuffled.map(ip => 
-      axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_BACKUP }).then(r => r.data?.result?.pods || [])
-    ));
-    return winner;
+      const winner = await Promise.any(shuffled.map(ip => 
+          axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC })
+               .then(r => r.data?.result?.pods || [])
+      ));
+      return winner;
   } catch (e) { return []; }
 }
 
-// UPDATED: Fetches both environments
 async function fetchCredits() {
-    try {
-        const [mainnetRes, devnetRes] = await Promise.allSettled([
-            axios.get(API_MAINNET, { timeout: TIMEOUT_CREDITS }),
-            axios.get(API_DEVNET, { timeout: TIMEOUT_CREDITS })
-        ]);
+    // Parallel Fetch from both environments
+    const [mainnetRes, devnetRes] = await Promise.allSettled([
+        axios.get(API_CREDITS_MAINNET, { timeout: TIMEOUT_CREDITS }),
+        axios.get(API_CREDITS_DEVNET, { timeout: TIMEOUT_CREDITS })
+    ]);
 
-        const mainnetData = mainnetRes.status === 'fulfilled' ? (mainnetRes.value.data?.pods_credits || mainnetRes.value.data || []) : [];
-        const devnetData = devnetRes.status === 'fulfilled' ? (devnetRes.value.data?.pods_credits || devnetRes.value.data || []) : [];
-
-        return { mainnet: mainnetData, devnet: devnetData };
-    } catch (error) { 
-        return { mainnet: [], devnet: [] };
-    }
+    return {
+        mainnet: mainnetRes.status === 'fulfilled' ? (mainnetRes.value.data?.pods_credits || mainnetRes.value.data || []) : [],
+        devnet: devnetRes.status === 'fulfilled' ? (devnetRes.value.data?.pods_credits || devnetRes.value.data || []) : []
+    };
 }
 
 async function resolveLocations(ips: string[]) {
-  // [KEEP EXISTING GEO LOGIC]
+  // [Exact same geo logic as before]
   const missing = ips.filter(ip => !geoCache.has(ip));
   if (missing.length > 0) {
     try {
@@ -200,52 +174,47 @@ async function resolveLocations(ips: string[]) {
   }
 }
 
-// --- EXPORT ---
+// --- MAIN EXPORT ---
 
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  const [rawPods, creditsResult] = await Promise.all([ fetchRawData(), fetchCredits() ]);
+  const [rawPods, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
   if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable");
 
-  // Prepare Credits Map with Network Tagging
+  // 1. Build the Unified Credit Map (The "Merge")
   const creditsMap = new Map<string, { val: number, net: 'MAINNET' | 'DEVNET' }>();
-  const creditsArray: number[] = [];
-  
-  // Process Mainnet (Priority)
-  if (Array.isArray(creditsResult.mainnet)) {
-      creditsResult.mainnet.forEach((c: any) => {
+  const allCreditsValues: number[] = [];
+
+  // Parse Devnet First (Base Layer)
+  if (Array.isArray(creditsData.devnet)) {
+      creditsData.devnet.forEach((c: any) => {
           const val = parseFloat(c.credits || c.amount || '0');
           const key = c.pod_id || c.pubkey || c.node;
           if (key && !isNaN(val)) {
-              creditsMap.set(key, { val, net: 'MAINNET' });
-              creditsArray.push(val);
+             creditsMap.set(key, { val, net: 'DEVNET' });
+             allCreditsValues.push(val);
           }
       });
   }
 
-  // Process Devnet (Only if not already in Mainnet)
-  if (Array.isArray(creditsResult.devnet)) {
-      creditsResult.devnet.forEach((c: any) => {
+  // Parse Mainnet Second (Overwrite Layer - Priority)
+  if (Array.isArray(creditsData.mainnet)) {
+      creditsData.mainnet.forEach((c: any) => {
           const val = parseFloat(c.credits || c.amount || '0');
           const key = c.pod_id || c.pubkey || c.node;
           if (key && !isNaN(val)) {
-              // Only add if not found in Mainnet to prevent duplication/confusion
-              if (!creditsMap.has(key)) {
-                  creditsMap.set(key, { val, net: 'DEVNET' });
-                  creditsArray.push(val);
-              }
+             creditsMap.set(key, { val, net: 'MAINNET' }); // Overwrites if exists
+             allCreditsValues.push(val);
           }
       });
   }
 
-  const creditsSystemOnline = creditsArray.length > 0;
+  allCreditsValues.sort((a, b) => a - b);
+  const medianCredits = allCreditsValues.length ? allCreditsValues[Math.floor(allCreditsValues.length / 2)] : 0;
 
-  creditsArray.sort((a, b) => a - b);
-  const medianCredits = creditsArray.length ? creditsArray[Math.floor(creditsArray.length / 2)] : 0;
-
+  // Stats Calcs
   const storageArray: number[] = rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
   const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
 
-  // [VERSION LOGIC SAME AS BEFORE]
   const versionCounts: Record<string, number> = {};
   const uniqueVersionsSet = new Set<string>();
   rawPods.forEach((p: any) => { 
@@ -265,6 +234,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   let sumStorageScore = 0;
   let sumHealthTotal = 0;
 
+  // 2. Enrich the Nodes
   const enrichedNodes: EnrichedNode[] = rawPods.map((pod: any) => {
     const ip = pod.address.split(':')[0];
     const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
@@ -274,22 +244,18 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
     const uptime = Number(pod.uptime) || 0;
     const nodeKey = pod.pubkey || pod.public_key;
 
-    // Resolve Credits & Network
+    // LOOKUP IN MERGED MAP
     const creditData = creditsMap.get(nodeKey);
-    const isUntracked = creditsSystemOnline && !creditData;
-    const credits = isUntracked ? null : (creditData?.val || 0);
-    const network = creditData?.net || 'UNKNOWN'; // NEW: Identifies which network provided the credits
+    
+    // Determine Status
+    const credits = creditData ? creditData.val : null;
+    const network = creditData ? creditData.net : 'UNKNOWN'; // Unknown usually implies Mainnet but untracked
+    const isUntracked = !creditData && (creditsData.mainnet.length > 0 || creditsData.devnet.length > 0);
 
     const vitality = calculateVitalityScore(
-        storageCommitted,
-        storageUsed, 
-        uptime, 
-        pod.version || '0.0.0', 
-        consensusVersion, 
-        sortedUniqueVersions,
-        medianCredits, 
-        credits, 
-        medianStorage
+        storageCommitted, storageUsed, uptime, 
+        pod.version || '0.0.0', consensusVersion, sortedUniqueVersions,
+        medianCredits, credits, medianStorage
     );
 
     sumUptimeScore += vitality.breakdown.uptime;
@@ -301,11 +267,11 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
     return {
       ...pod,
       pubkey: nodeKey,
+      network, // Pass the tag to UI
       storage_committed: storageCommitted, 
       storage_used: storageUsed,           
       credits, 
       isUntracked,
-      network, // Pass this to the frontend
       health: vitality.total,
       healthBreakdown: vitality.breakdown, 
       location: { 
@@ -332,13 +298,13 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
         medianStorage,
         totalNodes: total,
         systemStatus: {
-            credits: creditsSystemOnline, 
+            credits: creditsData.mainnet.length > 0 || creditsData.devnet.length > 0, 
             rpc: true 
         },
         avgBreakdown: {
             uptime: Math.round(sumUptimeScore / total),
             version: Math.round(sumVersionScore / total),
-            reputation: creditsSystemOnline ? Math.round(sumReputationScore / total) : null,
+            reputation: Math.round(sumReputationScore / total),
             storage: Math.round(sumStorageScore / total), 
             total: Math.round(sumHealthTotal / total)
         }
