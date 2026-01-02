@@ -986,11 +986,16 @@ export default function Home() {
         {/* HEADER: Flex layout separates Left(Identity) from Right(Star) */}
         <div className="mb-2 md:mb-4 flex justify-between items-start">
           <div className="overflow-hidden pr-2 w-full">
-            {/* Identity Label */}
+        {/* Identity Label */}
             <div className="flex items-center gap-2 mb-1">
               <div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold">NODE IDENTITY</div>
               {!node.is_public && <Shield size={10} className="text-zinc-600" />}
+              
+              {/* NEW: Network Badges */}
+              {node.network === 'MAINNET' && <span className="text-[8px] bg-green-500 text-black px-1 rounded font-bold uppercase">MAINNET</span>}
+              {node.network === 'DEVNET' && <span className="text-[8px] bg-blue-500 text-white px-1 rounded font-bold uppercase">DEVNET</span>}
             </div>
+
             
             {/* IDENTITY SWAP CONTAINER */}
             <div className="relative h-6 w-full">
