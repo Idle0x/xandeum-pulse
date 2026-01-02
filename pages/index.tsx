@@ -462,223 +462,29 @@ const formatLastSeen = (timestamp: number | undefined) => {
   return `${days}d ago`;
 };
 
-import { useState, useEffect, useRef } from 'react';
-import Head from 'next/head';
-import { useRouter } from 'next/router';
-import axios from 'axios';
-import Link from 'next/link';
-import { toPng } from 'html-to-image';
-import {
-  Search, Download, Server, Activity, Database, X, Shield, Clock, Zap, Trophy,
-  HardDrive, Star, Copy, Check, CheckCircle, Globe, AlertTriangle, ArrowUp, ArrowDown,
-  Wallet, Medal, Twitter, Info, ExternalLink, HelpCircle, Maximize2,
-  Map as MapIcon, BookOpen, Menu, LayoutDashboard, HeartPulse, Swords, Monitor,
-  ArrowLeftRight, Camera, FileJson, ClipboardCopy, RefreshCw, Share2, Plus,
-  Link as LinkIcon, Minimize2, Image as ImageIcon, ArrowLeft, AlertOctagon, PlayCircle
-} from 'lucide-react';
-
-// --- TYPES ---
-
-interface Node {
-  address?: string;
-  pubkey?: string;
-  version?: string;
-  uptime?: number;
-  last_seen_timestamp?: number;
-  is_public?: boolean;
-  network?: 'MAINNET' | 'DEVNET' | 'UNKNOWN';
-  storage_used?: number;
-  storage_committed?: number;
-  storage_usage_percentage?: string;
-  storage_usage_raw?: number;
-  rank?: number;
-  credits: number | null;
-  location?: {
-    lat: number;
-    lon: number;
-    countryName: string;
-    countryCode: string;
-    city: string;
-  };
-  health?: number;
-  healthBreakdown?: {
-    uptime: number;
-    version: number;
-    reputation: number | null;
-    storage: number;
-  };
-}
-
-// --- WELCOME CURTAIN COMPONENT ---
-
-const WelcomeCurtain = () => {
-  const [show, setShow] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    const seen = localStorage.getItem('xandeum_pulse_welcome_v1');
-    if (!seen) setTimeout(() => setShow(true), 100);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const handleEnter = () => {
-    localStorage.setItem('xandeum_pulse_welcome_v1', 'true');
-    setShow(false);
-  };
-
-  if (!show) return null;
-
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
-      <div className="bg-[#09090b] border border-zinc-800 p-6 md:p-8 rounded-3xl shadow-2xl max-w-md w-full relative overflow-hidden group">
-        <div className="absolute top-0 right-0 p-32 bg-blue-500/10 blur-[80px] rounded-full pointer-events-none"></div>
-        <div className="flex justify-center items-center gap-6 mb-6 relative z-10">
-          <div className="flex flex-col items-center gap-2">
-            <div className={`p-3 rounded-xl border border-zinc-800 shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-colors duration-500 ${!isMobile ? 'bg-zinc-800 text-blue-400' : 'bg-zinc-900 text-zinc-600'}`}>
-              <Monitor size={32} />
-            </div>
-            <span className={`text-[9px] font-bold uppercase tracking-widest ${!isMobile ? 'text-blue-400' : 'text-zinc-600'}`}>Desktop</span>
-          </div>
-          <div className="h-px w-8 bg-zinc-800"></div>
-          <div className="flex flex-col items-center gap-2">
-            <div className={`p-3 rounded-xl border border-zinc-800 transition-colors duration-500 ${isMobile ? 'bg-zinc-800 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'bg-zinc-900 text-zinc-600'}`}>
-              <div className="relative">
-                <LayoutDashboard size={24} />
-              </div>
-            </div>
-            <span className={`text-[9px] font-bold uppercase tracking-widest ${isMobile ? 'text-blue-400' : 'text-zinc-600'}`}>Mobile</span>
-          </div>
-        </div>
-        <div className="text-center relative z-10 space-y-2 mb-6">
-          <h2 className="text-xl md:text-2xl font-black text-white tracking-tight">Welcome to Pulse</h2>
-          <div className="text-xs text-zinc-400 leading-relaxed px-2 space-y-3">
-            <p>Hi there! This dashboard is packed with real-time data sourced directly from the network.</p>
-            <p className={isMobile ? "text-blue-200" : "text-zinc-300"}>{isMobile ? "Because of the data complexity, a desktop screen provides the best experience." : "You're using a large screen, which is perfect! You are ready to fully explore the interactive map and detailed metrics."}</p>
-          </div>
-        </div>
-        <div className="space-y-3 text-left relative z-10 mt-6">
-            <Link href="/docs?training=true">
-                <button className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm tracking-wide uppercase transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 group">
-                    <PlayCircle size={16} className="group-hover:scale-110 transition-transform" /> Take a Walkthrough
-                </button>
-            </Link>
-            <button onClick={handleEnter} className="w-full py-3.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-xl font-bold text-sm tracking-wide uppercase transition-all border border-zinc-700">Continue to Platform</button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- SUB-COMPONENTS ---
-
-const PhysicalLocationBadge = ({ node, zenMode }: { node: Node; zenMode: boolean }) => {
-  const ip = node.address ? node.address.split(':')[0] : 'Unknown';
-  const country = node.location?.countryName || 'Unknown Location';
-  const code = node.location?.countryCode;
-  return (
-    <div className="flex items-center gap-2 font-mono text-sm mt-1">
-      <span className={`font-bold transition-all duration-1000 ${zenMode ? 'text-blue-400' : 'text-cyan-400'} animate-pulse-glow text-shadow-neon`}>{ip}</span>
-      <span className="text-zinc-600">|</span>
-      <div className="flex items-center gap-2">
-        {code && code !== 'XX' && (<img src={`https://flagcdn.com/w40/${code.toLowerCase()}.png`} alt="flag" className="w-5 h-auto rounded-sm shadow-sm" />)}
-        <span className="text-white font-bold tracking-wide">{country}</span>
-      </div>
-      <style jsx>{`.text-shadow-neon { text-shadow: 0 0 10px rgba(34, 211, 238, 0.5); } .animate-pulse-glow { animation: pulse-glow 2s infinite; } @keyframes pulse-glow { 0%, 100% { opacity: 1; text-shadow: 0 0 10px rgba(34, 211, 238, 0.5); } 50% { opacity: 0.8; text-shadow: 0 0 20px rgba(34, 211, 238, 0.8); } }`}</style>
-    </div>
-  );
-};
-
-const ModalAvatar = ({ node }: { node: Node }) => {
-  const code = node.location?.countryCode;
-  if (code && code !== 'XX') return (<div className="w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center shadow-lg border border-white/10 overflow-hidden bg-zinc-900 relative group shrink-0"><img src={`https://flagcdn.com/w160/${code.toLowerCase()}.png`} alt="country flag" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition duration-500" /></div>);
-  return (<div className="w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center font-bold text-xl md:text-2xl shadow-lg border border-white/10 bg-gradient-to-br from-blue-600 to-purple-600 text-white shrink-0">{node.pubkey?.slice(0, 2) || '??'}</div>);
-};
-
-const RadialProgress = ({ score, size = 160, stroke = 12 }: { score: number; size?: number; stroke?: number; }) => {
-  const radius = (size - stroke) / 2;
-  const circumference = radius * 2 * Math.PI;
-  const offset = circumference - (score / 100) * circumference;
-  const color = score >= 80 ? '#22c55e' : score >= 50 ? '#eab308' : '#ef4444';
-  return (
-    <div className="relative flex items-center justify-center group" style={{ width: size, height: size }}>
-      <svg className="transform -rotate-90 w-full h-full drop-shadow-xl">
-        <circle cx={size / 2} cy={size / 2} r={radius} stroke="#18181b" strokeWidth={stroke} fill="transparent" />
-        <circle cx={size / 2} cy={size / 2} r={radius} stroke={color} strokeWidth={stroke} fill="transparent" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000 ease-out" />
-      </svg>
-      <div className="absolute flex flex-col items-center"><span className="text-4xl font-extrabold text-white tracking-tighter">{score}</span><span className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mt-1">Health Score</span></div>
-    </div>
-  );
-};
-
-const LiveWireLoader = () => (<div className="w-full h-1 relative overflow-hidden bg-zinc-900 border-b border-zinc-800"><div className="absolute inset-0 bg-blue-500/20 blur-[2px]"></div><div className="absolute h-full w-1/3 bg-gradient-to-r from-transparent via-blue-400 to-transparent animate-shimmer" style={{ animationDuration: '1.5s' }}></div></div>);
-
-const PulseGraphLoader = () => {
-  const [text, setText] = useState('Initializing Uplink...');
-  useEffect(() => {
-    const texts = ['Establishing Connection...', 'Parsing Gossip Protocol...', 'Syncing Node Storage...', 'Decrypting Ledger...'];
-    let i = 0;
-    const interval = setInterval(() => { setText(texts[i % texts.length]); i++; }, 800);
-    return () => clearInterval(interval);
-  }, []);
-  return (<div className="flex flex-col items-center justify-center py-20 opacity-80"><div className="relative w-64 h-32 mb-6"><svg viewBox="0 0 300 100" className="w-full h-full drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]"><path d="M0,50 L20,50 L30,20 L40,80 L50,50 L70,50 L80,30 L90,70 L100,50 L150,50 L160,10 L170,90 L180,50 L220,50 L230,30 L240,70 L250,50 L300,50" fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="animate-draw-graph" /><div className="absolute top-0 bottom-0 w-1 bg-white/50 blur-[1px] animate-scan-line"></div></svg></div><div className="font-mono text-blue-400 text-xs tracking-widest uppercase animate-pulse">{text}</div><style jsx>{`.animate-draw-graph { stroke-dasharray: 400; stroke-dashoffset: 400; animation: draw 2s ease-in-out infinite; } .animate-scan-line { left: 0; animation: scan 2s ease-in-out infinite; } @keyframes draw { 0% { stroke-dashoffset: 400; opacity: 0; } 10% { opacity: 1; } 50% { stroke-dashoffset: 0; } 90% { opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } } @keyframes scan { 0% { left: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { left: 100%; opacity: 0; } }`}</style></div>);
-};
-
-// --- HELPER FUNCTIONS ---
-
-const useTimeAgo = (timestamp: number | undefined) => {
-  const [timeAgo, setTimeAgo] = useState('Syncing...');
-  useEffect(() => {
-    if (!timestamp) return;
-    const update = () => {
-      const now = Date.now();
-      const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
-      const diff = Math.floor((now - time) / 1000);
-      if (diff < 60) setTimeAgo(`${diff} second${diff !== 1 ? 's' : ''} ago`);
-      else if (diff < 3600) setTimeAgo(`${Math.floor(diff / 60)} minute${Math.floor(diff / 60) !== 1 ? 's' : ''} ago`);
-      else setTimeAgo(`${Math.floor(diff / 3600)} hour${Math.floor(diff / 3600) !== 1 ? 's' : ''} ago`);
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [timestamp]);
-  return timeAgo;
-};
-
-const getSafeIp = (node: Node | null) => node?.address ? node.address.split(':')[0] : 'Unknown IP';
-const getSafeVersion = (node: Node | null) => node?.version || 'Unknown';
-const formatBytes = (bytes: number | undefined) => {
-  if (!bytes || bytes === 0 || isNaN(bytes)) return '0.00 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
-const formatUptime = (seconds: number | undefined) => {
-  if (!seconds || isNaN(seconds)) return '0m';
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  return d > 0 ? `${d}d ${h}h` : `${h}h`;
-};
-const formatLastSeen = (timestamp: number | undefined) => {
-  if (!timestamp || isNaN(timestamp)) return 'Never';
-  const diff = Date.now() - (timestamp < 10000000000 ? timestamp * 1000 : timestamp);
-  if (diff < 60000) return `${Math.floor(diff/1000)}s ago`;
-  const m = Math.floor(diff/60000);
-  return m < 60 ? `${m}m ago` : `${Math.floor(m/60)}h ago`;
-};
 const formatDetailedTimestamp = (timestamp: number | undefined) => {
   if (!timestamp || isNaN(timestamp)) return 'Never Seen';
-  return new Date(timestamp < 10000000000 ? timestamp * 1000 : timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
+  return new Date(time).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
 };
+
 const compareVersions = (v1: string = '0.0.0', v2: string = '0.0.0') => {
   const p1 = v1.replace(/[^0-9.]/g, '').split('.').map(Number);
   const p2 = v2.replace(/[^0-9.]/g, '').split('.').map(Number);
+
   for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
-    if ((p1[i]||0) > (p2[i]||0)) return 1;
-    if ((p1[i]||0) < (p2[i]||0)) return -1;
+    const n1 = p1[i] || 0;
+    const n2 = p2[i] || 0;
+    if (n1 > n2) return 1;
+    if (n1 < n2) return -1;
   }
   return 0;
 };
