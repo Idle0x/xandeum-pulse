@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
-const API_MAINNET = 'https://podcredits.xandeum.network/';
+const API_MAINNET = 'https://podcredits.xandeum.network/api/pods-credits';
 const API_DEVNET  = 'https://podcredits.xandeum.network/devnet/api/pods-credits';
 const TIMEOUT_LIMIT = 8000;
 
@@ -12,38 +12,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         axios.get(API_DEVNET, { timeout: TIMEOUT_LIMIT })
     ]);
 
-    // Create a Map to handle the merge (Priority: Mainnet overwrites Devnet)
-    const combinedMap = new Map();
+    const allCredits: any[] = [];
 
-    // 1. Load Devnet (Base)
-    if (devnetRes.status === 'fulfilled') {
-        const data = devnetRes.value.data?.pods_credits || devnetRes.value.data || [];
-        if(Array.isArray(data)) {
-            data.forEach((item: any) => {
-                const key = item.pod_id || item.pubkey || item.node;
-                if(key) combinedMap.set(key, { ...item, network: 'DEVNET' });
-            });
-        }
-    }
-
-    // 2. Load Mainnet (Priority)
+    // Push Mainnet items tagged
     if (mainnetRes.status === 'fulfilled') {
         const data = mainnetRes.value.data?.pods_credits || mainnetRes.value.data || [];
         if(Array.isArray(data)) {
-            data.forEach((item: any) => {
-                const key = item.pod_id || item.pubkey || item.node;
-                if(key) combinedMap.set(key, { ...item, network: 'MAINNET' });
-            });
+            data.forEach((c: any) => allCredits.push({ ...c, network: 'MAINNET' }));
         }
     }
 
-    // Convert to Array
-    const combinedArray = Array.from(combinedMap.values());
+    // Push Devnet items tagged (NO merging/overwriting)
+    if (devnetRes.status === 'fulfilled') {
+        const data = devnetRes.value.data?.pods_credits || devnetRes.value.data || [];
+        if(Array.isArray(data)) {
+            data.forEach((c: any) => allCredits.push({ ...c, network: 'DEVNET' }));
+        }
+    }
 
-    res.status(200).json({ pods_credits: combinedArray });
+    res.status(200).json({ pods_credits: allCredits });
 
   } catch (error: any) {
-    console.error('Credits Proxy Error:', error.message);
     res.status(503).json({ error: 'Credits System Offline' });
   }
 }
