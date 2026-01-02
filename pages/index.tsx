@@ -2206,7 +2206,7 @@ export default function Home() {
                                   <div className="opacity-0 group-hover:opacity-100 transition text-[10px] bg-white text-black font-bold px-2 py-0.5 rounded">
                                     SELECT
                                   </div>
-                                </span>
+                                </div>
                                 <div className="font-mono font-bold text-zinc-300 group-hover:text-white">
                                   {getSafeIp(n)}
                                 </div>
