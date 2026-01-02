@@ -13,10 +13,12 @@ import {
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
+// UPDATED: Added network field
 interface TopPerformerData {
     pk: string;
     val: number;
     subVal?: number; 
+    network?: string; 
 }
 
 interface LocationData {
@@ -72,12 +74,12 @@ const HEALTH_THRESHOLDS = [90, 75, 60, 40];
 
 export default function MapPage() {
   const router = useRouter();
-  
+
   // Data State
   const [locations, setLocations] = useState<LocationData[]>([]);
   const [stats, setStats] = useState<MapStats>({ totalNodes: 0, countries: 0, topRegion: 'Scanning...', topRegionMetric: 0 });
   const [loading, setLoading] = useState(true);
-  
+
   // View State
   const [viewMode, setViewMode] = useState<ViewMode>('STORAGE');
   const [isSplitView, setIsSplitView] = useState(false);
@@ -92,7 +94,7 @@ export default function MapPage() {
 
   const listRef = useRef<HTMLDivElement>(null);
   const hasDeepLinked = useRef(false);
-  
+
   const [dynamicThresholds, setDynamicThresholds] = useState<number[]>([0, 0, 0, 0]);
 
   const visibleNodes = useMemo(() => locations.reduce((sum, loc) => sum + loc.count, 0), [locations]);
@@ -117,7 +119,7 @@ export default function MapPage() {
         if (res.data) {
           setLocations(res.data.locations || []);
           setStats(res.data.stats || { totalNodes: 0, countries: 0, topRegion: 'Unknown', topRegionMetric: 0 });
-          
+
           if (router.isReady && router.query.focus && !hasDeepLinked.current) {
               hasDeepLinked.current = true;
               const targetIP = router.query.focus as string;
@@ -134,7 +136,7 @@ export default function MapPage() {
         }
       } catch (err) { console.error(err); } finally { setLoading(false); }
     };
-    
+
     fetchGeo();
     const interval = setInterval(fetchGeo, 10000);
     return () => clearInterval(interval);
@@ -150,7 +152,7 @@ export default function MapPage() {
       const values = locations
         .map(l => viewMode === 'STORAGE' ? l.totalStorage : (l.totalCredits || 0))
         .sort((a, b) => a - b);
-      
+
       const getQuantile = (q: number) => {
           const pos = (values.length - 1) * q;
           const base = Math.floor(pos);
@@ -203,7 +205,6 @@ export default function MapPage() {
   // Helper for Top Performer Stats
   const getPerformerStats = (pkData: TopPerformerData) => {
       if (viewMode === 'STORAGE') {
-          // Reverted to Indigo
           return <span className="text-indigo-400 font-bold">{formatStorage(pkData.val)} Committed</span>;
       }
       if (viewMode === 'CREDITS') {
@@ -213,7 +214,7 @@ export default function MapPage() {
           const score = pkData.val;
           const uptime = pkData.subVal || 0;
           const color = score >= 80 ? 'text-green-400' : score >= 50 ? 'text-yellow-400' : 'text-red-400';
-          
+
           return (
             <span className={`font-bold flex items-center gap-2 ${color}`}>
                  {score}% <span className="text-zinc-600">|</span> <span className="text-blue-300">{formatUptime(uptime)} Up</span>
@@ -268,7 +269,7 @@ export default function MapPage() {
       setCopiedLink(name);
       setTimeout(() => setCopiedLink(null), 2000);
   };
-  
+
   const handleZoomIn = () => { if (position.zoom < 5) setPosition(pos => ({ ...pos, zoom: pos.zoom * 1.5 })); };
   const handleZoomOut = () => { if (position.zoom > 1) setPosition(pos => ({ ...pos, zoom: pos.zoom / 1.5 })); };
   const handleMoveEnd = (pos: any) => setPosition(pos);
@@ -297,7 +298,6 @@ export default function MapPage() {
           const avgPerNode = loc.totalStorage / loc.count;
           return {
               labelA: 'Avg Density',
-              // UPDATED: Reverted to Indigo
               valA: <span className="text-indigo-400">{formatStorage(avgPerNode)} per Node</span>,
               descA: "Average committed storage per node in this region.",
               labelB: 'Global Share',
@@ -554,13 +554,14 @@ export default function MapPage() {
                                                             {viewMode === 'STORAGE' ? <Database size={14} /> : viewMode === 'CREDITS' ? <Zap size={14} /> : <Activity size={14} />}
                                                         </div>
                                                         <div className="flex flex-col">
-                                                            <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Region's Top Performer</div>
-                                                            {/* Desktop Layout: Stat and Key inline */}
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Region's Top Performer</div>
+                                                                {/* NEW: Network Badges */}
+                                                                {topData.network === 'MAINNET' && <span className="text-[8px] bg-green-500 text-black px-1 rounded font-bold uppercase">Mainnet</span>}
+                                                                {topData.network === 'DEVNET' && <span className="text-[8px] bg-blue-500 text-white px-1 rounded font-bold uppercase">Devnet</span>}
+                                                            </div>
                                                             <div className="flex items-center gap-3">
-                                                                {/* Shows PK on all screens, truncates more on desktop to fit stat */}
                                                                 <div className="text-xs font-mono text-white truncate w-32 md:w-24 lg:w-32">{topData.pk.slice(0, 16)}...</div>
-                                                                
-                                                                {/* Desktop Only Stat */}
                                                                 <div className="hidden md:block text-xs">
                                                                     {getPerformerStats(topData)}
                                                                 </div>
