@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
-const API_MAINNET = 'https://podcredits.xandeum.network/api/pods-credits';
-const API_DEVNET  = 'https://podcredits.xandeum.network/devnet/api/pods-credits';
+const API_MAINNET = 'https://podcredits.xandeum.network/';
+const API_DEVNET  = 'https://podcredits.xandeum.network/devnet/api/pods-credits';';
 const TIMEOUT_LIMIT = 8000;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
