@@ -8,13 +8,15 @@ const RPC_NODES = [
 ];
 
 const TIMEOUT_RPC = 4000;
-const TIMEOUT_CREDITS = 5000; 
+const TIMEOUT_CREDITS = 8000; // Increased for new API
 
-const API_CREDITS_MAINNET = 'https://podcredits.xandeum.network/api/pods-credits';
-const API_CREDITS_DEVNET  = 'https://podcredits.xandeum.network/devnet/api/pods-credits';
+// UPDATED API ENDPOINTS (EXACTLY AS REQUESTED)
+const API_CREDITS_MAINNET = 'https://podcredits.xandeum.network';
+const API_CREDITS_DEVNET  = 'https://podcredits.xandeum.network/devnet';
 
 const geoCache = new Map<string, { lat: number; lon: number; country: string; countryCode: string; city: string }>();
 
+// --- INTERFACES ---
 export interface EnrichedNode {
   address: string;
   pubkey: string;
@@ -23,7 +25,7 @@ export interface EnrichedNode {
   last_seen_timestamp: number;
   is_public: boolean;
   isUntracked?: boolean;
-  network: 'MAINNET' | 'DEVNET'; // Strict typing
+  network: 'MAINNET' | 'DEVNET';
   storage_used: number;      
   storage_committed: number; 
   credits: number | null; 
@@ -67,7 +69,6 @@ const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, so
 };
 
 // --- SCORING FACTORY ---
-// We now pass specific medians per network context
 const calculateVitalityScore = (
     storageCommitted: number, 
     storageUsed: number,
@@ -114,6 +115,18 @@ const calculateVitalityScore = (
 };
 
 // --- FETCHING ---
+
+// BROWSER MIMIC CONFIG
+const AXIOS_CONFIG = {
+    timeout: TIMEOUT_CREDITS,
+    headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://xandeum.network'
+    }
+};
+
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
   try {
@@ -132,13 +145,24 @@ async function fetchRawData() {
 }
 
 async function fetchCredits() {
+    // We try to fetch. If it fails (403/404), we catch it and return empty to prevent crash.
     const [mainnetRes, devnetRes] = await Promise.allSettled([
-        axios.get(API_CREDITS_MAINNET, { timeout: TIMEOUT_CREDITS }),
-        axios.get(API_CREDITS_DEVNET, { timeout: TIMEOUT_CREDITS })
+        axios.get(API_CREDITS_MAINNET, AXIOS_CONFIG),
+        axios.get(API_CREDITS_DEVNET, AXIOS_CONFIG)
     ]);
+
+    // Robust parsing: Check for `pods_credits` OR fallback to root array
+    const parseData = (res: PromiseSettledResult<any>) => {
+        if (res.status !== 'fulfilled') return [];
+        const d = res.value.data;
+        if (d?.pods_credits && Array.isArray(d.pods_credits)) return d.pods_credits;
+        if (Array.isArray(d)) return d;
+        return [];
+    };
+
     return {
-        mainnet: mainnetRes.status === 'fulfilled' ? (mainnetRes.value.data?.pods_credits || mainnetRes.value.data || []) : [],
-        devnet: devnetRes.status === 'fulfilled' ? (devnetRes.value.data?.pods_credits || devnetRes.value.data || []) : []
+        mainnet: parseData(mainnetRes),
+        devnet: parseData(devnetRes)
     };
 }
 
@@ -164,7 +188,7 @@ async function resolveLocations(ips: string[]) {
   }
 }
 
-// --- MAIN LOGIC ---
+// --- MAIN EXPORT ---
 
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
   const [rawPods, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
@@ -194,13 +218,11 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       });
   }
 
-  // Calculate Separate Medians
   mainnetValues.sort((a, b) => a - b);
   devnetValues.sort((a, b) => a - b);
   const medianMainnet = mainnetValues.length ? mainnetValues[Math.floor(mainnetValues.length / 2)] : 0;
   const medianDevnet = devnetValues.length ? devnetValues[Math.floor(devnetValues.length / 2)] : 0;
 
-  // Global Stats
   const storageArray: number[] = rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
   const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
 
@@ -217,10 +239,9 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
 
   await resolveLocations([...new Set(rawPods.map((p: any) => p.address.split(':')[0]))] as string[]);
 
-  // 2. NODE EXPLOSION (Physical -> Logical)
+  // 2. NODE EXPLOSION
   const expandedNodes: EnrichedNode[] = [];
   
-  // Scoring Helper
   const scoreNode = (pod: any, network: 'MAINNET' | 'DEVNET', credits: number | null, medianCredits: number, isUntracked: boolean) => {
       const ip = pod.address.split(':')[0];
       const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
@@ -237,7 +258,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       return {
           ...pod,
           pubkey: pod.pubkey || pod.public_key,
-          network, // Context Identity
+          network, 
           storage_committed: storageCommitted, 
           storage_used: storageUsed,           
           credits, 
@@ -255,22 +276,21 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       const inMainnet = mainnetMap.has(key);
       const inDevnet = devnetMap.has(key);
 
-      // CASE A: Exists in Mainnet (or is totally untracked, defaulting to Mainnet)
+      // CASE A: Mainnet
       if (inMainnet || (!inMainnet && !inDevnet)) {
           const credits = inMainnet ? (mainnetMap.get(key) || 0) : null;
           const isUntracked = !inMainnet && creditsData.mainnet.length > 0;
           expandedNodes.push(scoreNode(pod, 'MAINNET', credits, medianMainnet, isUntracked));
       }
 
-      // CASE B: Exists in Devnet
+      // CASE B: Devnet
       if (inDevnet) {
           const credits = devnetMap.get(key) || 0;
           expandedNodes.push(scoreNode(pod, 'DEVNET', credits, medianDevnet, false));
       }
   });
 
-  // 3. RANKING (Per Network)
-  // We must split, sort, and recombine to ensure rank is relative to the universe
+  // 3. RANKING
   const mainnetNodes = expandedNodes.filter(n => n.network === 'MAINNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const devnetNodes = expandedNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
 
@@ -281,22 +301,22 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   devnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (devnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
 
   const finalNodes = [...mainnetNodes, ...devnetNodes];
-
-  // 4. STATS (Simplified Aggregation)
   const avgHealth = finalNodes.length ? Math.round(finalNodes.reduce((a, b) => a + b.health, 0) / finalNodes.length) : 0;
   
   return { 
     nodes: finalNodes, 
     stats: { 
         consensusVersion, 
-        medianCredits: medianMainnet, // Default dashboard median to Mainnet
+        medianCredits: medianMainnet, 
         medianStorage,
         totalNodes: finalNodes.length,
-        systemStatus: { credits: true, rpc: true },
+        systemStatus: {
+            credits: creditsData.mainnet.length > 0 || creditsData.devnet.length > 0, 
+            rpc: true 
+        },
         avgBreakdown: {
-            // Simplified global averages for the "Network Vitals" card
             total: avgHealth,
-            uptime: 0, version: 0, reputation: 0, storage: 0 // Frontend rarely uses breakdown globally now
+            uptime: 0, version: 0, reputation: 0, storage: 0 
         }
     } 
   };
