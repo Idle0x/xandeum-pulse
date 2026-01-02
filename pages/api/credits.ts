@@ -2,8 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
 // URLS
-const API_MAINNET = 'https://podcredits.xandeum.network';
-const API_DEVNET  = 'https://podcredits.xandeum.network/devnet';
+const API_MAINNET = 'https://podcredits.xandeum.network/api/pods-credits';
+const API_DEVNET  = 'https://podcredits.xandeum.network/api/devnet-pod-credits';
 
 // CONFIG (Browser Mimic)
 const AXIOS_CONFIG = {
