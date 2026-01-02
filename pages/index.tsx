@@ -62,6 +62,7 @@ interface Node {
   uptime?: number;
   last_seen_timestamp?: number;
   is_public?: boolean;
+  network?: 'MAINNET' | 'DEVNET' | 'UNKNOWN';
   storage_used?: number;
   storage_committed?: number;
   storage_usage_percentage?: string;
