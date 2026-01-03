@@ -13,12 +13,12 @@ import {
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
-// UPDATED: Added network field
 interface TopPerformerData {
     pk: string;
     val: number;
     subVal?: number; 
-    network?: string; 
+    network?: string;
+    isUntracked?: boolean; // NEW: Flag to indicate specific data absence
 }
 
 interface LocationData {
@@ -57,11 +57,11 @@ const MODE_COLORS = {
 };
 
 const TIER_COLORS = [
-    "#f59e0b", // Gold/Orange (Massive/Legendary)
-    "#ec4899", // Hot Pink (Major/Elite)
-    "#00ced1", // Cyan (Standard/Proven) - Distinct from Blue
-    "#00bfff", // Deep Sky Blue (Entry/Active) - Better visibility than pale blue
-    "#d8b4fe"  // Bright Lilac (Micro/New) - Adjusted for visibility on black
+    "#f59e0b", 
+    "#ec4899", 
+    "#00ced1", 
+    "#00bfff", 
+    "#d8b4fe"  
 ];
 
 const TIER_LABELS = {
@@ -100,7 +100,15 @@ export default function MapPage() {
   const visibleNodes = useMemo(() => locations.reduce((sum, loc) => sum + loc.count, 0), [locations]);
   const privateNodes = Math.max(0, stats.totalNodes - visibleNodes);
 
-  // --- SCROLL TO ACTIVE ---
+  // --- GLOBAL API HEALTH CHECK ---
+  // If NO location has valid credits, the API is globally offline.
+  // If SOME have credits and others don't, the API is online but some regions are untracked.
+  const isGlobalCreditsOffline = useMemo(() => {
+      if (locations.length === 0) return false; // Loading or empty
+      return !locations.some(l => l.totalCredits !== null);
+  }, [locations]);
+
+  // ... (Scroll to Active Effect - No Changes) ...
   useEffect(() => {
       if (activeLocation && isSplitView) {
           const timer = setTimeout(() => {
@@ -111,7 +119,7 @@ export default function MapPage() {
       }
   }, [viewMode, activeLocation, isSplitView]);
 
-  // --- FETCH LOOP ---
+  // ... (Fetch Loop - No Changes) ...
   useEffect(() => {
     const fetchGeo = async () => {
       try {
@@ -142,7 +150,7 @@ export default function MapPage() {
     return () => clearInterval(interval);
   }, [router.isReady, router.query.focus]); 
 
-  // --- THRESHOLD CALCULATION ---
+  // ... (Threshold Calculation - No Changes) ...
   useEffect(() => {
       if (locations.length === 0) return;
       if (viewMode === 'HEALTH') {
@@ -167,6 +175,7 @@ export default function MapPage() {
   }, [locations, viewMode]);
 
   // --- HELPERS ---
+
   const getTierIndex = (loc: LocationData): number => {
     let val = 0;
     if (viewMode === 'STORAGE') val = loc.totalStorage;
@@ -202,12 +211,16 @@ export default function MapPage() {
       return `${h}h`;
   };
 
-  // Helper for Top Performer Stats
+  // UPDATED: Performer Stats
   const getPerformerStats = (pkData: TopPerformerData) => {
       if (viewMode === 'STORAGE') {
           return <span className="text-indigo-400 font-bold">{formatStorage(pkData.val)} Committed</span>;
       }
       if (viewMode === 'CREDITS') {
+          // If the region king is actually untracked
+          if (pkData.isUntracked) {
+              return <span className="text-zinc-500 font-bold italic">Untracked</span>;
+          }
           return <span className="text-yellow-500 font-bold">{pkData.val.toLocaleString()} Cr Earned</span>;
       }
       if (viewMode === 'HEALTH') {
@@ -279,14 +292,21 @@ export default function MapPage() {
     return scaleSqrt().domain([0, maxVal]).range([5, 12]);
   }, [locations]);
 
+  // UPDATED: Metric Text Logic
   const getMetricText = (loc: LocationData) => {
     switch (viewMode) {
         case 'STORAGE': return formatStorage(loc.totalStorage);
         case 'HEALTH': return `${loc.avgHealth}% Health`;
-        case 'CREDITS': return loc.totalCredits === null ? "API OFFLINE" : `${loc.totalCredits.toLocaleString()} Cr`;
+        case 'CREDITS': 
+            if (loc.totalCredits === null) {
+                // Return "API OFFLINE" only if globally offline, otherwise "UNTRACKED"
+                return isGlobalCreditsOffline ? "API OFFLINE" : "UNTRACKED";
+            }
+            return `${loc.totalCredits.toLocaleString()} Cr`;
     }
   };
 
+  // UPDATED: X-Ray Stats Logic
   const getXRayStats = (loc: LocationData, index: number, tierColor: string) => {
       const globalShare = ((loc.count / stats.totalNodes) * 100).toFixed(1);
       const rawPercentile = ((locations.length - index) / locations.length) * 100;
@@ -310,10 +330,14 @@ export default function MapPage() {
       }
       if (viewMode === 'CREDITS') {
           if (loc.totalCredits === null) {
+              const statusText = isGlobalCreditsOffline ? "API OFFLINE" : "UNTRACKED";
+              const statusColor = isGlobalCreditsOffline ? "text-red-400" : "text-zinc-500";
+              const statusIcon = isGlobalCreditsOffline ? <AlertOctagon size={12}/> : <EyeOff size={12}/>;
+
               return {
                   labelA: 'Avg Earnings',
-                  valA: <span className="text-red-400 flex items-center justify-center gap-1 font-bold"><AlertOctagon size={12}/> API OFFLINE</span>,
-                  descA: "Source endpoint is unreachable.",
+                  valA: <span className={`${statusColor} flex items-center justify-center gap-1 font-bold`}>{statusIcon} {statusText}</span>,
+                  descA: isGlobalCreditsOffline ? "Source endpoint is unreachable." : "This region is not currently tracked by the Credits API.",
                   labelB: 'Contribution',
                   valB: <span className="text-zinc-500 italic">Unknown</span>,
                   descB: "Data unavailable.",
@@ -431,6 +455,7 @@ export default function MapPage() {
           </div>
       )}
 
+      {/* HEADER COMPONENT (Same as before) */}
       <div className="shrink-0 w-full z-50 flex flex-col gap-3 px-4 md:px-6 py-3 bg-[#09090b] border-b border-zinc-800/30">
         <div className="flex items-center justify-between w-full">
             <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all cursor-pointer">
@@ -484,6 +509,7 @@ export default function MapPage() {
                 </ZoomableGroup>
                 </ComposableMap>
             )}
+            {/* ZOOM CONTROLS */}
             <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-30">
                 <button onClick={handleZoomIn} className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Plus size={16} /></button>
                 <button onClick={handleZoomOut} className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Minus size={16} /></button>
@@ -534,13 +560,14 @@ export default function MapPage() {
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <div className={`text-sm font-mono font-bold ${isMissingData ? 'text-red-400' : ''}`} style={isMissingData ? {} : { color: tierColor }}>{getMetricText(loc)}</div>
+                                        {/* UPDATED: Metric Text Color Logic */}
+                                        <div className={`text-sm font-mono font-bold ${isMissingData ? (isGlobalCreditsOffline ? 'text-red-400' : 'text-zinc-500 italic') : ''}`} style={isMissingData ? {} : { color: tierColor }}>{getMetricText(loc)}</div>
                                         <div className="text-[10px] text-zinc-500">{loc.count} Nodes</div>
                                     </div>
                                 </div>
                                 {isExpanded && (
                                     <div className="bg-black/30 border-t border-white/5 p-4 animate-in slide-in-from-top-2 duration-300">
-                                        <div className="flex justify-between items-center mb-4"><div className="text-[10px] md:text-sm font-bold uppercase tracking-widest px-3 py-1 rounded border bg-black/50" style={{ color: tierColor, borderColor: `${tierColor}40` }}>{isMissingData ? 'UNKNOWN' : TIER_LABELS[viewMode][tier]} TIER</div><div className="flex gap-2">{sampleIp && (<button onClick={(e) => handleShareLink(e, sampleIp, loc.name)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold hover:bg-blue-500/20 transition">{copiedLink === loc.name ? <Check size={12} /> : <Share2 size={12} />}{copiedLink === loc.name ? 'Link Copied' : 'Share Region'}</button>)}</div></div>
+                                        <div className="flex justify-between items-center mb-4"><div className="text-[10px] md:text-sm font-bold uppercase tracking-widest px-3 py-1 rounded border bg-black/50" style={{ color: tierColor, borderColor: `${tierColor}40` }}>{isMissingData ? (isGlobalCreditsOffline ? 'API ERROR' : 'UNTRACKED') : TIER_LABELS[viewMode][tier]} TIER</div><div className="flex gap-2">{sampleIp && (<button onClick={(e) => handleShareLink(e, sampleIp, loc.name)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold hover:bg-blue-500/20 transition">{copiedLink === loc.name ? <Check size={12} /> : <Share2 size={12} />}{copiedLink === loc.name ? 'Link Copied' : 'Share Region'}</button>)}</div></div>
                                         <div className="grid grid-cols-3 gap-2 text-xs md:text-sm text-center mb-4">
                                             <div className="flex flex-col items-center group/stat"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1 flex items-center gap-1">{xray.labelA}<HelpCircle size={8} className="cursor-help opacity-50"/><div className="absolute bottom-1/2 mb-2 hidden group-hover/stat:block bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-50 w-32">{xray.descA}</div></div><div className="font-mono font-bold">{xray.valA}</div></div>
                                             <div className="flex flex-col items-center border-l border-zinc-800/50 group/stat"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1 flex items-center gap-1">{xray.labelB}<HelpCircle size={8} className="cursor-help opacity-50"/><div className="absolute bottom-1/2 mb-2 hidden group-hover/stat:block bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-50 w-32">{xray.descB}</div></div><div className="text-white font-mono font-bold">{xray.valB}</div></div>
@@ -556,7 +583,6 @@ export default function MapPage() {
                                                         <div className="flex flex-col">
                                                             <div className="flex items-center gap-2">
                                                                 <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Region's Top Performer</div>
-                                                                {/* NEW: Network Badges */}
                                                                 {topData.network === 'MAINNET' && <span className="text-[8px] bg-green-500 text-black px-1 rounded font-bold uppercase">Mainnet</span>}
                                                                 {topData.network === 'DEVNET' && <span className="text-[8px] bg-blue-500 text-white px-1 rounded font-bold uppercase">Devnet</span>}
                                                             </div>
