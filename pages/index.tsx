@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
@@ -441,6 +440,7 @@ const formatUptime = (seconds: number | undefined) => {
   if (!seconds || isNaN(seconds)) return '0m';
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
+  // Correct template literal syntax
   return d > 0 ? `${d}d \( {h}h` : ` \){h}h`;
 };
 
@@ -566,6 +566,8 @@ export default function Home() {
     "You can compare your node metric again this network leader",
     "Copy node url to share a direct link"
   ];
+
+  const [networkFilter, setNetworkFilter] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
 
   // --- EFFECTS ---
 
@@ -835,7 +837,8 @@ export default function Home() {
     const pub = (node.pubkey || '').toLowerCase();
     const ver = (node.version || '').toLowerCase();
     const country = (node.location?.countryName || '').toLowerCase();
-    return (addr.includes(q) || pub.includes(q) || ver.includes(q) || country.includes(q));
+    const networkMatch = networkFilter === 'ALL' || node.network === networkFilter;
+    return networkMatch && (addr.includes(q) || pub.includes(q) || ver.includes(q) || country.includes(q));
   }).sort((a, b) => {
     let valA: any, valB: any;
 
@@ -1880,11 +1883,29 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm">
-              <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
-                Total Nodes
+            <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm flex flex-col justify-between">
+              <div className="flex justify-between items-start">
+                 <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Total Nodes</div>
+                 <div className="flex gap-1">
+                    <button onClick={() => setNetworkFilter('ALL')} className={`w-2 h-2 rounded-full ${networkFilter === 'ALL' ? 'bg-white' : 'bg-zinc-700'}`} title="All Networks"/>
+                    <button onClick={() => setNetworkFilter('MAINNET')} className={`w-2 h-2 rounded-full ${networkFilter === 'MAINNET' ? 'bg-green-500' : 'bg-green-900/30'}`} title="Mainnet Only"/>
+                    <button onClick={() => setNetworkFilter('DEVNET')} className={`w-2 h-2 rounded-full ${networkFilter === 'DEVNET' ? 'bg-blue-500' : 'bg-blue-900/30'}`} title="Devnet Only"/>
+                 </div>
               </div>
-              <div className="text-lg md:text-3xl font-bold text-white mt-1">{nodes.length}</div>
+              
+              <div className="mt-2">
+                <div className="text-2xl md:text-4xl font-black text-white tracking-tight">{nodes.length}</div>
+                <div className="flex items-center gap-3 mt-2 text-[10px] font-mono border-t border-white/5 pt-2">
+                   <div className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition" onClick={() => setNetworkFilter('MAINNET')}>
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                      <span className="text-zinc-400"><span className="text-white font-bold">{nodes.filter(n => n.network === 'MAINNET').length}</span> Mainnet</span>
+                   </div>
+                   <div className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition" onClick={() => setNetworkFilter('DEVNET')}>
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                      <span className="text-zinc-400"><span className="text-white font-bold">{nodes.filter(n => n.network === 'DEVNET').length}</span> Devnet</span>
+                   </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1910,12 +1931,12 @@ export default function Home() {
           </div>
         )}
 
-        {/* NEW: Active Nodes Header with 2-Line Filter Info */}
         {!loading && nodes.length > 0 && (
              <div className="flex items-center gap-2 mb-4 mt-8">
-                <Activity className="text-green-500" size={20} />
+                <Activity className={networkFilter === 'MAINNET' ? "text-green-500" : networkFilter === 'DEVNET' ? "text-blue-500" : "text-white"} size={20} />
                 <h3 className="text-lg font-bold text-white tracking-widest uppercase">
-                    Total Nodes - {filteredNodes.length}
+                    {networkFilter === 'ALL' ? 'Nodes across all networks' : networkFilter === 'MAINNET' ? <span className="text-green-500">Nodes on Mainnet</span> : <span className="text-blue-500">Nodes on Devnet</span>} 
+                    <span className="text-zinc-600 ml-2 text-sm">({filteredNodes.length})</span>
                 </h3>
                 <div className="flex flex-col justify-center ml-2 leading-none">
                     <span className="text-[7px] md:text-[9px] font-mono text-zinc-500 uppercase">
@@ -2226,7 +2247,7 @@ export default function Home() {
                   <div className="flex flex-col md:flex-row gap-8 md:gap-16 items-center">
                     <div
                       ref={proofRef}
-                      className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl shadow-2xl max-w-sm w-full relative overflow-hidden group"
+                      className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl shadow-2xl w-full max-w-[360px] aspect-[3/4] relative overflow-hidden group flex flex-col justify-between"
                     >
                       <div className="absolute top-0 right-0 p-32 bg-blue-500/10 blur-[80px] rounded-full pointer-events-none group-hover:bg-blue-500/20 transition duration-1000"></div>
                       <div className="relative z-10 text-center">
