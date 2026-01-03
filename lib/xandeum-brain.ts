@@ -25,7 +25,7 @@ export interface EnrichedNode {
   last_seen_timestamp: number;
   is_public: boolean;
   isUntracked?: boolean;
-  network: 'MAINNET' | 'DEVNET' | 'UNKNOWN'; // Added UNKNOWN
+  network: 'MAINNET' | 'DEVNET' | 'UNKNOWN';
   storage_used: number;      
   storage_committed: number; 
   credits: number | null; 
@@ -46,7 +46,7 @@ export interface EnrichedNode {
   rank?: number;
 }
 
-// --- HELPERS (Keep your existing math helpers here) ---
+// --- HELPERS ---
 const cleanSemver = (v: string) => (v || '0.0.0').replace(/[^0-9.]/g, '');
 const compareVersions = (v1: string, v2: string) => {
   const p1 = cleanSemver(v1).split('.').map(Number);
@@ -231,14 +231,14 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   await resolveLocations([...new Set(rawPods.map((p: any) => p.address.split(':')[0]))] as string[]);
 
   const expandedNodes: EnrichedNode[] = [];
-  
+
   const scoreNode = (pod: any, network: 'MAINNET' | 'DEVNET' | 'UNKNOWN', credits: number | null, medianCredits: number, isUntracked: boolean) => {
       const ip = pod.address.split(':')[0];
       const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
       const storageCommitted = Number(pod.storage_committed) || 0;
       const storageUsed = Number(pod.storage_used) || 0;
       const uptime = Number(pod.uptime) || 0;
-      
+
       const vitality = calculateVitalityScore(
           storageCommitted, storageUsed, uptime, 
           pod.version || '0.0.0', consensusVersion, sortedUniqueVersions,
@@ -266,40 +266,56 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       const inMainnet = mainnetMap.has(key);
       const inDevnet = devnetMap.has(key);
 
-      // CASE 1: Mainnet Node
       if (inMainnet) {
           const credits = mainnetMap.get(key) || 0;
           expandedNodes.push(scoreNode(pod, 'MAINNET', credits, medianMainnet, false));
       }
 
-      // CASE 2: Devnet Node
       if (inDevnet) {
           const credits = devnetMap.get(key) || 0;
           expandedNodes.push(scoreNode(pod, 'DEVNET', credits, medianDevnet, false));
       }
 
-      // CASE 3: Unknown (Not in either list)
       if (!inMainnet && !inDevnet) {
           const isUntracked = creditsData.mainnet.length > 0;
-          // Mark as UNKNOWN, assume mainnet median for basic vitality calc
           expandedNodes.push(scoreNode(pod, 'UNKNOWN', null, medianMainnet, isUntracked));
       }
   });
 
-  // Ranking (Filter by network to avoid cross-contamination)
+  // Ranking
   const mainnetNodes = expandedNodes.filter(n => n.network === 'MAINNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const devnetNodes = expandedNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const unknownNodes = expandedNodes.filter(n => n.network === 'UNKNOWN');
 
   let r = 1;
   mainnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (mainnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
-  
+
   r = 1;
   devnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (devnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
 
   const finalNodes = [...mainnetNodes, ...devnetNodes, ...unknownNodes];
-  const avgHealth = finalNodes.length ? Math.round(finalNodes.reduce((a, b) => a + b.health, 0) / finalNodes.length) : 0;
   
+  // CALCULATE REAL AVERAGES FOR BREAKDOWN
+  let totalUptime = 0;
+  let totalVersion = 0;
+  let totalReputation = 0;
+  let reputationCount = 0;
+  let totalStorage = 0;
+  
+  finalNodes.forEach(node => {
+    totalUptime += node.healthBreakdown.uptime;
+    totalVersion += node.healthBreakdown.version;
+    totalStorage += node.healthBreakdown.storage;
+    
+    if (node.healthBreakdown.reputation !== null) {
+      totalReputation += node.healthBreakdown.reputation;
+      reputationCount++;
+    }
+  });
+  
+  const nodeCount = finalNodes.length || 1;
+  const avgHealth = Math.round(finalNodes.reduce((a, b) => a + b.health, 0) / nodeCount);
+
   return { 
     nodes: finalNodes, 
     stats: { 
@@ -313,7 +329,10 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
         },
         avgBreakdown: {
             total: avgHealth,
-            uptime: 0, version: 0, reputation: 0, storage: 0 
+            uptime: Math.round(totalUptime / nodeCount),
+            version: Math.round(totalVersion / nodeCount),
+            reputation: reputationCount > 0 ? Math.round(totalReputation / reputationCount) : null,
+            storage: Math.round(totalStorage / nodeCount)
         }
     } 
   };
