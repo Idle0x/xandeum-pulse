@@ -8,15 +8,16 @@ import {
   Activity, Users, BarChart3, HelpCircle, Star, 
   Calculator, Zap, ChevronDown, 
   ExternalLink, ArrowUpRight, Eye, MapPin, Copy, Check, Share2, ArrowUp, ArrowDown,
-  AlertOctagon, ChevronDown as ChevronIcon 
+  AlertOctagon, ChevronDown as ChevronIcon,
+  Layers // Icon for Combined
 } from 'lucide-react';
 
-// UPDATED INTERFACE: Added 'network'
+// --- INTERFACES ---
 interface RankedNode {
   rank: number;
   pubkey: string;
   credits: number;
-  network: 'MAINNET' | 'DEVNET'; // NEW FIELD
+  network: 'MAINNET' | 'DEVNET';
   address?: string;
   location?: {
       countryName: string;
@@ -30,16 +31,16 @@ const NFT_BOOSTS = { 'Titan': 11, 'Dragon': 4, 'Coyote': 2.5, 'Rabbit': 1.5, 'Cr
 
 export default function Leaderboard() {
   const router = useRouter();
-  
+
   // DATA STATE
-  const [allNodes, setAllNodes] = useState<RankedNode[]>([]); // Stores everything raw
+  const [allNodes, setAllNodes] = useState<RankedNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [creditsOffline, setCreditsOffline] = useState(false);
-  
-  // FILTER STATE
-  const [networkFilter, setNetworkFilter] = useState<'MAINNET' | 'DEVNET'>('MAINNET'); // NEW TOGGLE
+
+  // FILTER STATE (Updated to include COMBINED)
+  const [networkFilter, setNetworkFilter] = useState<'MAINNET' | 'DEVNET' | 'COMBINED'>('MAINNET');
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // USER PREFS
   const [favorites, setFavorites] = useState<string[]>([]);
 
@@ -67,7 +68,7 @@ export default function Leaderboard() {
 
   const lastProcessedHighlight = useRef<string | null>(null);
 
-  // --- 1. DATA FETCHING (Updated for Merged API) ---
+  // --- 1. DATA FETCHING ---
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -91,7 +92,7 @@ export default function Leaderboard() {
         } else {
             setCreditsOffline(false);
 
-            // 1. Fetch History
+            // History Logic
             let history: Record<string, number> = {};
             try {
                 const h = localStorage.getItem('xandeum_rank_history');
@@ -100,30 +101,25 @@ export default function Leaderboard() {
 
             const newHistory: Record<string, number> = {};
 
-            // 2. Parse & Merge
             const parsedList: RankedNode[] = rawData.map((item: any) => {
                 const pKey = item.pod_id || item.pubkey || 'Unknown';
                 const meta = metaMap.get(pKey);
                 return {
                     pubkey: pKey,
                     credits: Number(item.credits || 0),
-                    network: item.network || 'MAINNET', // Capture network tag
-                    rank: 0, // Will be calculated dynamically
+                    network: item.network || 'MAINNET',
+                    rank: 0,
                     address: meta?.address,
                     location: meta?.location,
                     trend: 0
                 };
             });
 
-            // 3. Sort by credits globally (for trend calc mostly)
+            // Global sort for history tracking
             parsedList.sort((a, b) => b.credits - a.credits);
 
-            // 4. Calculate Trends Global (Optional, or per network)
-            // For simplicity, we just save current global index as history
             parsedList.forEach((n, i) => {
                 const prevRank = history[n.pubkey];
-                // Note: This trend is a bit "fuzzy" now that we have two networks, 
-                // but it still gives a sense of movement.
                 if (prevRank) n.trend = prevRank - (i + 1); 
                 newHistory[n.pubkey] = i + 1;
             });
@@ -146,11 +142,11 @@ export default function Leaderboard() {
     fetchData();
   }, []);
 
-  // --- 2. FILTER & RANKING LOGIC (The Core Fix) ---
+  // --- 2. FILTER & RANKING LOGIC (Updated for Combined) ---
   const filteredAndRanked = useMemo(() => {
-      // Step A: Filter by Network AND Search
+      // Step A: Filter
       const filtered = allNodes.filter(n => 
-          n.network === networkFilter && 
+          (networkFilter === 'COMBINED' || n.network === networkFilter) && 
           n.pubkey.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
@@ -166,7 +162,7 @@ export default function Leaderboard() {
   }, [allNodes, networkFilter, searchQuery]);
 
 
-  // --- 3. DEEP LINK / SCROLL LOGIC (Smart Auto-Switch) ---
+  // --- 3. DEEP LINK LOGIC ---
   useEffect(() => {
       if (!router.isReady || !router.query.highlight || allNodes.length === 0) return;
 
@@ -174,34 +170,34 @@ export default function Leaderboard() {
 
       if (lastProcessedHighlight.current === targetKey) return;
 
-      // Find the node in the FULL list
       const targetNode = allNodes.find(n => n.pubkey === targetKey);
 
       if (targetNode) {
           lastProcessedHighlight.current = targetKey;
 
-          // AUTO-SWITCH FILTER if needed
-          if (targetNode.network !== networkFilter) {
+          // If we aren't in combined mode and the node isn't in current filter, switch
+          if (networkFilter !== 'COMBINED' && targetNode.network !== networkFilter) {
               setNetworkFilter(targetNode.network);
           }
 
-          // Expand & Scroll (Wait for filter state to update and re-render)
           setTimeout(() => {
-              // Find index in the NEW filtered list
-              const reFiltered = allNodes.filter(n => n.network === targetNode.network).sort((a,b) => b.credits - a.credits);
-              const idx = reFiltered.findIndex(n => n.pubkey === targetKey);
+              // Recalculate index based on potential new filter
+              const listToSearch = networkFilter === 'COMBINED' 
+                ? allNodes.sort((a,b) => b.credits - a.credits)
+                : allNodes.filter(n => n.network === targetNode.network).sort((a,b) => b.credits - a.credits);
               
+              const idx = listToSearch.findIndex(n => n.pubkey === targetKey);
               if (idx >= visibleCount) setVisibleCount(idx + 20);
-              
+
               setExpandedNode(targetKey);
-              
+
               setTimeout(() => {
                   const el = document.getElementById(`node-${targetKey}`);
                   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
               }, 100);
           }, 100);
       }
-  }, [router.isReady, router.query.highlight, allNodes]); // Removed networkFilter dependency to avoid loops
+  }, [router.isReady, router.query.highlight, allNodes, networkFilter]); 
 
   // Hardware Calc Logic
   useEffect(() => {
@@ -346,7 +342,6 @@ export default function Leaderboard() {
                           </div>
                           <div className="space-y-4">
                               <div className="flex justify-between items-center border-b border-zinc-800 pb-4 relative"><span className="text-xs text-zinc-400 flex items-center gap-1">Projected Credits</span><span className="font-mono text-2xl font-bold text-yellow-500 text-shadow-glow">{simResult.boosted.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></div>
-                              {/* If offline, we can't calc share */}
                               {!creditsOffline ? (
                                 <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl text-center relative">
                                     <div className="text-[10px] text-blue-400 font-bold uppercase mb-1 flex items-center justify-center gap-1">Est. Network Share</div>
@@ -379,7 +374,7 @@ export default function Leaderboard() {
       {/* SEARCH & TOGGLE */}
       <div className="max-w-5xl mx-auto mb-6 relative space-y-3">
         <div className="flex justify-between items-center gap-4">
-             {/* TOGGLE GROUP */}
+             {/* UPDATED TOGGLE GROUP */}
              <div className="flex bg-zinc-900 p-1 rounded-xl border border-zinc-800 shrink-0">
                  <button 
                     onClick={() => setNetworkFilter('MAINNET')}
@@ -393,12 +388,24 @@ export default function Leaderboard() {
                  >
                     <Activity size={12} /> DEVNET
                  </button>
+                 <button 
+                    onClick={() => setNetworkFilter('COMBINED')}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${networkFilter === 'COMBINED' ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20' : 'text-zinc-500 hover:text-zinc-300'}`}
+                 >
+                    <Layers size={12} /> COMBINED
+                 </button>
              </div>
 
              {/* SEARCH BAR */}
              <div className="relative w-full">
                 <Search className="absolute left-4 top-3.5 text-zinc-500" size={20} />
-                <input type="text" placeholder={`Search ${networkFilter.toLowerCase()} nodes...`} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-12 pr-10 text-white focus:border-yellow-500 outline-none transition placeholder-zinc-600" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                <input 
+                  type="text" 
+                  placeholder={networkFilter === 'COMBINED' ? "Search all nodes..." : `Search ${networkFilter.toLowerCase()} nodes...`}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-12 pr-10 text-white focus:border-yellow-500 outline-none transition placeholder-zinc-600" 
+                  value={searchQuery} 
+                  onChange={(e) => setSearchQuery(e.target.value)} 
+                />
                 {searchQuery && (<button onClick={() => setSearchQuery('')} className="absolute right-4 top-3.5 text-zinc-500 hover:text-white"><X size={20} /></button>)}
              </div>
         </div>
@@ -412,7 +419,6 @@ export default function Leaderboard() {
           <div className="col-span-4 text-right">Credits</div>
         </div>
 
-        {/* --- CRASHPROOF ERROR STATE --- */}
         {loading ? (
           <div className="absolute inset-0 flex items-center justify-center">
              <div className="text-center animate-pulse text-zinc-500 font-mono flex flex-col items-center gap-3">
@@ -430,7 +436,6 @@ export default function Leaderboard() {
           <div className="p-20 text-center text-zinc-600"><Search size={48} className="mx-auto mb-4 opacity-50" /><p>No nodes found on {networkFilter}.</p></div>
         ) : (
           <div className="divide-y-0 px-2 pb-2">
-            {/* RENDER LOGIC: Filter first, then Slice */}
             {filteredAndRanked.slice(0, visibleCount).map((node) => {
               const isMyNode = node.address && favorites.includes(node.address);
               const isExpanded = expandedNode === node.pubkey;
@@ -438,7 +443,7 @@ export default function Leaderboard() {
 
               return (
                 <div 
-                    key={`${node.pubkey}-${node.network}`} // UPDATED KEY FOR UNIQUE NETWORKS
+                    key={`${node.pubkey}-${node.network}`} 
                     id={`node-${node.pubkey}`} 
                     className={`
                         relative transition-all duration-300 ease-out mb-2 rounded-xl border
@@ -451,7 +456,7 @@ export default function Leaderboard() {
                 >
                     <div className="grid grid-cols-12 gap-4 p-4 items-center cursor-pointer" onClick={() => handleRowClick(node)}>
 
-                        {/* RANK */}
+                        {/* RANK COLUMN */}
                         <div className="col-span-2 md:col-span-1 flex flex-col justify-center items-center gap-1 relative">
                             <div className="flex items-center gap-1">
                                 {node.rank === 1 && <Trophy size={16} className="text-yellow-400" />}
@@ -459,7 +464,18 @@ export default function Leaderboard() {
                                 <span className={`text-sm font-bold ${node.rank <= 3 ? 'text-white' : 'text-zinc-500'}`}>#{node.rank}</span>
                             </div>
 
-                            {/* WHALE WATCH TREND */}
+                            {/* NETWORK BADGE (For Combined View) */}
+                            {networkFilter === 'COMBINED' && (
+                                <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+                                    node.network === 'MAINNET' 
+                                    ? 'bg-green-500/10 text-green-500 border border-green-500/20' 
+                                    : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
+                                }`}>
+                                    {node.network === 'MAINNET' ? 'MN' : 'DN'}
+                                </span>
+                            )}
+
+                            {/* TREND INDICATOR */}
                             {node.trend !== 0 && (
                                 <div className={`text-[9px] font-bold flex items-center ${node.trend > 0 ? 'text-green-500' : 'text-red-500'}`}>
                                     {node.trend > 0 ? <ArrowUp size={8} /> : <ArrowDown size={8} />} {Math.abs(node.trend)}
@@ -567,14 +583,11 @@ export default function Leaderboard() {
       {/* FOOTER */}
       {!loading && !creditsOffline && (
         <div className="max-w-5xl mx-auto mt-6 text-center text-xs text-zinc-600 flex flex-col md:flex-row items-center justify-center gap-2">
-          {/* UPDATED FOOTER STATS */}
           <div className="flex items-center gap-2"><Eye size={12} />
               <span>Showing <span className="text-zinc-400 font-bold">{Math.min(visibleCount, filteredAndRanked.length)}</span> of <span className="text-zinc-400 font-bold">{filteredAndRanked.length}</span> nodes.</span>
           </div>
           <span className="hidden md:inline text-zinc-700">•</span>
           <span className="text-zinc-500">(Scroll or search to find others)</span>
-
-          {/* NEW ADDITION */}
           <span className="hidden md:inline text-zinc-700">•</span>
           <span className="text-zinc-600">
             Data sourced directly from the <a href="https://podcredits.xandeum.network/api/pods-credits" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-white underline underline-offset-2 transition-colors">podcredits API</a>.
