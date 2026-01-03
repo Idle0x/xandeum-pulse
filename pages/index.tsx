@@ -404,11 +404,11 @@ const useTimeAgo = (timestamp: number | undefined) => {
       const diff = Math.floor((now - time) / 1000);
 
       if (diff < 60) {
-        setTimeAgo(`\( {diff} second \){diff !== 1 ? 's' : ''} ago`);
+        setTimeAgo(`${diff} second${diff !== 1 ? 's' : ''} ago`);
       } else if (diff < 3600) {
-        setTimeAgo(`\( {Math.floor(diff / 60)} minute \){Math.floor(diff / 60) !== 1 ? 's' : ''} ago`);
+        setTimeAgo(`${Math.floor(diff / 60)} minute${Math.floor(diff / 60) !== 1 ? 's' : ''} ago`);
       } else {
-        setTimeAgo(`\( {Math.floor(diff / 3600)} hour \){Math.floor(diff / 3600) !== 1 ? 's' : ''} ago`);
+        setTimeAgo(`${Math.floor(diff / 3600)} hour${Math.floor(diff / 3600) !== 1 ? 's' : ''} ago`);
       }
     };
 
@@ -2246,73 +2246,73 @@ export default function Home() {
                   <div className="flex flex-col md:flex-row gap-8 md:gap-16 items-center">
                     <div
                       ref={proofRef}
-                      className="bg-zinc-950 border border-zinc-800 p-6 rounded-3xl shadow-2xl w-full max-w-[360px] aspect-[3/4] relative overflow-hidden group flex flex-col"
+                      className="bg-zinc-950 border border-zinc-800 p-4 rounded-2xl shadow-2xl w-full max-w-[300px] aspect-[3/4] relative overflow-hidden group flex flex-col"
                     >
-                      <div className="absolute top-0 right-0 p-32 bg-blue-500/10 blur-[80px] rounded-full pointer-events-none group-hover:bg-blue-500/20 transition duration-1000"></div>
+                      <div className="absolute top-0 right-0 p-24 bg-blue-500/10 blur-[60px] rounded-full pointer-events-none"></div>
                       
-                      {/* Header */}
-                      <div className="relative z-10 text-center mb-6">
-                        <div className="flex items-center justify-center gap-2 mb-2">
-                          <Activity size={20} className="text-blue-500" />
-                          <h2 className="text-lg font-extrabold text-white tracking-tight uppercase">
+                      {/* Compact Header */}
+                      <div className="relative z-10 text-center mb-3 pb-3 border-b border-zinc-800/50">
+                        <div className="flex items-center justify-center gap-1.5 mb-1">
+                          <Activity size={14} className="text-blue-500" />
+                          <h2 className="text-sm font-extrabold text-white tracking-tight uppercase">
                             PROOF OF PULSE
                           </h2>
                         </div>
-                        <p className="font-mono text-xs text-blue-400 font-bold">
+                        <p className="font-mono text-[10px] text-blue-400 font-bold">
                           {getSafeIp(selectedNode)}
                         </p>
                       </div>
 
-                      {/* Card Stack */}
-                      <div className="relative z-10 flex-1 flex flex-col justify-center space-y-3 px-2">
+                      {/* Compact Card Stack */}
+                      <div className="relative z-10 flex-1 flex flex-col justify-center space-y-2">
                         {/* Health Card */}
-                        <div className="bg-gradient-to-br from-green-500/10 to-green-900/5 border border-green-500/30 rounded-xl p-4 text-center">
-                          <div className="text-[9px] text-green-500 uppercase font-bold tracking-widest mb-1">
+                        <div className="bg-gradient-to-br from-green-500/10 to-green-900/5 border border-green-500/30 rounded-lg p-2.5 text-center">
+                          <div className="text-[8px] text-green-500 uppercase font-bold tracking-wider mb-0.5">
                             Health Score
                           </div>
-                          <div className="text-3xl font-black text-green-400">
+                          <div className="text-2xl font-black text-green-400">
                             {selectedNode.health}
                           </div>
                         </div>
 
                         {/* Storage Card */}
-                        <div className="bg-gradient-to-br from-purple-500/10 to-purple-900/5 border border-purple-500/30 rounded-xl p-4 text-center">
-                          <div className="text-[9px] text-purple-500 uppercase font-bold tracking-widest mb-1">
+                        <div className="bg-gradient-to-br from-purple-500/10 to-purple-900/5 border border-purple-500/30 rounded-lg p-2.5 text-center">
+                          <div className="text-[8px] text-purple-500 uppercase font-bold tracking-wider mb-0.5">
                             Storage Capacity
                           </div>
-                          <div className="text-2xl font-black text-purple-400">
+                          <div className="text-lg font-black text-purple-400">
                             {formatBytes(selectedNode.storage_committed)}
                           </div>
                         </div>
 
                         {/* Split Bottom Cards */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-900/5 border border-yellow-500/30 rounded-xl p-3 text-center">
-                            <div className="text-xl font-black text-yellow-400 mb-1">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-900/5 border border-yellow-500/30 rounded-lg p-2 text-center">
+                            <div className="text-base font-black text-yellow-400 mb-0.5">
                               {selectedNode.credits !== null
                                 ? selectedNode.credits.toLocaleString()
                                 : 'N/A'}
                             </div>
-                            <div className="text-[8px] text-yellow-500 uppercase font-bold tracking-widest">
+                            <div className="text-[7px] text-yellow-500 uppercase font-bold tracking-wider">
                               Credits
                             </div>
                           </div>
 
-                          <div className="bg-gradient-to-br from-blue-500/10 to-blue-900/5 border border-blue-500/30 rounded-xl p-3 text-center">
-                            <div className="text-lg font-black text-white mb-1 font-mono">
+                          <div className="bg-gradient-to-br from-blue-500/10 to-blue-900/5 border border-blue-500/30 rounded-lg p-2 text-center">
+                            <div className="text-sm font-black text-white mb-0.5 font-mono">
                               {getSafeVersion(selectedNode)}
                             </div>
-                            <div className="text-[8px] text-blue-500 uppercase font-bold tracking-widest">
+                            <div className="text-[7px] text-blue-500 uppercase font-bold tracking-wider">
                               Version
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Footer */}
-                      <div className="relative z-10 text-center mt-4 pt-4 border-t border-zinc-800">
-                        <div className="text-[9px] text-zinc-600 font-mono flex items-center justify-center gap-2">
-                          <Zap size={10} className="text-blue-500" /> VERIFIED BY XANDEUM PULSE
+                      {/* Compact Footer */}
+                      <div className="relative z-10 text-center mt-3 pt-2 border-t border-zinc-800/50">
+                        <div className="text-[8px] text-zinc-600 font-mono flex items-center justify-center gap-1.5">
+                          <Zap size={8} className="text-blue-500" /> VERIFIED BY XANDEUM PULSE
                         </div>
                       </div>
                     </div>
