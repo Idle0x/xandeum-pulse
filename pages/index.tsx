@@ -440,8 +440,7 @@ const formatUptime = (seconds: number | undefined) => {
   if (!seconds || isNaN(seconds)) return '0m';
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
-  // Correct template literal syntax
-  return d > 0 ? `${d}d \( {h}h` : ` \){h}h`;
+  return d > 0 ? `${d}d ${h}h` : `${h}h`;
 };
 
 const formatLastSeen = (timestamp: number | undefined) => {
@@ -2247,61 +2246,61 @@ export default function Home() {
                   <div className="flex flex-col md:flex-row gap-8 md:gap-16 items-center">
                     <div
                       ref={proofRef}
-                      className="bg-zinc-950 border border-zinc-800 p-8 rounded-3xl shadow-2xl w-full max-w-[360px] aspect-[3/4] relative overflow-hidden group flex flex-col justify-between"
+                      className="bg-zinc-950 border border-zinc-800 p-6 rounded-3xl shadow-2xl w-full max-w-[360px] aspect-[3/4] relative overflow-hidden group flex flex-col justify-between"
                     >
                       <div className="absolute top-0 right-0 p-32 bg-blue-500/10 blur-[80px] rounded-full pointer-events-none group-hover:bg-blue-500/20 transition duration-1000"></div>
                       <div className="relative z-10 text-center">
-                        <div className="inline-block p-4 bg-zinc-900 rounded-2xl mb-6 shadow-lg border border-zinc-800">
-                          <Activity size={40} className="text-blue-500" />
+                        <div className="inline-block p-3 bg-zinc-900 rounded-2xl mb-4 shadow-lg border border-zinc-800">
+                          <Activity size={32} className="text-blue-500" />
                         </div>
-                        <h2 className="text-2xl font-extrabold text-white mb-2 tracking-tight">
+                        <h2 className="text-xl font-extrabold text-white mb-2 tracking-tight">
                           PROOF OF PULSE
                         </h2>
-                        <p className="font-mono text-xs text-zinc-500 mb-8 bg-zinc-900 px-3 py-1 rounded-full inline-block border border-zinc-800">
+                        <p className="font-mono text-xs text-zinc-500 mb-6 bg-zinc-900 px-3 py-1 rounded-full inline-block border border-zinc-800">
                           {getSafeIp(selectedNode)}
                         </p>
 
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                          <div className="bg-zinc-900/80 p-4 rounded-xl border border-zinc-800">
-                            <div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                          <div className="bg-zinc-900/80 p-3 rounded-xl border border-zinc-800">
+                            <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">
                               Health
                             </div>
-                            <div className="text-2xl font-extrabold text-green-400">
+                            <div className="text-xl font-extrabold text-green-400">
                               {selectedNode.health}
                             </div>
                           </div>
 
-                          <div className="bg-zinc-900/80 p-4 rounded-xl border border-zinc-800">
-                            <div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">
+                          <div className="bg-zinc-900/80 p-3 rounded-xl border border-zinc-800">
+                            <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">
                               Storage
                             </div>
-                            <div className="text-xl font-extrabold text-purple-400">
+                            <div className="text-lg font-extrabold text-purple-400">
                               {formatBytes(selectedNode.storage_committed)}
                             </div>
                           </div>
 
-                          <div className="bg-zinc-900/80 p-4 rounded-xl border border-zinc-800">
-                            <div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">
+                          <div className="bg-zinc-900/80 p-3 rounded-xl border border-zinc-800">
+                            <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">
                               Credits
                             </div>
-                            <div className="text-xl font-extrabold text-yellow-500">
+                            <div className="text-lg font-extrabold text-yellow-500">
                               {selectedNode.credits !== null
                                 ? selectedNode.credits.toLocaleString()
                                 : 'N/A'}
                             </div>
                           </div>
 
-                          <div className="bg-zinc-900/80 p-4 rounded-xl border border-zinc-800">
-                            <div className="text-[10px] text-zinc-500 uppercase font-bold mb-1">
+                          <div className="bg-zinc-900/80 p-3 rounded-xl border border-zinc-800">
+                            <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">
                               Version
                             </div>
-                            <div className="text-lg font-mono text-white">
+                            <div className="text-base font-mono text-white">
                               {getSafeVersion(selectedNode)}
                             </div>
                           </div>
                         </div>
 
-                        <div className="text-[10px] text-zinc-600 font-mono flex items-center justify-center gap-2 mb-6">
+                        <div className="text-[9px] text-zinc-600 font-mono flex items-center justify-center gap-2 mb-4">
                           <Server size={10} /> VERIFIED BY XANDEUM PULSE
                         </div>
                       </div>
@@ -2385,8 +2384,8 @@ export default function Home() {
                                 </div>
                                 <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
                               </div>
-                              <div className="relative z-10 scale-110">
-                                <RadialProgress score={selectedNode.health || 0} size={160} />
+                              <div className="relative z-10 scale-90">
+                                <RadialProgress score={selectedNode.health || 0} size={140} />
                               </div>
                               <div className="mt-6 text-center w-full z-10 flex justify-center">
                                 <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
@@ -2536,8 +2535,8 @@ export default function Home() {
                                 }`}
                               />
                             </div>
-                            <div className="relative z-10 scale-110 group-hover:scale-125 transition-transform duration-500 ease-in-out group-hover:animate-pulse">
-                              <RadialProgress score={selectedNode.health || 0} size={160} />
+                            <div className="relative z-10 scale-100 group-hover:scale-110 transition-transform duration-500 ease-in-out">
+                              <RadialProgress score={selectedNode.health || 0} size={140} />
                             </div>
                             <div className="mt-6 text-center w-full z-10 flex justify-center">
                               <div className="text-[9px] font-bold uppercase tracking-widest text-green-400/80 animate-pulse group-hover:text-green-300 transition-colors flex items-center gap-1">
@@ -2712,6 +2711,7 @@ export default function Home() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div
+                                  
                               onClick={(e) => handleLeaderboardNav(e, selectedNode)}
                               className={`h-40 p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${
                                 zenMode
@@ -2755,13 +2755,13 @@ export default function Home() {
                               <div className="mt-auto relative z-10">
                                 <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">
                                   Global Rank{' '}
-                                  <span className="text-white text-lg ml-1">
+                                  <span className="text-white text-base ml-1">
                                     {(selectedNode as any).isUntracked ? '---' : `#${selectedNode?.rank || '-'}`}
                                   </span>
                                 </div>
-                                <div className="bg-zinc-800 shadow-[0_4px_0_0_rgba(0,0,0,0.3)] rounded-lg p-3 mt-2 border-b border-white/5">
+                                <div className="bg-zinc-800 shadow-[0_4px_0_0_rgba(0,0,0,0.3)] rounded-lg p-2.5 mt-1.5 border-b border-white/5">
                                   <div className="flex justify-between items-center">
-                                    <span className="text-[10px] text-zinc-500 font-mono uppercase">
+                                    <span className="text-[9px] text-zinc-500 font-mono uppercase">
                                       Credits Earned
                                     </span>
                                     <span className={`${(selectedNode as any).isUntracked ? 'text-zinc-500' : 'text-yellow-500'} font-mono font-bold text-xs`}>
@@ -2773,13 +2773,13 @@ export default function Home() {
                                 </div>
                               </div>
 
-                              <div className="mt-3 flex justify-end">
+                              <div className="mt-2 flex justify-end">
                                 <span className={`text-[9px] font-bold uppercase tracking-widest ${(selectedNode as any).isUntracked ? 'text-zinc-600' : 'text-yellow-500/80 animate-pulse group-hover:text-yellow-300'} transition-colors flex items-center gap-1`}>
                                   OPEN LEADERBOARD <ExternalLink size={8} />
                                 </span>
                               </div>
                             </div>
-
+                                                   
                           <Link href={`/map?focus=${getSafeIp(selectedNode)}`}>
                             <div
                               className={`h-40 p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${
