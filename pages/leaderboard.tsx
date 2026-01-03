@@ -254,7 +254,6 @@ export default function Leaderboard() {
     const estimatedNetworkBoostedTotal = currentNetworkBaseTotal * networkAvgMult;
     
     // Adding our hypothetical new credits to the pool (if New) or just comparing (if Import)
-    // For simplicity in a simulator, we compare UserBoosted vs (NetworkEst + UserBoosted)
     const totalPool = estimatedNetworkBoostedTotal + (simMode === 'NEW' ? boostedCredits : 0);
     
     const share = totalPool > 0 ? boostedCredits / totalPool : 0;
@@ -548,7 +547,7 @@ export default function Leaderboard() {
                                       </div>
                                   </div>
 
-                                  {/* NETWORK AVG MULTIPLIER INPUT (WHALE ADJUSTMENT) */}
+                                  {/* NETWORK AVG MULTIPLIER INPUT */}
                                   <div>
                                       {/* CLICK OUTSIDE LAYER */}
                                       {showNetworkHelp && (
@@ -557,17 +556,19 @@ export default function Leaderboard() {
 
                                       <div className="flex justify-between items-end mb-2 relative z-50">
                                           <div className="flex items-center gap-2">
-                                            <label className="text-[10px] text-zinc-400 uppercase font-bold">Est. Network Avg Boost</label>
+                                            <label className="text-[10px] text-zinc-400 uppercase font-bold">Est. Total Boosted Credits</label>
                                             <div className="relative">
                                                 <button onClick={() => setShowNetworkHelp(!showNetworkHelp)} className="text-zinc-500 hover:text-white transition"><Settings2 size={14} /></button>
                                                 {showNetworkHelp && (
-                                                    <div className="absolute right-0 md:left-0 bottom-full mb-2 w-64 bg-zinc-800 border border-zinc-700 p-4 rounded-xl shadow-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-200">
+                                                    // FIX: Tooltip anchored to right-0 for mobile visibility
+                                                    <div className="absolute right-0 bottom-full mb-2 w-64 bg-zinc-800 border border-zinc-700 p-4 rounded-xl shadow-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-200">
                                                         <p className="text-[10px] md:text-xs text-zinc-300 leading-relaxed">
-                                                            <strong className="text-white block mb-1">Why 14x Default?</strong>
-                                                            High-impact "Whale" nodes (Titan NFTs + Deep South Era) have 176x multipliers, significantly skewing the network average up.
-                                                            <span className="text-yellow-500 block mt-1">Adjusting this estimates how diluted your share is.</span>
+                                                            <strong className="text-white block mb-1">Estimation Multiplier</strong>
+                                                            We multiply total Base Credits by this factor to estimate the Total Network Boosted Credits. 
+                                                            <span className="text-yellow-500 block mt-1">14x accounts for high-impact Titan nodes.</span>
                                                         </p>
-                                                        <div className="absolute bottom-[-6px] right-4 md:left-1 w-3 h-3 bg-zinc-800 border-b border-r border-zinc-700 rotate-45"></div>
+                                                        {/* Arrow aligned to right to match container */}
+                                                        <div className="absolute bottom-[-6px] right-2 w-3 h-3 bg-zinc-800 border-b border-r border-zinc-700 rotate-45"></div>
                                                     </div>
                                                 )}
                                             </div>
@@ -578,6 +579,7 @@ export default function Leaderboard() {
                                          <input type="number" min="1" step="0.1" value={networkAvgMult} onChange={(e) => setNetworkAvgMult(Math.max(1, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none focus:border-purple-500 transition"/>
                                          <span className="absolute right-4 top-3.5 text-[10px] font-bold text-zinc-600">AVG X</span>
                                       </div>
+                                      <div className="text-[9px] text-zinc-500 mt-1.5 leading-tight">Select an estimated multiplier to calculate the total boosted credits.</div>
                                   </div>
                               </div>
 
@@ -602,9 +604,17 @@ export default function Leaderboard() {
 
                   {/* NAVIGATION FOOTER */}
                   <div className="p-3 md:p-4 border-t border-zinc-800 flex justify-between bg-black/20">
+                      {/* Back button visible after step 0 */}
                       <button onClick={() => setSimStep(Math.max(0, simStep - 1))} disabled={simStep === 0} className={`px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold transition ${simStep === 0 ? 'opacity-0 pointer-events-none' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}>BACK</button>
+                      
                       {simStep < 2 ? (
-                          <button onClick={() => isStep1Valid && setSimStep(simStep + 1)} disabled={!isStep1Valid} className={`px-6 md:px-8 py-2 font-bold text-[10px] md:text-xs rounded-lg transition-colors flex items-center gap-2 ${isStep1Valid ? 'bg-yellow-500 hover:bg-yellow-400 text-black' : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'}`}>NEXT STEP <ArrowUpRight size={14} /></button>
+                          /* Next Button Logic: 
+                             - In Step 0: Only show if Manual Input mode is toggled (Import uses 'LOAD' button).
+                             - In Step 1: Always show to allow progression.
+                          */
+                          (simStep === 1 || (simStep === 0 && showManualInput)) ? (
+                              <button onClick={() => isStep1Valid && setSimStep(simStep + 1)} disabled={!isStep1Valid} className={`px-6 md:px-8 py-2 font-bold text-[10px] md:text-xs rounded-lg transition-colors flex items-center gap-2 ${isStep1Valid ? 'bg-yellow-500 hover:bg-yellow-400 text-black' : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'}`}>NEXT STEP <ArrowUpRight size={14} /></button>
+                          ) : null
                       ) : (
                           <button onClick={() => { setSimStep(0); setBoostCounts({}); setSimMode('NEW'); setShowManualInput(false); setImportKey(''); setSimPerf(1.0); }} className="px-6 md:px-8 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-[10px] md:text-xs rounded-lg transition-colors flex items-center gap-2">RESET <Activity size={14} /></button>
                       )}
