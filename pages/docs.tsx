@@ -169,7 +169,7 @@ export default function DocsPage() {
                     <div className="md:mt-24"><ManualCard type="PROOF" icon={Share2} title="Proof of Pulse" color="green" tag="SOCIAL" desc="Generates a cryptographic snapshot of a node's specific block-height and health status into a shareable PNG." /></div>
                     <div className="md:mt-0"><ManualCard type="TIERS" icon={MapIcon} title="Context-Aware Tiers" color="purple" tag="DYNAMIC" desc="The map rejects static thresholds. It uses Live Percentiles. A 'Gold' marker always represents the top 10% of nodes." /></div>
                     <div className="md:mt-24"><ManualCard type="GHOST" icon={AlertTriangle} title="Ghost Nodes" color="yellow" tag="PRIVACY" desc="Nodes running on VPNs or private subnets are tracked in the stats but hidden from the map to prevent errors." /></div>
-                    
+
                     {/* NEW: CRASH PROTOCOLS CARD */}
                     <div className="md:mt-0">
                         <ManualCard 
@@ -220,20 +220,20 @@ export default function DocsPage() {
                         <p className="text-zinc-400 mb-6 text-sm leading-relaxed">
                             Pulse employs a high-frequency trading strategy to ensure data availability. It races multiple RPC nodes simultaneously.
                         </p>
-                        
+
                         {/* FAILOVER SNIPPET */}
                         <div className="mt-8">
                              <HoloCode 
-                                filename="lib/brain.ts"
-                                githubLink="https://github.com/riot-dev/xandeum-pulse/blob/main/lib/xandeum-brain.ts"
-                                code={`// The Race: 3 Simultaneous Requests
-const winner = await Promise.any(
-  shuffled.map(ip => 
-    axios.post(\`http://\${ip}:6000/rpc\`, payload, { 
-       timeout: 4000 
-    }).then(r => r.data?.result?.pods || [])
-  )
-);`}
+                                filename="lib/xandeum-brain.ts"
+                                githubLink="https://github.com/Idle0x/xandeum-pulse/blob/main/lib/xandeum-brain.ts"
+                                code={`// Race multiple RPC endpoints for redundancy
+const shuffled = RPC_NODES.slice(1).sort(() => 0.5 - Math.random()).slice(0, 3);
+
+// Promise.any returns the first successful response (The Winner)
+const winner = await Promise.any(shuffled.map(ip => 
+    axios.post(\`http://\${ip}:6000/rpc\`, payload, { timeout: 4000 })
+         .then(r => r.data?.result?.pods || [])
+));`}
                              />
                         </div>
                     </div>
@@ -258,16 +258,20 @@ const winner = await Promise.any(
 
                         {/* VITALITY SNIPPET */}
                         <HoloCode 
-                                filename="lib/scoring.ts"
-                                githubLink="https://github.com/riot-dev/xandeum-pulse/blob/main/lib/xandeum-brain.ts"
-                                code={`const calculateVitality = (up, store, cred) => {
-  // Non-linear Sigmoid Curve
-  const uScore = 100 / (1 + Math.exp(-0.2*(up-7)));
-  // Logarithmic Scale for Storage
-  const sScore = 50 * Math.log2(store + 1);
-  
-  return (uScore * 0.35) + (sScore * 0.30) + (cred * 0.20);
-}`}
+                                filename="lib/xandeum-brain.ts"
+                                githubLink="https://github.com/Idle0x/xandeum-pulse/blob/main/lib/xandeum-brain.ts"
+                                code={`const calculateVitalityScore = (uptimeDays, storage, medianStorage) => {
+  // Sigmoid Curve: Penalizes downtime heavily
+  let uptimeScore = 100 / (1 + Math.exp(-0.2 * (uptimeDays - 7)));
+
+  // Logarithmic Scale: Diminishing returns on massive storage
+  // Compares node storage vs network median
+  const baseStorageScore = 50 * Math.log2((storage / medianStorage) + 1);
+  const totalStorageScore = Math.min(100, baseStorageScore);
+
+  // Weighted Final Score
+  return (uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20);
+};`}
                         />
                     </div>
                     <div className="lg:col-span-7">
@@ -290,7 +294,7 @@ const winner = await Promise.any(
                     <p className="text-lg text-emerald-200/70 max-w-2xl ml-auto mb-6">
                         The interface is built for "Information Density without Clutter." It uses cyclical rotations and glassmorphism to present complex data.
                     </p>
-                    <a href="https://github.com/riot-dev/xandeum-pulse/blob/main/pages/index.tsx" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-700 hover:border-emerald-500/50 text-xs font-bold text-zinc-400 hover:text-white transition-all group">
+                    <a href="https://github.com/Idle0x/xandeum-pulse/blob/main/pages/index.tsx" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-700 hover:border-emerald-500/50 text-xs font-bold text-zinc-400 hover:text-white transition-all group">
                         <Github size={14}/> View Dashboard Source <ExternalLink size={12} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity"/>
                     </a>
                 </div>
@@ -316,7 +320,7 @@ const winner = await Promise.any(
                     <p className="text-lg text-purple-200/70 max-w-2xl mb-6">
                         Static thresholds are obsolete. Pulse uses "Live Percentiles" to color-code the map, ensuring meaningful visualization regardless of network growth.
                     </p>
-                    <a href="https://github.com/riot-dev/xandeum-pulse/blob/main/pages/map.tsx" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-700 hover:border-purple-500/50 text-xs font-bold text-zinc-400 hover:text-white transition-all group">
+                    <a href="https://github.com/Idle0x/xandeum-pulse/blob/main/pages/map.tsx" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-700 hover:border-purple-500/50 text-xs font-bold text-zinc-400 hover:text-white transition-all group">
                         <Github size={14}/> View Map Source <ExternalLink size={12} className="text-purple-500 opacity-0 group-hover:opacity-100 transition-opacity"/>
                     </a>
                 </div>
@@ -378,19 +382,22 @@ const winner = await Promise.any(
                         <p className="text-sm text-zinc-400 mb-6">
                             It supports <strong>Geometric Stacking</strong> for Era and NFT boosts, meaning multipliers compound rather than add.
                         </p>
-                        
+
                         <HoloCode 
-                            filename="lib/calc.ts"
-                            githubLink="https://github.com/riot-dev/xandeum-pulse/blob/main/pages/leaderboard.tsx"
-                            code={`// Geometric Stacking Logic
-const calculateFinal = () => {
-   // Multipliers compound (multiply), not add
-   let multiplier = 1;
-   if (boosts.length > 0) {
-      multiplier = boosts.reduce((a, b) => a * b, 1);
-   }
-   return baseCredits * multiplier;
-};`}
+                            filename="pages/leaderboard.tsx"
+                            githubLink="https://github.com/Idle0x/xandeum-pulse/blob/main/pages/leaderboard.tsx"
+                            code={`// Geometric Mean Boost Formula
+let product = 1;
+
+// Multipliers compound (multiply) rather than add
+Object.entries(boostCounts).forEach(([name, count]) => {
+    const val = BOOSTS[name] || 1;
+    for(let i=0; i<count; i++) product *= val;
+});
+
+// Root based on node count to normalize fairness
+const geoMean = Math.pow(product, 1 / Math.max(1, simNodes));
+const boostedCredits = rawCredits * geoMean;`}
                         />
                     </div>
 
@@ -401,23 +408,21 @@ const calculateFinal = () => {
                             <h3 className="text-xl font-bold text-white">The Identity Bridge</h3>
                         </div>
                         <p className="text-sm text-zinc-400 leading-relaxed mb-6">
-                            Pulse acts as the bridge by performing a <strong>Dual-Fetch Resolution</strong> in <code className="text-green-400">api/stats.ts</code>. It maps the anonymous financial ledger to the physical network topology.
+                            Pulse acts as the bridge by performing a <strong>Dual-Fetch Resolution</strong> in <code className="text-green-400">lib/xandeum-brain.ts</code>. It maps the anonymous financial ledger to the physical network topology.
                         </p>
                         <HoloCode 
-                            filename="api/geo.ts"
-                            githubLink="https://github.com/riot-dev/xandeum-pulse/blob/main/pages/api/geo.ts"
-                            code={`// Linking Ledger to Topology
+                            filename="lib/xandeum-brain.ts"
+                            githubLink="https://github.com/Idle0x/xandeum-pulse/blob/main/lib/xandeum-brain.ts"
+                            code={`// Batch resolve IPs to physical locations (Lat/Lon)
 const resolveLocations = async (ips) => {
-  // Batch resolve IPs to lat/lon
-  const missing = ips.filter(ip => !cache.has(ip));
-  await axios.post('ip-api.com/batch', missing);
+  // Filter only new IPs to respect cache
+  const missing = ips.filter(ip => !geoCache.has(ip));
   
-  // Merge with Credit Ledger
-  return nodes.map(n => ({
-     ...n,
-     location: cache.get(n.ip),
-     credits: ledger.get(n.pubkey)
-  }));
+  // Batch request to IP-API (100 at a time)
+  const chunk = missing.slice(0, 100);
+  await axios.post('http://ip-api.com/batch', chunk.map(ip => ({ 
+      query: ip, fields: "lat,lon,country,city" 
+  })));
 }`}
                         />
                     </div>
@@ -432,7 +437,7 @@ const resolveLocations = async (ips) => {
         <div className="flex items-center justify-center gap-2 text-zinc-500 mb-6">
             <Cpu size={16} />
             <span className="font-mono text-sm">
-                Built by <a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 transition-colors font-bold">riot'</a> for the Xandeum ecosystem | <a href="https://github.com/riot-dev/xandeum-pulse" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white underline underline-offset-4 transition-colors">Open Source</a>
+                Built by <a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 transition-colors font-bold">riot'</a> for the Xandeum ecosystem | <a href="https://github.com/Idle0x/xandeum-pulse" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white underline underline-offset-4 transition-colors">Open Source</a>
             </span>
         </div>
         <p className="text-zinc-700 text-[10px] uppercase tracking-widest">
@@ -502,7 +507,7 @@ function HoloCode({ code, filename, githubLink }: { code: string, filename: stri
             <div className="p-4 overflow-x-auto relative">
                 {/* Scanline Effect */}
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%] pointer-events-none z-10 opacity-20"></div>
-                
+
                 <pre className="font-mono text-[10px] md:text-xs leading-relaxed text-zinc-300">
                     <code dangerouslySetInnerHTML={{ 
                         __html: displayedCode.replace(/\/\/.*/g, '<span class="text-zinc-500 italic">$&</span>')
