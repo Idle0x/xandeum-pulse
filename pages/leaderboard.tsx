@@ -9,7 +9,7 @@ import {
   Calculator, Zap, ChevronDown, 
   ExternalLink, ArrowUpRight, Eye, MapPin, Copy, Check, Share2, ArrowUp, ArrowDown,
   AlertOctagon, ChevronDown as ChevronIcon,
-  Layers, Info
+  Layers, Info, AlertTriangle
 } from 'lucide-react';
 
 // --- INTERFACES ---
@@ -54,18 +54,18 @@ export default function Leaderboard() {
   const [importKey, setImportKey] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
-  const [simNodes, setSimNodes] = useState<number>(1); // Default 1
-  const [simStorageVal, setSimStorageVal] = useState<number>(1);
-  const [simStorageUnit, setSimStorageUnit] = useState<'MB' | 'GB' | 'TB' | 'PB'>('TB');
+  const [simNodes, setSimNodes] = useState<number>(1);
+  const [simStorageVal, setSimStorageVal] = useState<number>(100); // Default 100
+  const [simStorageUnit, setSimStorageUnit] = useState<'MB' | 'GB' | 'TB' | 'PB'>('GB'); // Default GB
   const [simStake, setSimStake] = useState<number>(1000); 
-  const [simPerf, setSimPerf] = useState(0.95);
+  const [simPerf, setSimPerf] = useState<number>(1.0); // Default 1.0 (Max Performance)
 
   // Step 2 Inputs
   const [boostCounts, setBoostCounts] = useState<Record<string, number>>({});
 
   // Step 3 Inputs
-  const [simNetworkFees, setSimNetworkFees] = useState<number>(100); // Default 100
-  const [showFeeHelp, setShowFeeHelp] = useState(false); // Tooltip State
+  const [simNetworkFees, setSimNetworkFees] = useState<number>(100); 
+  const [showFeeHelp, setShowFeeHelp] = useState(false); 
 
   // --- UI STATE ---
   const [expandedNode, setExpandedNode] = useState<string | null>(null);
@@ -215,11 +215,18 @@ export default function Leaderboard() {
         return { rawCredits: 0, geoMean: 1, boostedCredits: existingNodeData.credits, share, stoinc };
     }
 
+    // BASE METRIC CALCULATION
+    // storageCredits = pNodes * storage * perf * stake
     let storageInGB = simStorageVal;
+    if (simStorageUnit === 'MB') storageInGB = simStorageVal / 1024; // Standard binary conversion or 1000 depending on preference, sticking to 1000 for simplicity as per common blockchain logic unless specified
     if (simStorageUnit === 'MB') storageInGB = simStorageVal / 1000;
     if (simStorageUnit === 'TB') storageInGB = simStorageVal * 1000;
     if (simStorageUnit === 'PB') storageInGB = simStorageVal * 1000000;
-    const rawCredits = simNodes * storageInGB * simPerf * simStake;
+    
+    // Performance capped logically at calculation, but validated at input
+    const validPerf = Math.min(1, Math.max(0, simPerf));
+    
+    const rawCredits = simNodes * storageInGB * validPerf * simStake;
 
     let product = 1;
     Object.entries(boostCounts).forEach(([name, count]) => {
@@ -276,6 +283,9 @@ export default function Leaderboard() {
       setVisibleCount(prev => prev + 100);
   };
 
+  // Validation for Step 1 Next Button
+  const isStep1Valid = simPerf >= 0 && simPerf <= 1;
+
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-2 md:p-8 selection:bg-yellow-500/30">
       <Head><title>Xandeum Pulse - Credits & Reputation</title></Head>
@@ -328,6 +338,7 @@ export default function Leaderboard() {
                               <p className="text-[10px] md:text-xs text-zinc-500 mt-1">Define your hardware baseline OR import an active node.</p>
                           </div>
 
+                          {/* IMPORT SECTION */}
                           <div className={`mb-6 md:mb-8 border rounded-xl p-3 md:p-4 flex flex-col md:flex-row gap-4 items-start transition-colors ${importError ? 'bg-red-500/10 border-red-500/30' : importSuccess ? 'bg-green-500/10 border-green-500/30' : 'bg-blue-500/10 border-blue-500/20'}`}>
                               <div className="flex-1 w-full">
                                   <label className={`text-[9px] md:text-[10px] font-bold uppercase mb-1 block ${importError ? 'text-red-400' : importSuccess ? 'text-green-400' : 'text-blue-300'}`}>
@@ -355,14 +366,16 @@ export default function Leaderboard() {
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8" onClick={() => { if(simMode === 'EXISTING') setSimMode('NEW'); }}>
                               <div className="space-y-4 md:space-y-6">
+                                  {/* NODES INPUT */}
                                   <div>
                                       <label className="text-[10px] text-zinc-400 uppercase font-bold flex justify-between mb-2"><span>Number of pNodes</span></label>
-                                      {/* Changed from Slider to Number Input */}
                                       <div className="relative">
                                           <input type="number" min="1" value={simNodes} onChange={(e) => setSimNodes(Math.max(1, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none focus:border-yellow-500 transition"/>
                                           <span className="absolute right-3 top-2 md:top-3 text-[10px] md:text-sm text-zinc-500 font-bold">NODES</span>
                                       </div>
                                   </div>
+                                  
+                                  {/* STORAGE INPUT */}
                                   <div>
                                       <label className="text-[10px] text-zinc-400 uppercase font-bold block mb-2">Total Storage</label>
                                       <div className="flex gap-2">
@@ -370,6 +383,28 @@ export default function Leaderboard() {
                                           <select value={simStorageUnit} onChange={(e) => setSimStorageUnit(e.target.value as any)} className="bg-zinc-900 border border-zinc-700 rounded-xl p-2 md:p-3 text-[10px] md:text-base text-zinc-300 font-bold outline-none"><option>MB</option><option>GB</option><option>TB</option><option>PB</option></select>
                                       </div>
                                   </div>
+
+                                  {/* PERFORMANCE INPUT (NEW) */}
+                                  <div>
+                                      <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simPerf > 1 || simPerf < 0 ? 'text-red-500' : 'text-zinc-400'}`}>
+                                          <span>Performance Score (0.0 - 1.0)</span>
+                                          {(simPerf > 1 || simPerf < 0) && <span className="flex items-center gap-1 text-red-500"><AlertTriangle size={10} /> INVALID</span>}
+                                      </label>
+                                      <div className="relative">
+                                          <input 
+                                              type="number" 
+                                              step="0.01" 
+                                              min="0" 
+                                              max="1" 
+                                              value={simPerf} 
+                                              onChange={(e) => setSimPerf(Number(e.target.value))} 
+                                              className={`w-full bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${simPerf > 1 || simPerf < 0 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}
+                                          />
+                                      </div>
+                                      <div className="text-[9px] text-zinc-600 mt-1">If performance is 0, rewards will be 0.</div>
+                                  </div>
+
+                                  {/* STAKE INPUT */}
                                   <div>
                                       <label className="text-[10px] text-zinc-400 uppercase font-bold block mb-2">Total Stake (XAND)</label>
                                       <input type="number" min="0" value={simStake} onChange={(e) => setSimStake(Math.max(0, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none focus:border-yellow-500 transition"/>
@@ -378,6 +413,9 @@ export default function Leaderboard() {
                               <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 md:p-6 flex flex-col justify-center items-center text-center">
                                   <div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold mb-1">Base Metric</div>
                                   <div className="text-2xl md:text-4xl font-mono font-bold text-white mb-2">{metrics.rawCredits.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                                  {metrics.rawCredits === 0 && (
+                                    <div className="text-red-400 text-[10px] font-bold mt-2 uppercase flex items-center gap-1 bg-red-500/10 px-2 py-1 rounded"><AlertTriangle size={10}/> Factors cannot be zero</div>
+                                  )}
                               </div>
                           </div>
                       </div>
@@ -505,9 +543,9 @@ export default function Leaderboard() {
                   <div className="p-3 md:p-4 border-t border-zinc-800 flex justify-between bg-black/20">
                       <button onClick={() => setSimStep(Math.max(0, simStep - 1))} disabled={simStep === 0} className={`px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold transition ${simStep === 0 ? 'opacity-0 pointer-events-none' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}>BACK</button>
                       {simStep < 2 ? (
-                          <button onClick={() => setSimStep(simStep + 1)} className="px-6 md:px-8 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-[10px] md:text-xs rounded-lg transition-colors flex items-center gap-2">NEXT STEP <ArrowUpRight size={14} /></button>
+                          <button onClick={() => isStep1Valid && setSimStep(simStep + 1)} disabled={!isStep1Valid} className={`px-6 md:px-8 py-2 font-bold text-[10px] md:text-xs rounded-lg transition-colors flex items-center gap-2 ${isStep1Valid ? 'bg-yellow-500 hover:bg-yellow-400 text-black' : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'}`}>NEXT STEP <ArrowUpRight size={14} /></button>
                       ) : (
-                          <button onClick={() => { setSimStep(0); setBoostCounts({}); setSimMode('NEW'); setExistingNodeData(null); setImportKey(''); }} className="px-6 md:px-8 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-[10px] md:text-xs rounded-lg transition-colors flex items-center gap-2">RESET <Activity size={14} /></button>
+                          <button onClick={() => { setSimStep(0); setBoostCounts({}); setSimMode('NEW'); setExistingNodeData(null); setImportKey(''); setSimPerf(1.0); }} className="px-6 md:px-8 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-[10px] md:text-xs rounded-lg transition-colors flex items-center gap-2">RESET <Activity size={14} /></button>
                       )}
                   </div>
               </div>
