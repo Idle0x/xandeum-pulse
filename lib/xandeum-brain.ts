@@ -11,8 +11,8 @@ const TIMEOUT_RPC = 4000;
 const TIMEOUT_CREDITS = 8000;
 
 // CORRECT API ENDPOINTS
-const API_CREDITS_MAINNET = 'https://podcredits.xandeum.network/api/pods-credits';
-const API_CREDITS_DEVNET  = 'https://podcredits.xandeum.network/api/devnet-pod-credits';
+const API_CREDITS_MAINNET = 'https://podcredits.xandeum.network/api/mainnet-pod-credits';
+const API_CREDITS_DEVNET  = 'https://podcredits.xandeum.network/api/pods-credits';
 
 const geoCache = new Map<string, { lat: number; lon: number; country: string; countryCode: string; city: string }>();
 
