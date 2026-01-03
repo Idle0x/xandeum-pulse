@@ -221,7 +221,7 @@ export default function DocsPage() {
                             Pulse employs a high-frequency trading strategy to ensure data availability. It races multiple RPC nodes simultaneously.
                         </p>
 
-                        {/* FAILOVER SNIPPET (FIXED) */}
+                        {/* FAILOVER SNIPPET (PURE LOGIC) */}
                         <div className="mt-8">
                              <HoloCode 
                                 filename="lib/xandeum-brain.ts"
@@ -256,7 +256,7 @@ const winner = await Promise.any(shuffled.map(ip =>
                              </div>
                         </div>
 
-                        {/* VITALITY SNIPPET (FIXED) */}
+                        {/* VITALITY SNIPPET (PURE LOGIC) */}
                         <HoloCode 
                                 filename="lib/xandeum-brain.ts"
                                 githubLink="https://github.com/Idle0x/xandeum-pulse/blob/main/lib/xandeum-brain.ts"
@@ -511,10 +511,6 @@ function HoloCode({ code, filename, githubLink }: { code: string, filename: stri
                 <pre className="font-mono text-[10px] md:text-xs leading-relaxed text-zinc-300">
                     <code dangerouslySetInnerHTML={{ 
                         __html: displayedCode.replace(/\/\/.*/g, '<span class="text-zinc-500 italic">$&</span>')
-                                           .replace(/const|let|var|return|await|async|if|else/g, '<span class="text-purple-400">$&</span>')
-                                           .replace(/function|=>|reduce|map|filter/g, '<span class="text-blue-400">$&</span>')
-                                           .replace(/'.*'|".*"/g, '<span class="text-green-400">$&</span>')
-                                           .replace(/\d+/g, '<span class="text-yellow-500">$&</span>')
                     }} />
                     <span className="inline-block w-2 h-4 bg-blue-500 ml-1 align-middle animate-pulse"></span>
                 </pre>
