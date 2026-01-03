@@ -801,7 +801,7 @@ export default function Home() {
     const dataUrl = await toPng(proofRef.current, {
       cacheBust: true,
       backgroundColor: '#09090b',
-      pixelRatio: 3, // Critical for tiny fonts
+      pixelRatio: 3, // Forces HD quality
     });
     const link = document.createElement('a');
     link.download = `xandeum-proof-${selectedNode?.pubkey?.slice(0,6) || 'node'}.png`;
@@ -2247,43 +2247,45 @@ export default function Home() {
                   <div className="flex flex-col md:flex-row gap-8 md:gap-16 itecenter">
                     <div
   ref={proofRef}
-  className="bg-zinc-950 border border-zinc-800 p-5 rounded-xl shadow-2xl w-full max-w-[300px] aspect-[3/4] relative overflow-hidden group flex flex-col"
+  // [STRATEGY]: h-fit ensures the box shrinks to fit content exactly. No empty space.
+  className="bg-zinc-950 border border-zinc-800 p-5 rounded-xl shadow-2xl w-full max-w-[300px] h-fit relative overflow-hidden group flex flex-col"
 >
   {/* Background Effects */}
   <div className="absolute top-0 right-0 p-24 bg-blue-500/10 blur-[50px] rounded-full pointer-events-none"></div>
 
-  {/* --- 1. HEADER SECTION --- */}
-  <div className="relative z-10 mb-4 shrink-0">
-    {/* TITLE (Left Aligned, Smaller) */}
-    <div className="flex items-center gap-1.5">
+  {/* --- 1. CENTERED HEADER --- */}
+  <div className="relative z-10 mb-4 text-center">
+    
+    {/* TITLE */}
+    <div className="flex items-center justify-center gap-1.5 mb-1">
       <Activity size={12} className="text-blue-500" />
       <h2 className="text-xs font-black text-white tracking-tighter uppercase">
         PROOF OF PULSE
       </h2>
     </div>
 
-    {/* IP & FLAG (Absolute Top Right, Tiny) */}
-    <div className="absolute top-0 right-0 flex items-center gap-1.5 opacity-80">
-      <span className="font-mono text-[9px] text-blue-400 font-bold tracking-wide">
+    {/* IP & FLAG (Centered Below) */}
+    <div className="flex items-center justify-center gap-1.5 opacity-90">
+      <span className="font-mono text-[10px] text-zinc-300 font-bold tracking-wide">
         {getSafeIp(selectedNode)}
       </span>
       {selectedNode?.location?.countryCode && (
         <img
           src={`https://flagcdn.com/w20/${selectedNode.location.countryCode.toLowerCase()}.png`}
           alt="flag"
-          className="w-3 h-auto rounded-[1px] opacity-80"
+          className="w-3 h-auto rounded-[1px]"
         />
       )}
     </div>
     
-    {/* Divider line moved up */}
-    <div className="h-px bg-zinc-800/50 w-full mt-2"></div>
+    {/* Divider */}
+    <div className="h-px bg-zinc-800/50 w-full mt-3"></div>
   </div>
 
-  {/* --- 2. COMPACT CARDS (Packed to the top) --- */}
+  {/* --- 2. COMPACT CARDS STACK --- */}
   <div className="relative z-10 flex flex-col gap-2">
     
-    {/* CARD 1: HEALTH (Inline, Single Line) */}
+    {/* CARD 1: HEALTH (Inline) */}
     <div className="bg-gradient-to-r from-green-900/10 to-transparent border border-green-500/20 rounded-lg px-3 py-2 flex items-center justify-between">
       <div className="flex items-center gap-1.5">
         <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
@@ -2296,7 +2298,7 @@ export default function Home() {
       </span>
     </div>
 
-    {/* CARD 2: STORAGE (Inline, Single Line) */}
+    {/* CARD 2: STORAGE (Inline) */}
     <div className="bg-gradient-to-r from-purple-900/10 to-transparent border border-purple-500/20 rounded-lg px-3 py-2 flex items-center justify-between">
       <div className="flex items-center gap-1.5">
         <Database size={8} className="text-purple-500" />
@@ -2337,15 +2339,15 @@ export default function Home() {
     </div>
   </div>
 
-  {/* --- 3. FOOTER (Pushed to bottom) --- */}
-  <div className="mt-auto relative z-10 text-center pt-3 border-t border-zinc-900">
+  {/* --- 3. FOOTER --- */}
+  <div className="mt-4 relative z-10 text-center pt-3 border-t border-zinc-900">
     <div className="text-[8px] text-zinc-600 font-mono flex items-center justify-center gap-1.5 uppercase tracking-widest">
       <Zap size={8} className="text-blue-600 fill-blue-600" /> 
       Verified by Pulse
     </div>
   </div>
 </div>
-
+                    
                     <div className="flex flex-col gap-3 w-full max-w-sm">
                       {/* --- NEW BACK BUTTON LAYOUT --- */}
                       <button
