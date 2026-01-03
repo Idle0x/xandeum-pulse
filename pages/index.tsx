@@ -796,25 +796,21 @@ export default function Home() {
   };
 
     const handleDownloadProof = async () => {
-    if (proofRef.current === null) return;
-    try {
-      const dataUrl = await toPng(proofRef.current, {
-        cacheBust: true,
-        backgroundColor: '#09090b',
-        pixelRatio: 3, // [Strategy 2] Forces 3x resolution (crisp text)
-        style: {
-           // Optional: Force exact styling during capture if CSS behaves oddly
-           fontFamily: 'sans-serif' 
-        }
-      });
-      const link = document.createElement('a');
-      link.download = `xandeum-proof-${selectedNode?.pubkey?.slice(0,6) || 'node'}.png`;
-      link.href = dataUrl;
-      link.click();
-    } catch (err) {
-      console.error("Failed to generate proof", err);
-    }
-  };
+  if (proofRef.current === null) return;
+  try {
+    const dataUrl = await toPng(proofRef.current, {
+      cacheBust: true,
+      backgroundColor: '#09090b',
+      pixelRatio: 3, // Critical for tiny fonts
+    });
+    const link = document.createElement('a');
+    link.download = `xandeum-proof-${selectedNode?.pubkey?.slice(0,6) || 'node'}.png`;
+    link.href = dataUrl;
+    link.click();
+  } catch (err) {
+    console.error("Failed to generate proof", err);
+  }
+};
 
   // --- SORTING LOGIC ---
   const handleSortChange = (metric: 'uptime' | 'version' | 'storage' | 'health') => {
@@ -2248,85 +2244,105 @@ export default function Home() {
                 </div>
               ) : shareMode ? (
                 <div className="flex flex-col items-center justify-center h-full animate-in zoom-in-95 duration-300 py-10">
-                  <div className="flex flex-col md:flex-row gap-8 md:gap-16 items-center">
+                  <div className="flex flex-col md:flex-row gap-8 md:gap-16 itecenter">
                     <div
+                      <div
   ref={proofRef}
-  // [Strategy 1] Fixed width 320px allows for better internal spacing than 300px
-  // while keeping aspect-[3/4] strict.
-  className="bg-zinc-950 border border-zinc-800 p-6 rounded-2xl shadow-2xl w-full max-w-[320px] aspect-[3/4] relative overflow-hidden group flex flex-col h-full justify-between"
+  className="bg-zinc-950 border border-zinc-800 p-5 rounded-xl shadow-2xl w-full max-w-[300px] aspect-[3/4] relative overflow-hidden group flex flex-col"
 >
   {/* Background Effects */}
-  <div className="absolute top-0 right-0 p-24 bg-blue-500/10 blur-[60px] rounded-full pointer-events-none"></div>
+  <div className="absolute top-0 right-0 p-24 bg-blue-500/10 blur-[50px] rounded-full pointer-events-none"></div>
 
-  {/* --- 1. HEADER (Shrink-0 prevents crushing) --- */}
-  <div className="relative z-10 text-center border-b border-zinc-800/50 pb-4 shrink-0">
-    <div className="flex items-center justify-center gap-2 mb-2">
-      <div className="p-1.5 bg-blue-500/10 rounded-lg">
-        <Activity size={16} className="text-blue-500" />
-      </div>
-      <h2 className="text-base font-extrabold text-white tracking-tight uppercase">
+  {/* --- 1. HEADER SECTION --- */}
+  <div className="relative z-10 mb-4 shrink-0">
+    {/* TITLE (Left Aligned, Smaller) */}
+    <div className="flex items-center gap-1.5">
+      <Activity size={12} className="text-blue-500" />
+      <h2 className="text-xs font-black text-white tracking-tighter uppercase">
         PROOF OF PULSE
       </h2>
     </div>
-    <p className="font-mono text-[11px] text-blue-400 font-bold bg-blue-900/20 py-1 px-3 rounded-full inline-block border border-blue-500/20">
-      {getSafeIp(selectedNode)}
-    </p>
+
+    {/* IP & FLAG (Absolute Top Right, Tiny) */}
+    <div className="absolute top-0 right-0 flex items-center gap-1.5 opacity-80">
+      <span className="font-mono text-[9px] text-blue-400 font-bold tracking-wide">
+        {getSafeIp(selectedNode)}
+      </span>
+      {selectedNode?.location?.countryCode && (
+        <img
+          src={`https://flagcdn.com/w20/${selectedNode.location.countryCode.toLowerCase()}.png`}
+          alt="flag"
+          className="w-3 h-auto rounded-[1px] opacity-80"
+        />
+      )}
+    </div>
+    
+    {/* Divider line moved up */}
+    <div className="h-px bg-zinc-800/50 w-full mt-2"></div>
   </div>
 
-  {/* --- 2. MIDDLE CONTENT (Flex-1 expands to fill gap) --- */}
-  <div className="relative z-10 flex-1 flex flex-col justify-center space-y-3 py-2">
+  {/* --- 2. COMPACT CARDS (Packed to the top) --- */}
+  <div className="relative z-10 flex flex-col gap-2">
     
-    {/* Health Card */}
-    <div className="bg-gradient-to-br from-green-500/10 to-green-900/5 border border-green-500/30 rounded-xl p-3 text-center flex items-center justify-between px-6">
-      <div className="text-[9px] text-green-500 uppercase font-bold tracking-wider text-left">
-        Health<br/>Score
+    {/* CARD 1: HEALTH (Inline, Single Line) */}
+    <div className="bg-gradient-to-r from-green-900/10 to-transparent border border-green-500/20 rounded-lg px-3 py-2 flex items-center justify-between">
+      <div className="flex items-center gap-1.5">
+        <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+        <span className="text-[9px] font-bold text-green-500 uppercase tracking-widest">
+          Health Score
+        </span>
       </div>
-      <div className="text-3xl font-black text-green-400">
+      <span className="font-mono font-bold text-sm text-white">
         {selectedNode?.health || 0}
-      </div>
+      </span>
     </div>
 
-    {/* Storage Card */}
-    <div className="bg-gradient-to-br from-purple-500/10 to-purple-900/5 border border-purple-500/30 rounded-xl p-3 text-center flex items-center justify-between px-6">
-      <div className="text-[9px] text-purple-500 uppercase font-bold tracking-wider text-left">
-        Storage<br/>Capacity
+    {/* CARD 2: STORAGE (Inline, Single Line) */}
+    <div className="bg-gradient-to-r from-purple-900/10 to-transparent border border-purple-500/20 rounded-lg px-3 py-2 flex items-center justify-between">
+      <div className="flex items-center gap-1.5">
+        <Database size={8} className="text-purple-500" />
+        <span className="text-[9px] font-bold text-purple-500 uppercase tracking-widest">
+          Storage
+        </span>
       </div>
-      <div className="text-xl font-black text-purple-400">
+      <span className="font-mono font-bold text-sm text-white">
         {formatBytes(selectedNode?.storage_committed)}
-      </div>
+      </span>
     </div>
 
-    {/* Split Bottom Cards */}
-    <div className="grid grid-cols-2 gap-3">
-      <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-900/5 border border-yellow-500/30 rounded-xl p-3 text-center flex flex-col justify-center">
-        <div className="text-lg font-black text-yellow-400 leading-none mb-1">
-          {selectedNode?.credits !== null
+    {/* CARD 3: SPLIT ROW (Credits & Version) */}
+    <div className="grid grid-cols-2 gap-2">
+      {/* Credits */}
+      <div className="bg-gradient-to-br from-yellow-500/5 to-transparent border border-yellow-500/20 rounded-lg p-2 flex flex-col items-center justify-center">
+        <span className="font-mono font-bold text-sm text-yellow-400 leading-none mb-1">
+           {selectedNode?.credits !== null
             ? (selectedNode?.credits >= 1000000 
                 ? (selectedNode.credits / 1000000).toFixed(1) + 'M' 
                 : selectedNode.credits.toLocaleString())
-            : 'N/A'}
-        </div>
-        <div className="text-[7px] text-yellow-500 uppercase font-bold tracking-wider">
-          Credits Earned
-        </div>
+            : '-'}
+        </span>
+        <span className="text-[7px] font-bold text-yellow-600 uppercase tracking-wider">
+          Credits
+        </span>
       </div>
 
-      <div className="bg-gradient-to-br from-blue-500/10 to-blue-900/5 border border-blue-500/30 rounded-xl p-3 text-center flex flex-col justify-center">
-        <div className="text-sm font-black text-white mb-1 font-mono">
+      {/* Version */}
+      <div className="bg-gradient-to-br from-blue-500/5 to-transparent border border-blue-500/20 rounded-lg p-2 flex flex-col items-center justify-center">
+        <span className="font-mono font-bold text-sm text-blue-200 leading-none mb-1">
           {getSafeVersion(selectedNode)}
-        </div>
-        <div className="text-[7px] text-blue-500 uppercase font-bold tracking-wider">
-          Node Version
-        </div>
+        </span>
+        <span className="text-[7px] font-bold text-blue-500 uppercase tracking-wider">
+          Version
+        </span>
       </div>
     </div>
   </div>
 
-  {/* --- 3. FOOTER (Shrink-0) --- */}
-  <div className="relative z-10 text-center pt-4 border-t border-zinc-800/50 shrink-0">
-    <div className="text-[9px] text-zinc-500 font-mono flex items-center justify-center gap-2">
-      <Zap size={10} className="text-blue-500 fill-blue-500" /> 
-      <span className="tracking-widest uppercase font-bold">Verified by Xandeum Pulse</span>
+  {/* --- 3. FOOTER (Pushed to bottom) --- */}
+  <div className="mt-auto relative z-10 text-center pt-3 border-t border-zinc-900">
+    <div className="text-[8px] text-zinc-600 font-mono flex items-center justify-center gap-1.5 uppercase tracking-widest">
+      <Zap size={8} className="text-blue-600 fill-blue-600" /> 
+      Verified by Pulse
     </div>
   </div>
 </div>
