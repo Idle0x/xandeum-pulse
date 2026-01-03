@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -9,7 +9,8 @@ import {
   Share2, Terminal, AlertTriangle, Monitor, AlertOctagon,
   ArrowRight, Camera, Swords, 
   ClipboardCopy, RefreshCw, RotateCcw, MapPin, Wallet, Star,
-  Eye, Search, Sliders, Radio, Grip, FileJson, Link as LinkIcon, Hash, Hand
+  Eye, Search, Sliders, Radio, Grip, FileJson, Link as LinkIcon, Hash, Hand,
+  WifiOff, Github, Code, ExternalLink
 } from 'lucide-react';
 
 export default function DocsPage() {
@@ -58,7 +59,7 @@ export default function DocsPage() {
             </div>
             <span className="text-xs md:text-sm font-bold text-zinc-400 group-hover:text-white transition-colors uppercase tracking-widest">Dashboard</span>
           </Link>
-          
+
           <div className="hidden md:flex items-center gap-6">
              {['flight', 'manual', 'brain', 'telemetry', 'spatial', 'economics'].map((tab) => (
                 <button 
@@ -87,13 +88,13 @@ export default function DocsPage() {
       </nav>
 
       <main className="pt-40 pb-32">
-        
+
         {/* ==========================================
             HERO: THE NERVOUS SYSTEM
            ========================================== */}
         <header className="max-w-5xl mx-auto px-6 mb-32 md:mb-40 text-center relative">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[500px] bg-blue-500/10 blur-[120px] rounded-full pointer-events-none"></div>
-            
+
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-zinc-900/80 border border-zinc-800 text-zinc-400 text-[10px] font-bold uppercase tracking-widest mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
                 <Cpu size={12} className="text-blue-500" /> v2.2 Architecture
             </div>
@@ -111,7 +112,6 @@ export default function DocsPage() {
            ========================================== */}
         <section id="flight" className="relative py-24 md:py-32 border-t border-zinc-900 bg-[#050505]">
              <div className="max-w-6xl mx-auto px-6">
-                {/* ALIGNED LEFT */}
                 <div className="text-left mb-16">
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-900/20 border border-blue-500/30 text-blue-400 text-[10px] font-bold uppercase tracking-widest mb-4">
                         <Terminal size={12} /> Interactive Walkthrough
@@ -125,13 +125,10 @@ export default function DocsPage() {
                     </p>
                 </div>
 
-                {/* THE COMPREHENSIVE SIMULATOR */}
-                {/* INCREASED HEIGHT TO 850px/900px to accommodate split screen */}
                 <div className="border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl bg-[#09090b] relative max-w-5xl mx-auto h-[850px] md:h-[900px] flex flex-col">
                     <PulseOS_Simulator />
                 </div>
-                
-                {/* RESET BUTTON OUTSIDE */}
+
                 <div className="flex justify-center mt-6">
                     <button 
                         onClick={() => window.location.reload()}
@@ -147,12 +144,9 @@ export default function DocsPage() {
             SECTION 1.5: THE FIELD MANUAL
            ========================================== */}
         <section id="manual" className="relative py-24 border-t border-zinc-900 bg-[#050505] overflow-hidden">
-            {/* Background Texture - Grid */}
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-            
+
             <div className="max-w-6xl mx-auto px-6 relative z-10">
-                
-                {/* HEADER - ALIGNED RIGHT */}
                 <div className="text-right mb-24 space-y-4 flex flex-col items-end">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-green-500/30 bg-green-900/10 text-green-400 text-[10px] font-mono font-bold tracking-widest uppercase mb-4 animate-pulse">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -163,126 +157,36 @@ export default function DocsPage() {
                     </h2>
                     <p className="text-zinc-400 text-sm md:text-base max-w-2xl leading-relaxed font-light">
                         Pulse is not a passive display. It is an active intelligence tool. 
-                        Master these <span className="text-white font-bold">7 Protocols</span> to achieve full network visibility.
+                        Master these <span className="text-white font-bold">8 Protocols</span> to achieve full network visibility.
                     </p>
                 </div>
 
-                {/* --- CONTENT CARDS (Staggered Grid) --- */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+                    {/* ... Existing Cards ... */}
+                    <div className="md:mt-0"><ManualCard type="CYCLIC" icon={Activity} title="Cyclic Metric Rotation" color="blue" tag="UX/UI" desc="Screen real estate is war. Node Cards automatically cycle their tertiary metric every 5 seconds. Storage → Capacity → Health." /></div>
+                    <div className="md:mt-24"><ManualCard type="ZEN" icon={Eye} title="Zen Mode" color="zinc" tag="OLED" desc="Visual noise kills focus. Click the Monitor Icon to engage Zen Mode. This strips away all gradients, blurs, and animations." /></div>
+                    <div className="md:mt-0"><ManualCard type="INSPECTOR" icon={Search} title="The Node Inspector" color="red" tag="DIAGNOSTICS" desc="Clicking any node opens the Inspector. This is the source of truth for raw Uptime, Storage, and Version data." /></div>
+                    <div className="md:mt-24"><ManualCard type="PROOF" icon={Share2} title="Proof of Pulse" color="green" tag="SOCIAL" desc="Generates a cryptographic snapshot of a node's specific block-height and health status into a shareable PNG." /></div>
+                    <div className="md:mt-0"><ManualCard type="TIERS" icon={MapIcon} title="Context-Aware Tiers" color="purple" tag="DYNAMIC" desc="The map rejects static thresholds. It uses Live Percentiles. A 'Gold' marker always represents the top 10% of nodes." /></div>
+                    <div className="md:mt-24"><ManualCard type="GHOST" icon={AlertTriangle} title="Ghost Nodes" color="yellow" tag="PRIVACY" desc="Nodes running on VPNs or private subnets are tracked in the stats but hidden from the map to prevent errors." /></div>
                     
+                    {/* NEW: CRASH PROTOCOLS CARD */}
                     <div className="md:mt-0">
                         <ManualCard 
-                            type="CYCLIC"
-                            icon={Activity} 
-                            title="Cyclic Metric Rotation" 
-                            color="blue"
-                            tag="UX/UI"
-                            desc="Screen real estate is war. Node Cards automatically cycle their tertiary metric every 5 seconds. Storage → Capacity → Health. Changing the 'Sort By' filter instantly snaps all cards to the relevant metric." 
-                        />
-                    </div>
-
-                    <div className="md:mt-24">
-                        <ManualCard 
-                            type="ZEN"
-                            icon={Eye} 
-                            title="Zen Mode" 
-                            color="zinc"
-                            tag="OLED"
-                            desc="Visual noise kills focus. Click the Monitor Icon to engage Zen Mode. This strips away all gradients, blurs, and animations, leaving a high-contrast, OLED-black interface designed for 24/7 dedicated status screens." 
-                        />
-                    </div>
-
-                    <div className="md:mt-0">
-                        <ManualCard 
-                            type="INSPECTOR"
-                            icon={Search} 
-                            title="The Node Inspector" 
+                            type="CRASH"
+                            icon={WifiOff} 
+                            title="Crash Protocols" 
                             color="red"
-                            tag="DIAGNOSTICS"
-                            desc="Clicking any node opens the Inspector. This is the source of truth. It breaks down the 'Vitality Score' into raw components: Uptime (Sigmoid Curve), Storage (Logarithmic Scale), and Consensus Version." 
+                            tag="REDUNDANCY"
+                            desc="Optimistic UI Architecture. If the upstream API fails, Pulse gracefully degrades. It switches to cached metrics or displays 'Offline' badges without breaking the rendering tree (White Screen of Death)." 
                         />
                     </div>
 
-                    <div className="md:mt-24">
-                        <ManualCard 
-                            type="PROOF"
-                            icon={Share2} 
-                            title="Proof of Pulse" 
-                            color="green"
-                            tag="SOCIAL"
-                            desc="Trust, but verify. Inside the Inspector, the Camera icon generates a 'Proof of Pulse'. This renders a cryptographic snapshot of that node's specific block-height and health status into a shareable PNG." 
-                        />
-                    </div>
-
-                    <div className="md:mt-0">
-                        <ManualCard 
-                            type="TIERS"
-                            icon={MapIcon} 
-                            title="Context-Aware Tiers" 
-                            color="purple"
-                            tag="DYNAMIC"
-                            desc="The map rejects static thresholds. It uses Live Percentiles. A 'Gold' marker always represents the top 10% of nodes, whether the network average is 1TB or 1PB. It adapts as the network grows." 
-                        />
-                    </div>
-
-                    <div className="md:mt-24">
-                        <ManualCard 
-                            type="GHOST"
-                            icon={AlertTriangle} 
-                            title="Ghost Nodes" 
-                            color="yellow"
-                            tag="PRIVACY"
-                            desc="Nodes running on VPNs or private subnets are tracked in the stats but hidden from the map to prevent geolocation errors. Look for the '⚠ Private Network' warning in the location headers." 
-                        />
-                    </div>
-
-                    <div className="md:mt-0">
-                        <ManualCard 
-                            type="STOINC"
-                            icon={Zap} 
-                            title="STOINC Simulator" 
-                            color="yellow"
-                            tag="CALCULATOR"
-                            desc="Found on the Leaderboard, this tool forecasts earnings based on hardware. It uses Geometric Stacking—meaning NFT boosts and Era multipliers compound upon each other rather than adding linearly." 
-                        />
-                    </div>
-
-                    <div className="md:mt-24">
-                        <ManualCard 
-                            type="IDENTITY"
-                            icon={Shield} 
-                            title="The Identity Bridge" 
-                            color="indigo"
-                            tag="BACKEND"
-                            desc="The Blockchain knows Keys. The Network knows IPs. Pulse acts as the bridge. We perform a 'Dual-Fetch Resolution' to link anonymous wallets to physical nodes, revealing where top earners are located." 
-                        />
-                    </div>
-
-                    <div className="md:mt-0">
-                        <ManualCard 
-                            type="VERSUS"
-                            icon={Swords} 
-                            title="Head-to-Head Engine" 
-                            color="red"
-                            tag="PVP"
-                            desc="Don't just guess which node is better. The 'Compare' button in the modal launches a direct PVP overlay. It highlights differentials in green (advantage) or red (deficit) for Uptime, Version, and Yield." 
-                        />
-                    </div>
-
-                    <div className="md:mt-24">
-                        <ManualCard 
-                            type="WHALE"
-                            icon={Trophy} 
-                            title="Whale Watching" 
-                            color="yellow"
-                            tag="TRACKING"
-                            desc="The Leaderboard isn't just a list. It tracks Rank Deltas. A green arrow (▲) means a node is climbing the reputation ladder. A red arrow (▼) means they are losing consensus favor. Use this to spot rising stars." 
-                        />
-                    </div>
-
+                    <div className="md:mt-24"><ManualCard type="STOINC" icon={Zap} title="STOINC Simulator" color="yellow" tag="CALCULATOR" desc="Forecasts earnings based on hardware using Geometric Stacking—boosts compound rather than add linearly." /></div>
+                    <div className="md:mt-0"><ManualCard type="IDENTITY" icon={Shield} title="The Identity Bridge" color="indigo" tag="BACKEND" desc="Links anonymous wallets to physical nodes via Dual-Fetch Resolution, revealing where top earners are located." /></div>
+                    <div className="md:mt-24"><ManualCard type="VERSUS" icon={Swords} title="Head-to-Head Engine" color="red" tag="PVP" desc="The 'Compare' button highlights differentials in green (advantage) or red (deficit) for Uptime, Version, and Yield." /></div>
                 </div>
-                
-                {/* ABSTRACT FOOTER FOR MANUAL */}
+
                 <div className="mt-32 max-w-2xl mx-auto text-center relative group cursor-pointer" onClick={() => scrollTo('brain')}>
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-purple-500/20 blur-[80px] rounded-full group-hover:bg-purple-500/40 transition-all"></div>
                     <Radio size={48} className="text-purple-400 mx-auto mb-6 relative z-10 animate-pulse" />
@@ -291,7 +195,6 @@ export default function DocsPage() {
                         The dashboard listens to the "Gossip Protocol." Like a stethoscope, the pulsing orbs represent actual data packets traversing the network.
                     </p>
                 </div>
-
             </div>
         </section>
 
@@ -315,17 +218,23 @@ export default function DocsPage() {
                     <div>
                         <h3 className="text-2xl font-bold text-white mb-4">"Hero & Race" Failover Strategy</h3>
                         <p className="text-zinc-400 mb-6 text-sm leading-relaxed">
-                            Pulse doesn't rely on a single endpoint. It employs a high-frequency trading strategy to ensure data availability.
+                            Pulse employs a high-frequency trading strategy to ensure data availability. It races multiple RPC nodes simultaneously.
                         </p>
-                        <div className="space-y-6">
-                            <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
-                                <strong className="text-white text-sm block mb-1">Phase 1: The Hero (4s Timeout)</strong>
-                                <p className="text-xs text-zinc-500">We attempt a connection to the Primary Seed. If it hangs for &gt;4s, we abort immediately.</p>
-                            </div>
-                            <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
-                                <strong className="text-white text-sm block mb-1">Phase 2: The Race (Promise.any)</strong>
-                                <p className="text-xs text-zinc-500">We shuffle the backup node pool and trigger 3 simultaneous requests. The first node to respond wins; the others are discarded.</p>
-                            </div>
+                        
+                        {/* FAILOVER SNIPPET */}
+                        <div className="mt-8">
+                             <HoloCode 
+                                filename="lib/brain.ts"
+                                githubLink="https://github.com/riot-dev/xandeum-pulse/blob/main/lib/xandeum-brain.ts"
+                                code={`// The Race: 3 Simultaneous Requests
+const winner = await Promise.any(
+  shuffled.map(ip => 
+    axios.post(\`http://\${ip}:6000/rpc\`, payload, { 
+       timeout: 4000 
+    }).then(r => r.data?.result?.pods || [])
+  )
+);`}
+                             />
                         </div>
                     </div>
                     <div className="bg-black/50 border border-indigo-500/20 rounded-3xl p-8 relative overflow-hidden backdrop-blur-sm">
@@ -340,26 +249,26 @@ export default function DocsPage() {
                         <p className="text-zinc-400 mb-6 text-sm leading-relaxed">
                             We use non-linear math to calculate a fair 0-100 score. A linear scale fails because the difference between 99% and 99.9% uptime is massive.
                         </p>
-                        
                         <div className="space-y-4 mb-8">
                              <div className="p-3 bg-zinc-900 border-l-2 border-blue-500">
                                 <div className="text-xs font-bold text-blue-400 uppercase mb-1">Sigmoid Uptime</div>
                                 <div className="text-[10px] text-zinc-500 font-mono">100 / (1 + e^(-0.2 * (days - 7)))</div>
                              </div>
-                             <div className="p-3 bg-zinc-900 border-l-2 border-purple-500">
-                                <div className="text-xs font-bold text-purple-400 uppercase mb-1">Logarithmic Storage</div>
-                                <div className="text-[10px] text-zinc-500 font-mono">50 * log2(ratio + 1) + UtilBonus</div>
-                             </div>
                         </div>
 
-                        <div className="p-4 bg-yellow-900/10 border border-yellow-500/20 rounded-xl">
-                            <h4 className="text-yellow-500 font-bold text-xs uppercase flex items-center gap-2 mb-2">
-                                <AlertTriangle size={14}/> Crashproof Re-Weighting
-                            </h4>
-                            <p className="text-[10px] text-zinc-400 leading-relaxed">
-                                If the Credits API goes offline, the Brain detects the <code className="text-zinc-300">null</code> payload and automatically shifts the scoring weights. Toggle the <strong>API Status</strong> switch in the simulator to see this live.
-                            </p>
-                        </div>
+                        {/* VITALITY SNIPPET */}
+                        <HoloCode 
+                                filename="lib/scoring.ts"
+                                githubLink="https://github.com/riot-dev/xandeum-pulse/blob/main/lib/xandeum-brain.ts"
+                                code={`const calculateVitality = (up, store, cred) => {
+  // Non-linear Sigmoid Curve
+  const uScore = 100 / (1 + Math.exp(-0.2*(up-7)));
+  // Logarithmic Scale for Storage
+  const sScore = 50 * Math.log2(store + 1);
+  
+  return (uScore * 0.35) + (sScore * 0.30) + (cred * 0.20);
+}`}
+                        />
                     </div>
                     <div className="lg:col-span-7">
                         <VitalitySimulator />
@@ -373,14 +282,17 @@ export default function DocsPage() {
            ========================================== */}
         <section id="telemetry" className="relative py-24 md:py-32 border-t border-zinc-900 bg-gradient-to-b from-[#050505] to-emerald-950/10">
             <div className="max-w-6xl mx-auto px-6">
-                <div className="mb-20 text-right">
+                <div className="mb-20 flex flex-col items-end text-right">
                     <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-6 flex items-center justify-end gap-4">
                         Telemetry & UX
                         <div className="p-3 bg-emerald-600 rounded-2xl shadow-[0_0_30px_rgba(16,185,129,0.3)]"><Activity size={28} className="text-white" /></div>
                     </h2>
-                    <p className="text-lg text-emerald-200/70 max-w-2xl ml-auto">
+                    <p className="text-lg text-emerald-200/70 max-w-2xl ml-auto mb-6">
                         The interface is built for "Information Density without Clutter." It uses cyclical rotations and glassmorphism to present complex data.
                     </p>
+                    <a href="https://github.com/riot-dev/xandeum-pulse/blob/main/pages/index.tsx" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-700 hover:border-emerald-500/50 text-xs font-bold text-zinc-400 hover:text-white transition-all group">
+                        <Github size={14}/> View Dashboard Source <ExternalLink size={12} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity"/>
+                    </a>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-24">
@@ -401,16 +313,19 @@ export default function DocsPage() {
                         <div className="p-3 bg-purple-600 rounded-2xl shadow-[0_0_30px_rgba(147,51,234,0.3)]"><Globe size={28} className="text-white" /></div>
                         Spatial Intelligence
                     </h2>
-                    <p className="text-lg text-purple-200/70 max-w-2xl">
+                    <p className="text-lg text-purple-200/70 max-w-2xl mb-6">
                         Static thresholds are obsolete. Pulse uses "Live Percentiles" to color-code the map, ensuring meaningful visualization regardless of network growth.
                     </p>
+                    <a href="https://github.com/riot-dev/xandeum-pulse/blob/main/pages/map.tsx" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-700 hover:border-purple-500/50 text-xs font-bold text-zinc-400 hover:text-white transition-all group">
+                        <Github size={14}/> View Map Source <ExternalLink size={12} className="text-purple-500 opacity-0 group-hover:opacity-100 transition-opacity"/>
+                    </a>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-24">
                     <div className="bg-black border border-zinc-800 rounded-3xl p-8 relative shadow-2xl">
                         <XRaySimulator />
                     </div>
-                    
+
                     <div>
                         <h3 className="text-2xl font-bold text-white mb-6">Context-Aware X-Ray</h3>
                         <p className="text-zinc-400 text-sm mb-8 leading-relaxed">
@@ -458,22 +373,25 @@ export default function DocsPage() {
                     <div className="bg-black border border-zinc-800 rounded-3xl p-10">
                         <div className="flex items-center gap-3 mb-6">
                             <Zap className="text-yellow-500" />
-                            <h3 className="text-xl font-bold text-white">STOINC Simulator</h3>
+                            <h3 className="text-xl font-bold text-white">STOINC Simulator Logic</h3>
                         </div>
-                        <div className="prose prose-invert prose-sm text-zinc-400">
-                            <p>
-                                Forecasting earnings involves complex multipliers. The Simulator allows users to input hardware specs to estimate base credits.
-                            </p>
-                            <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl font-mono text-xs mt-4 mb-4">
-                                <div className="text-zinc-500">// Simulator Logic</div>
-                                <div className="text-blue-400">const</div> base = Nodes * Storage * Stake;<br/>
-                                <div className="text-blue-400">const</div> multiplier = Boosts.<div className="text-yellow-400 inline">reduce</div>((a,b) =&gt; a * b, 1);<br/>
-                                <div className="text-purple-400">return</div> base * multiplier;
-                            </div>
-                            <p>
-                                It supports <strong>Geometric Stacking</strong> for Era and NFT boosts, meaning multipliers compound rather than add.
-                            </p>
-                        </div>
+                        <p className="text-sm text-zinc-400 mb-6">
+                            It supports <strong>Geometric Stacking</strong> for Era and NFT boosts, meaning multipliers compound rather than add.
+                        </p>
+                        
+                        <HoloCode 
+                            filename="lib/calc.ts"
+                            githubLink="https://github.com/riot-dev/xandeum-pulse/blob/main/pages/leaderboard.tsx"
+                            code={`// Geometric Stacking Logic
+const calculateFinal = () => {
+   // Multipliers compound (multiply), not add
+   let multiplier = 1;
+   if (boosts.length > 0) {
+      multiplier = boosts.reduce((a, b) => a * b, 1);
+   }
+   return baseCredits * multiplier;
+};`}
+                        />
                     </div>
 
                     {/* Identity Bridge */}
@@ -483,15 +401,25 @@ export default function DocsPage() {
                             <h3 className="text-xl font-bold text-white">The Identity Bridge</h3>
                         </div>
                         <p className="text-sm text-zinc-400 leading-relaxed mb-6">
-                            Pulse acts as the bridge by performing a <strong>Dual-Fetch Resolution</strong> in <code className="text-green-400">api/stats.ts</code>. It maps the anonymous financial ledger to the physical network topology, allowing you to see exactly <em>where</em> the top earners are located.
+                            Pulse acts as the bridge by performing a <strong>Dual-Fetch Resolution</strong> in <code className="text-green-400">api/stats.ts</code>. It maps the anonymous financial ledger to the physical network topology.
                         </p>
-                        <div className="flex items-center gap-2 text-xs font-mono bg-zinc-900 p-2 rounded border border-zinc-800">
-                            <span className="text-yellow-500">Credits API</span>
-                            <span className="text-zinc-600">--&gt;</span>
-                            <span className="text-white font-bold">PULSE</span>
-                            <span className="text-zinc-600">&lt;--</span>
-                            <span className="text-blue-500">RPC Nodes</span>
-                        </div>
+                        <HoloCode 
+                            filename="api/geo.ts"
+                            githubLink="https://github.com/riot-dev/xandeum-pulse/blob/main/pages/api/geo.ts"
+                            code={`// Linking Ledger to Topology
+const resolveLocations = async (ips) => {
+  // Batch resolve IPs to lat/lon
+  const missing = ips.filter(ip => !cache.has(ip));
+  await axios.post('ip-api.com/batch', missing);
+  
+  // Merge with Credit Ledger
+  return nodes.map(n => ({
+     ...n,
+     location: cache.get(n.ip),
+     credits: ledger.get(n.pubkey)
+  }));
+}`}
+                        />
                     </div>
                 </div>
             </div>
@@ -504,7 +432,7 @@ export default function DocsPage() {
         <div className="flex items-center justify-center gap-2 text-zinc-500 mb-6">
             <Cpu size={16} />
             <span className="font-mono text-sm">
-                Built by <a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 transition-colors font-bold">riot'</a> for the Xandeum ecosystem
+                Built by <a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 transition-colors font-bold">riot'</a> for the Xandeum ecosystem | <a href="https://github.com/riot-dev/xandeum-pulse" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white underline underline-offset-4 transition-colors">Open Source</a>
             </span>
         </div>
         <p className="text-zinc-700 text-[10px] uppercase tracking-widest">
@@ -515,6 +443,80 @@ export default function DocsPage() {
   );
 }
 
+// ==========================================
+// HOLO CODE HUB
+// ==========================================
+
+function HoloCode({ code, filename, githubLink }: { code: string, filename: string, githubLink: string }) {
+    const [displayedCode, setDisplayedCode] = useState('');
+    const [isCopied, setIsCopied] = useState(false);
+    const [hasTyped, setHasTyped] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Intersection Observer for Typewriter Effect
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && !hasTyped) {
+                    setHasTyped(true);
+                    let i = 0;
+                    const interval = setInterval(() => {
+                        setDisplayedCode(code.slice(0, i));
+                        i++;
+                        if (i > code.length) clearInterval(interval);
+                    }, 10);
+                }
+            },
+            { threshold: 0.5 }
+        );
+
+        if (containerRef.current) observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, [code, hasTyped]);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(code);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+    };
+
+    return (
+        <div ref={containerRef} className="relative group rounded-xl overflow-hidden border border-blue-500/20 bg-[#0a0a0c] shadow-2xl backdrop-blur-sm">
+            {/* Glass Header */}
+            <div className="flex justify-between items-center px-4 py-2 border-b border-white/5 bg-white/5">
+                <div className="flex items-center gap-2">
+                    <Code size={12} className="text-blue-400"/>
+                    <span className="text-[10px] font-mono text-blue-300/80">{filename}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <a href={githubLink} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded hover:bg-white/10 text-zinc-500 hover:text-white transition-colors" title="View on GitHub">
+                        <Github size={12}/>
+                    </a>
+                    <button onClick={handleCopy} className="p-1.5 rounded hover:bg-white/10 text-zinc-500 hover:text-white transition-colors" title="Copy Snippet">
+                        {isCopied ? <Check size={12} className="text-green-500"/> : <ClipboardCopy size={12}/>}
+                    </button>
+                </div>
+            </div>
+
+            {/* Code Body */}
+            <div className="p-4 overflow-x-auto relative">
+                {/* Scanline Effect */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%] pointer-events-none z-10 opacity-20"></div>
+                
+                <pre className="font-mono text-[10px] md:text-xs leading-relaxed text-zinc-300">
+                    <code dangerouslySetInnerHTML={{ 
+                        __html: displayedCode.replace(/\/\/.*/g, '<span class="text-zinc-500 italic">$&</span>')
+                                           .replace(/const|let|var|return|await|async|if|else/g, '<span class="text-purple-400">$&</span>')
+                                           .replace(/function|=>|reduce|map|filter/g, '<span class="text-blue-400">$&</span>')
+                                           .replace(/'.*'|".*"/g, '<span class="text-green-400">$&</span>')
+                                           .replace(/\d+/g, '<span class="text-yellow-500">$&</span>')
+                    }} />
+                    <span className="inline-block w-2 h-4 bg-blue-500 ml-1 align-middle animate-pulse"></span>
+                </pre>
+            </div>
+        </div>
+    );
+}
 
 // ==========================================
 // COMPREHENSIVE PULSE OS SIMULATOR (V5.1 - FIXED MAP LAYOUT & LOGIC)
@@ -522,13 +524,13 @@ export default function DocsPage() {
 
 function PulseOS_Simulator() {
     type View = 'DASH' | 'MODAL' | 'MAP' | 'HEALTH_SIM' | 'LEADERBOARD_SIM' | 'COMPARE' | 'PROOF';
-    
+
     // NAVIGATION & SYSTEM STATE
     const [view, setView] = useState<View>('DASH');
     const [url, setUrl] = useState('https://xandeum-pulse.vercel.app');
     const [isAnimating, setIsAnimating] = useState(false);
     const [readyButtons, setReadyButtons] = useState<string[]>([]);
-    
+
     // --- MAP STATE ---
     type MapStage = 'IDLE' | 'SELECTED' | 'DRAWER_OPEN' | 'SCROLLING' | 'EXPANDED';
     const [mapStage, setMapStage] = useState<MapStage>('IDLE');
@@ -571,7 +573,7 @@ function PulseOS_Simulator() {
     const navigate = (target: View, animationDuration = 1000, urlSuffix = '') => {
         setReadyButtons([]); 
         setIsAnimating(true);
-        
+
         // URL Bar Updates
         let newUrl = 'https://xandeum-pulse.vercel.app';
         if (target === 'MODAL') newUrl += '/?open=8x...2A';
@@ -583,7 +585,7 @@ function PulseOS_Simulator() {
         setTimeout(() => {
             setView(target);
             setIsAnimating(false);
-            
+
             // --- SCENARIO SPECIFIC INIT LOGIC ---
 
             // 1. HEALTH SIMULATION
@@ -600,7 +602,7 @@ function PulseOS_Simulator() {
                     setHealthScore(score);
                 }, 50);
             }
-            
+
             // 2. LEADERBOARD SIM
             else if (target === 'LEADERBOARD_SIM') {
                 setTimeout(() => setReadyButtons(['lb-row-3']), 800);
@@ -682,7 +684,7 @@ function PulseOS_Simulator() {
 
             {/* --- VIEWPORT --- */}
             <div className="flex-1 relative bg-black overflow-hidden h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-zinc-900/50 via-black to-black">
-                
+
                 {/* =======================================
                     VIEW: DASHBOARD
                    ======================================= */}
@@ -715,7 +717,7 @@ function PulseOS_Simulator() {
                                     </div>
                                     <div className="text-2xl md:text-3xl font-bold text-white">{i===1 ? '98%' : `${40 + i*5}%`}</div>
                                     <div className="text-[9px] text-zinc-600">Health Score</div>
-                                    
+
                                     {i===1 && readyButtons.includes('card-1') && (
                                         <div className="absolute -top-2 -right-2 bg-blue-600 text-white text-[8px] md:text-[9px] font-bold px-2 py-1 rounded-full animate-bounce shadow-lg z-10">
                                             CLICK HERE
@@ -857,7 +859,7 @@ function PulseOS_Simulator() {
                                         <span className="text-sm font-bold text-white">Diagnostics & Vitality</span>
                                         <span className="text-[10px] text-green-400 bg-green-900/20 px-2 py-1 rounded border border-green-900/50">TOP 1% NETWORK</span>
                                     </div>
-                                    
+
                                     {['Storage Capacity', 'Reputation Score', 'Uptime Stability'].map((label, idx) => (
                                         <div key={label} className="space-y-1">
                                             <div className="flex justify-between text-[10px] text-zinc-500 font-bold uppercase">
@@ -874,7 +876,7 @@ function PulseOS_Simulator() {
                                     ))}
                                 </div>
                             </div>
-                            
+
                             {/* Footer / Back Button */}
                             <div className="p-4 bg-zinc-900/50 border-t border-zinc-800 flex justify-center">
                                 <button 
@@ -918,10 +920,10 @@ function PulseOS_Simulator() {
                    ======================================= */}
                 {view === 'MAP' && (
                     <div className="absolute inset-0 bg-[#050505] z-30 flex flex-col animate-in zoom-in-90 duration-700">
-                        
+
                         {/* 1. TOP MAP SECTION (Transitions to 45% height) */}
                         <div className={`relative w-full transition-all duration-700 ease-in-out bg-[#0a0a0a] overflow-hidden flex flex-col ${mapStage === 'EXPANDED' ? 'h-[45%]' : 'h-full'}`}>
-                            
+
                             {/* Map Header */}
                             <div className="p-3 md:p-4 bg-black/80 border-b border-zinc-800 flex justify-between items-center shrink-0 z-10">
                                 <div className="text-sm font-bold text-white flex items-center gap-2">
@@ -965,11 +967,11 @@ function PulseOS_Simulator() {
 
                         {/* 2. BOTTOM DRAWER SECTION (Transitions to 55% height) */}
                         <div className={`w-full bg-[#09090b] border-t border-zinc-800 transition-all duration-700 ease-in-out flex flex-col relative ${mapStage === 'EXPANDED' ? 'h-[55%]' : 'h-0'}`}>
-                            
+
                             {/* DRAWER CONTENT */}
                             {mapStage === 'EXPANDED' && (
                                 <div className="flex-1 flex flex-col p-6 animate-in slide-in-from-bottom duration-700 fade-in">
-                                    
+
                                     {/* Header & Back */}
                                     <div className="flex justify-between items-start mb-6 shrink-0">
                                         <div>
@@ -1128,7 +1130,7 @@ function PulseOS_Simulator() {
                                         {/* Generated Proof Card */}
                                         <div className="w-64 md:w-80 bg-zinc-950 border-2 border-green-500/50 rounded-2xl p-6 mb-8 relative shadow-[0_0_40px_rgba(16,185,129,0.3)] animate-in zoom-in duration-500">
                                             <div className="absolute top-0 right-0 p-20 bg-green-500/10 blur-3xl rounded-full"></div>
-                                            
+
                                             <div className="text-center relative z-10">
                                                 <div className="inline-block p-3 bg-zinc-900 rounded-xl mb-4 border border-zinc-800">
                                                     <Activity size={32} className="text-green-500" />
@@ -1196,28 +1198,28 @@ function VitalitySimulator() {
     const [credits, setCredits] = useState(5000);
     const [versionGap, setVersionGap] = useState(0);
     const [apiOnline, setApiOnline] = useState(true);
-    
+
     const uScore = Math.min(100, Math.round(100 / (1 + Math.exp(-0.2 * (uptimeDays - 7)))));
     const sScore = Math.min(100, Math.round(50 * Math.log2((storageTB/1) + 1)));
     const cScore = apiOnline ? Math.min(100, Math.round((credits / 10000) * 100)) : 0;
     const vScore = versionGap === 0 ? 100 : versionGap === 1 ? 90 : versionGap === 2 ? 70 : 30;
-    
+
     let totalScore = 0;
     if (apiOnline) {
         totalScore = Math.round((uScore * 0.35) + (sScore * 0.30) + (cScore * 0.20) + (vScore * 0.15));
     } else {
         totalScore = Math.round((uScore * 0.45) + (sScore * 0.35) + (vScore * 0.20));
     }
-    
+
     return (
         <div className="bg-black border border-zinc-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
             <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r transition-all duration-500 ${apiOnline ? 'from-blue-500 via-purple-500 to-green-500' : 'from-red-500 via-orange-500 to-yellow-500'}`}></div>
-            
+
             <div className="flex justify-between items-center mb-6">
                 <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                     <Activity size={14} /> Vitality Engine
                 </span>
-                
+
                 <div className="relative">
                     {/* Bouncing Label */}
                     <div className="absolute -top-8 right-0 bg-blue-600 text-white text-[9px] font-bold px-2 py-1 rounded-full animate-bounce whitespace-nowrap shadow-lg z-10">
@@ -1239,7 +1241,7 @@ function VitalitySimulator() {
                 </div>
                 <div className="text-xs text-zinc-500 mt-2 font-mono">LIVE SCORE CALCULATION</div>
             </div>
-            
+
             <div className="space-y-6">
                 <div>
                     <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wider">
@@ -1312,7 +1314,7 @@ function FailoverVisualizer() {
                 {step === 1 && <div className="absolute top-1/2 left-16 w-3 h-3 bg-blue-500 rounded-full -translate-y-1/2 animate-[ping_1s_infinite]"></div>}
                 {step === 2 && <div className="absolute top-1/2 left-1/2 w-4 h-4 bg-red-500 rounded-full -translate-y-1/2"></div>}
                 {step === 3 && <><div className="absolute top-1/3 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><div className="absolute top-1/2 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><div className="absolute top-2/3 left-1/3 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div></>}
-                
+
                 <div className="z-10 flex flex-col gap-2">
                     <div className={`px-3 py-1 rounded border text-[10px] font-bold transition-all ${step === 2 ? 'bg-red-500/10 border-red-500 text-red-500' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>Primary</div>
                     <div className={`px-3 py-1 rounded border text-[10px] font-bold transition-all ${step >= 4 ? 'bg-green-500/10 border-green-500 text-green-500 scale-105' : 'bg-zinc-900 border-zinc-700 text-zinc-500'}`}>Backups</div>
@@ -1349,14 +1351,14 @@ function XRaySimulator() {
                         {mode === 'STORAGE' ? '1.2 PB' : mode === 'HEALTH' ? '98% Score' : '5.2M Cr'}
                     </div>
                 </div>
-                
+
                 <div className="bg-black/50 p-4 rounded-xl border border-white/5 relative z-10">
                     <div className="flex justify-center mb-4">
                         <span className={`text-[10px] uppercase font-bold px-3 py-1.5 rounded border tracking-widest ${mode === 'STORAGE' ? 'text-indigo-400 border-indigo-500/30' : mode === 'HEALTH' ? 'text-emerald-400 border-emerald-500/30' : 'text-yellow-500 border-yellow-500/30'}`}>
                             {mode === 'STORAGE' ? 'MASSIVE TIER' : mode === 'HEALTH' ? 'FLAWLESS TIER' : 'ELITE EARNER'}
                         </span>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4 text-center">
                         <div>
                             <div className="text-[10px] text-zinc-500 uppercase mb-1 font-bold">
