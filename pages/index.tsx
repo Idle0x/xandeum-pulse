@@ -795,12 +795,17 @@ export default function Home() {
     a.click();
   };
 
-  const handleDownloadProof = async () => {
+    const handleDownloadProof = async () => {
     if (proofRef.current === null) return;
     try {
       const dataUrl = await toPng(proofRef.current, {
         cacheBust: true,
-        backgroundColor: '#09090b'
+        backgroundColor: '#09090b',
+        pixelRatio: 3, // [Strategy 2] Forces 3x resolution (crisp text)
+        style: {
+           // Optional: Force exact styling during capture if CSS behaves oddly
+           fontFamily: 'sans-serif' 
+        }
       });
       const link = document.createElement('a');
       link.download = `xandeum-proof-${selectedNode?.pubkey?.slice(0,6) || 'node'}.png`;
@@ -2245,77 +2250,86 @@ export default function Home() {
                 <div className="flex flex-col items-center justify-center h-full animate-in zoom-in-95 duration-300 py-10">
                   <div className="flex flex-col md:flex-row gap-8 md:gap-16 items-center">
                     <div
-                      ref={proofRef}
-                      className="bg-zinc-950 border border-zinc-800 p-4 rounded-2xl shadow-2xl w-full max-w-[300px] aspect-[3/4] relative overflow-hidden group flex flex-col"
-                    >
-                      <div className="absolute top-0 right-0 p-24 bg-blue-500/10 blur-[60px] rounded-full pointer-events-none"></div>
-                      
-                      {/* Compact Header */}
-                      <div className="relative z-10 text-center mb-3 pb-3 border-b border-zinc-800/50">
-                        <div className="flex items-center justify-center gap-1.5 mb-1">
-                          <Activity size={14} className="text-blue-500" />
-                          <h2 className="text-sm font-extrabold text-white tracking-tight uppercase">
-                            PROOF OF PULSE
-                          </h2>
-                        </div>
-                        <p className="font-mono text-[10px] text-blue-400 font-bold">
-                          {getSafeIp(selectedNode)}
-                        </p>
-                      </div>
+  ref={proofRef}
+  // [Strategy 1] Fixed width 320px allows for better internal spacing than 300px
+  // while keeping aspect-[3/4] strict.
+  className="bg-zinc-950 border border-zinc-800 p-6 rounded-2xl shadow-2xl w-full max-w-[320px] aspect-[3/4] relative overflow-hidden group flex flex-col h-full justify-between"
+>
+  {/* Background Effects */}
+  <div className="absolute top-0 right-0 p-24 bg-blue-500/10 blur-[60px] rounded-full pointer-events-none"></div>
 
-                      {/* Compact Card Stack */}
-                      <div className="relative z-10 flex-1 flex flex-col justify-center space-y-2">
-                        {/* Health Card */}
-                        <div className="bg-gradient-to-br from-green-500/10 to-green-900/5 border border-green-500/30 rounded-lg p-2.5 text-center">
-                          <div className="text-[8px] text-green-500 uppercase font-bold tracking-wider mb-0.5">
-                            Health Score
-                          </div>
-                          <div className="text-2xl font-black text-green-400">
-                            {selectedNode.health}
-                          </div>
-                        </div>
+  {/* --- 1. HEADER (Shrink-0 prevents crushing) --- */}
+  <div className="relative z-10 text-center border-b border-zinc-800/50 pb-4 shrink-0">
+    <div className="flex items-center justify-center gap-2 mb-2">
+      <div className="p-1.5 bg-blue-500/10 rounded-lg">
+        <Activity size={16} className="text-blue-500" />
+      </div>
+      <h2 className="text-base font-extrabold text-white tracking-tight uppercase">
+        PROOF OF PULSE
+      </h2>
+    </div>
+    <p className="font-mono text-[11px] text-blue-400 font-bold bg-blue-900/20 py-1 px-3 rounded-full inline-block border border-blue-500/20">
+      {getSafeIp(selectedNode)}
+    </p>
+  </div>
 
-                        {/* Storage Card */}
-                        <div className="bg-gradient-to-br from-purple-500/10 to-purple-900/5 border border-purple-500/30 rounded-lg p-2.5 text-center">
-                          <div className="text-[8px] text-purple-500 uppercase font-bold tracking-wider mb-0.5">
-                            Storage Capacity
-                          </div>
-                          <div className="text-lg font-black text-purple-400">
-                            {formatBytes(selectedNode.storage_committed)}
-                          </div>
-                        </div>
+  {/* --- 2. MIDDLE CONTENT (Flex-1 expands to fill gap) --- */}
+  <div className="relative z-10 flex-1 flex flex-col justify-center space-y-3 py-2">
+    
+    {/* Health Card */}
+    <div className="bg-gradient-to-br from-green-500/10 to-green-900/5 border border-green-500/30 rounded-xl p-3 text-center flex items-center justify-between px-6">
+      <div className="text-[9px] text-green-500 uppercase font-bold tracking-wider text-left">
+        Health<br/>Score
+      </div>
+      <div className="text-3xl font-black text-green-400">
+        {selectedNode?.health || 0}
+      </div>
+    </div>
 
-                        {/* Split Bottom Cards */}
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-900/5 border border-yellow-500/30 rounded-lg p-2 text-center">
-                            <div className="text-base font-black text-yellow-400 mb-0.5">
-                              {selectedNode.credits !== null
-                                ? selectedNode.credits.toLocaleString()
-                                : 'N/A'}
-                            </div>
-                            <div className="text-[7px] text-yellow-500 uppercase font-bold tracking-wider">
-                              Credits
-                            </div>
-                          </div>
+    {/* Storage Card */}
+    <div className="bg-gradient-to-br from-purple-500/10 to-purple-900/5 border border-purple-500/30 rounded-xl p-3 text-center flex items-center justify-between px-6">
+      <div className="text-[9px] text-purple-500 uppercase font-bold tracking-wider text-left">
+        Storage<br/>Capacity
+      </div>
+      <div className="text-xl font-black text-purple-400">
+        {formatBytes(selectedNode?.storage_committed)}
+      </div>
+    </div>
 
-                          <div className="bg-gradient-to-br from-blue-500/10 to-blue-900/5 border border-blue-500/30 rounded-lg p-2 text-center">
-                            <div className="text-sm font-black text-white mb-0.5 font-mono">
-                              {getSafeVersion(selectedNode)}
-                            </div>
-                            <div className="text-[7px] text-blue-500 uppercase font-bold tracking-wider">
-                              Version
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+    {/* Split Bottom Cards */}
+    <div className="grid grid-cols-2 gap-3">
+      <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-900/5 border border-yellow-500/30 rounded-xl p-3 text-center flex flex-col justify-center">
+        <div className="text-lg font-black text-yellow-400 leading-none mb-1">
+          {selectedNode?.credits !== null
+            ? (selectedNode?.credits >= 1000000 
+                ? (selectedNode.credits / 1000000).toFixed(1) + 'M' 
+                : selectedNode.credits.toLocaleString())
+            : 'N/A'}
+        </div>
+        <div className="text-[7px] text-yellow-500 uppercase font-bold tracking-wider">
+          Credits Earned
+        </div>
+      </div>
 
-                      {/* Compact Footer */}
-                      <div className="relative z-10 text-center mt-3 pt-2 border-t border-zinc-800/50">
-                        <div className="text-[8px] text-zinc-600 font-mono flex items-center justify-center gap-1.5">
-                          <Zap size={8} className="text-blue-500" /> VERIFIED BY XANDEUM PULSE
-                        </div>
-                      </div>
-                    </div>
+      <div className="bg-gradient-to-br from-blue-500/10 to-blue-900/5 border border-blue-500/30 rounded-xl p-3 text-center flex flex-col justify-center">
+        <div className="text-sm font-black text-white mb-1 font-mono">
+          {getSafeVersion(selectedNode)}
+        </div>
+        <div className="text-[7px] text-blue-500 uppercase font-bold tracking-wider">
+          Node Version
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {/* --- 3. FOOTER (Shrink-0) --- */}
+  <div className="relative z-10 text-center pt-4 border-t border-zinc-800/50 shrink-0">
+    <div className="text-[9px] text-zinc-500 font-mono flex items-center justify-center gap-2">
+      <Zap size={10} className="text-blue-500 fill-blue-500" /> 
+      <span className="tracking-widest uppercase font-bold">Verified by Xandeum Pulse</span>
+    </div>
+  </div>
+</div>
 
                     <div className="flex flex-col gap-3 w-full max-w-sm">
                       {/* --- NEW BACK BUTTON LAYOUT --- */}
