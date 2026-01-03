@@ -15,15 +15,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const key = `${city}-${countryName}`;
       const storageGB = (node.storage_committed || 0) / (1024 ** 3);
-      // Capture the network (Added in previous step)
       const network = node.network || 'UNKNOWN';
+      const hasCredits = node.credits !== null; // Check if this specific node has data
 
       if (cityMap.has(key)) {
         const existing = cityMap.get(key);
         existing.count++;
         existing.totalStorage += storageGB;
 
-        if (node.credits !== null) {
+        if (hasCredits) {
             existing.totalCredits += node.credits;
             existing.hasValidCreditData = true;
         }
@@ -34,24 +34,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         existing.ips.push(node.address.split(':')[0]);
 
-        // --- TRACKING KINGS (Updated to track Network) ---
+        // --- TRACKING KINGS ---
         if (storageGB > existing.bestNodes.storageVal) {
             existing.bestNodes.storageVal = storageGB;
             existing.bestNodes.storagePk = node.pubkey;
-            existing.bestNodes.storageNet = network; // NEW
+            existing.bestNodes.storageNet = network;
         }
 
-        if (node.credits !== null && node.credits > existing.bestNodes.creditsVal) {
+        // Only update Credit King if this node actually has credits
+        // OR if the existing king has 0 and we want to overwrite (though usually null < 0 is false)
+        if (hasCredits && (node.credits || 0) >= existing.bestNodes.creditsVal) {
             existing.bestNodes.creditsVal = node.credits;
             existing.bestNodes.creditsPk = node.pubkey;
-            existing.bestNodes.creditsNet = network; // NEW
+            existing.bestNodes.creditsNet = network;
+            existing.bestNodes.creditsUntracked = false; // Mark as tracked
         }
 
         if (node.health > existing.bestNodes.healthVal) {
             existing.bestNodes.healthVal = node.health;
             existing.bestNodes.healthPk = node.pubkey;
             existing.bestNodes.healthUptime = node.uptime || 0;
-            existing.bestNodes.healthNet = network; // NEW
+            existing.bestNodes.healthNet = network;
         }
 
       } else {
@@ -63,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           count: 1,
           totalStorage: storageGB,
           totalCredits: node.credits || 0, 
-          hasValidCreditData: node.credits !== null, 
+          hasValidCreditData: hasCredits, 
           healthSum: node.health,
           totalUptime: node.uptime || 0,
           publicCount: node.is_public ? 1 : 0,
@@ -72,7 +75,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Initial Best Nodes
           bestNodes: {
               storageVal: storageGB, storagePk: node.pubkey, storageNet: network,
-              creditsVal: node.credits || 0, creditsPk: node.pubkey, creditsNet: network,
+              
+              // Credits King Init
+              creditsVal: node.credits || 0, 
+              creditsPk: node.pubkey, 
+              creditsNet: network,
+              creditsUntracked: !hasCredits, // Mark untracked if initial node is null
+
               healthVal: node.health, healthPk: node.pubkey, healthUptime: node.uptime || 0, healthNet: network
           }
         });
@@ -96,10 +105,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           publicRatio: (l.publicCount / l.count) * 100,
           ips: l.ips,
 
-          // UPDATED STRUCTURE: Passing 'network' property
           topPerformers: {
               STORAGE: { pk: l.bestNodes.storagePk, val: l.bestNodes.storageVal, network: l.bestNodes.storageNet },
-              CREDITS: { pk: l.bestNodes.creditsPk, val: l.bestNodes.creditsVal, network: l.bestNodes.creditsNet },
+              // Pass the isUntracked flag for credits
+              CREDITS: { 
+                  pk: l.bestNodes.creditsPk, 
+                  val: l.bestNodes.creditsVal, 
+                  network: l.bestNodes.creditsNet,
+                  isUntracked: l.bestNodes.creditsUntracked 
+              },
               HEALTH:  { pk: l.bestNodes.healthPk, val: l.bestNodes.healthVal, subVal: l.bestNodes.healthUptime, network: l.bestNodes.healthNet }
           }
         };
