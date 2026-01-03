@@ -2246,62 +2246,73 @@ export default function Home() {
                   <div className="flex flex-col md:flex-row gap-8 md:gap-16 items-center">
                     <div
                       ref={proofRef}
-                      className="bg-zinc-950 border border-zinc-800 p-6 rounded-3xl shadow-2xl w-full max-w-[360px] aspect-[3/4] relative overflow-hidden group flex flex-col justify-between"
+                      className="bg-zinc-950 border border-zinc-800 p-6 rounded-3xl shadow-2xl w-full max-w-[360px] aspect-[3/4] relative overflow-hidden group flex flex-col"
                     >
                       <div className="absolute top-0 right-0 p-32 bg-blue-500/10 blur-[80px] rounded-full pointer-events-none group-hover:bg-blue-500/20 transition duration-1000"></div>
-                      <div className="relative z-10 text-center">
-                        <div className="inline-block p-3 bg-zinc-900 rounded-2xl mb-4 shadow-lg border border-zinc-800">
-                          <Activity size={32} className="text-blue-500" />
+                      
+                      {/* Header */}
+                      <div className="relative z-10 text-center mb-6">
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                          <Activity size={20} className="text-blue-500" />
+                          <h2 className="text-lg font-extrabold text-white tracking-tight uppercase">
+                            PROOF OF PULSE
+                          </h2>
                         </div>
-                        <h2 className="text-xl font-extrabold text-white mb-2 tracking-tight">
-                          PROOF OF PULSE
-                        </h2>
-                        <p className="font-mono text-xs text-zinc-500 mb-6 bg-zinc-900 px-3 py-1 rounded-full inline-block border border-zinc-800">
+                        <p className="font-mono text-xs text-blue-400 font-bold">
                           {getSafeIp(selectedNode)}
                         </p>
+                      </div>
 
-                        <div className="grid grid-cols-2 gap-3 mb-3">
-                          <div className="bg-zinc-900/80 p-3 rounded-xl border border-zinc-800">
-                            <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">
-                              Health
-                            </div>
-                            <div className="text-xl font-extrabold text-green-400">
-                              {selectedNode.health}
-                            </div>
+                      {/* Card Stack */}
+                      <div className="relative z-10 flex-1 flex flex-col justify-center space-y-3 px-2">
+                        {/* Health Card */}
+                        <div className="bg-gradient-to-br from-green-500/10 to-green-900/5 border border-green-500/30 rounded-xl p-4 text-center">
+                          <div className="text-[9px] text-green-500 uppercase font-bold tracking-widest mb-1">
+                            Health Score
                           </div>
-
-                          <div className="bg-zinc-900/80 p-3 rounded-xl border border-zinc-800">
-                            <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">
-                              Storage
-                            </div>
-                            <div className="text-lg font-extrabold text-purple-400">
-                              {formatBytes(selectedNode.storage_committed)}
-                            </div>
+                          <div className="text-3xl font-black text-green-400">
+                            {selectedNode.health}
                           </div>
+                        </div>
 
-                          <div className="bg-zinc-900/80 p-3 rounded-xl border border-zinc-800">
-                            <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">
-                              Credits
-                            </div>
-                            <div className="text-lg font-extrabold text-yellow-500">
+                        {/* Storage Card */}
+                        <div className="bg-gradient-to-br from-purple-500/10 to-purple-900/5 border border-purple-500/30 rounded-xl p-4 text-center">
+                          <div className="text-[9px] text-purple-500 uppercase font-bold tracking-widest mb-1">
+                            Storage Capacity
+                          </div>
+                          <div className="text-2xl font-black text-purple-400">
+                            {formatBytes(selectedNode.storage_committed)}
+                          </div>
+                        </div>
+
+                        {/* Split Bottom Cards */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-900/5 border border-yellow-500/30 rounded-xl p-3 text-center">
+                            <div className="text-xl font-black text-yellow-400 mb-1">
                               {selectedNode.credits !== null
                                 ? selectedNode.credits.toLocaleString()
                                 : 'N/A'}
                             </div>
+                            <div className="text-[8px] text-yellow-500 uppercase font-bold tracking-widest">
+                              Credits
+                            </div>
                           </div>
 
-                          <div className="bg-zinc-900/80 p-3 rounded-xl border border-zinc-800">
-                            <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1">
-                              Version
-                            </div>
-                            <div className="text-base font-mono text-white">
+                          <div className="bg-gradient-to-br from-blue-500/10 to-blue-900/5 border border-blue-500/30 rounded-xl p-3 text-center">
+                            <div className="text-lg font-black text-white mb-1 font-mono">
                               {getSafeVersion(selectedNode)}
+                            </div>
+                            <div className="text-[8px] text-blue-500 uppercase font-bold tracking-widest">
+                              Version
                             </div>
                           </div>
                         </div>
+                      </div>
 
-                        <div className="text-[9px] text-zinc-600 font-mono flex items-center justify-center gap-2 mb-4">
-                          <Server size={10} /> VERIFIED BY XANDEUM PULSE
+                      {/* Footer */}
+                      <div className="relative z-10 text-center mt-4 pt-4 border-t border-zinc-800">
+                        <div className="text-[9px] text-zinc-600 font-mono flex items-center justify-center gap-2">
+                          <Zap size={10} className="text-blue-500" /> VERIFIED BY XANDEUM PULSE
                         </div>
                       </div>
                     </div>
@@ -2842,12 +2853,9 @@ export default function Home() {
                 <div className="mt-6 pt-6 border-t border-zinc-800 flex flex-col gap-4">
                   <div className="flex flex-col items-center justify-center gap-3">
                     <div className="text-[10px] text-zinc-500 flex items-center gap-1.5 bg-black/40 px-3 py-1 rounded-full border border-zinc-800/50">
-                      <Clock size={10} /> Last Seen:{' '}
-                      <span className="text-zinc-300 font-mono">{timeAgo}</span>{' '}
-                      <span className="text-zinc-600">
-                        ({formatDetailedTimestamp(selectedNode.last_seen_timestamp)})
-                      </span>
-                    </div>
+                        <Clock size={10} /> Last Seen:{' '}
+                        <span className="text-zinc-300 font-mono">{timeAgo}</span>
+                      </div>
                     <button
                       onClick={(e) => copyNodeUrl(e, selectedNode.pubkey || '')}
                       className="flex items-center justify-center gap-2 px-6 py-2 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/20 hover:border-blue-500/30 rounded-full text-[10px] font-bold text-blue-400 transition group"
