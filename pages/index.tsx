@@ -2246,7 +2246,6 @@ export default function Home() {
                 <div className="flex flex-col items-center justify-center h-full animate-in zoom-in-95 duration-300 py-10">
                   <div className="flex flex-col md:flex-row gap-8 md:gap-16 itecenter">
                     <div
-                      <div
   ref={proofRef}
   className="bg-zinc-950 border border-zinc-800 p-5 rounded-xl shadow-2xl w-full max-w-[300px] aspect-[3/4] relative overflow-hidden group flex flex-col"
 >
