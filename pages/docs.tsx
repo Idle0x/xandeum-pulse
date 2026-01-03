@@ -221,7 +221,7 @@ export default function DocsPage() {
                             Pulse employs a high-frequency trading strategy to ensure data availability. It races multiple RPC nodes simultaneously.
                         </p>
 
-                        {/* FAILOVER SNIPPET */}
+                        {/* FAILOVER SNIPPET (FIXED) */}
                         <div className="mt-8">
                              <HoloCode 
                                 filename="lib/xandeum-brain.ts"
@@ -256,7 +256,7 @@ const winner = await Promise.any(shuffled.map(ip =>
                              </div>
                         </div>
 
-                        {/* VITALITY SNIPPET */}
+                        {/* VITALITY SNIPPET (FIXED) */}
                         <HoloCode 
                                 filename="lib/xandeum-brain.ts"
                                 githubLink="https://github.com/Idle0x/xandeum-pulse/blob/main/lib/xandeum-brain.ts"
