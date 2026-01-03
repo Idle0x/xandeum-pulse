@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
-const API_MAINNET = 'https://podcredits.xandeum.network/api/pods-credits';
-const API_DEVNET  = 'https://podcredits.xandeum.network/api/devnet-pod-credits';
+const API_MAINNET = 'https://podcredits.xandeum.network/api/mainnet-pod-credits';
+const API_DEVNET  = 'https://podcredits.xandeum.network/api/pods-credits';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
