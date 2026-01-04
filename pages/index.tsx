@@ -427,6 +427,14 @@ const getSafeVersion = (node: Node | null) => {
   return node?.version || 'Unknown';
 };
 
+const formatBytes = (bytes: number | undefined) => {
+  if (!bytes || bytes === 0 || isNaN(bytes)) return '0.00 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
 const formatUptime = (seconds: number | undefined) => {
   if (!seconds || isNaN(seconds)) return '0m';
   const d = Math.floor(seconds / 86400);
