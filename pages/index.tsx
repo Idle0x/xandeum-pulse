@@ -2655,137 +2655,288 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                <>
-                  <div className="flex flex-col gap-4 h-full">
-                    {modalView !== 'overview' ? (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
-                        <div className="md:col-span-1 h-full">
-                          {modalView === 'health' && (
-                            <div
-                              className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group bg-zinc-900 border-green-500 ring-1 ring-green-500`}
-                              onClick={() => handleCardToggle('health')}
-                            >
-                              <div className="absolute inset-0 bg-gradient-to-b from-green-900/10 to-transparent pointer-events-none"></div>
-                              <div className="w-full flex justify-between items-start z-10 mb-4">
-                                <div className="flex flex-col">
-                                  <h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">
-                                    DIAGNOSTICS
-                                  </h3>
-                                  <div className="text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit bg-green-500/20 text-green-400">
-                                    Active View
-                                  </div>
+                <div className="flex flex-col gap-4 h-full">
+                  {modalView !== 'overview' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
+                      <div className="md:col-span-1 h-full">
+                        {modalView === 'health' && (
+                          <div
+                            className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group bg-zinc-900 border-green-500 ring-1 ring-green-500`}
+                            onClick={() => handleCardToggle('health')}
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-b from-green-900/10 to-transparent pointer-events-none"></div>
+                            <div className="w-full flex justify-between items-start z-10 mb-4">
+                              <div className="flex flex-col">
+                                <h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">
+                                  DIAGNOSTICS
+                                </h3>
+                                <div className="text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit bg-green-500/20 text-green-400">
+                                  Active View
                                 </div>
-                                <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
                               </div>
-                              <div className="relative z-10 scale-90">
-                                <RadialProgress score={selectedNode.health || 0} size={140} />
-                              </div>
-                              <div className="mt-6 text-center w-full z-10 flex justify-center">
-                                <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
-                                  <Minimize2 size={8} /> CLICK TO COLLAPSE
-                                </div>
+                              <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
+                            </div>
+                            <div className="relative z-10 scale-90">
+                              <RadialProgress score={selectedNode.health || 0} size={140} />
+                            </div>
+                            <div className="mt-6 text-center w-full z-10 flex justify-center">
+                              <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
+                                <Minimize2 size={8} /> CLICK TO COLLAPSE
                               </div>
                             </div>
-                          )}
+                          </div>
+                        )}
 
-                          {modalView === 'storage' && (
-                            <div
-                              className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group bg-zinc-900 border-purple-500 ring-1 ring-purple-500`}
-                              onClick={() => handleCardToggle('storage')}
-                            >
-                              <div className="absolute inset-0 bg-gradient-to-b from-purple-900/10 to-transparent pointer-events-none"></div>
-                              <div className="w-full flex justify-between items-start z-10 mb-4">
-                                <div className="flex flex-col">
-                                  <h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">
-                                    STORAGE
-                                  </h3>
-                                  <div className="text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit bg-purple-500/20 text-purple-400">
-                                    Active View
-                                  </div>
-                                </div>
-                                <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
-                              </div>
-                              <div className="relative w-full mt-4 space-y-2">
-                                <div className="text-[10px] text-zinc-500 font-bold uppercase">
-                                  Your Node
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-zinc-400 text-xs">Committed</span>
-                                  <span className="text-purple-400 font-mono text-sm">
-                                    {formatBytes(selectedNode.storage_committed)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-zinc-400 text-xs">Used</span>
-                                  <span className="text-blue-400 font-mono text-sm">
-                                    {formatBytes(selectedNode.storage_used)}
-                                  </span>
-                                </div>
-                                <div className="h-px bg-zinc-800 my-2"></div>
-                                <div className="flex justify-between">
-                                  <span className="text-zinc-500 text-xs">Network Median</span>
-                                  <span className="text-zinc-300 font-mono text-sm">
-                                    {formatBytes(medianCommitted)}
-                                  </span>
+                        {modalView === 'storage' && (
+                          <div
+                            className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group bg-zinc-900 border-purple-500 ring-1 ring-purple-500`}
+                            onClick={() => handleCardToggle('storage')}
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-b from-purple-900/10 to-transparent pointer-events-none"></div>
+                            <div className="w-full flex justify-between items-start z-10 mb-4">
+                              <div className="flex flex-col">
+                                <h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">
+                                  STORAGE
+                                </h3>
+                                <div className="text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit bg-purple-500/20 text-purple-400">
+                                  Active View
                                 </div>
                               </div>
-                              <div className="mt-6 text-center w-full z-10 flex justify-center">
-                                <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
-                                  <Minimize2 size={8} /> CLICK TO COLLAPSE
-                                </div>
+                              <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
+                            </div>
+                            <div className="relative w-full mt-4 space-y-2">
+                              <div className="text-[10px] text-zinc-500 font-bold uppercase">
+                                Your Node
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-zinc-400 text-xs">Committed</span>
+                                <span className="text-purple-400 font-mono text-sm">
+                                  {formatBytes(selectedNode.storage_committed)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-zinc-400 text-xs">Used</span>
+                                <span className="text-blue-400 font-mono text-sm">
+                                  {formatBytes(selectedNode.storage_used)}
+                                </span>
+                              </div>
+                              <div className="h-px bg-zinc-800 my-2"></div>
+                              <div className="flex justify-between">
+                                <span className="text-zinc-500 text-xs">Network Median</span>
+                                <span className="text-zinc-300 font-mono text-sm">
+                                  {formatBytes(medianCommitted)}
+                                </span>
                               </div>
                             </div>
-                          )}
+                            <div className="mt-6 text-center w-full z-10 flex justify-center">
+                              <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
+                                <Minimize2 size={8} /> CLICK TO COLLAPSE
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
-                          {modalView === 'identity' && (
-                            <div
-                              className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group bg-zinc-900 border-blue-500 ring-1 ring-blue-500`}
-                              onClick={() => handleCardToggle('identity')}
-                            >
-                              <div className="absolute inset-0 bg-gradient-to-b from-blue-900/10 to-transparent pointer-events-none"></div>
-                              <div className="w-full flex justify-between items-start z-10 mb-4">
-                                <div className="flex flex-col">
-                                  <h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">
-                                    IDENTITY
-                                  </h3>
-                                  <div className="text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit bg-blue-500/20 text-blue-400">
-                                    Active View
-                                  </div>
+                        {modalView === 'identity' && (
+                          <div
+                            className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group bg-zinc-900 border-blue-500 ring-1 ring-blue-500`}
+                            onClick={() => handleCardToggle('identity')}
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-b from-blue-900/10 to-transparent pointer-events-none"></div>
+                            <div className="w-full flex justify-between items-start z-10 mb-4">
+                              <div className="flex flex-col">
+                                <h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">
+                                  IDENTITY
+                                </h3>
+                                <div className="text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit bg-blue-500/20 text-blue-400">
+                                  Active View
                                 </div>
-                                <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
                               </div>
-                              <div className="relative z-10 flex flex-col items-center gap-4">
-                                <Shield size={64} className="text-blue-500 opacity-80" />
-                                {isSelectedNodeLatest
-                                  ? (
-                                  <div className="text-[10px] text-green-500 font-bold bg-green-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-green-500/20">
-                                    <CheckCircle size={12} />
-                                    UP TO DATE
-                                  </div>
-                                ) : (
-                                  <div className="text-[10px] text-orange-500 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-orange-500/20">
-                                    <AlertTriangle size={12} />
-                                    UPDATE NEEDED
-                                  </div>
-                                )}
-                              </div>
-                              <div className="mt-6 text-center w-full z-10 flex justify-center">
-                                <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
-                                  <Minimize2 size={8} /> CLICK TO COLLAPSE
+                              <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
+                            </div>
+                            <div className="relative z-10 flex flex-col items-center gap-4">
+                              <Shield size={64} className="text-blue-500 opacity-80" />
+                              {isSelectedNodeLatest
+                                ? (
+                                <div className="text-[10px] text-green-500 font-bold bg-green-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-green-500/20">
+                                  <CheckCircle size={12} />
+                                  UP TO DATE
                                 </div>
+                              ) : (
+                                <div className="text-[10px] text-orange-500 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-orange-500/20">
+                                  <AlertTriangle size={12} />
+                                  UPDATE NEEDED
+                                </div>
+                              )}
+                            </div>
+                            <div className="mt-6 text-center w-full z-10 flex justify-center">
+                              <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
+                                <Minimize2 size={8} /> CLICK TO COLLAPSE
                               </div>
                             </div>
-                          )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="md:col-span-2 h-full">
+                        {modalView === 'health' && renderHealthBreakdown()}
+                        {modalView === 'storage' && renderStorageAnalysis()}
+                        {modalView === 'identity' && renderIdentityDetails()}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-4 h-full">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div
+                          className={`rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group h-64 ${
+                            zenMode
+                              ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
+                              : 'bg-zinc-900/30 border-zinc-800 hover:border-blue-500/30'
+                          }`}
+                          onClick={() => handleCardToggle('health')}
+                        >
+                          <div
+                            className={`absolute inset-0 bg-gradient-to-b from-transparent pointer-events-none ${
+                              zenMode ? 'to-green-900/10' : 'to-blue-900/10'
+                            }`}
+                          ></div>
+                          <div className="w-full flex justify-between items-start z-10 mb-4">
+                            <div className="flex flex-col">
+                              <h3
+                                className={`text-[10px] font-bold tracking-widest uppercase ${
+                                  zenMode ? 'text-zinc-400' : 'text-zinc-500'
+                                }`}
+                              >
+                                SYSTEM DIAGNOSTICS
+                              </h3>
+                              <div
+                                className={`text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit ${
+                                  (selectedNode.health || 0) >= avgNetworkHealth
+                                    ? 'bg-green-500/20 text-green-400'
+                                    : 'bg-red-500/20 text-red-400'
+                                }`}
+                              >
+                                {(selectedNode.health || 0) >= avgNetworkHealth
+                                  ? '▲ Above Avg'
+                                  : '▼ Below Avg'}
+                              </div>
+                            </div>
+                            <HelpCircle
+                              size={14}
+                              className={`z-20 hover:text-white transition ${
+                                zenMode ? 'text-zinc-600' : 'text-zinc-500'
+                              }`}
+                            />
+                          </div>
+                          <div className="relative z-10 scale-100 group-hover:scale-110 transition-transform duration-500 ease-in-out">
+                            <RadialProgress score={selectedNode.health || 0} size={140} />
+                          </div>
+                          <div className="mt-6 text-center w-full z-10 flex justify-center">
+                            <div className="text-[9px] font-bold uppercase tracking-widest text-green-400/80 animate-pulse group-hover:text-green-300 transition-colors flex items-center gap-1">
+                              <Maximize2 size={8} /> CLICK TO EXPAND
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="md:col-span-2 h-full">
-                          {modalView === 'health' && renderHealthBreakdown()}
-                          {modalView === 'storage' && renderStorageAnalysis()}
-                          {modalView === 'identity' && renderIdentityDetails()}
+                        <div
+                          className={`p-5 rounded-2xl border flex flex-col justify-between cursor-pointer transition group relative h-64 ${
+                            zenMode
+                              ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
+                              : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'
+                          }`}
+                          onClick={() => handleCardToggle('storage')}
+                        >
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={`p-2 rounded-lg ${
+                                  zenMode ? 'bg-green-900/20 text-green-500' : 'bg-blue-500/10 text-blue-500'
+                                }`}
+                              >
+                                <Database size={18} />
+                              </div>
+                              <div
+                                className={`text-xs font-bold uppercase ${
+                                  zenMode ? 'text-zinc-400' : 'text-zinc-500'
+                                }`}
+                              >
+                                STORAGE CAPACITY
+                              </div>
+                            </div>
+                            <HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" />
+                          </div>
+
+                          <div className="mt-auto space-y-4 relative z-10">
+                            <div className="flex items-end justify-between">
+                              <div>
+                                <div className="text-[9px] font-mono text-zinc-500 mb-1 bg-zinc-900/50 border border-zinc-800 px-2 py-0.5 rounded-full inline-block">
+                                  {(selectedNode?.storage_used || 0).toLocaleString()} raw
+                                </div>
+                                <div className="flex items-baseline gap-1">
+                                  <span
+                                    className={`text-2xl font-bold font-mono ${
+                                      zenMode ? 'text-green-400' : 'text-blue-400'
+                                    }`}
+                                  >
+                                    {formatBytes(selectedNode?.storage_used).split(' ')[0]}
+                                    <span className="text-sm ml-1">
+                                      {formatBytes(selectedNode?.storage_used).split(' ')[1]}
+                                    </span>
+                                  </span>
+                                </div>
+                                <div className="text-[9px] text-zinc-600 uppercase font-bold tracking-wider mt-0.5">
+                                  USED
+                                </div>
+                              </div>
+
+                              <div className="text-right">
+                                <div className="flex items-baseline gap-1 justify-end">
+                                  <span
+                                    className={`text-2xl font-bold font-mono ${
+                                      zenMode ? 'text-green-600' : 'text-purple-400'
+                                    }`}
+                                  >
+                                    {formatBytes(selectedNode?.storage_committed).split(' ')[0]}
+                                    <span className="text-sm ml-1">
+                                      {formatBytes(selectedNode?.storage_committed).split(' ')[1]}
+                                    </span>
+                                  </span>
+                                </div>
+                                <div className="text-[9px] text-zinc-600 uppercase font-bold tracking-wider mt-0.5">
+                                  COMMITTED
+                                </div>
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="h-2 bg-zinc-800 rounded-full overflow-hidden mb-2">
+                                <div
+                                  className={`h-full transition-all duration-1000 group-hover:brightness-125 ${
+                                    zenMode
+                                      ? 'bg-green-500'
+                                      : 'bg-gradient-to-r from-blue-500 to-purple-500'
+                                  }`}
+                                  style={{
+                                    width: `${Math.min(
+                                      100,
+                                      ((selectedNode?.storage_used || 0) /
+                                        (selectedNode?.storage_committed || 1)) *
+                                        100
+                                    )}%`,
+                                  }}
+                                ></div>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 flex justify-center">
+                              <div className="text-[9px] font-bold uppercase tracking-widest text-purple-400/80 animate-pulse group-hover:text-purple-300 transition-colors flex items-center gap-1">
+                                <Maximize2 size={8} /> CLICK TO EXPAND
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    ) : (
-                      <>
+
+                      <div className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div
                             className={`rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group h-64 ${
@@ -3122,11 +3273,10 @@ export default function Home() {
                           </div>
                         </div>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
-              </>
-            )}
+              )}
 
             {!compareMode && !shareMode && (
               <div className="mt-6 pt-6 border-t border-zinc-800 flex flex-col gap-4">
