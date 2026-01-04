@@ -1239,7 +1239,7 @@ export default function Home() {
     );
   };
 
-  const renderZenCard = (node: Node) => {
+    const renderZenCard = (node: Node) => {
     const isLatest = checkIsLatest(node.version);
     const health = node.health || 0;
     const isVersionSort = sortBy === 'version';
@@ -1280,8 +1280,9 @@ export default function Home() {
             </div>
           </div>
           <div>
-            <div className="text-[8px] md:text-[9px] text-zinc-600 uppercase font-bold mb-1">Rank</div>
-            <div className="font-mono text-yellow-600">#{node.rank || '-'}</div>
+            {/* UPDATED: Specific Health Rank Display */}
+            <div className="text-[8px] md:text-[9px] text-zinc-600 uppercase font-bold mb-1">Health Rank</div>
+            <div className="font-mono text-yellow-600">#{node.health_rank || '-'}</div>
           </div>
         </div>
       </div>
@@ -1389,7 +1390,7 @@ export default function Home() {
     );
   };
 
-  const renderHealthBreakdown = () => {
+    const renderHealthBreakdown = () => {
     const health = selectedNode?.health || 0;
     const bd = selectedNode?.healthBreakdown || {
       uptime: health,
@@ -1399,9 +1400,11 @@ export default function Home() {
     };
     const avgs = networkStats.avgBreakdown;
     const totalNodes = networkStats.totalNodes || 1;
-    const rank = selectedNode?.rank || totalNodes;
+    
+    // UPDATED: Use health_rank if available, otherwise fallback (Dual Ranking Logic)
+    const rank = selectedNode?.health_rank || selectedNode?.rank || totalNodes;
 
-    // FIXED: Percentile calculation
+    // Recalculate percentile based on the correct rank type
     const rankPercentile = (rank / totalNodes) * 100;
     const betterThanPercent = 100 - rankPercentile;
 
@@ -1574,7 +1577,7 @@ export default function Home() {
 
           <div className="mt-auto pt-4 border-t border-zinc-800 flex justify-center">
             <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-              <Zap size={14} /> RANK #{rank} • BETTER THAN {betterThanPercent < 1 ? '<1' : Math.floor(betterThanPercent)}% OF NETWORK
+              <Zap size={14} /> HEALTH RANK #{rank} • BETTER THAN {betterThanPercent < 1 ? '<1' : Math.floor(betterThanPercent)}% OF NETWORK
             </div>
           </div>
         </div>
