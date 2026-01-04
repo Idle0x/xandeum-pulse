@@ -48,25 +48,61 @@ export interface EnrichedNode {
 }
 
 // --- HELPERS ---
-const cleanSemver = (v: string) => (v || '0.0.0').replace(/[^0-9.]/g, '');
+
+// STRIP suffixes: "1.2-trynet" -> "1.2", "0.8.0-beta" -> "0.8.0"
+const cleanSemver = (v: string) => {
+  if (!v) return '0.0.0';
+  const mainVer = v.split('-')[0]; 
+  return mainVer.replace(/[^0-9.]/g, '');
+};
+
 const compareVersions = (v1: string, v2: string) => {
   const p1 = cleanSemver(v1).split('.').map(Number);
   const p2 = cleanSemver(v2).split('.').map(Number);
   for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
-    if ((p1[i] || 0) > (p2[i] || 0)) return 1;
-    if ((p1[i] || 0) < (p2[i] || 0)) return -1;
+    const n1 = p1[i] || 0;
+    const n2 = p2[i] || 0;
+    if (n1 > n2) return 1;
+    if (n1 < n2) return -1;
   }
   return 0;
 };
-const calculateSigmoidScore = (value: number, midpoint: number, steepness: number) => 100 / (1 + Math.exp(-steepness * (value - midpoint)));
+
+const calculateSigmoidScore = (value: number, midpoint: number, steepness: number) => 
+  100 / (1 + Math.exp(-steepness * (value - midpoint)));
+
 const calculateLogScore = (value: number, median: number, maxScore: number = 100) => {
     if (median === 0) return value > 0 ? maxScore : 0;
     return Math.min(maxScore, (maxScore / 2) * Math.log2((value / median) + 1));
 };
-const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedUniqueVersions: string[]) => {
-    if (compareVersions(nodeVersion, consensusVersion) >= 0) return 100;
-    const distance = sortedUniqueVersions.indexOf(nodeVersion) - sortedUniqueVersions.indexOf(consensusVersion);
-    return distance <= 0 ? 100 : Math.max(0, 10 - (distance - 5)); 
+
+// NEW: Exact Lookup Table based on v2.0 Spec
+const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedCleanVersions: string[]) => {
+    const cleanNode = cleanSemver(nodeVersion);
+    const cleanConsensus = cleanSemver(consensusVersion);
+
+    // 1. If newer or same as consensus -> 100
+    if (compareVersions(cleanNode, cleanConsensus) >= 0) return 100;
+
+    // 2. Find positions in the Master List
+    const consensusIndex = sortedCleanVersions.indexOf(cleanConsensus);
+    const nodeIndex = sortedCleanVersions.indexOf(cleanNode);
+
+    // If version is unknown/weird and not in list, punish severely
+    if (nodeIndex === -1) return 0;
+
+    const distance = nodeIndex - consensusIndex;
+
+    // 3. Apply Distance Decay Table
+    if (distance <= 0) return 100; 
+    if (distance === 1) return 90;
+    if (distance === 2) return 70;
+    if (distance === 3) return 50;
+    if (distance === 4) return 30;
+    if (distance === 5) return 10;
+
+    // 4. "Death Zone" (6+ versions behind)
+    return Math.max(0, 10 - (distance - 5));
 };
 
 // --- SCORING FACTORY ---
@@ -76,30 +112,39 @@ const calculateVitalityScore = (
     uptimeSeconds: number, 
     version: string, 
     consensusVersion: string, 
-    sortedUniqueVersions: string[], 
+    sortedCleanVersions: string[], // NOW EXPECTS CLEAN VERSIONS
     medianCredits: number, 
     credits: number | null, 
     medianStorage: number
 ) => {
+  // ⛔ Gatekeeper Rule
   if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
 
+  // 1️⃣ Uptime Score (Sigmoid)
   const uptimeDays = uptimeSeconds / 86400;
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
-  if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
+  if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); // Hard cap for new nodes
 
+  // 2️⃣ Storage Score (Logarithmic + Bonus)
   const baseStorageScore = calculateLogScore(storageCommitted, medianStorage, 100);
   const utilizationBonus = storageUsed > 0 ? Math.min(15, 5 * Math.log2((storageUsed / (1024 ** 3)) + 2)) : 0;
   const totalStorageScore = baseStorageScore + utilizationBonus;
 
-  const versionScore = getVersionScoreByRank(version, consensusVersion, sortedUniqueVersions);
+  // 4️⃣ Version Score (Distance-Based)
+  const versionScore = getVersionScoreByRank(version, consensusVersion, sortedCleanVersions);
 
   let total = 0;
   let reputationScore: number | null = null;
 
+  // 🔁 Dynamic Re-Weighting Logic
   if (credits !== null && medianCredits > 0) {
+      // 3️⃣ Reputation Score (Standard Mode)
       reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
+      
+      // Standard Weights: U(35%) + S(30%) + R(20%) + V(15%)
       total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15));
   } else {
+      // Fallback Weights: U(45%) + S(35%) + V(20%)
       total = Math.round((uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20));
       reputationScore = null; 
   }
@@ -218,16 +263,23 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const storageArray: number[] = rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
   const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
 
+  // --- VERSION CONSENSUS LOGIC (FIXED: Uses Clean Versions) ---
   const versionCounts: Record<string, number> = {};
-  const uniqueVersionsSet = new Set<string>();
+  const uniqueCleanVersionsSet = new Set<string>();
+
   rawPods.forEach((p: any) => { 
-      const v = (p.version || '0.0.0'); 
-      const cleanV = cleanSemver(v);
+      const rawV = (p.version || '0.0.0'); 
+      const cleanV = cleanSemver(rawV);
+      // Votes based on CLEAN version
       versionCounts[cleanV] = (versionCounts[cleanV] || 0) + 1;
-      uniqueVersionsSet.add(v);
+      uniqueCleanVersionsSet.add(cleanV);
   });
+  
+  // Consensus is the most common clean version
   const consensusVersion = Object.keys(versionCounts).sort((a, b) => versionCounts[b] - versionCounts[a])[0] || '0.0.0';
-  const sortedUniqueVersions = Array.from(uniqueVersionsSet).sort((a, b) => compareVersions(b, a));
+  
+  // Master List sorted Descending
+  const sortedCleanVersions = Array.from(uniqueCleanVersionsSet).sort((a, b) => compareVersions(b, a));
 
   await resolveLocations([...new Set(rawPods.map((p: any) => p.address.split(':')[0]))] as string[]);
 
@@ -242,7 +294,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
 
       const vitality = calculateVitalityScore(
           storageCommitted, storageUsed, uptime, 
-          pod.version || '0.0.0', consensusVersion, sortedUniqueVersions,
+          pod.version || '0.0.0', consensusVersion, sortedCleanVersions, // Pass cleaned list
           medianCredits, credits, medianStorage
       );
 
