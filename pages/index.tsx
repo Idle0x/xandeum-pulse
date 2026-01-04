@@ -2656,7 +2656,7 @@ export default function Home() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-4 h-full">
-                                {modalView !== 'overview' ? (
+              {modalView !== 'overview' ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
                   <div className="md:col-span-1 h-full">
                     {modalView === 'health' && (
@@ -3132,6 +3132,7 @@ export default function Home() {
                 </div>
               )}
             </div>
+            )} {/* <--- THIS CLOSING TAG WAS MISSING IN PREVIOUS VERSION */}
 
             {!compareMode && !shareMode && (
               <div className="mt-6 pt-6 border-t border-zinc-800 flex flex-col gap-4">
