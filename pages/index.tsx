@@ -763,7 +763,7 @@ export default function Home() {
     }
   };
 
-  const copyRawJson = (node: Node) => {
+    const copyRawJson = (node: Node) => {
     copyToClipboard(JSON.stringify(node, null, 2), 'json');
   };
 
@@ -1295,7 +1295,7 @@ export default function Home() {
     );
   };
 
-  // --- IDENTITY DETAILS (With Uptime & Red Back) ---
+    // --- IDENTITY DETAILS (With Green Checkmark Logic) ---
   const renderIdentityDetails = () => {
     const details = [
       { label: 'Public Key', val: selectedNode?.pubkey || 'Unknown' },
@@ -1342,11 +1342,20 @@ export default function Home() {
                 >
                   {d.val}
                 </code>
+                {/* DYNAMIC COPY BUTTON */}
                 <button
-                  onClick={() => copyToClipboard(d.val)}
-                  className="p-1.5 rounded bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition"
+                  onClick={() => copyToClipboard(d.val, d.label)} // Pass Label as ID
+                  className={`p-1.5 rounded transition ${
+                    copiedField === d.label 
+                      ? 'bg-green-500/20 text-green-500' 
+                      : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'
+                  }`}
                 >
-                  <Copy size={12} />
+                  {copiedField === d.label ? (
+                    <Check size={12} className="animate-in zoom-in duration-200" />
+                  ) : (
+                    <Copy size={12} />
+                  )}
                 </button>
               </div>
             </div>
@@ -2293,11 +2302,16 @@ export default function Home() {
                     <span className="text-zinc-400 truncate max-w-[120px] md:max-w-none">
                       {selectedNode.pubkey ? `${selectedNode.pubkey.slice(0, 12)}...` : 'Unknown'}
                     </span>
-                    <Copy
-                      size={10}
-                      className="cursor-pointer hover:text-white"
-                      onClick={() => copyToClipboard(selectedNode.pubkey || '', 'pubkey')}
-                    />
+                    <button 
+                        onClick={() => copyToClipboard(selectedNode.pubkey || '', 'pubkey')}
+                        className="hover:text-white transition"
+                    >
+                        {copiedField === 'pubkey' ? (
+                            <Check size={10} className="text-green-500 animate-in zoom-in" />
+                        ) : (
+                            <Copy size={10} />
+                        )}
+                    </button>
                   </div>
 
                   <div className="mt-1">
@@ -2607,7 +2621,7 @@ export default function Home() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col gap-3 w-full max-w-sm">
+                     <div className="flex flex-col gap-3 w-full max-w-sm">
                       <button
                         onClick={() => setShareMode(false)}
                         className="px-6 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white text-xs font-bold transition border border-zinc-800 mb-6 flex items-center justify-center gap-2 group"
@@ -2621,10 +2635,14 @@ export default function Home() {
 
                       <button
                         onClick={() => copyStatusReport(selectedNode)}
-                        className="flex items-center justify-center gap-2 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-white border border-zinc-700"
+                        className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-bold transition duration-300 border ${
+                           copiedField === 'report' 
+                           ? 'bg-green-500/10 border-green-500/50 text-green-500' 
+                           : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-white'
+                        }`}
                       >
-                        <ClipboardCopy size={14} />
-                        Copy Diagnostic Report
+                        {copiedField === 'report' ? <Check size={14} /> : <ClipboardCopy size={14} />}
+                        {copiedField === 'report' ? 'REPORT COPIED' : 'Copy Diagnostic Report'}
                       </button>
 
                       <button
@@ -2637,18 +2655,26 @@ export default function Home() {
 
                       <button
                         onClick={() => copyRawJson(selectedNode)}
-                        className="flex items-center justify-center gap-2 px-4 py-3 bg-zinc-900 hover:bg-zinc-800 rounded-lg text-xs font-bold text-zinc-400 border border-zinc-800"
+                        className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-bold transition duration-300 border ${
+                           copiedField === 'json' 
+                           ? 'bg-green-500/10 border-green-500/50 text-green-500' 
+                           : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-400'
+                        }`}
                       >
-                        <FileJson size={14} />
-                        Copy JSON Data (Dev)
+                        {copiedField === 'json' ? <Check size={14} /> : <FileJson size={14} />}
+                        {copiedField === 'json' ? 'JSON COPIED' : 'Copy JSON Data (Dev)'}
                       </button>
 
                       <button
                         onClick={(e) => copyNodeUrl(e, selectedNode.pubkey || '')}
-                        className="flex items-center justify-center gap-2 px-4 py-3 bg-zinc-900 hover:bg-zinc-800 rounded-lg text-xs font-bold text-zinc-400 border border-zinc-800"
+                        className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-bold transition duration-300 border ${
+                           copiedField === 'url' 
+                           ? 'bg-green-500/10 border-green-500/50 text-green-500' 
+                           : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-400'
+                        }`}
                       >
-                        <LinkIcon size={14} />
-                        Copy Public Node URL
+                        {copiedField === 'url' ? <Check size={14} /> : <LinkIcon size={14} />}
+                        {copiedField === 'url' ? 'URL COPIED' : 'Copy Public Node URL'}
                       </button>
 
                       <button
@@ -2659,8 +2685,6 @@ export default function Home() {
                         DOWNLOAD PROOF
                       </button>
                     </div>
-                  </div>
-                </div>
               ) : (
                 <div className="flex flex-col gap-4 h-full">
               {modalView !== 'overview' ? (
