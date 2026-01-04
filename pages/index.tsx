@@ -434,13 +434,6 @@ const formatUptime = (seconds: number | undefined) => {
   return d > 0 ? `${d}d ${h}h` : `${h}h`;
 };
 
-const formatUptime = (seconds: number | undefined) => {
-  if (!seconds || isNaN(seconds)) return '0m';
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  return d > 0 ? `${d}d \( {h}h` : ` \){h}h`;
-};
-
 const formatLastSeen = (timestamp: number | undefined) => {
   if (!timestamp || isNaN(timestamp)) return 'Never';
   const now = Date.now();
