@@ -419,14 +419,6 @@ const useTimeAgo = (timestamp: number | undefined) => {
   return timeAgo;
 };
 
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [timestamp]);
-
-  return timeAgo;
-};
-
 const getSafeIp = (node: Node | null) => {
   return node?.address ? node.address.split(':')[0] : 'Unknown IP';
 };
