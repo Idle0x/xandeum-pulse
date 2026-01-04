@@ -121,19 +121,19 @@ const WelcomeCurtain = () => {
 
         <div className="flex justify-center items-center gap-6 mb-6 relative z-10">
           <div className="flex flex-col items-center gap-2">
-            <div className={p-3 rounded-xl border border-zinc-800 shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-colors duration-500 ${!isMobile ? 'bg-zinc-800 text-blue-400' : 'bg-zinc-900 text-zinc-600'}}>
+            <div className={`p-3 rounded-xl border border-zinc-800 shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-colors duration-500 ${!isMobile ? 'bg-zinc-800 text-blue-400' : 'bg-zinc-900 text-zinc-600'}`}>
               <Monitor size={32} />
             </div>
-            <span className={text-[9px] font-bold uppercase tracking-widest ${!isMobile ? 'text-blue-400' : 'text-zinc-600'}}>Desktop</span>
+            <span className={`text-[9px] font-bold uppercase tracking-widest ${!isMobile ? 'text-blue-400' : 'text-zinc-600'}`}>Desktop</span>
           </div>
           <div className="h-px w-8 bg-zinc-800"></div>
           <div className="flex flex-col items-center gap-2">
-            <div className={p-3 rounded-xl border border-zinc-800 transition-colors duration-500 ${isMobile ? 'bg-zinc-800 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'bg-zinc-900 text-zinc-600'}}>
+            <div className={`p-3 rounded-xl border border-zinc-800 transition-colors duration-500 ${isMobile ? 'bg-zinc-800 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'bg-zinc-900 text-zinc-600'}`}>
               <div className="relative">
                 <LayoutDashboard size={24} />
               </div>
             </div>
-            <span className={text-[9px] font-bold uppercase tracking-widest ${isMobile ? 'text-blue-400' : 'text-zinc-600'}}>Mobile</span>
+            <span className={`text-[9px] font-bold uppercase tracking-widest ${isMobile ? 'text-blue-400' : 'text-zinc-600'}`}>Mobile</span>
           </div>
         </div>
 
@@ -192,7 +192,7 @@ const PhysicalLocationBadge = ({ node, zenMode }: { node: Node; zenMode: boolean
       <div className="flex items-center gap-2">
         {code && code !== 'XX' && (
           <img
-            src={https://flagcdn.com/w40/${code.toLowerCase()}.png}
+            src={`https://flagcdn.com/w40/${code.toLowerCase()}.png`}
             alt="flag"
             className="w-5 h-auto rounded-sm shadow-sm"
           />
@@ -229,7 +229,7 @@ const ModalAvatar = ({ node }: { node: Node }) => {
     return (
       <div className="w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center shadow-lg border border-white/10 overflow-hidden bg-zinc-900 relative group shrink-0">
         <img
-          src={https://flagcdn.com/w160/${code.toLowerCase()}.png}
+          src={`https://flagcdn.com/w160/${code.toLowerCase()}.png`}
           alt="country flag"
           className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition duration-500"
         />
@@ -403,11 +403,11 @@ const useTimeAgo = (timestamp: number | undefined) => {
       const diff = Math.floor((now - time) / 1000);
 
       if (diff < 60) {
-        setTimeAgo(${diff} second${diff !== 1 ? 's' : ''} ago);
+        setTimeAgo(`\( {diff} second \){diff !== 1 ? 's' : ''} ago`);
       } else if (diff < 3600) {
-        setTimeAgo(${Math.floor(diff / 60)} minute${Math.floor(diff / 60) !== 1 ? 's' : ''} ago);
+        setTimeAgo(`\( {Math.floor(diff / 60)} minute \){Math.floor(diff / 60) !== 1 ? 's' : ''} ago`);
       } else {
-        setTimeAgo(${Math.floor(diff / 3600)} hour${Math.floor(diff / 3600) !== 1 ? 's' : ''} ago);
+        setTimeAgo(`\( {Math.floor(diff / 3600)} hour \){Math.floor(diff / 3600) !== 1 ? 's' : ''} ago`);
       }
     };
 
@@ -428,7 +428,7 @@ const getSafeVersion = (node: Node | null) => {
 };
 
 const formatBytes = (bytes: number | undefined) => {
-  if (!bytes  bytes === 0  isNaN(bytes)) return '0.00 B';
+  if (!bytes || bytes === 0 || isNaN(bytes)) return '0.00 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -439,7 +439,7 @@ const formatUptime = (seconds: number | undefined) => {
   if (!seconds || isNaN(seconds)) return '0m';
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
-  return d > 0 ? ${d}d ${h}h : ${h}h;
+  return d > 0 ? `${d}d \( {h}h` : ` \){h}h`;
 };
 
 const formatLastSeen = (timestamp: number | undefined) => {
@@ -449,16 +449,16 @@ const formatLastSeen = (timestamp: number | undefined) => {
   const diff = now - time;
 
   if (diff < 1000) return 'Just now';
-  if (diff < 60000) return ${Math.floor(diff / 1000)}s ago;
+  if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`;
 
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return ${mins}m ago;
+  if (mins < 60) return `${mins}m ago`;
 
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return ${hours}h ago;
+  if (hours < 24) return `${hours}h ago`;
 
   const days = Math.floor(hours / 24);
-  return ${days}d ago;
+  return `${days}d ago`;
 };
 
 const formatDetailedTimestamp = (timestamp: number | undefined) => {
@@ -625,7 +625,7 @@ export default function Home() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(/api/stats?t=${Date.now()});
+      const res = await axios.get(`/api/stats?t=${Date.now()}`);
 
       if (res.data.result && res.data.result.pods) {
         let podList = res.data.result.pods as Node[];
@@ -646,7 +646,7 @@ export default function Home() {
 
           if (cap > 0 && used > 0) {
             rawPercent = (used / cap) * 100;
-            percentStr = rawPercent < 0.01 ? "< 0.01%" : ${rawPercent.toFixed(2)}%;
+            percentStr = rawPercent < 0.01 ? "< 0.01%" : `${rawPercent.toFixed(2)}%`;
           } 
 
           return {
@@ -731,7 +731,7 @@ export default function Home() {
        showToast("This node is visible on the network but it is not found on the rewards/credits API.");
        return;
     }
-    const url = node.pubkey ? /leaderboard?highlight=${node.pubkey} : '/leaderboard';
+    const url = node.pubkey ? `/leaderboard?highlight=${node.pubkey}` : '/leaderboard';
     router.push(url);
   };
 
@@ -762,24 +762,24 @@ export default function Home() {
 
   const copyStatusReport = (node: Node) => {
     const health = node.health || 0;
-    const report = [XANDEUM PULSE REPORT]\nNode: ${node.address || 'Unknown'}\nStatus: ${(node.uptime || 0) > 86400 ? 'STABLE' : 'BOOTING'}\nHealth: ${health}/100\nMonitor at: https://xandeum-pulse.vercel.app;
+    const report = `[XANDEUM PULSE REPORT]\nNode: ${node.address || 'Unknown'}\nStatus: ${(node.uptime || 0) > 86400 ? 'STABLE' : 'BOOTING'}\nHealth: ${health}/100\nMonitor at: https://xandeum-pulse.vercel.app`;
     copyToClipboard(report, 'report');
   };
 
   const shareToTwitter = (node: Node) => {
     const health = node.health || 0;
     const creditsDisplay = node.credits !== null ? node.credits.toLocaleString() : 'N/A';
-    const text = Just checked my pNode status on Xandeum Pulse! ⚡\n\n🟢 Status: ${(node.uptime || 0) > 86400 ? 'Stable' : 'Booting'}\n❤️ Health: ${health}/100\n💰 Credits: ${creditsDisplay}\n\nMonitor here:;
+    const text = `Just checked my pNode status on Xandeum Pulse! ⚡\n\n🟢 Status: ${(node.uptime || 0) > 86400 ? 'Stable' : 'Booting'}\n❤️ Health: ${health}/100\n💰 Credits: ${creditsDisplay}\n\nMonitor here:`;
 
     window.open(
-      https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent("https://xandeum-pulse.vercel.app")},
+      `https://twitter.com/intent/tweet?text=\( {encodeURIComponent(text)}&url= \){encodeURIComponent("https://xandeum-pulse.vercel.app")}`,
       '_blank'
     );
   };
 
   const copyNodeUrl = (e: React.MouseEvent, pubkey: string) => {
     e.stopPropagation();
-    const url = ${window.location.origin}/?open=${pubkey};
+    const url = `\( {window.location.origin}/?open= \){pubkey}`;
     copyToClipboard(url, 'url');
   };
 
@@ -787,13 +787,13 @@ export default function Home() {
     const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Health_Score,Country,Last_Seen_ISO,Is_Favorite\n';
     const rows = filteredNodes.map(n => {
       const creditVal = n.credits !== null ? n.credits : 'NULL';
-      return ${getSafeIp(n)},${n.pubkey || 'Unknown'},${n.rank},${creditVal},${getSafeVersion(n)},${n.uptime},${n.storage_committed},${n.storage_used},${n.health},${n.location?.countryName},${new Date(n.last_seen_timestamp || 0).toISOString()},${favorites.includes(n.address || '')};
+      return `\( {getSafeIp(n)}, \){n.pubkey || 'Unknown'},\( {n.rank}, \){creditVal},\( {getSafeVersion(n)}, \){n.uptime},\( {n.storage_committed}, \){n.storage_used},\( {n.health}, \){n.location?.countryName},\( {new Date(n.last_seen_timestamp || 0).toISOString()}, \){favorites.includes(n.address || '')}`;
     });
     const blob = new Blob([headers + rows.join('\n')], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = xandeum_pulse_export_${new Date().toISOString().split('T')[0]}.csv;
+    a.download = `xandeum_pulse_export_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   };
 
@@ -806,7 +806,7 @@ export default function Home() {
         pixelRatio: 3,
       });
       const link = document.createElement('a');
-      link.download = xandeum-proof-${selectedNode?.pubkey?.slice(0,6) || 'node'}.png;
+      link.download = `xandeum-proof-${selectedNode?.pubkey?.slice(0,6) || 'node'}.png`;
       link.href = dataUrl;
       link.click();
     } catch (err) {
@@ -838,7 +838,7 @@ export default function Home() {
     const ver = (node.version || '').toLowerCase();
     const country = (node.location?.countryName || '').toLowerCase();
     const networkMatch = networkFilter === 'ALL' || node.network === networkFilter;
-    return networkMatch && (addr.includes(q)  pub.includes(q)  ver.includes(q) || country.includes(q));
+    return networkMatch && (addr.includes(q) || pub.includes(q) || ver.includes(q) || country.includes(q));
   }).sort((a, b) => {
     let valA: any, valB: any;
 
@@ -855,8 +855,8 @@ export default function Home() {
 
     if (sortBy === 'version') {
       return sortOrder === 'asc'
-        ? compareVersions(a.version  '0.0.0', b.version  '0.0.0')
-        : compareVersions(b.version  '0.0.0', a.version  '0.0.0');
+        ? compareVersions(a.version || '0.0.0', b.version || '0.0.0')
+        : compareVersions(b.version || '0.0.0', a.version || '0.0.0');
     }
 
     return sortOrder === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
@@ -890,7 +890,7 @@ export default function Home() {
       const score = node.health || 0;
       return {
         label: 'Health Score',
-        value: ${score}/100,
+        value: `${score}/100`,
         color: score > 80 ? 'text-green-400' : 'text-yellow-400',
         icon: Activity
       };
@@ -917,7 +917,7 @@ export default function Home() {
   const renderCapacityModal = () => {
     const avgCommitted = totalStorageCommitted / (nodes.length || 1);
     const top10Storage = [...nodes]
-      .sort((a, b) => (b.storage_committed  0) - (a.storage_committed  0))
+      .sort((a, b) => (b.storage_committed || 0) - (a.storage_committed || 0))
       .slice(0, 10);
     const top10Total = top10Storage.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
     const top10Dominance = ((top10Total / totalStorageCommitted) * 100).toFixed(2);
@@ -1093,11 +1093,11 @@ export default function Home() {
                 >
                   <div className="flex justify-between items-center mb-2">
                     <div className="flex items-center gap-3">
-                      <div className={text-2xl font-black ${isConsensus ? 'text-blue-400' : 'text-zinc-500'}}>
+                      <div className={`text-2xl font-black ${isConsensus ? 'text-blue-400' : 'text-zinc-500'}`}>
                         #{idx + 1}
                       </div>
                       <div>
-                        <div className={font-mono font-bold flex items-center gap-2 ${isConsensus ? 'text-white' : 'text-zinc-300'}}>
+                        <div className={`font-mono font-bold flex items-center gap-2 ${isConsensus ? 'text-white' : 'text-zinc-300'}`}>
                           {version}
                           {isConsensus && (
                             <span className="text-[9px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30 uppercase font-bold">
@@ -1111,8 +1111,8 @@ export default function Home() {
                   </div>
                   <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
                     <div 
-                      className={h-full transition-all duration-1000 ${isConsensus ? 'bg-blue-500' : 'bg-zinc-600'}}
-                      style={{ width: ${percentage}% }}
+                      className={`h-full transition-all duration-1000 ${isConsensus ? 'bg-blue-500' : 'bg-zinc-600'}`}
+                      style={{ width: `${percentage}%` }}
                     ></div>
                   </div>
                 </div>
@@ -1132,11 +1132,11 @@ export default function Home() {
 
     return (
       <div className="flex justify-between items-center py-3 border-b border-zinc-800/50 text-xs hover:bg-white/5 px-2 rounded">
-        <div className={flex-1 text-right font-mono flex items-center justify-end gap-2 ${isABetter ? 'text-green-400 font-bold' : 'text-zinc-400'}}>
+        <div className={`flex-1 text-right font-mono flex items-center justify-end gap-2 ${isABetter ? 'text-green-400 font-bold' : 'text-zinc-400'}`}>
           {format(valA)} {isABetter && <CheckCircle size={12} />}
         </div>
         <div className="px-4 text-[10px] text-zinc-600 uppercase font-bold w-32 text-center">{label}</div>
-        <div className={flex-1 text-left font-mono flex items-center justify-start gap-2 ${isBBetter ? 'text-green-400 font-bold' : 'text-zinc-400'}}>
+        <div className={`flex-1 text-left font-mono flex items-center justify-start gap-2 ${isBBetter ? 'text-green-400 font-bold' : 'text-zinc-400'}`}>
           {isBBetter && <CheckCircle size={12} />} {format(valB)}
         </div>
       </div>
@@ -1148,11 +1148,11 @@ export default function Home() {
     const isFav = favorites.includes(node.address || '');
     const isVersionSort = sortBy === 'version';
     const isLatest = checkIsLatest(node.version);
-    const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png : null;
+    const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
 
     return (
       <div
-        key={${node.pubkey}-${node.network}-${i}}
+        key={`\( {node.pubkey}- \){node.network}-${i}`}
         onClick={() => { setSelectedNode(node); setModalView('overview'); }}
         className={`group relative border rounded-xl p-3 md:p-5 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${
           zenMode ? 'bg-black border-zinc-800 hover:border-zinc-600' : isFav ? 'bg-gradient-to-b from-zinc-900 to-black border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.1)]' : 'bg-gradient-to-b from-zinc-900 to-black border-zinc-800 hover:border-blue-500/50'
@@ -1183,7 +1183,7 @@ export default function Home() {
             </div>
           </div>
 
-          <button onClick={(e) => toggleFavorite(e, node.address || '')} className={p-3 rounded-full transition-all duration-200 shrink-0 active:scale-90 ${isFav ? 'text-yellow-500 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'text-zinc-600 hover:text-yellow-500 hover:bg-zinc-800'}} style={{ minWidth: '44px', minHeight: '44px' }}>
+          <button onClick={(e) => toggleFavorite(e, node.address || '')} className={`p-3 rounded-full transition-all duration-200 shrink-0 active:scale-90 ${isFav ? 'text-yellow-500 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'text-zinc-600 hover:text-yellow-500 hover:bg-zinc-800'}`} style={{ minWidth: '44px', minHeight: '44px' }}>
             <Star size={24} strokeWidth={isFav ? 2.5 : 2} fill={isFav ? "currentColor" : "none"} />
           </button>
         </div>
@@ -1200,7 +1200,7 @@ export default function Home() {
 
           <div className="pt-1 md:pt-2">
             <div className="text-[9px] md:text-[10px] text-zinc-600 uppercase font-bold mb-1">Network Rewards</div>
-              <div className={flex justify-between items-center text-[10px] md:text-xs p-1.5 md:p-2 rounded-lg border transition-colors ${(node as any).isUntracked ? 'bg-zinc-900/50 border-zinc-800' : 'bg-black/40 border-zinc-800/50'}}>
+              <div className={`flex justify-between items-center text-[10px] md:text-xs p-1.5 md:p-2 rounded-lg border transition-colors ${(node as any).isUntracked ? 'bg-zinc-900/50 border-zinc-800' : 'bg-black/40 border-zinc-800/50'}`}>
                {(node as any).isUntracked ? (
                    <div className="flex items-center gap-2 text-zinc-500 w-full justify-center font-bold text-[9px] md:text-[10px] tracking-wide">
                      <AlertTriangle size={10} className="text-zinc-600"/> NOT FOUND ON API
@@ -1229,7 +1229,7 @@ export default function Home() {
               <span className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold block mb-0.5 flex items-center gap-1">
                 <cycleData.icon size={10} /> {cycleData.label}
               </span>
-              <span className={text-sm md:text-lg font-bold ${cycleData.color} font-mono tracking-tight}>
+              <span className={`text-sm md:text-lg font-bold ${cycleData.color} font-mono tracking-tight`}>
                 {cycleData.value}
               </span>
             </div>
@@ -1256,7 +1256,7 @@ export default function Home() {
             <div className="font-mono text-xs md:text-sm text-zinc-300 truncate w-24 md:w-32 lg:w-48">{node.pubkey || 'Unknown'}</div>
             <div className="text-[9px] md:text-[10px] text-zinc-600 font-mono mt-0.5">{getSafeIp(node)}</div>
           </div>
-          <div className={text-lg md:text-xl font-bold ${health && health >= 80 ? 'text-green-500' : 'text-yellow-500'}}>
+          <div className={`text-lg md:text-xl font-bold ${health && health >= 80 ? 'text-green-500' : 'text-yellow-500'}`}>
             {health}
           </div>
         </div>
@@ -1275,7 +1275,7 @@ export default function Home() {
           </div>
           <div>
             <div className="text-[8px] md:text-[9px] text-zinc-600 uppercase font-bold mb-1">Version</div>
-            <div className={font-mono flex items-center gap-1 md:gap-2 ${isVersionSort ? 'text-cyan-400 animate-pulse' : 'text-zinc-300'}}>
+            <div className={`font-mono flex items-center gap-1 md:gap-2 ${isVersionSort ? 'text-cyan-400 animate-pulse' : 'text-zinc-300'}`}>
               {node.version} {isLatest && <CheckCircle size={8} className="text-green-500" />}
             </div>
           </div>
@@ -1292,7 +1292,7 @@ export default function Home() {
   const renderIdentityDetails = () => {
     const details = [
       { label: 'Public Key', val: selectedNode?.pubkey || 'Unknown' },
-      { label: 'RPC Endpoint', val: http://${getSafeIp(selectedNode)}:6000 },
+      { label: 'RPC Endpoint', val: `http://${getSafeIp(selectedNode)}:6000` },
       { label: 'IP Address', val: getSafeIp(selectedNode) },
       { label: 'Node Version', val: getSafeVersion(selectedNode) },
       { label: 'Current Uptime', val: formatUptime(selectedNode?.uptime), color: 'text-orange-400' },
@@ -1446,7 +1446,7 @@ export default function Home() {
         if(usedGB > 0) {
             bonus = Math.min(15, 5 * Math.log2(usedGB + 2));
         }
-        return (Base: ${Math.round(base)} + Bonus: ${Math.round(bonus)});
+        return `(Base: ${Math.round(base)} + Bonus: ${Math.round(bonus)})`;
     };
 
     return (
@@ -1549,13 +1549,13 @@ export default function Home() {
                   </div>
                   <div className="h-2 bg-zinc-800 rounded-full overflow-visible relative">
                     <div
-                      className={h-full rounded-l-full transition-all duration-1000 ${barColor} shadow-[0_0_10px_rgba(255,255,255,0.1)]}
-                      style={{ width: ${Math.min(100, rawVal)}% }}
+                      className={`h-full rounded-l-full transition-all duration-1000 ${barColor} shadow-[0_0_10px_rgba(255,255,255,0.1)]`}
+                      style={{ width: `${Math.min(100, rawVal)}%` }}
                     ></div>
                     <div
                       className="absolute top-[-4px] bottom-[-4px] w-0.5 bg-white shadow-[0_0_5px_white] z-10"
-                      style={{ left: ${Math.min(100, rawAvg)}% }}
-                      title={Network Average: ${rawAvg}}
+                      style={{ left: `${Math.min(100, rawAvg)}%` }}
+                      title={`Network Average: ${rawAvg}`}
                     ></div>
                   </div>
                 </div>
@@ -1629,7 +1629,7 @@ export default function Home() {
               className={`w-full transition-all duration-1000 relative z-10 group-hover:bg-purple-600/40 ${
                 isPos ? 'bg-purple-600/30' : 'bg-purple-900/20'
               }`}
-              style={{ height: ${tankFill}% }}
+              style={{ height: `${tankFill}%` }}
             >
               <div
                 className={`absolute top-0 left-0 right-0 h-0.5 ${
@@ -1651,7 +1651,7 @@ export default function Home() {
             {!isPos && (
               <div
                 className="absolute top-0 left-0 right-0 bg-red-900/10 border-b border-red-500/30 pattern-diagonal-lines"
-                style={{ height: ${100 - tankFill}% }}
+                style={{ height: `${100 - tankFill}%` }}
               >
                 <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-red-500 uppercase tracking-widest opacity-50">
                   Deficit Gap
@@ -1687,11 +1687,11 @@ export default function Home() {
                 <>
                   <div
                     className="absolute top-0 bottom-0 left-0 bg-purple-600"
-                    style={{ width: ${tankFill}% }}
+                    style={{ width: `${tankFill}%` }}
                   ></div>
                   <div
                     className="absolute top-0 bottom-0 right-0 bg-red-500/10 border-l border-red-500/50"
-                    style={{ width: ${100 - tankFill}% }}
+                    style={{ width: `${100 - tankFill}%` }}
                   ></div>
                 </>
               )}
@@ -1782,7 +1782,7 @@ export default function Home() {
               </div>
             </Link>
 
-            <Link href={selectedNode?.pubkey ? /leaderboard?highlight=${selectedNode.pubkey} : '/leaderboard'}>
+            <Link href={selectedNode?.pubkey ? `/leaderboard?highlight=${selectedNode.pubkey}` : '/leaderboard'}>
               <div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer">
                 <Trophy size={18} />
                 <span className="text-sm font-bold">Leaderboard</span>
@@ -1990,7 +1990,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className={sticky top-0 z-[80] w-full h-1 bg-gradient-to-b from-black/50 to-transparent pointer-events-none transition-opacity duration-300 ${scrolled ? 'opacity-100' : 'opacity-0'}}></div>
+      <div className={`sticky top-0 z-[80] w-full h-1 bg-gradient-to-b from-black/50 to-transparent pointer-events-none transition-opacity duration-300 ${scrolled ? 'opacity-100' : 'opacity-0'}`}></div>
 
       {searchQuery && (
         <div className="sticky top-[140px] z-[85] w-full bg-blue-900/90 border-b border-blue-500/30 py-2 px-6 text-center backdrop-blur-md animate-in slide-in-from-top-1">
@@ -2143,9 +2143,9 @@ export default function Home() {
               <div className="flex justify-between items-start relative z-10">
                 <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Total Nodes</div>
                 <div className="flex gap-1">
-                  <div className={w-2 h-2 rounded-full transition-all duration-300 ${networkFilter === 'ALL' ? 'bg-white scale-125' : 'bg-zinc-700 scale-100'}} title="All Networks"/>
-                  <div className={w-2 h-2 rounded-full transition-all duration-300 ${networkFilter === 'MAINNET' ? 'bg-green-500 scale-125' : 'bg-green-900/30 scale-100'}} title="Mainnet Only"/>
-                  <div className={w-2 h-2 rounded-full transition-all duration-300 ${networkFilter === 'DEVNET' ? 'bg-blue-500 scale-125' : 'bg-blue-900/30 scale-100'}} title="Devnet Only"/>
+                  <div className={`w-2 h-2 rounded-full transition-all duration-300 ${networkFilter === 'ALL' ? 'bg-white scale-125' : 'bg-zinc-700 scale-100'}`} title="All Networks"/>
+                  <div className={`w-2 h-2 rounded-full transition-all duration-300 ${networkFilter === 'MAINNET' ? 'bg-green-500 scale-125' : 'bg-green-900/30 scale-100'}`} title="Mainnet Only"/>
+                  <div className={`w-2 h-2 rounded-full transition-all duration-300 ${networkFilter === 'DEVNET' ? 'bg-blue-500 scale-125' : 'bg-blue-900/30 scale-100'}`} title="Devnet Only"/>
                 </div>
               </div>
 
