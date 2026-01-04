@@ -69,6 +69,7 @@ interface Node {
   storage_usage_percentage?: string;
   storage_usage_raw?: number;
   rank?: number;
+  health_rank?: number;
   credits: number | null; // Nullable
   location?: {
     lat: number;
