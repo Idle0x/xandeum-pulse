@@ -403,13 +403,21 @@ const useTimeAgo = (timestamp: number | undefined) => {
       const diff = Math.floor((now - time) / 1000);
 
       if (diff < 60) {
-        setTimeAgo(`\( {diff} second \){diff !== 1 ? 's' : ''} ago`);
+        setTimeAgo(`${diff} second${diff !== 1 ? 's' : ''} ago`);
       } else if (diff < 3600) {
-        setTimeAgo(`\( {Math.floor(diff / 60)} minute \){Math.floor(diff / 60) !== 1 ? 's' : ''} ago`);
+        setTimeAgo(`${Math.floor(diff / 60)} minute${Math.floor(diff / 60) !== 1 ? 's' : ''} ago`);
       } else {
-        setTimeAgo(`\( {Math.floor(diff / 3600)} hour \){Math.floor(diff / 3600) !== 1 ? 's' : ''} ago`);
+        setTimeAgo(`${Math.floor(diff / 3600)} hour${Math.floor(diff / 3600) !== 1 ? 's' : ''} ago`);
       }
     };
+
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [timestamp]);
+
+  return timeAgo;
+};
 
     update();
     const interval = setInterval(update, 1000);
@@ -427,12 +435,11 @@ const getSafeVersion = (node: Node | null) => {
   return node?.version || 'Unknown';
 };
 
-const formatBytes = (bytes: number | undefined) => {
-  if (!bytes || bytes === 0 || isNaN(bytes)) return '0.00 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+const formatUptime = (seconds: number | undefined) => {
+  if (!seconds || isNaN(seconds)) return '0m';
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  return d > 0 ? `${d}d ${h}h` : `${h}h`;
 };
 
 const formatUptime = (seconds: number | undefined) => {
@@ -766,28 +773,28 @@ export default function Home() {
     copyToClipboard(report, 'report');
   };
 
-  const shareToTwitter = (node: Node) => {
+    const shareToTwitter = (node: Node) => {
     const health = node.health || 0;
     const creditsDisplay = node.credits !== null ? node.credits.toLocaleString() : 'N/A';
     const text = `Just checked my pNode status on Xandeum Pulse! ⚡\n\n🟢 Status: ${(node.uptime || 0) > 86400 ? 'Stable' : 'Booting'}\n❤️ Health: ${health}/100\n💰 Credits: ${creditsDisplay}\n\nMonitor here:`;
 
     window.open(
-      `https://twitter.com/intent/tweet?text=\( {encodeURIComponent(text)}&url= \){encodeURIComponent("https://xandeum-pulse.vercel.app")}`,
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent("https://xandeum-pulse.vercel.app")}`,
       '_blank'
     );
   };
 
-  const copyNodeUrl = (e: React.MouseEvent, pubkey: string) => {
+    const copyNodeUrl = (e: React.MouseEvent, pubkey: string) => {
     e.stopPropagation();
-    const url = `\( {window.location.origin}/?open= \){pubkey}`;
+    const url = `${window.location.origin}/?open=${pubkey}`;
     copyToClipboard(url, 'url');
   };
 
-  const exportCSV = () => {
+    const exportCSV = () => {
     const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Health_Score,Country,Last_Seen_ISO,Is_Favorite\n';
     const rows = filteredNodes.map(n => {
       const creditVal = n.credits !== null ? n.credits : 'NULL';
-      return `\( {getSafeIp(n)}, \){n.pubkey || 'Unknown'},\( {n.rank}, \){creditVal},\( {getSafeVersion(n)}, \){n.uptime},\( {n.storage_committed}, \){n.storage_used},\( {n.health}, \){n.location?.countryName},\( {new Date(n.last_seen_timestamp || 0).toISOString()}, \){favorites.includes(n.address || '')}`;
+      return `${getSafeIp(n)},${n.pubkey || 'Unknown'},${n.rank},${creditVal},${getSafeVersion(n)},${n.uptime},${n.storage_committed},${n.storage_used},${n.health},${n.location?.countryName},${new Date(n.last_seen_timestamp || 0).toISOString()},${favorites.includes(n.address || '')}`;
     });
     const blob = new Blob([headers + rows.join('\n')], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
