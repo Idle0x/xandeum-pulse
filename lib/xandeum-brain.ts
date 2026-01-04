@@ -76,7 +76,7 @@ const calculateLogScore = (value: number, median: number, maxScore: number = 100
     return Math.min(maxScore, (maxScore / 2) * Math.log2((value / median) + 1));
 };
 
-// NEW: Exact Lookup Table based on v2.0 Spec
+// NEW: Exact Lookup Table based on v2.0 Spec (Uses CLEAN versions for distance)
 const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedCleanVersions: string[]) => {
     const cleanNode = cleanSemver(nodeVersion);
     const cleanConsensus = cleanSemver(consensusVersion);
@@ -112,18 +112,19 @@ const calculateVitalityScore = (
     uptimeSeconds: number, 
     version: string, 
     consensusVersion: string, 
-    sortedCleanVersions: string[], // NOW EXPECTS CLEAN VERSIONS
+    sortedCleanVersions: string[], 
     medianCredits: number, 
     credits: number | null, 
     medianStorage: number
 ) => {
-  // ⛔ Gatekeeper Rule
+  // ⛔ Gatekeeper Rule: Hard Constraint
   if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
 
   // 1️⃣ Uptime Score (Sigmoid)
   const uptimeDays = uptimeSeconds / 86400;
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
-  if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); // Hard cap for new nodes
+  // Cap score at 20 for nodes younger than 1 day
+  if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
 
   // 2️⃣ Storage Score (Logarithmic + Bonus)
   const baseStorageScore = calculateLogScore(storageCommitted, medianStorage, 100);
@@ -140,7 +141,7 @@ const calculateVitalityScore = (
   if (credits !== null && medianCredits > 0) {
       // 3️⃣ Reputation Score (Standard Mode)
       reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
-      
+
       // Standard Weights: U(35%) + S(30%) + R(20%) + V(15%)
       total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15));
   } else {
@@ -263,21 +264,24 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const storageArray: number[] = rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
   const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
 
-  // --- VERSION CONSENSUS LOGIC (FIXED: Uses Clean Versions) ---
-  const versionCounts: Record<string, number> = {};
+  // --- VERSION CONSENSUS LOGIC (TWO-TRACK STRATEGY) ---
+  const rawVersionCounts: Record<string, number> = {}; 
   const uniqueCleanVersionsSet = new Set<string>();
 
   rawPods.forEach((p: any) => { 
       const rawV = (p.version || '0.0.0'); 
       const cleanV = cleanSemver(rawV);
-      // Votes based on CLEAN version
-      versionCounts[cleanV] = (versionCounts[cleanV] || 0) + 1;
+      
+      // Track 1: Vote using EXACT RAW string (Strict Mode Consensus)
+      rawVersionCounts[rawV] = (rawVersionCounts[rawV] || 0) + 1;
+      
+      // Track 2: Build the simplified ladder (Semantic Ranking)
       uniqueCleanVersionsSet.add(cleanV);
   });
-  
-  // Consensus is the most common clean version
-  const consensusVersion = Object.keys(versionCounts).sort((a, b) => versionCounts[b] - versionCounts[a])[0] || '0.0.0';
-  
+
+  // Consensus is the most common RAW version
+  const consensusVersion = Object.keys(rawVersionCounts).sort((a, b) => rawVersionCounts[b] - rawVersionCounts[a])[0] || '0.0.0';
+
   // Master List sorted Descending
   const sortedCleanVersions = Array.from(uniqueCleanVersionsSet).sort((a, b) => compareVersions(b, a));
 
@@ -294,7 +298,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
 
       const vitality = calculateVitalityScore(
           storageCommitted, storageUsed, uptime, 
-          pod.version || '0.0.0', consensusVersion, sortedCleanVersions, // Pass cleaned list
+          pod.version || '0.0.0', consensusVersion, sortedCleanVersions, 
           medianCredits, credits, medianStorage
       );
 
