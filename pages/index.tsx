@@ -2245,7 +2245,7 @@ export default function Home() {
         )}
       </main>
 
-      {/* --- THE ULTRA MODAL --- */}
+            {/* --- THE ULTRA MODAL --- */}
       {selectedNode && (
         <div
           className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-4"
@@ -2257,6 +2257,7 @@ export default function Home() {
             }`}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* -- MODAL HEADER -- */}
             <div
               className={`shrink-0 p-4 md:p-6 border-b flex justify-between items-start ${
                 zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'
@@ -2333,6 +2334,7 @@ export default function Home() {
               </div>
             </div>
 
+            {/* -- SCROLLABLE CONTENT -- */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 relative flex flex-col">
               {compareMode ? (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300 h-full flex flex-col relative">
@@ -2614,7 +2616,7 @@ export default function Home() {
                       </div>
                     </div>
 
-                     <div className="flex flex-col gap-3 w-full max-w-sm">
+                    <div className="flex flex-col gap-3 w-full max-w-sm">
                       <button
                         onClick={() => setShareMode(false)}
                         className="px-6 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white text-xs font-bold transition border border-zinc-800 mb-6 flex items-center justify-center gap-2 group"
@@ -2678,485 +2680,487 @@ export default function Home() {
                         DOWNLOAD PROOF
                       </button>
                     </div>
-              ) : (
-                <div className="flex flex-col gap-4 h-full">
-              {modalView !== 'overview' ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
-                  <div className="md:col-span-1 h-full">
-                    {modalView === 'health' && (
-                      <div
-                        className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group bg-zinc-900 border-green-500 ring-1 ring-green-500`}
-                        onClick={() => handleCardToggle('health')}
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-b from-green-900/10 to-transparent pointer-events-none"></div>
-                        <div className="w-full flex justify-between items-start z-10 mb-4">
-                          <div className="flex flex-col">
-                            <h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">
-                              DIAGNOSTICS
-                            </h3>
-                            <div className="text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit bg-green-500/20 text-green-400">
-                              Active View
-                            </div>
-                          </div>
-                          <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
-                        </div>
-                        <div className="relative z-10 scale-90">
-                          <RadialProgress score={selectedNode.health || 0} size={140} />
-                        </div>
-                        <div className="mt-6 text-center w-full z-10 flex justify-center">
-                          <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
-                            <Minimize2 size={8} /> CLICK TO COLLAPSE
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {modalView === 'storage' && (
-                      <div
-                        className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group bg-zinc-900 border-purple-500 ring-1 ring-purple-500`}
-                        onClick={() => handleCardToggle('storage')}
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-b from-purple-900/10 to-transparent pointer-events-none"></div>
-                        <div className="w-full flex justify-between items-start z-10 mb-4">
-                          <div className="flex flex-col">
-                            <h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">
-                              STORAGE
-                            </h3>
-                            <div className="text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit bg-purple-500/20 text-purple-400">
-                              Active View
-                            </div>
-                          </div>
-                          <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
-                        </div>
-                        <div className="relative w-full mt-4 space-y-2">
-                          <div className="text-[10px] text-zinc-500 font-bold uppercase">
-                            Your Node
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-zinc-400 text-xs">Committed</span>
-                            <span className="text-purple-400 font-mono text-sm">
-                              {formatBytes(selectedNode.storage_committed)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-zinc-400 text-xs">Used</span>
-                            <span className="text-blue-400 font-mono text-sm">
-                              {formatBytes(selectedNode.storage_used)}
-                            </span>
-                          </div>
-                          <div className="h-px bg-zinc-800 my-2"></div>
-                          <div className="flex justify-between">
-                            <span className="text-zinc-500 text-xs">Network Median</span>
-                            <span className="text-zinc-300 font-mono text-sm">
-                              {formatBytes(medianCommitted)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="mt-6 text-center w-full z-10 flex justify-center">
-                          <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
-                            <Minimize2 size={8} /> CLICK TO COLLAPSE
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {modalView === 'identity' && (
-                      <div
-                        className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group bg-zinc-900 border-blue-500 ring-1 ring-blue-500`}
-                        onClick={() => handleCardToggle('identity')}
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-b from-blue-900/10 to-transparent pointer-events-none"></div>
-                        <div className="w-full flex justify-between items-start z-10 mb-4">
-                          <div className="flex flex-col">
-                            <h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">
-                              IDENTITY
-                            </h3>
-                            <div className="text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit bg-blue-500/20 text-blue-400">
-                              Active View
-                            </div>
-                          </div>
-                          <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
-                        </div>
-                        <div className="relative z-10 flex flex-col items-center gap-4">
-                          <Shield size={64} className="text-blue-500 opacity-80" />
-                          {isSelectedNodeLatest
-                            ? (
-                            <div className="text-[10px] text-green-500 font-bold bg-green-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-green-500/20">
-                              <CheckCircle size={12} />
-                              UP TO DATE
-                            </div>
-                          ) : (
-                            <div className="text-[10px] text-orange-500 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-orange-500/20">
-                              <AlertTriangle size={12} />
-                              UPDATE NEEDED
-                            </div>
-                          )}
-                        </div>
-                        <div className="mt-6 text-center w-full z-10 flex justify-center">
-                          <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
-                            <Minimize2 size={8} /> CLICK TO COLLAPSE
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="md:col-span-2 h-full">
-                    {modalView === 'health' && renderHealthBreakdown()}
-                    {modalView === 'storage' && renderStorageAnalysis()}
-                    {modalView === 'identity' && renderIdentityDetails()}
                   </div>
                 </div>
               ) : (
                 <div className="flex flex-col gap-4 h-full">
-                  {/* --- TOP ROW: 3 CARDS (Health, Storage, Identity) --- */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    
-                    {/* 1. SYSTEM DIAGNOSTICS (Health) */}
-                    <div
-                      className={`rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group h-64 ${
-                        zenMode
-                          ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
-                          : 'bg-zinc-900/30 border-zinc-800 hover:border-blue-500/30'
-                      }`}
-                      onClick={() => handleCardToggle('health')}
-                    >
-                      <div
-                        className={`absolute inset-0 bg-gradient-to-b from-transparent pointer-events-none ${
-                          zenMode ? 'to-green-900/10' : 'to-blue-900/10'
-                        }`}
-                      ></div>
-                      <div className="w-full flex justify-between items-start z-10 mb-4">
-                        <div className="flex flex-col">
-                          <h3
-                            className={`text-[10px] font-bold tracking-widest uppercase ${
-                              zenMode ? 'text-zinc-400' : 'text-zinc-500'
-                            }`}
-                          >
-                            SYSTEM DIAGNOSTICS
-                          </h3>
+                  {modalView !== 'overview' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
+                      <div className="md:col-span-1 h-full">
+                        {modalView === 'health' && (
                           <div
-                            className={`text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit ${
-                              (selectedNode.health || 0) >= avgNetworkHealth
-                                ? 'bg-green-500/20 text-green-400'
-                                : 'bg-red-500/20 text-red-400'
-                            }`}
+                            className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group bg-zinc-900 border-green-500 ring-1 ring-green-500`}
+                            onClick={() => handleCardToggle('health')}
                           >
-                            {(selectedNode.health || 0) >= avgNetworkHealth
-                              ? '▲ Above Avg'
-                              : '▼ Below Avg'}
+                            <div className="absolute inset-0 bg-gradient-to-b from-green-900/10 to-transparent pointer-events-none"></div>
+                            <div className="w-full flex justify-between items-start z-10 mb-4">
+                              <div className="flex flex-col">
+                                <h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">
+                                  DIAGNOSTICS
+                                </h3>
+                                <div className="text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit bg-green-500/20 text-green-400">
+                                  Active View
+                                </div>
+                              </div>
+                              <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
+                            </div>
+                            <div className="relative z-10 scale-90">
+                              <RadialProgress score={selectedNode.health || 0} size={140} />
+                            </div>
+                            <div className="mt-6 text-center w-full z-10 flex justify-center">
+                              <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
+                                <Minimize2 size={8} /> CLICK TO COLLAPSE
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <HelpCircle
-                          size={14}
-                          className={`z-20 hover:text-white transition ${
-                            zenMode ? 'text-zinc-600' : 'text-zinc-500'
-                          }`}
-                        />
+                        )}
+
+                        {modalView === 'storage' && (
+                          <div
+                            className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group bg-zinc-900 border-purple-500 ring-1 ring-purple-500`}
+                            onClick={() => handleCardToggle('storage')}
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-b from-purple-900/10 to-transparent pointer-events-none"></div>
+                            <div className="w-full flex justify-between items-start z-10 mb-4">
+                              <div className="flex flex-col">
+                                <h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">
+                                  STORAGE
+                                </h3>
+                                <div className="text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit bg-purple-500/20 text-purple-400">
+                                  Active View
+                                </div>
+                              </div>
+                              <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
+                            </div>
+                            <div className="relative w-full mt-4 space-y-2">
+                              <div className="text-[10px] text-zinc-500 font-bold uppercase">
+                                Your Node
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-zinc-400 text-xs">Committed</span>
+                                <span className="text-purple-400 font-mono text-sm">
+                                  {formatBytes(selectedNode.storage_committed)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-zinc-400 text-xs">Used</span>
+                                <span className="text-blue-400 font-mono text-sm">
+                                  {formatBytes(selectedNode.storage_used)}
+                                </span>
+                              </div>
+                              <div className="h-px bg-zinc-800 my-2"></div>
+                              <div className="flex justify-between">
+                                <span className="text-zinc-500 text-xs">Network Median</span>
+                                <span className="text-zinc-300 font-mono text-sm">
+                                  {formatBytes(medianCommitted)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="mt-6 text-center w-full z-10 flex justify-center">
+                              <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
+                                <Minimize2 size={8} /> CLICK TO COLLAPSE
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {modalView === 'identity' && (
+                          <div
+                            className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group bg-zinc-900 border-blue-500 ring-1 ring-blue-500`}
+                            onClick={() => handleCardToggle('identity')}
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-b from-blue-900/10 to-transparent pointer-events-none"></div>
+                            <div className="w-full flex justify-between items-start z-10 mb-4">
+                              <div className="flex flex-col">
+                                <h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">
+                                  IDENTITY
+                                </h3>
+                                <div className="text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit bg-blue-500/20 text-blue-400">
+                                  Active View
+                                </div>
+                              </div>
+                              <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
+                            </div>
+                            <div className="relative z-10 flex flex-col items-center gap-4">
+                              <Shield size={64} className="text-blue-500 opacity-80" />
+                              {isSelectedNodeLatest
+                                ? (
+                                <div className="text-[10px] text-green-500 font-bold bg-green-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-green-500/20">
+                                  <CheckCircle size={12} />
+                                  UP TO DATE
+                                </div>
+                              ) : (
+                                <div className="text-[10px] text-orange-500 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-orange-500/20">
+                                  <AlertTriangle size={12} />
+                                  UPDATE NEEDED
+                                </div>
+                              )}
+                            </div>
+                            <div className="mt-6 text-center w-full z-10 flex justify-center">
+                              <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
+                                <Minimize2 size={8} /> CLICK TO COLLAPSE
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="relative z-10 scale-100 group-hover:scale-110 transition-transform duration-500 ease-in-out">
-                        <RadialProgress score={selectedNode.health || 0} size={140} />
-                      </div>
-                      <div className="mt-6 text-center w-full z-10 flex justify-center">
-                        <div className="text-[9px] font-bold uppercase tracking-widest text-green-400/80 animate-pulse group-hover:text-green-300 transition-colors flex items-center gap-1">
-                          <Maximize2 size={8} /> CLICK TO EXPAND
-                        </div>
+
+                      <div className="md:col-span-2 h-full">
+                        {modalView === 'health' && renderHealthBreakdown()}
+                        {modalView === 'storage' && renderStorageAnalysis()}
+                        {modalView === 'identity' && renderIdentityDetails()}
                       </div>
                     </div>
-
-                    {/* 2. STORAGE CAPACITY */}
-                    <div
-                      className={`p-5 rounded-2xl border flex flex-col justify-between cursor-pointer transition group relative h-64 ${
-                        zenMode
-                          ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
-                          : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'
-                      }`}
-                      onClick={() => handleCardToggle('storage')}
-                    >
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`p-2 rounded-lg ${
-                              zenMode ? 'bg-green-900/20 text-green-500' : 'bg-blue-500/10 text-blue-500'
-                            }`}
-                          >
-                            <Database size={18} />
-                          </div>
-                          <div
-                            className={`text-xs font-bold uppercase ${
-                              zenMode ? 'text-zinc-400' : 'text-zinc-500'
-                            }`}
-                          >
-                            STORAGE CAPACITY
-                          </div>
-                        </div>
-                        <HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" />
-                      </div>
-
-                      <div className="mt-auto space-y-4 relative z-10">
-                        <div className="flex items-end justify-between">
-                          <div>
-                            <div className="text-[9px] font-mono text-zinc-500 mb-1 bg-zinc-900/50 border border-zinc-800 px-2 py-0.5 rounded-full inline-block">
-                              {(selectedNode?.storage_used || 0).toLocaleString()} raw
-                            </div>
-                            <div className="flex items-baseline gap-1">
-                              <span
-                                className={`text-2xl font-bold font-mono ${
-                                  zenMode ? 'text-green-400' : 'text-blue-400'
-                                }`}
-                              >
-                                {formatBytes(selectedNode?.storage_used).split(' ')[0]}
-                                <span className="text-sm ml-1">
-                                  {formatBytes(selectedNode?.storage_used).split(' ')[1]}
-                                </span>
-                              </span>
-                            </div>
-                            <div className="text-[9px] text-zinc-600 uppercase font-bold tracking-wider mt-0.5">
-                              USED
-                            </div>
-                          </div>
-
-                          <div className="text-right">
-                            <div className="flex items-baseline gap-1 justify-end">
-                              <span
-                                className={`text-2xl font-bold font-mono ${
-                                  zenMode ? 'text-green-600' : 'text-purple-400'
-                                }`}
-                              >
-                                {formatBytes(selectedNode?.storage_committed).split(' ')[0]}
-                                <span className="text-sm ml-1">
-                                  {formatBytes(selectedNode?.storage_committed).split(' ')[1]}
-                                </span>
-                              </span>
-                            </div>
-                            <div className="text-[9px] text-zinc-600 uppercase font-bold tracking-wider mt-0.5">
-                              COMMITTED
-                            </div>
-                          </div>
-                        </div>
-
-                        <div>
-                          <div className="h-2 bg-zinc-800 rounded-full overflow-hidden mb-2">
-                            <div
-                              className={`h-full transition-all duration-1000 group-hover:brightness-125 ${
-                                zenMode
-                                  ? 'bg-green-500'
-                                  : 'bg-gradient-to-r from-blue-500 to-purple-500'
-                              }`}
-                              style={{
-                                width: `${Math.min(
-                                  100,
-                                  ((selectedNode?.storage_used || 0) /
-                                    (selectedNode?.storage_committed || 1)) *
-                                    100
-                                )}%`,
-                              }}
-                            ></div>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 flex justify-center">
-                          <div className="text-[9px] font-bold uppercase tracking-widest text-purple-400/80 animate-pulse group-hover:text-purple-300 transition-colors flex items-center gap-1">
-                            <Maximize2 size={8} /> CLICK TO EXPAND
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 3. IDENTITY & STATUS */}
-                    <div
-                      className={`p-5 rounded-2xl border flex flex-col justify-between relative overflow-hidden cursor-pointer group h-64 ${
-                        zenMode
-                          ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
-                          : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'
-                      }`}
-                      onClick={() => handleCardToggle('identity')}
-                    >
-                      <div className="flex justify-between items-start mb-2 relative z-10">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`p-2 rounded-lg ${
-                              zenMode ? 'bg-zinc-800 text-zinc-400' : 'bg-zinc-800 text-zinc-400'
-                            }`}
-                          >
-                            <Server size={18} />
-                          </div>
-                          <div
-                            className={`text-xs font-bold uppercase ${
-                              zenMode ? 'text-zinc-400' : 'text-zinc-500'
-                            }`}
-                          >
-                            IDENTITY & STATUS
-                          </div>
-                        </div>
-                        <HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" />
-                      </div>
-
-                      <div className="mt-auto relative z-10">
+                  ) : (
+                    <div className="flex flex-col gap-4 h-full">
+                      {/* --- TOP ROW: 3 CARDS (Health, Storage, Identity) --- */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        
+                        {/* 1. SYSTEM DIAGNOSTICS (Health) */}
                         <div
-                          className={`text-xl font-mono group-hover:text-blue-400 group-hover:animate-pulse ${
-                            zenMode ? 'text-white' : 'text-white'
+                          className={`rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group h-64 ${
+                            zenMode
+                              ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
+                              : 'bg-zinc-900/30 border-zinc-800 hover:border-blue-500/30'
+                          }`}
+                          onClick={() => handleCardToggle('health')}
+                        >
+                          <div
+                            className={`absolute inset-0 bg-gradient-to-b from-transparent pointer-events-none ${
+                              zenMode ? 'to-green-900/10' : 'to-blue-900/10'
+                            }`}
+                          ></div>
+                          <div className="w-full flex justify-between items-start z-10 mb-4">
+                            <div className="flex flex-col">
+                              <h3
+                                className={`text-[10px] font-bold tracking-widest uppercase ${
+                                  zenMode ? 'text-zinc-400' : 'text-zinc-500'
+                                }`}
+                              >
+                                SYSTEM DIAGNOSTICS
+                              </h3>
+                              <div
+                                className={`text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit ${
+                                  (selectedNode.health || 0) >= avgNetworkHealth
+                                    ? 'bg-green-500/20 text-green-400'
+                                    : 'bg-red-500/20 text-red-400'
+                                }`}
+                              >
+                                {(selectedNode.health || 0) >= avgNetworkHealth
+                                  ? '▲ Above Avg'
+                                  : '▼ Below Avg'}
+                              </div>
+                            </div>
+                            <HelpCircle
+                              size={14}
+                              className={`z-20 hover:text-white transition ${
+                                zenMode ? 'text-zinc-600' : 'text-zinc-500'
+                              }`}
+                            />
+                          </div>
+                          <div className="relative z-10 scale-100 group-hover:scale-110 transition-transform duration-500 ease-in-out">
+                            <RadialProgress score={selectedNode.health || 0} size={140} />
+                          </div>
+                          <div className="mt-6 text-center w-full z-10 flex justify-center">
+                            <div className="text-[9px] font-bold uppercase tracking-widest text-green-400/80 animate-pulse group-hover:text-green-300 transition-colors flex items-center gap-1">
+                              <Maximize2 size={8} /> CLICK TO EXPAND
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2. STORAGE CAPACITY */}
+                        <div
+                          className={`p-5 rounded-2xl border flex flex-col justify-between cursor-pointer transition group relative h-64 ${
+                            zenMode
+                              ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
+                              : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'
+                          }`}
+                          onClick={() => handleCardToggle('storage')}
+                        >
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={`p-2 rounded-lg ${
+                                  zenMode ? 'bg-green-900/20 text-green-500' : 'bg-blue-500/10 text-blue-500'
+                                }`}
+                              >
+                                <Database size={18} />
+                              </div>
+                              <div
+                                className={`text-xs font-bold uppercase ${
+                                  zenMode ? 'text-zinc-400' : 'text-zinc-500'
+                                }`}
+                              >
+                                STORAGE CAPACITY
+                              </div>
+                            </div>
+                            <HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" />
+                          </div>
+
+                          <div className="mt-auto space-y-4 relative z-10">
+                            <div className="flex items-end justify-between">
+                              <div>
+                                <div className="text-[9px] font-mono text-zinc-500 mb-1 bg-zinc-900/50 border border-zinc-800 px-2 py-0.5 rounded-full inline-block">
+                                  {(selectedNode?.storage_used || 0).toLocaleString()} raw
+                                </div>
+                                <div className="flex items-baseline gap-1">
+                                  <span
+                                    className={`text-2xl font-bold font-mono ${
+                                      zenMode ? 'text-green-400' : 'text-blue-400'
+                                    }`}
+                                  >
+                                    {formatBytes(selectedNode?.storage_used).split(' ')[0]}
+                                    <span className="text-sm ml-1">
+                                      {formatBytes(selectedNode?.storage_used).split(' ')[1]}
+                                    </span>
+                                  </span>
+                                </div>
+                                <div className="text-[9px] text-zinc-600 uppercase font-bold tracking-wider mt-0.5">
+                                  USED
+                                </div>
+                              </div>
+
+                              <div className="text-right">
+                                <div className="flex items-baseline gap-1 justify-end">
+                                  <span
+                                    className={`text-2xl font-bold font-mono ${
+                                      zenMode ? 'text-green-600' : 'text-purple-400'
+                                    }`}
+                                  >
+                                    {formatBytes(selectedNode?.storage_committed).split(' ')[0]}
+                                    <span className="text-sm ml-1">
+                                      {formatBytes(selectedNode?.storage_committed).split(' ')[1]}
+                                    </span>
+                                  </span>
+                                </div>
+                                <div className="text-[9px] text-zinc-600 uppercase font-bold tracking-wider mt-0.5">
+                                  COMMITTED
+                                </div>
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="h-2 bg-zinc-800 rounded-full overflow-hidden mb-2">
+                                <div
+                                  className={`h-full transition-all duration-1000 group-hover:brightness-125 ${
+                                    zenMode
+                                      ? 'bg-green-500'
+                                      : 'bg-gradient-to-r from-blue-500 to-purple-500'
+                                  }`}
+                                  style={{
+                                    width: `${Math.min(
+                                      100,
+                                      ((selectedNode?.storage_used || 0) /
+                                        (selectedNode?.storage_committed || 1)) *
+                                        100
+                                    )}%`,
+                                  }}
+                                ></div>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 flex justify-center">
+                              <div className="text-[9px] font-bold uppercase tracking-widest text-purple-400/80 animate-pulse group-hover:text-purple-300 transition-colors flex items-center gap-1">
+                                <Maximize2 size={8} /> CLICK TO EXPAND
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 3. IDENTITY & STATUS */}
+                        <div
+                          className={`p-5 rounded-2xl border flex flex-col justify-between relative overflow-hidden cursor-pointer group h-64 ${
+                            zenMode
+                              ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
+                              : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'
+                          }`}
+                          onClick={() => handleCardToggle('identity')}
+                        >
+                          <div className="flex justify-between items-start mb-2 relative z-10">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={`p-2 rounded-lg ${
+                                  zenMode ? 'bg-zinc-800 text-zinc-400' : 'bg-zinc-800 text-zinc-400'
+                                }`}
+                              >
+                                <Server size={18} />
+                              </div>
+                              <div
+                                className={`text-xs font-bold uppercase ${
+                                  zenMode ? 'text-zinc-400' : 'text-zinc-500'
+                                }`}
+                              >
+                                IDENTITY & STATUS
+                              </div>
+                            </div>
+                            <HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" />
+                          </div>
+
+                          <div className="mt-auto relative z-10">
+                            <div
+                              className={`text-xl font-mono group-hover:text-blue-400 group-hover:animate-pulse ${
+                                zenMode ? 'text-white' : 'text-white'
+                              }`}
+                            >
+                              {getSafeVersion(selectedNode)}
+                            </div>
+
+                            <div className="text-xs text-zinc-500 mt-1 font-mono flex items-center gap-1">
+                              <Clock size={12} className="text-zinc-600" />
+                              Up: <span className="text-zinc-400">{formatUptime(selectedNode.uptime)}</span>
+                            </div>
+
+                            {isSelectedNodeLatest
+                              ? (
+                              <div className="text-[10px] text-green-500 mt-2 font-bold bg-green-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
+                                <CheckCircle size={10} />
+                                UP TO DATE
+                              </div>
+                            ) : (
+                              <div className="text-[10px] text-orange-500 mt-2 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
+                                <AlertTriangle size={10} />
+                                UPDATE NEEDED
+                              </div>
+                            )}
+
+                            <div className="mt-4 flex justify-center">
+                              <div className="text-[9px] font-bold uppercase tracking-widest text-blue-400/80 animate-pulse group-hover:text-blue-300 transition-colors flex items-center gap-1">
+                                <Maximize2 size={8} /> CLICK TO EXPAND
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* --- BOTTOM ROW: 2 CARDS (Reputation, Map) --- */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        
+                        {/* 4. REPUTATION (Leaderboard) */}
+                        <div
+                          onClick={(e) => handleLeaderboardNav(e, selectedNode)}
+                          className={`h-40 p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${
+                            zenMode
+                              ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
+                              : 'bg-zinc-900/50 border-zinc-800 hover:border-yellow-500/30'
                           }`}
                         >
-                          {getSafeVersion(selectedNode)}
-                        </div>
+                          <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/5 to-transparent z-20 pointer-events-none"></div>
+                          <div className="absolute top-0 right-0 p-12 bg-yellow-500/5 blur-2xl rounded-full group-hover:bg-yellow-500/10 transition"></div>
 
-                        <div className="text-xs text-zinc-500 mt-1 font-mono flex items-center gap-1">
-                          <Clock size={12} className="text-zinc-600" />
-                          Up: <span className="text-zinc-400">{formatUptime(selectedNode.uptime)}</span>
-                        </div>
-
-                        {isSelectedNodeLatest
-                          ? (
-                          <div className="text-[10px] text-green-500 mt-2 font-bold bg-green-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
-                            <CheckCircle size={10} />
-                            UP TO DATE
-                          </div>
-                        ) : (
-                          <div className="text-[10px] text-orange-500 mt-2 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
-                            <AlertTriangle size={10} />
-                            UPDATE NEEDED
-                          </div>
-                        )}
-
-                        <div className="mt-4 flex justify-center">
-                          <div className="text-[9px] font-bold uppercase tracking-widest text-blue-400/80 animate-pulse group-hover:text-blue-300 transition-colors flex items-center gap-1">
-                            <Maximize2 size={8} /> CLICK TO EXPAND
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* --- BOTTOM ROW: 2 CARDS (Reputation, Map) --- */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    
-                    {/* 4. REPUTATION (Leaderboard) */}
-                    <div
-                      onClick={(e) => handleLeaderboardNav(e, selectedNode)}
-                      className={`h-40 p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${
-                        zenMode
-                          ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
-                          : 'bg-zinc-900/50 border-zinc-800 hover:border-yellow-500/30'
-                      }`}
-                    >
-                      <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/5 to-transparent z-20 pointer-events-none"></div>
-                      <div className="absolute top-0 right-0 p-12 bg-yellow-500/5 blur-2xl rounded-full group-hover:bg-yellow-500/10 transition"></div>
-
-                      <div className="flex justify-between items-start mb-2 relative z-10">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`p-2 rounded-lg ${
-                              zenMode ? 'bg-yellow-900/20 text-yellow-600' : 'bg-yellow-500/10 text-yellow-500'
-                            }`}
-                          >
-                            <Trophy size={18} />
-                          </div>
-                          <div
-                            className={`text-xs font-bold uppercase ${
-                              zenMode ? 'text-zinc-400' : 'text-zinc-500'
-                            }`}
-                          >
-                            REPUTATION
-                          </div>
-                        </div>
-                        <HelpCircle
-                          size={12}
-                          className="text-zinc-600 hover:text-white z-20"
-                          onClick={(e) => toggleTooltip(e, 'card_rank')}
-                        />
-                      </div>
-
-                      {activeTooltip === 'card_rank' && (
-                        <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-12 left-4 right-4 animate-in fade-in">
-                          Rank is determined by total reputation credits.
-                        </div>
-                      )}
-
-                      <div className="mt-auto relative z-10">
-                        <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">
-                          Global Rank{' '}
-                          <span className="text-white text-base ml-1">
-                            {(selectedNode as any).isUntracked ? '---' : `#${selectedNode?.rank || '-'}`}
-                          </span>
-                        </div>
-                        <div className="bg-zinc-800 shadow-[0_4px_0_0_rgba(0,0,0,0.3)] rounded-lg p-2.5 mt-1.5 border-b border-white/5">
-                          <div className="flex justify-between items-center">
-                            <span className="text-[9px] text-zinc-500 font-mono uppercase">
-                              Credits Earned
-                            </span>
-                            <span className={`${(selectedNode as any).isUntracked ? 'text-zinc-500' : 'text-yellow-500'} font-mono font-bold text-xs`}>
-                              {(selectedNode as any).isUntracked 
-                                ? 'NOT TRACKED' 
-                                : (selectedNode?.credits !== null ? selectedNode.credits.toLocaleString() : 'N/A')}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-2 flex justify-end">
-                        <span className={`text-[9px] font-bold uppercase tracking-widest ${(selectedNode as any).isUntracked ? 'text-zinc-600' : 'text-yellow-500/80 animate-pulse group-hover:text-yellow-300'} transition-colors flex items-center gap-1`}>
-                          OPEN LEADERBOARD <ExternalLink size={8} />
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* 5. PHYSICAL LAYER (Map) */}
-                    <Link href={`/map?focus=${getSafeIp(selectedNode)}`}>
-                      <div
-                        className={`h-40 p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${
-                          zenMode
-                            ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
-                            : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'
-                        }`}
-                      >
-                        <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition group-hover:scale-150 duration-700"></div>
-
-                        <div className="flex justify-between items-start mb-2 relative z-10">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={`p-2 rounded-lg ${
-                                zenMode ? 'bg-blue-900/20 text-blue-600' : 'bg-blue-500/10 text-blue-500'
-                              }`}
-                            >
-                              <Globe size={18} />
+                          <div className="flex justify-between items-start mb-2 relative z-10">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={`p-2 rounded-lg ${
+                                  zenMode ? 'bg-yellow-900/20 text-yellow-600' : 'bg-yellow-500/10 text-yellow-500'
+                                }`}
+                              >
+                                <Trophy size={18} />
+                              </div>
+                              <div
+                                className={`text-xs font-bold uppercase ${
+                                  zenMode ? 'text-zinc-400' : 'text-zinc-500'
+                                }`}
+                              >
+                                REPUTATION
+                              </div>
                             </div>
-                            <div
-                              className={`text-xs font-bold uppercase ${
-                                zenMode ? 'text-zinc-400' : 'text-zinc-500'
-                              }`}
-                            >
-                              PHYSICAL LAYER
+                            <HelpCircle
+                              size={12}
+                              className="text-zinc-600 hover:text-white z-20"
+                              onClick={(e) => toggleTooltip(e, 'card_rank')}
+                            />
+                          </div>
+
+                          {activeTooltip === 'card_rank' && (
+                            <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-12 left-4 right-4 animate-in fade-in">
+                              Rank is determined by total reputation credits.
+                            </div>
+                          )}
+
+                          <div className="mt-auto relative z-10">
+                            <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">
+                              Global Rank{' '}
+                              <span className="text-white text-base ml-1">
+                                {(selectedNode as any).isUntracked ? '---' : `#${selectedNode?.rank || '-'}`}
+                              </span>
+                            </div>
+                            <div className="bg-zinc-800 shadow-[0_4px_0_0_rgba(0,0,0,0.3)] rounded-lg p-2.5 mt-1.5 border-b border-white/5">
+                              <div className="flex justify-between items-center">
+                                <span className="text-[9px] text-zinc-500 font-mono uppercase">
+                                  Credits Earned
+                                </span>
+                                <span className={`${(selectedNode as any).isUntracked ? 'text-zinc-500' : 'text-yellow-500'} font-mono font-bold text-xs`}>
+                                  {(selectedNode as any).isUntracked 
+                                    ? 'NOT TRACKED' 
+                                    : (selectedNode?.credits !== null ? selectedNode.credits.toLocaleString() : 'N/A')}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                          <HelpCircle
-                            size={12}
-                            className="text-zinc-600 hover:text-white z-20"
-                            onClick={(e) => toggleTooltip(e, 'card_loc')}
-                          />
-                        </div>
 
-                        {activeTooltip === 'card_loc' && (
-                          <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-12 left-4 right-4 animate-in fade-in">
-                            Approximate physical location based on IP triangulation.
-                          </div>
-                        )}
-
-                        <div className="mt-auto relative z-10 group-hover:translate-x-1 transition-transform">
-                          <PhysicalLocationBadge node={selectedNode} zenMode={zenMode} />
-                          <div className="mt-3 flex justify-end">
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-blue-400/80 animate-pulse group-hover:text-blue-300 transition-colors flex items-center gap-1">
-                              OPEN MAP VIEW <ExternalLink size={8} />
+                          <div className="mt-2 flex justify-end">
+                            <span className={`text-[9px] font-bold uppercase tracking-widest ${(selectedNode as any).isUntracked ? 'text-zinc-600' : 'text-yellow-500/80 animate-pulse group-hover:text-yellow-300'} transition-colors flex items-center gap-1`}>
+                              OPEN LEADERBOARD <ExternalLink size={8} />
                             </span>
                           </div>
                         </div>
+
+                        {/* 5. PHYSICAL LAYER (Map) */}
+                        <Link href={`/map?focus=${getSafeIp(selectedNode)}`}>
+                          <div
+                            className={`h-40 p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${
+                              zenMode
+                                ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
+                                : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'
+                            }`}
+                          >
+                            <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition group-hover:scale-150 duration-700"></div>
+
+                            <div className="flex justify-between items-start mb-2 relative z-10">
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className={`p-2 rounded-lg ${
+                                    zenMode ? 'bg-blue-900/20 text-blue-600' : 'bg-blue-500/10 text-blue-500'
+                                  }`}
+                                >
+                                  <Globe size={18} />
+                                </div>
+                                <div
+                                  className={`text-xs font-bold uppercase ${
+                                    zenMode ? 'text-zinc-400' : 'text-zinc-500'
+                                  }`}
+                                >
+                                  PHYSICAL LAYER
+                                </div>
+                              </div>
+                              <HelpCircle
+                                size={12}
+                                className="text-zinc-600 hover:text-white z-20"
+                                onClick={(e) => toggleTooltip(e, 'card_loc')}
+                              />
+                            </div>
+
+                            {activeTooltip === 'card_loc' && (
+                              <div className="absolute z-20 bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 top-12 left-4 right-4 animate-in fade-in">
+                                Approximate physical location based on IP triangulation.
+                              </div>
+                            )}
+
+                            <div className="mt-auto relative z-10 group-hover:translate-x-1 transition-transform">
+                              <PhysicalLocationBadge node={selectedNode} zenMode={zenMode} />
+                              <div className="mt-3 flex justify-end">
+                                <span className="text-[9px] font-bold uppercase tracking-widest text-blue-400/80 animate-pulse group-hover:text-blue-300 transition-colors flex items-center gap-1">
+                                  OPEN MAP VIEW <ExternalLink size={8} />
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </Link>
                       </div>
-                    </Link>
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-            )} {/* <--- THIS CLOSING TAG WAS MISSING IN PREVIOUS VERSION */}
 
             {!compareMode && !shareMode && (
               <div className="mt-6 pt-6 border-t border-zinc-800 flex flex-col gap-4">
@@ -3167,9 +3171,9 @@ export default function Home() {
                   </div>
                   <button
                     onClick={(e) => copyNodeUrl(e, selectedNode.pubkey || '')}
-                    className="flex items-center justify-center gap-2 px-6 py-2 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/20 hover:border-blue-500/30 rounded-full text-[10px] font-bold text-blue-400 transition group"
+                    className={`flex items-center justify-center gap-2 px-6 py-2 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/20 hover:border-blue-500/30 rounded-full text-[10px] font-bold text-blue-400 transition group`}
                   >
-                    <LinkIcon size={12} />
+                    {copiedField === 'url' ? <Check size={12} /> : <LinkIcon size={12} />}
                     {copiedField === 'url' ? 'LINK COPIED' : 'COPY NODE URL'}
                   </button>
                 </div>
