@@ -1292,7 +1292,7 @@ export default function Home() {
   const renderIdentityDetails = () => {
     const details = [
       { label: 'Public Key', val: selectedNode?.pubkey || 'Unknown' },
-      { label: 'RPC Endpoint', val: http://${getSafeIp(selectedNode)}:6000 }, // Fixed backticks
+      { label: 'RPC Endpoint', val: http://${getSafeIp(selectedNode)}:6000 },
       { label: 'IP Address', val: getSafeIp(selectedNode) },
       { label: 'Node Version', val: getSafeVersion(selectedNode) },
       { label: 'Current Uptime', val: formatUptime(selectedNode?.uptime), color: 'text-orange-400' },
@@ -1446,7 +1446,7 @@ export default function Home() {
         if(usedGB > 0) {
             bonus = Math.min(15, 5 * Math.log2(usedGB + 2));
         }
-        return (Base: ${Math.round(base)} + Bonus: ${Math.round(bonus)}); // Fixed backticks
+        return (Base: ${Math.round(base)} + Bonus: ${Math.round(bonus)});
     };
 
     return (
@@ -1549,13 +1549,13 @@ export default function Home() {
                   </div>
                   <div className="h-2 bg-zinc-800 rounded-full overflow-visible relative">
                     <div
-                      className={h-full rounded-l-full transition-all duration-1000 ${barColor} shadow-[0_0_10px_rgba(255,255,255,0.1)]} // Fixed backticks
-                      style={{ width: ${Math.min(100, rawVal)}% }} // Fixed backticks
+                      className={h-full rounded-l-full transition-all duration-1000 ${barColor} shadow-[0_0_10px_rgba(255,255,255,0.1)]}
+                      style={{ width: ${Math.min(100, rawVal)}% }}
                     ></div>
                     <div
                       className="absolute top-[-4px] bottom-[-4px] w-0.5 bg-white shadow-[0_0_5px_white] z-10"
-                      style={{ left: ${Math.min(100, rawAvg)}% }} // Fixed backticks
-                      title={Network Average: ${rawAvg}} // Fixed backticks
+                      style={{ left: ${Math.min(100, rawAvg)}% }}
+                      title={Network Average: ${rawAvg}}
                     ></div>
                   </div>
                 </div>
@@ -1629,7 +1629,7 @@ export default function Home() {
               className={`w-full transition-all duration-1000 relative z-10 group-hover:bg-purple-600/40 ${
                 isPos ? 'bg-purple-600/30' : 'bg-purple-900/20'
               }`}
-              style={{ height: ${tankFill}% }} // Fixed backticks
+              style={{ height: ${tankFill}% }}
             >
               <div
                 className={`absolute top-0 left-0 right-0 h-0.5 ${
@@ -1651,7 +1651,7 @@ export default function Home() {
             {!isPos && (
               <div
                 className="absolute top-0 left-0 right-0 bg-red-900/10 border-b border-red-500/30 pattern-diagonal-lines"
-                style={{ height: ${100 - tankFill}% }} // Fixed backticks
+                style={{ height: ${100 - tankFill}% }}
               >
                 <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-red-500 uppercase tracking-widest opacity-50">
                   Deficit Gap
@@ -1687,11 +1687,11 @@ export default function Home() {
                 <>
                   <div
                     className="absolute top-0 bottom-0 left-0 bg-purple-600"
-                    style={{ width: ${tankFill}% }} // Fixed backticks
+                    style={{ width: ${tankFill}% }}
                   ></div>
                   <div
                     className="absolute top-0 bottom-0 right-0 bg-red-500/10 border-l border-red-500/50"
-                    style={{ width: ${100 - tankFill}% }} // Fixed backticks
+                    style={{ width: ${100 - tankFill}% }}
                   ></div>
                 </>
               )}
