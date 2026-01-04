@@ -43,7 +43,8 @@ export interface EnrichedNode {
     countryCode: string;
     city: string;
   };
-  rank?: number;
+  rank?: number;        // REPUTATION RANK (Based on Credits) - Used for Leaderboard
+  health_rank?: number; // HEALTH RANK (Based on Vitality) - Used for Diagnostics
 }
 
 // --- HELPERS ---
@@ -52,8 +53,8 @@ const compareVersions = (v1: string, v2: string) => {
   const p1 = cleanSemver(v1).split('.').map(Number);
   const p2 = cleanSemver(v2).split('.').map(Number);
   for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
-    if ((p1[i]||0) > (p2[i]||0)) return 1;
-    if ((p1[i]||0) < (p2[i]||0)) return -1;
+    if ((p1[i] || 0) > (p2[i] || 0)) return 1;
+    if ((p1[i] || 0) < (p2[i] || 0)) return -1;
   }
   return 0;
 };
@@ -282,7 +283,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       }
   });
 
-  // Ranking
+  // --- REPUTATION RANKING (Original Logic) ---
   const mainnetNodes = expandedNodes.filter(n => n.network === 'MAINNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const devnetNodes = expandedNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const unknownNodes = expandedNodes.filter(n => n.network === 'UNKNOWN');
@@ -294,25 +295,37 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   devnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (devnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
 
   const finalNodes = [...mainnetNodes, ...devnetNodes, ...unknownNodes];
-  
+
+  // --- HEALTH RANKING (New Logic) ---
+  // Rank the entire network based on health score, independent of network type
+  const healthSorted = [...finalNodes].sort((a, b) => b.health - a.health);
+  let hr = 1;
+  healthSorted.forEach((n, i) => {
+      // If health matches previous node, share the rank
+      if (i > 0 && n.health < healthSorted[i-1].health) {
+          hr = i + 1;
+      }
+      n.health_rank = hr;
+  });
+
   // CALCULATE REAL AVERAGES FOR BREAKDOWN
   let totalUptime = 0;
   let totalVersion = 0;
   let totalReputation = 0;
   let reputationCount = 0;
   let totalStorage = 0;
-  
+
   finalNodes.forEach(node => {
     totalUptime += node.healthBreakdown.uptime;
     totalVersion += node.healthBreakdown.version;
     totalStorage += node.healthBreakdown.storage;
-    
+
     if (node.healthBreakdown.reputation !== null) {
       totalReputation += node.healthBreakdown.reputation;
       reputationCount++;
     }
   });
-  
+
   const nodeCount = finalNodes.length || 1;
   const avgHealth = Math.round(finalNodes.reduce((a, b) => a + b.health, 0) / nodeCount);
 
