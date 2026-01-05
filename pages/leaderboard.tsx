@@ -5,12 +5,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { 
   Trophy, Medal, ArrowLeft, Search, Wallet, X, 
-  Activity, Users, BarChart3, HelpCircle, Star, 
+  Activity, Users, BarChart3, HelpCircle, 
   Calculator, Zap, ChevronDown, 
-  ExternalLink, ArrowUpRight, Eye, MapPin, Copy, Check, Share2, ArrowUp, ArrowDown,
+  ArrowUpRight, Eye, MapPin, Copy, Check, Share2,
   AlertOctagon, ChevronDown as ChevronIcon,
   Layers, Info, AlertTriangle, Settings2
 } from 'lucide-react';
+
+// IMPORT THE NEW ECONOMICS ENGINE
+import { calculateStoinc, ERA_BOOSTS, NFT_BOOSTS } from '../lib/xandeum-economics';
 
 // --- INTERFACES ---
 interface RankedNode {
@@ -25,10 +28,6 @@ interface RankedNode {
   };
   trend: number; 
 }
-
-// --- CONSTANTS ---
-const ERA_BOOSTS = { 'DeepSouth': 16, 'South': 10, 'Main': 7, 'Coal': 3.5, 'Central': 2, 'North': 1.25 };
-const NFT_BOOSTS = { 'Titan': 11, 'Dragon': 4, 'Coyote': 2.5, 'Rabbit': 1.5, 'Cricket': 1.1, 'XENO': 1.1 };
 
 export default function Leaderboard() {
   const router = useRouter();
@@ -54,14 +53,14 @@ export default function Leaderboard() {
   const [importKey, setImportKey] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
-  
+
   // Manual Inputs
   const [simNodes, setSimNodes] = useState<number>(1);
   const [simStorageVal, setSimStorageVal] = useState<number>(100); 
   const [simStorageUnit, setSimStorageUnit] = useState<'MB' | 'GB' | 'TB' | 'PB'>('GB'); 
   const [simStake, setSimStake] = useState<number>(1000); 
   const [simPerf, setSimPerf] = useState<number>(1.0);
-  
+
   // Imported Base Credit State (if using import)
   const [importedBaseCredits, setImportedBaseCredits] = useState<number>(0);
 
@@ -71,7 +70,7 @@ export default function Leaderboard() {
   // Step 3 Inputs (Network & Fees)
   const [simNetworkFees, setSimNetworkFees] = useState<number>(100); 
   const [showFeeHelp, setShowFeeHelp] = useState(false); 
-  
+
   // Network Estimation Inputs
   const [networkAvgMult, setNetworkAvgMult] = useState<number>(14); // Default 14x
   const [showNetworkHelp, setShowNetworkHelp] = useState(false);
@@ -189,7 +188,7 @@ export default function Leaderboard() {
   }, [router.isReady, router.query.highlight, allNodes, networkFilter]); 
 
 
-  // --- 4. SIMULATOR LOGIC ---
+  // --- 4. SIMULATOR LOGIC (UPDATED TO USE LIBRARY) ---
   const handleImportNode = () => {
     setImportError(null);
     setImportSuccess(false);
@@ -209,7 +208,7 @@ export default function Leaderboard() {
         // IMPORTANT: We store the Base Credits from API, but we DO NOT skip step 2.
         // User must still apply boosts in Step 2.
         setImportedBaseCredits(node.credits);
-        
+
         setTimeout(() => {
             setSimStep(1); // Go to Step 2 (Boosts)
             setImportSuccess(false);
@@ -219,50 +218,43 @@ export default function Leaderboard() {
     }
   };
 
-  const calculateSimMetrics = () => {
-    // 1. DETERMINE BASE CREDITS (User's Raw Meat)
-    let userBaseCredits = 0;
-    
-    if (simMode === 'IMPORT') {
-        userBaseCredits = importedBaseCredits;
-    } else {
-        // Manual Calculation
-        let storageInGB = simStorageVal;
-        if (simStorageUnit === 'MB') storageInGB = simStorageVal / 1000;
-        if (simStorageUnit === 'TB') storageInGB = simStorageVal * 1000;
-        if (simStorageUnit === 'PB') storageInGB = simStorageVal * 1000000;
-        const validPerf = Math.min(1, Math.max(0, simPerf));
-        userBaseCredits = simNodes * storageInGB * validPerf * simStake;
-    }
+  // REPLACED OLD FUNCTION WITH USEMEMO HOOK TO LIB
+  const metrics = useMemo(() => {
+      // Logic for calculating base if using IMPORT mode
+      // If import mode, we use the imported credits as base, else calculate from hardware
+      const currentNetworkTotal = allNodes.reduce((sum, n) => sum + n.credits, 0);
+      
+      const result = calculateStoinc({
+          storageVal: simStorageVal,
+          storageUnit: simStorageUnit,
+          nodeCount: simMode === 'IMPORT' ? 1 : simNodes, 
+          performance: simPerf,
+          stake: simStake,
+          boosts: boostCounts,
+          networkTotalBase: currentNetworkTotal,
+          networkAvgMult: networkAvgMult,
+          networkFees: simNetworkFees
+      });
 
-    // 2. APPLY USER BOOSTS (User's Seasoning)
-    let product = 1;
-    Object.entries(boostCounts).forEach(([name, count]) => {
-        const val = {...ERA_BOOSTS, ...NFT_BOOSTS}[name as keyof typeof ERA_BOOSTS | keyof typeof NFT_BOOSTS] || 1;
-        for(let i=0; i<count; i++) product *= val;
-    });
-    // If import mode, we assume 1 node for geo-mean logic unless we want to get fancy, 
-    // but for manual it uses simNodes. For import, using 1 is safe as they apply boosts to their wallet.
-    const safeNodes = simMode === 'IMPORT' ? 1 : Math.max(1, simNodes); 
-    const geoMean = Math.pow(product, 1 / safeNodes);
-    const boostedCredits = userBaseCredits * geoMean;
+      // Override rawCredits if we are in IMPORT mode
+      const rawCredits = simMode === 'IMPORT' ? importedBaseCredits : result.userBaseCredits;
+      
+      // Re-calculate boosted if override happened (simple multiplier since geoMean is returned)
+      const boostedCredits = simMode === 'IMPORT' ? (importedBaseCredits * result.geoMean) : result.boostedCredits;
+      
+      // Re-calculate share/earnings if override happened
+      const estimatedNetworkBoostedTotal = (currentNetworkTotal * networkAvgMult) + (simMode === 'NEW' ? boostedCredits : 0);
+      const share = estimatedNetworkBoostedTotal > 0 ? boostedCredits / estimatedNetworkBoostedTotal : 0;
+      const stoinc = simNetworkFees * 0.94 * share;
 
-    // 3. NETWORK SHARE CALCULATION (Using Estimated Network Total)
-    const currentNetworkBaseTotal = allNodes.reduce((sum, n) => sum + n.credits, 0);
-    
-    // We estimate the Total Network BOOSTED Credits using the user-defined multiplier (Default 14x)
-    const estimatedNetworkBoostedTotal = currentNetworkBaseTotal * networkAvgMult;
-    
-    // Adding our hypothetical new credits to the pool (if New) or just comparing (if Import)
-    const totalPool = estimatedNetworkBoostedTotal + (simMode === 'NEW' ? boostedCredits : 0);
-    
-    const share = totalPool > 0 ? boostedCredits / totalPool : 0;
-    const stoinc = simNetworkFees * 0.94 * share;
-
-    return { rawCredits: userBaseCredits, geoMean, boostedCredits, share, stoinc };
-  };
-
-  const metrics = calculateSimMetrics();
+      return { 
+          rawCredits, 
+          geoMean: result.geoMean, 
+          boostedCredits, 
+          share, 
+          stoinc 
+      };
+  }, [simStorageVal, simStorageUnit, simNodes, simPerf, simStake, boostCounts, allNodes, networkAvgMult, simNetworkFees, simMode, importedBaseCredits]);
 
   const toggleBoostCount = (name: string, delta: number) => {
       const current = boostCounts[name] || 0;
@@ -377,7 +369,7 @@ export default function Leaderboard() {
                                           {importSuccess ? <Check size={14} /> : 'LOAD'}
                                       </button>
                                   </div>
-                                  
+
                                   {/* TOGGLE FOR MANUAL INPUT */}
                                   <div className="mt-3">
                                       <button 
@@ -460,7 +452,7 @@ export default function Leaderboard() {
                                 </div>
                               )}
                           </div>
-                          
+
                           <div className="flex flex-col md:grid md:grid-cols-2 gap-4 md:gap-8 flex-grow min-h-0">
                               <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar space-y-3 md:space-y-4">
                                   <div className="space-y-1 md:space-y-2">
@@ -540,7 +532,7 @@ export default function Leaderboard() {
                                             </div>
                                           </div>
                                       </div>
-                                      
+
                                       <div className="relative">
                                          <input type="number" min="0" value={simNetworkFees} onChange={(e) => setSimNetworkFees(Number(e.target.value))} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none focus:border-blue-500 transition"/>
                                          <span className="absolute right-4 top-3.5 text-[10px] font-bold text-zinc-600">SOL</span>
@@ -574,7 +566,7 @@ export default function Leaderboard() {
                                             </div>
                                           </div>
                                       </div>
-                                      
+
                                       <div className="relative">
                                          <input type="number" min="1" step="0.1" value={networkAvgMult} onChange={(e) => setNetworkAvgMult(Math.max(1, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none focus:border-purple-500 transition"/>
                                          <span className="absolute right-4 top-3.5 text-[10px] font-bold text-zinc-600">AVG X</span>
@@ -606,7 +598,7 @@ export default function Leaderboard() {
                   <div className="p-3 md:p-4 border-t border-zinc-800 flex justify-between bg-black/20">
                       {/* Back button visible after step 0 */}
                       <button onClick={() => setSimStep(Math.max(0, simStep - 1))} disabled={simStep === 0} className={`px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold transition ${simStep === 0 ? 'opacity-0 pointer-events-none' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}>BACK</button>
-                      
+
                       {simStep < 2 ? (
                           /* Next Button Logic: 
                              - In Step 0: Only show if Manual Input mode is toggled (Import uses 'LOAD' button).
