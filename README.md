@@ -155,10 +155,14 @@ Reputation tracking and earnings forecasting.
 This project implements a rigorous testing suite to ensure financial accuracy, crash resistance, and system cohesion.
 
 ### 🛡️ Crash Protocols (Resilience)
-We explicitly test for network failures using Mock Service Workers. If the Xandeum RPC or Credits API goes offline, the UI is verified to gracefully degrade to "Cached Mode" or display specific error badges rather than crashing (White Screen of Death).
+We explicitly test for network failures using Mock Service Workers. If the Xandeum RPC or Credits API goes offline, the UI is verified to gracefully degrade to "Cached Mode" or display specific error badges rather than crashing (White Screen of Death). 
+
+- See [`__tests__/integration/navigation.test.tsx`](__tests__/integration/navigation.test.tsx)
 
 ### 📐 Geometric Precision (Economics)
 The **Stoinc Simulator** uses verified geometric stacking logic (`__tests__/lib/xandeum-economics.test.ts`) for NFT boosts. Unit tests confirm that multipliers compound correctly and that edge cases (like 0 storage or negative values) are clamped to prevent financial calculation errors.
+
+- See [`__tests__/lib/xandeum-economics.test.ts`](__tests__/lib/xandeum-economics.test.ts)
 
 ### 👻 Ghost Node Handling (Privacy)
 Integration tests verify that "Ghost Nodes" (Private/VPN IPs) are tracked in global statistics but correctly masked on the geospatial map to prevent rendering errors (`lat: 0, lon: 0`) and privacy leaks.
