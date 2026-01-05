@@ -298,7 +298,8 @@ export default function Leaderboard() {
       setVisibleCount(prev => prev + 100);
   };
 
-  const isStep1Valid = simPerf >= 0 && simPerf <= 1;
+  // UPDATED: Now checks if simNodes is at least 1
+  const isStep1Valid = simPerf >= 0 && simPerf <= 1 && simNodes >= 1;
 
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-2 md:p-8 selection:bg-yellow-500/30">
@@ -342,7 +343,6 @@ export default function Leaderboard() {
 
           {/* WIZARD CONTENT */}
           {showSim && (
-              // UPDATED: Removed min-h-[400px], added transitions for auto-height scaling
               <div className="relative transition-all duration-300 ease-in-out">
 
                   {/* SCREEN 1: HARDWARE & IMPORT */}
@@ -408,20 +408,23 @@ export default function Leaderboard() {
                           {showManualInput && (
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 animate-in slide-in-from-top-2 fade-in duration-300">
                                   <div className="space-y-4 md:space-y-6">
-                                      {/* NODES INPUT */}
+                                      {/* NODES INPUT (FIXED: ALLOWS DELETING TO 0) */}
                                       <div>
-                                          <label className="text-[10px] text-zinc-400 uppercase font-bold flex justify-between mb-2"><span>Number of pNodes</span></label>
+                                          <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simNodes < 1 ? 'text-red-500' : 'text-zinc-400'}`}>
+                                            <span>Number of pNodes</span>
+                                            {simNodes < 1 && <span className="flex items-center gap-1 text-red-500"><AlertTriangle size={10} /> MUST BE ≥ 1</span>}
+                                          </label>
                                           <div className="relative">
                                               <input 
                                                 type="number" 
-                                                min="1" 
+                                                min="0" 
                                                 value={simNodes} 
                                                 onChange={(e) => {
-                                                    setSimNodes(Math.max(1, Number(e.target.value)));
-                                                    // Force mode to NEW when user edits manually
+                                                    const val = e.target.value === '' ? 0 : Number(e.target.value);
+                                                    setSimNodes(val);
                                                     if(simMode === 'IMPORT') setSimMode('NEW');
                                                 }} 
-                                                className="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none focus:border-yellow-500 transition"
+                                                className={`w-full bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${simNodes < 1 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}
                                               />
                                               <span className="absolute right-3 top-2 md:top-3 text-[10px] md:text-sm text-zinc-500 font-bold">NODES</span>
                                           </div>
@@ -571,7 +574,7 @@ export default function Leaderboard() {
                                       </div>
                                   </div>
 
-                                  {/* NETWORK AVG MULTIPLIER INPUT */}
+                                  {/* NETWORK AVG MULTIPLIER INPUT (FIXED: ALLOWS DELETING TO 0) */}
                                   <div>
                                       {/* CLICK OUTSIDE LAYER */}
                                       {showNetworkHelp && (
@@ -580,7 +583,7 @@ export default function Leaderboard() {
 
                                       <div className="flex justify-between items-end mb-2 relative z-50">
                                           <div className="flex items-center gap-2">
-                                            <label className="text-[10px] text-zinc-400 uppercase font-bold">Est. Total Boosted Credits</label>
+                                            <label className={`text-[10px] uppercase font-bold ${networkAvgMult < 1 ? 'text-red-500' : 'text-zinc-400'}`}>Est. Total Boosted Credits</label>
                                             <div className="relative">
                                                 <button onClick={() => setShowNetworkHelp(!showNetworkHelp)} className="text-zinc-500 hover:text-white transition"><Settings2 size={14} /></button>
                                                 {showNetworkHelp && (
@@ -600,10 +603,25 @@ export default function Leaderboard() {
                                       </div>
 
                                       <div className="relative">
-                                         <input type="number" min="1" step="0.1" value={networkAvgMult} onChange={(e) => setNetworkAvgMult(Math.max(1, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none focus:border-purple-500 transition"/>
+                                         <input 
+                                            type="number" 
+                                            min="0" 
+                                            step="0.1" 
+                                            value={networkAvgMult} 
+                                            onChange={(e) => {
+                                                const val = e.target.value === '' ? 0 : Number(e.target.value);
+                                                setNetworkAvgMult(val);
+                                            }}
+                                            className={`w-full bg-zinc-900 border rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none transition ${networkAvgMult < 1 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-purple-500'}`}
+                                         />
                                          <span className="absolute right-4 top-3.5 text-[10px] font-bold text-zinc-600">AVG X</span>
                                       </div>
-                                      <div className="text-[9px] text-zinc-500 mt-1.5 leading-tight">Select an estimated multiplier to calculate the total boosted credits.</div>
+                                      {/* Error Message for Invalid Multiplier */}
+                                      {networkAvgMult < 1 ? (
+                                        <div className="text-[9px] text-red-400 font-bold mt-1.5 flex items-center gap-1"><AlertTriangle size={10} /> Invalid Multiplier (Must be ≥ 1)</div>
+                                      ) : (
+                                        <div className="text-[9px] text-zinc-500 mt-1.5 leading-tight">Select an estimated multiplier to calculate the total boosted credits.</div>
+                                      )}
                                   </div>
                               </div>
 
