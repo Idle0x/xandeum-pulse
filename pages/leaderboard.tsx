@@ -47,7 +47,7 @@ export default function Leaderboard() {
   const [showSim, setShowSim] = useState(false);
   const [simStep, setSimStep] = useState(0); 
   const [simMode, setSimMode] = useState<'NEW' | 'IMPORT'>('NEW');
-  const [showManualInput, setShowManualInput] = useState(false); // Toggle for Step 1 Hero View
+  const [showManualInput, setShowManualInput] = useState(false); 
 
   // Step 1 Inputs
   const [importKey, setImportKey] = useState('');
@@ -61,7 +61,7 @@ export default function Leaderboard() {
   const [simStake, setSimStake] = useState<number>(1000); 
   const [simPerf, setSimPerf] = useState<number>(1.0);
 
-  // Imported Base Credit State (if using import)
+  // Imported Base Credit State
   const [importedBaseCredits, setImportedBaseCredits] = useState<number>(0);
 
   // Step 2 Inputs (Boosts)
@@ -72,7 +72,7 @@ export default function Leaderboard() {
   const [showFeeHelp, setShowFeeHelp] = useState(false); 
 
   // Network Estimation Inputs
-  const [networkAvgMult, setNetworkAvgMult] = useState<number>(14); // Default 14x
+  const [networkAvgMult, setNetworkAvgMult] = useState<number>(14); 
   const [showNetworkHelp, setShowNetworkHelp] = useState(false);
 
   // --- UI STATE ---
@@ -188,9 +188,8 @@ export default function Leaderboard() {
   }, [router.isReady, router.query.highlight, allNodes, networkFilter]); 
 
 
-  // --- 4. SIMULATOR LOGIC (UPDATED) ---
+  // --- 4. SIMULATOR LOGIC ---
   
-  // Resets the simulator to "Manual Mode"
   const clearImport = () => {
     setImportKey('');
     setImportSuccess(false);
@@ -218,7 +217,7 @@ export default function Leaderboard() {
         setImportedBaseCredits(node.credits);
 
         setTimeout(() => {
-            setSimStep(1); // Go to Step 2 (Boosts)
+            setSimStep(1); 
             setImportSuccess(false);
         }, 800);
     } else {
@@ -227,7 +226,6 @@ export default function Leaderboard() {
   };
 
   const metrics = useMemo(() => {
-      // Logic for calculating base if using IMPORT mode
       const currentNetworkTotal = allNodes.reduce((sum, n) => sum + n.credits, 0);
 
       const result = calculateStoinc({
@@ -242,13 +240,8 @@ export default function Leaderboard() {
           networkFees: simNetworkFees
       });
 
-      // Override rawCredits if we are in IMPORT mode
       const rawCredits = simMode === 'IMPORT' ? importedBaseCredits : result.userBaseCredits;
-
-      // Re-calculate boosted if override happened (simple multiplier since geoMean is returned)
       const boostedCredits = simMode === 'IMPORT' ? (importedBaseCredits * result.geoMean) : result.boostedCredits;
-
-      // Re-calculate share/earnings if override happened
       const estimatedNetworkBoostedTotal = (currentNetworkTotal * networkAvgMult) + (simMode === 'NEW' ? boostedCredits : 0);
       const share = estimatedNetworkBoostedTotal > 0 ? boostedCredits / estimatedNetworkBoostedTotal : 0;
       const stoinc = simNetworkFees * 0.94 * share;
@@ -298,8 +291,6 @@ export default function Leaderboard() {
       setVisibleCount(prev => prev + 100);
   };
 
-  // UPDATED: isStep1Valid only strictly enforces simNodes. 
-  // Other fields show red errors but do not block progression.
   const isStep1Valid = simNodes >= 1;
 
   return (
@@ -321,7 +312,6 @@ export default function Leaderboard() {
       {/* --- STOINC SIMULATOR WIZARD --- */}
       <div className="max-w-5xl mx-auto mb-6 md:mb-10 bg-gradient-to-b from-zinc-900 to-black border border-yellow-500/30 rounded-xl md:rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.1)] transition-all duration-300">
 
-          {/* HEADER BAR */}
           <div className="p-3 md:p-4 bg-yellow-500/10 border-b border-yellow-500/20 flex justify-between items-center cursor-pointer hover:bg-yellow-500/20 transition" onClick={() => setShowSim(!showSim)}>
               <div className="flex items-center gap-3">
                   <div className="p-1.5 md:p-2 bg-yellow-500 text-black rounded-lg"><Calculator size={18} /></div>
@@ -342,11 +332,9 @@ export default function Leaderboard() {
               </div>
           </div>
 
-          {/* WIZARD CONTENT */}
           {showSim && (
               <div className="relative transition-all duration-300 ease-in-out">
 
-                  {/* SCREEN 1: HARDWARE & IMPORT */}
                   {simStep === 0 && (
                       <div className="p-4 md:p-8 animate-in slide-in-from-right-4 fade-in duration-300">
                           <div className="mb-6 text-center">
@@ -354,7 +342,6 @@ export default function Leaderboard() {
                               <p className="text-[10px] md:text-xs text-zinc-500 mt-1">Load your live stats or simulate a new setup.</p>
                           </div>
 
-                          {/* HERO VIEW: IMPORT SECTION */}
                           <div className={`mb-6 md:mb-8 border rounded-xl p-3 md:p-4 flex flex-col md:flex-row gap-4 items-start transition-colors ${importError ? 'bg-red-500/10 border-red-500/30' : importSuccess ? 'bg-green-500/10 border-green-500/30' : 'bg-blue-500/10 border-blue-500/20'}`}>
                               <div className="flex-1 w-full">
                                   <label className={`text-[9px] md:text-[10px] font-bold uppercase mb-1 block ${importError ? 'text-red-400' : importSuccess ? 'text-green-400' : 'text-blue-300'}`}>
@@ -369,47 +356,33 @@ export default function Leaderboard() {
                                             onChange={(e) => { 
                                                 setImportKey(e.target.value); 
                                                 if(importError) setImportError(null);
-                                                // IMMEDIATE RESET IF CLEARED
                                                 if(e.target.value === '') clearImport();
                                             }}
                                             onKeyDown={(e) => e.key === 'Enter' && handleImportNode()}
                                             className={`w-full bg-zinc-900 border rounded-lg p-2 pr-10 text-[10px] md:text-xs text-white font-mono outline-none transition ${importError ? 'border-red-500/50 focus:border-red-500' : 'border-zinc-700 focus:border-blue-500'}`}
                                         />
                                         {importKey && (
-                                            <button 
-                                                onClick={clearImport}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
-                                            >
+                                            <button onClick={clearImport} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white">
                                                 <X size={14} />
                                             </button>
                                         )}
                                       </div>
-                                      <button 
-                                          onClick={handleImportNode}
-                                          disabled={importSuccess}
-                                          className={`font-bold text-[10px] px-3 md:px-4 rounded-lg uppercase transition whitespace-nowrap ${importSuccess ? 'bg-green-500 text-black' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
-                                      >
+                                      <button onClick={handleImportNode} disabled={importSuccess} className={`font-bold text-[10px] px-3 md:px-4 rounded-lg uppercase transition whitespace-nowrap ${importSuccess ? 'bg-green-500 text-black' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}>
                                           {importSuccess ? <Check size={14} /> : 'LOAD'}
                                       </button>
                                   </div>
 
-                                  {/* TOGGLE FOR MANUAL INPUT */}
                                   <div className="mt-3">
-                                      <button 
-                                        onClick={() => { setShowManualInput(!showManualInput); setSimMode('NEW'); }} 
-                                        className="text-[10px] md:text-xs text-zinc-500 hover:text-white underline underline-offset-2 transition-colors font-medium"
-                                      >
+                                      <button onClick={() => { setShowManualInput(!showManualInput); setSimMode('NEW'); }} className="text-[10px] md:text-xs text-zinc-500 hover:text-white underline underline-offset-2 transition-colors font-medium">
                                         Are your keys unavailable? Calculate manually instead
                                       </button>
                                   </div>
                               </div>
                           </div>
 
-                          {/* MANUAL INPUTS (COLLAPSIBLE) */}
                           {showManualInput && (
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 animate-in slide-in-from-top-2 fade-in duration-300">
                                   <div className="space-y-4 md:space-y-6">
-                                      {/* NODES INPUT (VALIDATION: BLOCKS NEXT STEP) */}
                                       <div>
                                           <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simNodes < 1 ? 'text-red-500' : 'text-zinc-400'}`}>
                                             <span>Number of pNodes</span>
@@ -431,72 +404,44 @@ export default function Leaderboard() {
                                           </div>
                                       </div>
 
-                                      {/* STORAGE INPUT (VALIDATION: RED BOX, NO BLOCK) */}
                                       <div>
                                           <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simStorageVal <= 0 ? 'text-red-500' : 'text-zinc-400'}`}>
                                             <span>Total Storage</span>
-                                            {simStorageVal <= 0 && <span className="flex items-center gap-1 text-red-500"><AlertTriangle size={10} /> MUST BE > 0</span>}
+                                            {simStorageVal <= 0 && <span className="flex items-center gap-1 text-red-500"><AlertTriangle size={10} /> MUST BE {'>'} 0</span>}
                                           </label>
                                           <div className="flex gap-2">
-                                              <input 
-                                                type="number" 
-                                                min="0" 
-                                                value={simStorageVal} 
-                                                onChange={(e) => setSimStorageVal(Number(e.target.value))} 
-                                                className={`flex-1 bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${simStorageVal <= 0 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}
-                                              />
+                                              <input type="number" min="0" value={simStorageVal} onChange={(e) => setSimStorageVal(Number(e.target.value))} className={`flex-1 bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${simStorageVal <= 0 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}/>
                                               <select value={simStorageUnit} onChange={(e) => setSimStorageUnit(e.target.value as any)} className="bg-zinc-900 border border-zinc-700 rounded-xl p-2 md:p-3 text-[10px] md:text-base text-zinc-300 font-bold outline-none"><option>MB</option><option>GB</option><option>TB</option><option>PB</option></select>
                                           </div>
                                       </div>
 
-                                      {/* PERFORMANCE INPUT (VALIDATION: RED BOX, NO BLOCK) */}
                                       <div>
                                           <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simPerf <= 0 || simPerf > 1 ? 'text-red-500' : 'text-zinc-400'}`}>
                                               <span>Performance Score (0.0 - 1.0)</span>
                                               {(simPerf <= 0 || simPerf > 1) && <span className="flex items-center gap-1 text-red-500"><AlertTriangle size={10} /> INVALID</span>}
                                           </label>
                                           <div className="relative">
-                                              <input 
-                                                  type="number" 
-                                                  step="0.01" 
-                                                  min="0" 
-                                                  max="1" 
-                                                  value={simPerf} 
-                                                  onChange={(e) => setSimPerf(Number(e.target.value))} 
-                                                  className={`w-full bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${(simPerf <= 0 || simPerf > 1) ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}
-                                              />
+                                              <input type="number" step="0.01" min="0" max="1" value={simPerf} onChange={(e) => setSimPerf(Number(e.target.value))} className={`w-full bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${(simPerf <= 0 || simPerf > 1) ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}/>
                                           </div>
-                                          <div className="text-[9px] text-zinc-600 mt-1">If performance is 0, rewards will be 0.</div>
                                       </div>
 
-                                      {/* STAKE INPUT (VALIDATION: RED BOX, NO BLOCK) */}
                                       <div>
                                           <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simStake <= 0 ? 'text-red-500' : 'text-zinc-400'}`}>
                                             <span>Total Stake (XAND)</span>
-                                            {simStake <= 0 && <span className="flex items-center gap-1 text-red-500"><AlertTriangle size={10} /> MUST BE > 0</span>}
+                                            {simStake <= 0 && <span className="flex items-center gap-1 text-red-500"><AlertTriangle size={10} /> MUST BE {'>'} 0</span>}
                                           </label>
-                                          <input 
-                                            type="number" 
-                                            min="0" 
-                                            value={simStake} 
-                                            onChange={(e) => setSimStake(Number(e.target.value))} 
-                                            className={`w-full bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${simStake <= 0 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}
-                                          />
+                                          <input type="number" min="0" value={simStake} onChange={(e) => setSimStake(Number(e.target.value))} className={`w-full bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${simStake <= 0 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}/>
                                       </div>
                                   </div>
                                   <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 md:p-6 flex flex-col justify-center items-center text-center">
                                       <div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold mb-1">Base Metric</div>
                                       <div className="text-2xl md:text-4xl font-mono font-bold text-white mb-2">{metrics.rawCredits.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-                                      {metrics.rawCredits === 0 && (
-                                        <div className="text-red-400 text-[10px] font-bold mt-2 uppercase flex items-center gap-1 bg-red-500/10 px-2 py-1 rounded"><AlertTriangle size={10}/> Factors cannot be zero</div>
-                                      )}
                                   </div>
                               </div>
                           )}
                       </div>
                   )}
 
-                  {/* SCREEN 2: BOOSTS */}
                   {simStep === 1 && (
                       <div className="p-3 md:p-8 animate-in slide-in-from-right-4 fade-in duration-300 h-[450px] md:h-[400px] flex flex-col">
                           <div className="mb-4 text-center shrink-0">
@@ -554,7 +499,6 @@ export default function Leaderboard() {
                       </div>
                   )}
 
-                  {/* SCREEN 3: EARNINGS */}
                   {simStep === 2 && (
                       <div className="p-4 md:p-8 animate-in slide-in-from-right-4 fade-in duration-300">
                           <div className="mb-6 text-center">
@@ -564,100 +508,54 @@ export default function Leaderboard() {
 
                           <div className="max-w-xl mx-auto space-y-6 md:space-y-8">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  {/* NETWORK FEES INPUT (VALIDATION: RED BOX, NO BLOCK) */}
                                   <div>
-                                      {/* CLICK OUTSIDE LAYER */}
-                                      {showFeeHelp && (
-                                        <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowFeeHelp(false)}></div>
-                                      )}
-
+                                      {showFeeHelp && <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowFeeHelp(false)}></div>}
                                       <div className="flex justify-between items-end mb-2 relative z-50">
                                           <div className="flex items-center gap-2">
-                                            <label className={`text-[10px] uppercase font-bold ${simNetworkFees <= 0 ? 'text-red-500' : 'text-zinc-400'}`}>
-                                                Total Network Fees
-                                            </label>
+                                            <label className={`text-[10px] uppercase font-bold ${simNetworkFees <= 0 ? 'text-red-500' : 'text-zinc-400'}`}>Total Network Fees</label>
                                             <div className="relative">
                                                 <button onClick={() => setShowFeeHelp(!showFeeHelp)} className="text-zinc-500 hover:text-white transition"><Info size={14} /></button>
                                                 {showFeeHelp && (
                                                     <div className="absolute left-0 bottom-full mb-2 w-64 bg-zinc-800 border border-zinc-700 p-4 rounded-xl shadow-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-200">
-                                                        <p className="text-[10px] md:text-xs text-zinc-300 leading-relaxed">
-                                                            <strong className="text-white block mb-1">About Network Fees:</strong>
-                                                            Revenue collected from storage-enabled dApps (sedApps) per epoch. 
-                                                            <span className="text-yellow-500 block mt-1">94% of this total is distributed to pNode owners.</span>
-                                                        </p>
+                                                        <p className="text-[10px] md:text-xs text-zinc-300 leading-relaxed"><strong className="text-white block mb-1">About Network Fees:</strong>Revenue collected from sedApps. <span className="text-yellow-500 block mt-1">94% is distributed to pNode owners.</span></p>
                                                         <div className="absolute bottom-[-6px] left-1 w-3 h-3 bg-zinc-800 border-b border-r border-zinc-700 rotate-45"></div>
                                                     </div>
                                                 )}
                                             </div>
                                           </div>
                                       </div>
-
                                       <div className="relative">
-                                         <input 
-                                            type="number" 
-                                            min="0" 
-                                            value={simNetworkFees} 
-                                            onChange={(e) => setSimNetworkFees(Number(e.target.value))} 
-                                            className={`w-full bg-zinc-900 border rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none transition ${simNetworkFees <= 0 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-blue-500'}`}
-                                         />
+                                         <input type="number" min="0" value={simNetworkFees} onChange={(e) => setSimNetworkFees(Number(e.target.value))} className={`w-full bg-zinc-900 border rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none transition ${simNetworkFees <= 0 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-blue-500'}`}/>
                                          <span className="absolute right-4 top-3.5 text-[10px] font-bold text-zinc-600">SOL</span>
                                       </div>
                                       {simNetworkFees <= 0 && <div className="text-[9px] text-red-400 font-bold mt-1.5 flex items-center gap-1"><AlertTriangle size={10} /> Invalid Fee</div>}
                                   </div>
 
-                                  {/* NETWORK AVG MULTIPLIER INPUT (VALIDATION: RED BOX, NO BLOCK) */}
                                   <div>
-                                      {/* CLICK OUTSIDE LAYER */}
-                                      {showNetworkHelp && (
-                                        <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowNetworkHelp(false)}></div>
-                                      )}
-
+                                      {showNetworkHelp && <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowNetworkHelp(false)}></div>}
                                       <div className="flex justify-between items-end mb-2 relative z-50">
                                           <div className="flex items-center gap-2">
                                             <label className={`text-[10px] uppercase font-bold ${networkAvgMult < 1 ? 'text-red-500' : 'text-zinc-400'}`}>Est. Total Boosted Credits</label>
                                             <div className="relative">
                                                 <button onClick={() => setShowNetworkHelp(!showNetworkHelp)} className="text-zinc-500 hover:text-white transition"><Settings2 size={14} /></button>
                                                 {showNetworkHelp && (
-                                                    // FIX: Tooltip anchored to left-0 (like Fees) to avoid overflow on mobile
                                                     <div className="absolute left-0 bottom-full mb-2 w-64 bg-zinc-800 border border-zinc-700 p-4 rounded-xl shadow-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-200">
-                                                        <p className="text-[10px] md:text-xs text-zinc-300 leading-relaxed">
-                                                            <strong className="text-white block mb-1">Estimation Multiplier</strong>
-                                                            We multiply total Base Credits by this factor to estimate the Total Network Boosted Credits. 
-                                                            <span className="text-yellow-500 block mt-1">14x accounts for high-impact Titan nodes.</span>
-                                                        </p>
-                                                        {/* Arrow aligned to left to match container anchor */}
+                                                        <p className="text-[10px] md:text-xs text-zinc-300 leading-relaxed"><strong className="text-white block mb-1">Estimation Multiplier</strong>Factor to estimate Total Network Boosted Credits. <span className="text-yellow-500 block mt-1">14x accounts for high-impact nodes.</span></p>
                                                         <div className="absolute bottom-[-6px] left-1 w-3 h-3 bg-zinc-800 border-b border-r border-zinc-700 rotate-45"></div>
                                                     </div>
                                                 )}
                                             </div>
                                           </div>
                                       </div>
-
                                       <div className="relative">
-                                         <input 
-                                            type="number" 
-                                            min="0" 
-                                            step="0.1" 
-                                            value={networkAvgMult} 
-                                            onChange={(e) => {
-                                                const val = e.target.value === '' ? 0 : Number(e.target.value);
-                                                setNetworkAvgMult(val);
-                                            }}
-                                            className={`w-full bg-zinc-900 border rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none transition ${networkAvgMult < 1 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-purple-500'}`}
-                                         />
+                                         <input type="number" min="0" step="0.1" value={networkAvgMult} onChange={(e) => { const val = e.target.value === '' ? 0 : Number(e.target.value); setNetworkAvgMult(val); }} className={`w-full bg-zinc-900 border rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none transition ${networkAvgMult < 1 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-purple-500'}`}/>
                                          <span className="absolute right-4 top-3.5 text-[10px] font-bold text-zinc-600">AVG X</span>
                                       </div>
-                                      {/* Error Message for Invalid Multiplier */}
-                                      {networkAvgMult < 1 ? (
-                                        <div className="text-[9px] text-red-400 font-bold mt-1.5 flex items-center gap-1"><AlertTriangle size={10} /> Invalid Multiplier (Must be ≥ 1)</div>
-                                      ) : (
-                                        <div className="text-[9px] text-zinc-500 mt-1.5 leading-tight">Select an estimated multiplier to calculate the total boosted credits.</div>
-                                      )}
+                                      {networkAvgMult < 1 && <div className="text-[9px] text-red-400 font-bold mt-1.5 flex items-center gap-1"><AlertTriangle size={10} /> Invalid Multiplier (Must be ≥ 1)</div>}
                                   </div>
                               </div>
 
                               <div className="bg-gradient-to-br from-zinc-900 to-black border border-yellow-500/30 rounded-xl md:rounded-2xl p-6 md:p-8 relative overflow-hidden group">
-                                  <div className="absolute top-0 right-0 p-16 md:p-32 bg-yellow-500/5 rounded-full blur-2xl md:blur-3xl -mr-8 -mt-8 pointer-events-none"></div>
                                   <div className="relative z-10 flex flex-col items-center text-center space-y-4 md:space-y-6">
                                       <div>
                                           <div className="text-[9px] md:text-[10px] text-blue-400 font-bold uppercase tracking-widest mb-1">Your Share</div>
@@ -675,16 +573,9 @@ export default function Leaderboard() {
                       </div>
                   )}
 
-                  {/* NAVIGATION FOOTER */}
                   <div className="p-3 md:p-4 border-t border-zinc-800 flex justify-between bg-black/20">
-                      {/* Back button visible after step 0 */}
                       <button onClick={() => setSimStep(Math.max(0, simStep - 1))} disabled={simStep === 0} className={`px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold transition ${simStep === 0 ? 'opacity-0 pointer-events-none' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}>BACK</button>
-
                       {simStep < 2 ? (
-                          /* Next Button Logic: 
-                             - In Step 0: Only show if Manual Input mode is toggled (Import uses 'LOAD' button).
-                             - In Step 1: Always show to allow progression.
-                          */
                           (simStep === 1 || (simStep === 0 && showManualInput)) ? (
                               <button onClick={() => isStep1Valid && setSimStep(simStep + 1)} disabled={!isStep1Valid} className={`px-6 md:px-8 py-2 font-bold text-[10px] md:text-xs rounded-lg transition-colors flex items-center gap-2 ${isStep1Valid ? 'bg-yellow-500 hover:bg-yellow-400 text-black' : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'}`}>NEXT STEP <ArrowUpRight size={14} /></button>
                           ) : null
@@ -696,18 +587,15 @@ export default function Leaderboard() {
           )}
       </div>
 
-      {/* NETWORK STATS BAR */}
       {!loading && !creditsOffline && filteredAndRanked.length > 0 && (
         <div className="max-w-5xl mx-auto mb-6 grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-4 rounded-xl backdrop-blur-sm"><div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Users size={12}/> Nodes ({networkFilter})</div><div className="text-lg md:text-2xl font-bold text-white">{filteredAndRanked.length}</div></div>
           <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-4 rounded-xl backdrop-blur-sm"><div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Wallet size={12}/> Total Credits</div><div className="text-lg md:text-2xl font-bold text-yellow-400 mt-1">{(filteredAndRanked.reduce((sum, n) => sum + n.credits, 0) / 1000000).toFixed(1)}M</div></div>
-          {/* UPDATED: Removed compact notation for Avg Credits */}
           <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-4 rounded-xl backdrop-blur-sm"><div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Activity size={12}/> Avg Credits</div><div className="text-lg md:text-2xl font-bold text-white mt-1">{Math.round(filteredAndRanked.reduce((sum, n) => sum + n.credits, 0) / filteredAndRanked.length).toLocaleString()}</div></div>
           <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-4 rounded-xl backdrop-blur-sm"><div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><BarChart3 size={12}/> Top 10 Dom</div><div className="text-lg md:text-2xl font-bold text-blue-400 mt-1">{(() => { const total = filteredAndRanked.reduce((sum, n) => sum + n.credits, 0); const top10 = filteredAndRanked.slice(0, 10).reduce((sum, n) => sum + n.credits, 0); return total > 0 ? ((top10 / total) * 100).toFixed(1) : 0; })()}%</div></div>
         </div>
       )}
 
-      {/* SEARCH & TOGGLE */}
       <div className="max-w-5xl mx-auto mb-6 relative space-y-3">
         <div className="flex flex-col md:flex-row justify-between items-center gap-3 md:gap-4">
              <div className="flex w-full md:w-auto bg-zinc-900 p-1 rounded-xl border border-zinc-800 shrink-0">
@@ -723,7 +611,6 @@ export default function Leaderboard() {
         </div>
       </div>
 
-      {/* TABLE */}
       <div className="max-w-5xl mx-auto bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-visible backdrop-blur-sm relative min-h-[400px]">
         <div className="grid grid-cols-12 gap-2 md:gap-4 p-3 md:p-4 border-b border-zinc-800 text-[9px] md:text-xs font-bold text-zinc-500 uppercase tracking-widest sticky top-0 bg-zinc-900/95 backdrop-blur-sm z-10 rounded-t-2xl">
           <div className="col-span-2 md:col-span-1 text-center">Rank</div>
@@ -767,7 +654,6 @@ export default function Leaderboard() {
                             <span>{node.pubkey}</span>
                             <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180 text-cyan-400' : 'text-zinc-600 group-hover:text-zinc-400'}`}><ChevronDown size={16} /></div>
                         </div>
-                        {/* UPDATED: Removed compact notation for Node Credits */}
                         <div className="col-span-4 text-right font-bold font-mono text-xs md:text-base text-yellow-500 flex items-center justify-end gap-2">
                             {node.credits.toLocaleString()}
                             <Wallet size={14} className="text-zinc-600 group-hover:text-yellow-500 transition hidden md:block" />
@@ -775,19 +661,32 @@ export default function Leaderboard() {
                     </div>
 
                     {isExpanded && (
-                        <div className="border-t border-zinc-800/50 p-3 md:p-4 pl-3 md:pl-12 animate-in slide-in-from-top-2 duration-200">
+                        <div className="border-t border-zinc-800/50 p-3 md:p-4 animate-in slide-in-from-top-2 duration-200">
                             <div className="flex flex-col gap-4">
-                                <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                                    <div className="grid grid-cols-2 md:flex gap-2 w-full md:w-auto">
-                                        {node.address && (<Link href={`/map?focus=${node.address.split(':')[0]}`}><button className="w-full md:w-auto flex items-center justify-center gap-2 px-3 py-2 md:px-5 md:py-3 rounded-lg md:rounded-xl bg-blue-900/20 border border-blue-500/30 hover:bg-blue-900/40 text-[10px] md:text-xs font-bold text-blue-400 transition-all whitespace-nowrap">{flagUrl ? <img src={flagUrl} className="w-4 rounded-sm" alt="flag"/> : <MapPin size={12} />}MAP</button></Link>)}
-                                        <Link href={`/?open=${node.pubkey}`}><button className="w-full md:w-auto flex items-center justify-center gap-2 px-3 py-2 md:px-5 md:py-3 rounded-lg md:rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-[10px] md:text-xs font-bold text-white transition-all whitespace-nowrap"><Activity size={12} className="text-green-400" />DIAGNOSTICS</button></Link>
-                                        <button onClick={(e) => handleUseInSim(e)} className="w-full md:w-auto flex items-center justify-center gap-2 px-3 py-2 md:px-5 md:py-3 rounded-lg md:rounded-xl bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/20 text-[10px] md:text-xs font-bold text-yellow-500 transition-all whitespace-nowrap"><Calculator size={12} />CALCULATE</button>
-                                        <button onClick={(e) => handleCopyKey(e, node.pubkey)} className="md:hidden w-full flex items-center justify-center gap-2 px-3 py-2 bg-zinc-800/50 rounded-lg text-[10px] font-mono text-zinc-400">{copiedKey === node.pubkey ? <Check size={12} /> : <Copy size={12} />} COPY</button>
-                                    </div>
-                                    <div className="hidden md:flex gap-2 justify-end">
-                                        <button onClick={(e) => handleCopyKey(e, node.pubkey)} className="flex items-center gap-2 px-3 py-2 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg text-[10px] font-mono text-zinc-400 hover:text-white transition">{copiedKey === node.pubkey ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}{copiedKey === node.pubkey ? 'COPIED KEY' : 'COPY KEY'}</button>
-                                        <button onClick={(e) => handleShareUrl(e, node.pubkey)} className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg text-[10px] font-bold text-blue-400 transition">{copiedLink === node.pubkey ? <Check size={12} /> : <Share2 size={12} />}{copiedLink === node.pubkey ? 'LINK COPIED' : 'SHARE RANK'}</button>
-                                    </div>
+                                <div className="grid grid-cols-6 md:flex md:flex-wrap gap-2 w-full">
+                                    {node.address && (
+                                        <Link href={`/map?focus=${node.address.split(':')[0]}`} className="col-span-3 md:w-auto">
+                                            <button className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-blue-900/20 border border-blue-500/30 hover:bg-blue-900/40 text-[10px] md:text-xs font-bold text-blue-400 transition-all whitespace-nowrap">
+                                                {flagUrl ? <img src={flagUrl} className="w-4 rounded-sm" alt="flag"/> : <MapPin size={12} />} MAP
+                                            </button>
+                                        </Link>
+                                    )}
+                                    <Link href={`/?open=${node.pubkey}`} className="col-span-3 md:w-auto">
+                                        <button className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-[10px] md:text-xs font-bold text-white transition-all whitespace-nowrap">
+                                            <Activity size={12} className="text-green-400" /> DIAGNOSTICS
+                                        </button>
+                                    </Link>
+                                    <button onClick={(e) => handleUseInSim(e)} className="col-span-2 md:w-auto flex items-center justify-center gap-2 px-2 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/20 text-[10px] md:text-xs font-bold text-yellow-500 transition-all whitespace-nowrap">
+                                        <Calculator size={12} /> CALC
+                                    </button>
+                                    <button onClick={(e) => handleCopyKey(e, node.pubkey)} className="col-span-2 md:w-auto flex items-center justify-center gap-2 px-2 py-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl text-[10px] font-bold text-zinc-400 hover:text-white transition whitespace-nowrap">
+                                        {copiedKey === node.pubkey ? <Check size={12} className="text-green-500" /> : <Copy size={12} />} 
+                                        {copiedKey === node.pubkey ? 'COPIED' : 'COPY'}
+                                    </button>
+                                    <button onClick={(e) => handleShareUrl(e, node.pubkey)} className="col-span-2 md:w-auto flex items-center justify-center gap-2 px-2 py-3 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl text-[10px] font-bold text-blue-400 transition whitespace-nowrap">
+                                        {copiedLink === node.pubkey ? <Check size={12} /> : <Share2 size={12} />} 
+                                        {copiedLink === node.pubkey ? 'COPIED' : 'SHARE'}
+                                    </button>
                                 </div>
                             </div>
                         </div>
