@@ -70,7 +70,7 @@ interface Node {
   storage_usage_raw?: number;
   rank?: number;
   health_rank?: number;
-  credits: number | null; // Nullable
+  credits: number | null; 
   location?: {
     lat: number;
     lon: number;
@@ -551,7 +551,7 @@ export default function Home() {
   const showToast = (msg: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ visible: true, msg });
-    toastTimer.current = setTimeout(() => setToast(null), 15000); 
+    toastTimer.current = setTimeout(() => setToast(null), 7000); // Updated to 7 seconds
   };
 
   const proofRef = useRef<HTMLDivElement>(null);
@@ -758,7 +758,7 @@ export default function Home() {
   const handleLeaderboardNav = (e: React.MouseEvent, node: Node) => {
     e.stopPropagation();
     if ((node as any).isUntracked) {
-       showToast("This node is visible on the network but it is not found on the rewards/credits API.");
+       showToast("This node is currently not receiving storage credits from the protocol due to various reasons including: performance thresholds not yet met, the node is in a 'proving' phase, or the associated stake is below the required minimum for rewards. Note that the node is still successfully contributing to the network's total capacity.");
        return;
     }
     const url = node.pubkey ? `/leaderboard?highlight=${node.pubkey}` : '/leaderboard';
@@ -1233,7 +1233,7 @@ export default function Home() {
               <div className={`flex justify-between items-center text-[10px] md:text-xs p-1.5 md:p-2 rounded-lg border transition-colors ${(node as any).isUntracked ? 'bg-zinc-900/50 border-zinc-800' : 'bg-black/40 border-zinc-800/50'}`}>
                {(node as any).isUntracked ? (
                    <div className="flex items-center gap-2 text-zinc-500 w-full justify-center font-bold text-[9px] md:text-[10px] tracking-wide">
-                     <AlertTriangle size={10} className="text-zinc-600"/> NOT FOUND ON API
+                     <AlertTriangle size={10} className="text-zinc-600"/> NO STORAGE CREDITS
                    </div>
                ) : node.credits !== null ? (
                    <>
@@ -1248,7 +1248,7 @@ export default function Home() {
                    </>
                ) : (
                    <div className="flex items-center gap-2 text-red-400 w-full justify-center font-bold italic text-[9px] md:text-[10px]">
-                     <AlertOctagon size={10}/> CREDITS API OFFLINE
+                     <AlertOctagon size={10}/> API OFFLINE
                    </div>
                )}
             </div>
@@ -1310,7 +1310,6 @@ export default function Home() {
             </div>
           </div>
           <div>
-            {/* UPDATED: Specific Health Rank Display */}
             <div className="text-[8px] md:text-[9px] text-zinc-600 uppercase font-bold mb-1">Health Rank</div>
             <div className="font-mono text-yellow-600">#{node.health_rank || '-'}</div>
           </div>
@@ -1544,8 +1543,8 @@ export default function Home() {
                              <span className="text-zinc-500 font-bold flex items-center gap-2">
                                 {m.label} <span className="text-[9px] font-mono text-zinc-600">(Weighted: 0%)</span>
                              </span>
-                             <div className="font-mono text-[10px] text-red-500 font-bold flex items-center gap-1">
-                                <AlertOctagon size={10}/> API OFFLINE
+                             <div className="font-mono text-[10px] text-zinc-500 font-bold flex items-center gap-1">
+                                <Info size={10} className="text-zinc-600"/> NO STORAGE CREDITS
                              </div>
                         </div>
                         <div className="h-2 bg-zinc-800/50 rounded-full border border-red-900/30 overflow-hidden">
@@ -2010,8 +2009,8 @@ export default function Home() {
                       ? 'bg-zinc-800 border-zinc-600 text-zinc-200'
                       : 'bg-blue-500/10 border-blue-500/50 text-blue-400'
                     : zenMode
-                    ? 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300'
-                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800'
+                    ? 'bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-zinc-300'
+                    : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'
                 }`}
               >
                 {opt === 'uptime' && <Clock size={12} />}
@@ -2815,6 +2814,14 @@ export default function Home() {
                               <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
                             </div>
                             <div className="relative z-10 flex flex-col items-center gap-4">
+                              {/* NEW: Network Status badge above Shield (Expanded Section) */}
+                              <div className={`text-[10px] font-black tracking-widest px-4 py-1.5 rounded-full border ${
+                                  selectedNode.network === 'MAINNET' ? 'text-green-500 border-green-500/30 bg-green-500/5' : 
+                                  selectedNode.network === 'DEVNET' ? 'text-blue-500 border-blue-500/30 bg-blue-500/5' : 
+                                  'text-zinc-600 border-zinc-800'
+                              }`}>
+                                  {selectedNode.network || 'UNKNOWN'} NETWORK
+                              </div>
                               <Shield size={64} className="text-blue-500 opacity-80" />
                               {isSelectedNodeLatest
                                 ? (
@@ -3026,7 +3033,14 @@ export default function Home() {
                                 IDENTITY & STATUS
                               </div>
                             </div>
-                            <HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" />
+                            {/* NEW: Network Badge in Circled Area (Modal Overview) */}
+                            <div className={`px-2 py-1 rounded text-[9px] font-black uppercase border ${
+                                selectedNode.network === 'MAINNET' ? 'bg-green-500/10 border-green-500/30 text-green-500' : 
+                                selectedNode.network === 'DEVNET' ? 'bg-blue-500/10 border-blue-500/30 text-blue-500' : 
+                                'bg-zinc-800 border-zinc-700 text-zinc-500'
+                            }`}>
+                                {selectedNode.network || 'UNKNOWN'}
+                            </div>
                           </div>
 
                           <div className="mt-auto relative z-10">
@@ -3122,10 +3136,10 @@ export default function Home() {
                                 <span className="text-[9px] text-zinc-500 font-mono uppercase">
                                   Credits Earned
                                 </span>
-                                <span className={`${(selectedNode as any).isUntracked ? 'text-zinc-500' : 'text-yellow-500'} font-mono font-bold text-xs`}>
+                                <span className={`${(selectedNode as any).isUntracked ? 'text-zinc-500 font-bold' : 'text-yellow-500 font-bold'} font-mono text-xs`}>
                                   {(selectedNode as any).isUntracked 
-                                    ? 'NOT TRACKED' 
-                                    : (selectedNode?.credits !== null ? selectedNode.credits.toLocaleString() : 'N/A')}
+                                    ? 'NO STORAGE CREDITS' 
+                                    : (selectedNode?.credits !== null ? selectedNode.credits.toLocaleString() : 'API OFFLINE')}
                                 </span>
                               </div>
                             </div>
