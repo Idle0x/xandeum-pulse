@@ -663,31 +663,66 @@ export default function Leaderboard() {
                     {isExpanded && (
                         <div className="border-t border-zinc-800/50 p-3 md:p-4 animate-in slide-in-from-top-2 duration-200">
                             <div className="flex flex-col gap-4">
-                                <div className="grid grid-cols-6 md:flex md:flex-wrap gap-2 w-full">
+                                
+                                {/* --- MOBILE ONLY VIEW (Grid 2x3) --- */}
+                                <div className="grid grid-cols-6 gap-2 md:hidden">
+                                    {/* Row 1 */}
                                     {node.address && (
-                                        <Link href={`/map?focus=${node.address.split(':')[0]}`} className="col-span-3 md:w-auto">
-                                            <button className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-blue-900/20 border border-blue-500/30 hover:bg-blue-900/40 text-[10px] md:text-xs font-bold text-blue-400 transition-all whitespace-nowrap">
+                                        <Link href={`/map?focus=${node.address.split(':')[0]}`} className="col-span-3">
+                                            <button className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-blue-900/20 border border-blue-500/30 text-[10px] font-bold text-blue-400">
                                                 {flagUrl ? <img src={flagUrl} className="w-4 rounded-sm" alt="flag"/> : <MapPin size={12} />} MAP
                                             </button>
                                         </Link>
                                     )}
-                                    <Link href={`/?open=${node.pubkey}`} className="col-span-3 md:w-auto">
-                                        <button className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-[10px] md:text-xs font-bold text-white transition-all whitespace-nowrap">
+                                    <Link href={`/?open=${node.pubkey}`} className="col-span-3">
+                                        <button className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-[10px] font-bold text-white">
                                             <Activity size={12} className="text-green-400" /> DIAGNOSTICS
                                         </button>
                                     </Link>
-                                    <button onClick={(e) => handleUseInSim(e)} className="col-span-2 md:w-auto flex items-center justify-center gap-2 px-2 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/20 text-[10px] md:text-xs font-bold text-yellow-500 transition-all whitespace-nowrap">
+
+                                    {/* Row 2 */}
+                                    <button onClick={(e) => handleUseInSim(e)} className="col-span-2 flex items-center justify-center gap-2 px-1 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-[10px] font-bold text-yellow-500">
                                         <Calculator size={12} /> CALC
                                     </button>
-                                    <button onClick={(e) => handleCopyKey(e, node.pubkey)} className="col-span-2 md:w-auto flex items-center justify-center gap-2 px-2 py-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl text-[10px] font-bold text-zinc-400 hover:text-white transition whitespace-nowrap">
-                                        {copiedKey === node.pubkey ? <Check size={12} className="text-green-500" /> : <Copy size={12} />} 
-                                        {copiedKey === node.pubkey ? 'COPIED' : 'COPY'}
+                                    <button onClick={(e) => handleCopyKey(e, node.pubkey)} className="col-span-2 flex items-center justify-center gap-2 px-1 py-3 bg-zinc-800/50 rounded-xl text-[10px] font-bold text-zinc-400">
+                                        {copiedKey === node.pubkey ? <Check size={12} /> : <Copy size={12} />} COPY
                                     </button>
-                                    <button onClick={(e) => handleShareUrl(e, node.pubkey)} className="col-span-2 md:w-auto flex items-center justify-center gap-2 px-2 py-3 bg-blue-500/10 hover:bg-blue-500/20 rounded-xl text-[10px] font-bold text-blue-400 transition whitespace-nowrap">
-                                        {copiedLink === node.pubkey ? <Check size={12} /> : <Share2 size={12} />} 
-                                        {copiedLink === node.pubkey ? 'COPIED' : 'SHARE'}
+                                    <button onClick={(e) => handleShareUrl(e, node.pubkey)} className="col-span-2 flex items-center justify-center gap-2 px-1 py-3 bg-blue-500/10 rounded-xl text-[10px] font-bold text-blue-400">
+                                        {copiedLink === node.pubkey ? <Check size={12} /> : <Share2 size={12} />} LINK
                                     </button>
                                 </div>
+
+                                {/* --- DESKTOP ONLY VIEW (Original Design - Intentionally Left Intact) --- */}
+                                <div className="hidden md:flex flex-row gap-4 items-center justify-between">
+                                    <div className="flex gap-2 w-full md:w-auto">
+                                        {node.address && (
+                                            <Link href={`/map?focus=${node.address.split(':')[0]}`}>
+                                                <button className="w-full md:w-auto flex items-center justify-center gap-2 px-3 py-2 md:px-5 md:py-3 rounded-lg md:rounded-xl bg-blue-900/20 border border-blue-500/30 hover:bg-blue-900/40 text-[10px] md:text-xs font-bold text-blue-400 transition-all whitespace-nowrap">
+                                                    {flagUrl ? <img src={flagUrl} className="w-4 rounded-sm" alt="flag"/> : <MapPin size={12} />}MAP
+                                                </button>
+                                            </Link>
+                                        )}
+                                        <Link href={`/?open=${node.pubkey}`}>
+                                            <button className="w-full md:w-auto flex items-center justify-center gap-2 px-3 py-2 md:px-5 md:py-3 rounded-lg md:rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-[10px] md:text-xs font-bold text-white transition-all whitespace-nowrap">
+                                                <Activity size={12} className="text-green-400" />DIAGNOSTICS
+                                            </button>
+                                        </Link>
+                                        <button onClick={(e) => handleUseInSim(e)} className="w-full md:w-auto flex items-center justify-center gap-2 px-3 py-2 md:px-5 md:py-3 rounded-lg md:rounded-xl bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/20 text-[10px] md:text-xs font-bold text-yellow-500 transition-all whitespace-nowrap">
+                                            <Calculator size={12} />CALCULATE
+                                        </button>
+                                    </div>
+                                    <div className="flex gap-2 justify-end">
+                                        <button onClick={(e) => handleCopyKey(e, node.pubkey)} className="flex items-center gap-2 px-3 py-2 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg text-[10px] font-mono text-zinc-400 hover:text-white transition">
+                                            {copiedKey === node.pubkey ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                                            {copiedKey === node.pubkey ? 'COPIED KEY' : 'COPY KEY'}
+                                        </button>
+                                        <button onClick={(e) => handleShareUrl(e, node.pubkey)} className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg text-[10px] font-bold text-blue-400 transition">
+                                            {copiedLink === node.pubkey ? <Check size={12} /> : <Share2 size={12} />}
+                                            {copiedLink === node.pubkey ? 'LINK COPIED' : 'SHARE RANK'}
+                                        </button>
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
                     )}
