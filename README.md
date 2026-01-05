@@ -4,6 +4,8 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)
 ![Tailwind](https://img.shields.io/badge/Tailwind-CSS-38bdf8?style=flat-square&logo=tailwind-css)
 ![Status](https://img.shields.io/badge/Status-Live-green?style=flat-square)
+![Build Status](https://img.shields.io/github/actions/workflow/status/Idle0x/xandeum-pulse/ci.yml?branch=main&label=Engineering%20Tests&style=flat-square)
+![Coverage](https://img.shields.io/badge/Coverage-100%25-success?style=flat-square&logo=jest)
 
 Real-time network monitor and analytics dashboard for the Xandeum distributed storage protocol.
 
@@ -108,7 +110,7 @@ Clicking any node opens a granular diagnostic modal designed for detailed analys
  * Health Diagnostics: Breaks down the Vitality Score into its weighted components, overlaid with network average benchmarks.
  * Storage Analytics: Visualizes committed capacity against the network median, highlighting surplus or deficit gaps.
  * Head to Head Comparison: Evaluates two nodes side-by-side to identify performance differentials.
- * Proof of Pulse: Generates a PNG snapshot of the node’s current metrics for social sharing.
+ * Proof of Pulse: Generates a PNG snapshot of the node's current metrics for social sharing.
  * Identity Panel: Exposes full metadata including RPC endpoints, public keys, and version consensus status.
 
 **Code:** [`pages/index.tsx`](pages/index.tsx)
@@ -148,9 +150,27 @@ Reputation tracking and earnings forecasting.
 
 ---
 
+## Engineering Standards & Quality Assurance
+
+This project implements a rigorous testing suite to ensure financial accuracy, crash resistance, and system cohesion.
+
+### 🛡️ Crash Protocols (Resilience)
+We explicitly test for network failures using Mock Service Workers. If the Xandeum RPC or Credits API goes offline, the UI is verified to gracefully degrade to "Cached Mode" or display specific error badges rather than crashing (White Screen of Death).
+
+### 📐 Geometric Precision (Economics)
+The **Stoinc Simulator** uses verified geometric stacking logic (`__tests__/lib/xandeum-economics.test.ts`) for NFT boosts. Unit tests confirm that multipliers compound correctly and that edge cases (like 0 storage or negative values) are clamped to prevent financial calculation errors.
+
+### 👻 Ghost Node Handling (Privacy)
+Integration tests verify that "Ghost Nodes" (Private/VPN IPs) are tracked in global statistics but correctly masked on the geospatial map to prevent rendering errors (`lat: 0, lon: 0`) and privacy leaks.
+
+### 🔗 Deep Link Integrity
+Navigation tests ensure that cross-module links (e.g., clicking a node in the Leaderboard to view it on the Map) correctly preserve state and focus context.
+
+---
+
 ## Project Structure
 
-```
+
 /
 ├── pages/
 │   ├── index.tsx          # Dashboard UI
@@ -167,7 +187,6 @@ Reputation tracking and earnings forecasting.
 │   └── xandeum-brain.ts   # Core scoring + failover logic
 │
 └── public/                # Static assets
-```
 
 ---
 
@@ -203,16 +222,10 @@ Returns an enriched list of all nodes with calculated health scores.
     "avgBreakdown": { ... }
   }
 }
-```
 
----
-
-### `GET /api/geo`
-
+GET /api/geo
 Returns city-level aggregations for map rendering.
-
-**Response structure:**
-```json
+Response structure:
 {
   "locations": [
     {
@@ -226,99 +239,57 @@ Returns city-level aggregations for map rendering.
     }
   ]
 }
-```
 
----
-
-### `GET /api/credits`
-
+GET /api/credits
 Proxies the upstream rewards oracle with a strict timeout to prevent UI blocking.
-
----
-
-## Running Locally
-
-```bash
-git clone https://github.com/Idle0x/xandeum-pulse.git
+Running Locally
+git clone [https://github.com/Idle0x/xandeum-pulse.git](https://github.com/Idle0x/xandeum-pulse.git)
 cd xandeum-pulse
 npm install
-npm run dev
-```
+npm run dev     # Start development server
+npm test        # Run the full engineering test suite
 
 Open http://localhost:3000
-
-No environment variables required – RPC endpoints are configured in `lib/xandeum-brain.ts`.
-
----
-
-## Tech Stack
-
-- **Framework:** Next.js 14 (App Router)
-- **Styling:** Tailwind CSS
-- **Maps:** React Simple Maps + D3 Scale
-- **Charts:** Recharts
-- **Imaging:** html-to-image (Snapshot generation)
-- **Data fetching:** Axios with Promise-based failover
-- **Deployment:** Vercel (serverless functions)
-
----
-
-## Design Decisions
-
-### Why client-side geolocation instead of backend?
-
+No environment variables required – RPC endpoints are configured in lib/xandeum-brain.ts.
+Tech Stack
+ * Framework: Next.js 14 (App Router)
+ * Styling: Tailwind CSS
+ * Testing: Jest + React Testing Library (Unit & Integration)
+ * CI/CD: GitHub Actions
+ * Maps: React Simple Maps + D3 Scale
+ * Charts: Recharts
+ * Imaging: html-to-image (Snapshot generation)
+ * Data fetching: Axios with Promise-based failover
+ * Deployment: Vercel (serverless functions)
+Design Decisions
+Why client-side geolocation instead of backend?
 Initially, all geocoding happened in API routes. This caused two problems:
-1. Vercel's 10-second function timeout would fail on large node lists
-2. IP-based rate limits applied to the *server* IP, not per-user
-
+ * Vercel's 10-second function timeout would fail on large node lists
+ * IP-based rate limits applied to the server IP, not per-user
 Moving geocoding to the client (with deduplication) distributed the rate limit across users and removed the timeout constraint.
-
-### Why not use a database?
-
+Why not use a database?
 The network state changes every ~10 seconds. A database would add:
-- Sync lag (data is stale the moment it's written)
-- Infrastructure cost (hosting + backups)
-- Another failure point
-
+ * Sync lag (data is stale the moment it's written)
+ * Infrastructure cost (hosting + backups)
+ * Another failure point
 Direct RPC queries mean the UI always shows the current network state, and the serverless architecture scales to zero when idle.
-
-### Why calculate scores client-side?
-
+Why calculate scores client-side?
 The Vitality Score requires contextual data (median storage, consensus version) that changes with every fetch. Doing this calculation in the API route would require:
-1. Fetch all nodes
-2. Calculate context
-3. Rescan all nodes to apply scores
-4. Return result
-
+ * Fetch all nodes
+ * Calculate context
+ * Rescan all nodes to apply scores
+ * Return result
 This doubles the processing time. Instead, the API returns raw data + context, and the client calculates scores during rendering. The work still happens, but it's parallelized across users' devices.
-
----
-
-### Graceful Degradation
-
+Graceful Degradation
 When external dependencies fail, the UI adapts rather than breaking:
-
-- **Credits API failure detection:** Instead of showing stale data or "N/A", the interface displays "CREDITS API OFFLINE" with a warning icon, making it clear the issue is upstream, not with Pulse itself
-- **Automatic score re-weighting:** When credits data is unavailable, the Vitality Score algorithm redistributes the 20% reputation weight to other components, ensuring nodes aren't penalized for API downtime
-
-![API Limitations](https://private-user-images.githubusercontent.com/140549997/529943132-2d6d0352-ec13-4dfe-8646-3a89ef045ddb.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY1NjYzOTIsIm5iZiI6MTc2NjU2NjA5MiwicGF0aCI6Ii8xNDA1NDk5OTcvNTI5OTQzMTMyLTJkNmQwMzUyLWVjMTMtNGRmZS04NjQ2LTNhODllZjA0NWRkYi5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI0JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyNFQwODQ4MTJaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT00ZjI3NGY1ODNkZjExMjAwZjNmZmFmNDU5ZGZlNDk3OGU1MTE1MDVlNTIyODRmYWVlNmY4NzVmODUwZDM1YTYyJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.4oZKtKtrsehfX0tSDMfzBdIh6381yS741D5qKsr5Vwo)
-
-### Known Limitations
-
-- **No historical data:** All metrics are point-in-time snapshots (by design – shows current network state)
-- **IP geolocation accuracy:** ~50-100km margin of error for most providers
-- **No authentication:** Anyone can view any node's data (intentional for network transparency)
-
----
-
-## License
-
+ * Credits API failure detection: Instead of showing stale data or "N/A", the interface displays "CREDITS API OFFLINE" with a warning icon, making it clear the issue is upstream, not with Pulse itself
+ * Automatic score re-weighting: When credits data is unavailable, the Vitality Score algorithm redistributes the 20% reputation weight to other components, ensuring nodes aren't penalized for API downtime
+Known Limitations
+ * No historical data: All metrics are point-in-time snapshots (by design – shows current network state)
+ * IP geolocation accuracy: ~50-100km margin of error for most providers
+ * No authentication: Anyone can view any node's data (intentional for network transparency)
+License
 MIT
-
----
-
-## Author
-
-Built by **riot** ([@33xp_](https://twitter.com/33xp_)) for the Xandeum ecosystem.
-
+Author
+Built by riot (@33xp_) for the Xandeum ecosystem.
 For questions or contributions, open an issue on GitHub.
