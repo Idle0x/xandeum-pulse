@@ -50,13 +50,13 @@ export interface EnrichedNode {
 // --- HELPERS ---
 
 // STRIP suffixes: "1.2-trynet" -> "1.2", "0.8.0-beta" -> "0.8.0"
-const cleanSemver = (v: string) => {
+export const cleanSemver = (v: string) => {
   if (!v) return '0.0.0';
   const mainVer = v.split('-')[0]; 
   return mainVer.replace(/[^0-9.]/g, '');
 };
 
-const compareVersions = (v1: string, v2: string) => {
+export const compareVersions = (v1: string, v2: string) => {
   const p1 = cleanSemver(v1).split('.').map(Number);
   const p2 = cleanSemver(v2).split('.').map(Number);
   for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
@@ -68,16 +68,16 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
-const calculateSigmoidScore = (value: number, midpoint: number, steepness: number) => 
+export const calculateSigmoidScore = (value: number, midpoint: number, steepness: number) => 
   100 / (1 + Math.exp(-steepness * (value - midpoint)));
 
-const calculateLogScore = (value: number, median: number, maxScore: number = 100) => {
+export const calculateLogScore = (value: number, median: number, maxScore: number = 100) => {
     if (median === 0) return value > 0 ? maxScore : 0;
     return Math.min(maxScore, (maxScore / 2) * Math.log2((value / median) + 1));
 };
 
 // NEW: Exact Lookup Table based on v2.0 Spec (Uses CLEAN versions for distance)
-const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedCleanVersions: string[]) => {
+export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedCleanVersions: string[]) => {
     const cleanNode = cleanSemver(nodeVersion);
     const cleanConsensus = cleanSemver(consensusVersion);
 
@@ -106,7 +106,7 @@ const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, so
 };
 
 // --- SCORING FACTORY ---
-const calculateVitalityScore = (
+export const calculateVitalityScore = (
     storageCommitted: number, 
     storageUsed: number,
     uptimeSeconds: number, 
@@ -271,10 +271,10 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   rawPods.forEach((p: any) => { 
       const rawV = (p.version || '0.0.0'); 
       const cleanV = cleanSemver(rawV);
-      
+
       // Track 1: Vote using EXACT RAW string (Strict Mode Consensus)
       rawVersionCounts[rawV] = (rawVersionCounts[rawV] || 0) + 1;
-      
+
       // Track 2: Build the simplified ladder (Semantic Ranking)
       uniqueCleanVersionsSet.add(cleanV);
   });
