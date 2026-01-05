@@ -624,40 +624,69 @@ export default function Home() {
   }, [loading, nodes, router.query.open]);
 
   const fetchData = async () => {
-    setLoading(true);
-    try {
-      const res = await axios.get(`/api/stats?t=${Date.now()}`);
+  setLoading(true);
+  try {
+    const res = await axios.get(`/api/stats?t=${Date.now()}`);
 
-      if (res.data.result && res.data.result.pods) {
-        let podList = res.data.result.pods as Node[];
-        const stats = res.data.stats;
+    if (res.data.result && res.data.result.pods) {
+      let podList = res.data.result.pods as Node[];
+      const stats = res.data.stats;
 
-        if (stats) {
-            setNetworkStats(stats);
-            setMostCommonVersion(stats.consensusVersion || 'N/A');
-            setAvgNetworkHealth(stats.avgBreakdown?.total || 0);
-            setMedianCommitted(stats.medianStorage || 0);
-        }
+      if (stats) {
+          setNetworkStats(stats);
+          setMostCommonVersion(stats.consensusVersion || 'N/A');
+          setAvgNetworkHealth(stats.avgBreakdown?.total || 0);
+          setMedianCommitted(stats.medianStorage || 0);
+      }
 
-        podList = podList.map(node => { 
-          const used = node.storage_used || 0; 
-          const cap = node.storage_committed || 0; 
-          let percentStr = "0%";
-          let rawPercent = 0; 
+      // --- NEW DETERMINISTIC SEQUENTIAL RANKING ---
+      // 1. Sort a temporary clone using the Tier-Breaker Logic
+      // Priority: Credits (High to Low) > Health (High to Low) > Pubkey (Alphabetic)
+      const sortedForRank = [...podList].sort((a, b) => {
+          // Primary: Credits
+          const creditsA = a.credits || 0;
+          const creditsB = b.credits || 0;
+          if (creditsB !== creditsA) return creditsB - creditsA;
 
-          if (cap > 0 && used > 0) {
-            rawPercent = (used / cap) * 100;
-            percentStr = rawPercent < 0.01 ? "< 0.01%" : `${rawPercent.toFixed(2)}%`;
-          } 
+          // Secondary: Health Score (Tier-breaker)
+          const healthA = a.health || 0;
+          const healthB = b.health || 0;
+          if (healthB !== healthA) return healthB - healthA;
 
-          return {
-            ...node,
-            storage_usage_percentage: percentStr,
-            storage_usage_raw: rawPercent
-          }; 
-        });
+          // Tertiary: Pubkey (Deterministic fallback)
+          return (a.pubkey || '').localeCompare(b.pubkey || '');
+      });
 
-        setNodes(podList);
+      // 2. Create a Map of Pubkey -> Rank (Strict Index + 1)
+      const rankMap = new Map<string, number>();
+      sortedForRank.forEach((node, idx) => {
+          if (node.pubkey) {
+              rankMap.set(node.pubkey, idx + 1);
+          }
+      });
+
+      // 3. Process the podList and inject the unique rank
+      podList = podList.map(node => { 
+        const used = node.storage_used || 0; 
+        const cap = node.storage_committed || 0; 
+        let percentStr = "0%";
+        let rawPercent = 0; 
+
+        if (cap > 0 && used > 0) {
+          rawPercent = (used / cap) * 100;
+          percentStr = rawPercent < 0.01 ? "< 0.01%" : `${rawPercent.toFixed(2)}%`;
+        } 
+
+        return {
+          ...node,
+          // OVERRIDE with unique rank from map, fallback to original if pubkey missing
+          rank: node.pubkey ? rankMap.get(node.pubkey) : node.rank,
+          storage_usage_percentage: percentStr,
+          storage_usage_raw: rawPercent
+        }; 
+      });
+
+      setNodes(podList);
 
         const stableNodes = podList.filter(n => (n.uptime || 0) > 86400).length;
         setNetworkHealth((podList.length > 0 ? (stableNodes / podList.length) * 100 : 0).toFixed(2));
