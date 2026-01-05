@@ -176,21 +176,29 @@ Navigation tests ensure that cross-module links (e.g., clicking a node in the Le
 
 ```
 /
+├── .github/
+│   └── workflows/ci.yml     # Automated CI/CD Pipeline
+│
+├── __tests__/               # Engineering Test Suite
+│   ├── integration/         # Deep-link & Routing verification
+│   └── lib/                 # Unit tests for Math & Logic
+│
 ├── pages/
-│   ├── index.tsx          # Dashboard UI
-│   ├── map.tsx            # Geographic visualizer
-│   ├── leaderboard.tsx    # Reputation rankings
-│   └── docs.tsx           # Interactive documentation
+│   ├── index.tsx            # Dashboard UI
+│   ├── map.tsx              # Geographic visualizer
+│   ├── leaderboard.tsx      # Reputation rankings
+│   └── docs.tsx             # Interactive documentation
 │
 ├── pages/api/
-│   ├── stats.ts           # Main data aggregation endpoint
-│   ├── geo.ts             # Geographic clustering logic
-│   └── credits.ts         # Reputation API proxy
+│   ├── stats.ts             # Main data aggregation endpoint
+│   ├── geo.ts               # Geographic clustering logic
+│   └── credits.ts           # Reputation API proxy
 │
 ├── lib/
-│   └── xandeum-brain.ts   # Core scoring + failover logic
+│   ├── xandeum-brain.ts     # Vitality scoring + failover logic
+│   └── xandeum-economics.ts # Stoinc Simulator math engine
 │
-└── public/                # Static assets
+└── public/                  # Static assets
 ```
 
 ---
