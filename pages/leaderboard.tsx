@@ -684,15 +684,15 @@ export default function Leaderboard() {
                                     <button onClick={(e) => handleUseInSim(e)} className="col-span-2 flex items-center justify-center gap-2 px-1 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-[10px] font-bold text-yellow-500">
                                         <Calculator size={12} /> CALC
                                     </button>
-                                    <button onClick={(e) => handleCopyKey(e, node.pubkey)} className="col-span-2 flex items-center justify-center gap-2 px-1 py-3 bg-zinc-800/50 rounded-xl text-[10px] font-bold text-zinc-400">
-                                        {copiedKey === node.pubkey ? <Check size={12} /> : <Copy size={12} />} COPY
+                                    <button onClick={(e) => handleCopyKey(e, node.pubkey)} className="col-span-2 flex items-center justify-center gap-1 px-0.5 py-3 bg-zinc-800/50 rounded-xl text-[10px] font-bold text-zinc-400">
+                                        {copiedKey === node.pubkey ? <Check size={12} /> : <Copy size={12} />} COPY KEY
                                     </button>
-                                    <button onClick={(e) => handleShareUrl(e, node.pubkey)} className="col-span-2 flex items-center justify-center gap-2 px-1 py-3 bg-blue-500/10 rounded-xl text-[10px] font-bold text-blue-400">
-                                        {copiedLink === node.pubkey ? <Check size={12} /> : <Share2 size={12} />} LINK
+                                    <button onClick={(e) => handleShareUrl(e, node.pubkey)} className="col-span-2 flex items-center justify-center gap-1 px-0.5 py-3 bg-blue-500/10 rounded-xl text-[10px] font-bold text-blue-400">
+                                        {copiedLink === node.pubkey ? <Check size={12} /> : <Share2 size={12} />} SHARE
                                     </button>
                                 </div>
 
-                                {/* --- DESKTOP ONLY VIEW (Original Design - Intentionally Left Intact) --- */}
+                                {/* --- DESKTOP ONLY VIEW --- */}
                                 <div className="hidden md:flex flex-row gap-4 items-center justify-between">
                                     <div className="flex gap-2 w-full md:w-auto">
                                         {node.address && (
