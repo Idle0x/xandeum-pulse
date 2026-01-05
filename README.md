@@ -11,7 +11,7 @@ Real-time network monitor and analytics dashboard for the Xandeum distributed st
 
 **check it out:** https://xandeum-pulse.vercel.app
 
-![Main Dashboard](https://private-user-images.githubusercontent.com/140549997/529937748-e5f273fc-8468-4da1-a01b-fa1dcf6f81b2.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY1NjUxOTcsIm5iZiI6MTc2NjU2NDg5NywicGF0aCI6Ii8xNDA1NDk5OTcvNTI5OTM3NzQ4LWU1ZjI3M2ZjLTg0NjgtNGRhMS1hMDFiLWZhMWRjZjZmODFiMi5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI0JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyNFQwODI4MTdaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT02OTZiZmEzYTYzYmJkZjlhMjMxYTZhMTdiNDI5OTI0NTk0Mzk5NWExNzA0M2NlNzU4NzAwMGRjZWVmMjdjNjU0JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.jBVP9vuR60L4GwKjjklkGX2Y-8yKA-hbR5mRa-CpBXc)
+![Homepage](https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2Fhomepage.png)
 
 ---
 
@@ -104,6 +104,8 @@ The primary monitoring interface for node operators.
 **Code:** [`pages/index.tsx`](pages/index.tsx)
 - See `renderZenCard()` - [Lines 1049-1097](pages/index.tsx#L1049-L1097) - (zen mode toggle)
 
+![Dashboard](https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2Fdashboard.png)
+
 ### 2. Deep Node Inspection
 
 Clicking any node opens a granular diagnostic modal designed for detailed analysis.
@@ -118,7 +120,7 @@ Clicking any node opens a granular diagnostic modal designed for detailed analys
 - See `handleDownloadProof()` - [Lines 800-814](pages/index.tsx#L800-L814) - (proof generation)
 - See renderStorageAnalysis - [Line 1395-1521](pages/index.tsx#L1395-L1521) - (storage calculation)
 
-![Inspector Modal](https://private-user-images.githubusercontent.com/140549997/529940088-cae31cd7-fd73-46b6-8868-92895a72db3b.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY1NjU2OTcsIm5iZiI6MTc2NjU2NTM5NywicGF0aCI6Ii8xNDA1NDk5OTcvNTI5OTQwMDg4LWNhZTMxY2Q3LWZkNzMtNDZiNi04ODY4LTkyODk1YTcyZGIzYi5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI0JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyNFQwODM2MzdaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1lYzkzYjQxMWE2YWI4ODUxMTYyNDdjMTFhN2Q5MTE5YWQ3NDAyZWNhOGQ3YmY4NjQ2OTVmMzk2NGRhYWQ0OWU4JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.aiY7lezl-qh0GWDWKj2wSEQfOrPdceLwnLdWce9Xezk)
+![Inspector Modal](https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2FInspector%20Modal.png)
 
 ### 3. Geographic Map
 
@@ -132,7 +134,7 @@ Visualizes the physical distribution of network infrastructure.
 - See `useEffect()` - [Lines 103-172](pages/map.tsx#L103-L172) - (percentile calculation & spatial intelligence)
 - See `getXRayStats()` - [Lines 301-365](pages/map.tsx#L301-L365) - (region inspector)
 
-![Network Topology](https://private-user-images.githubusercontent.com/140549997/529941528-4a440bb3-8981-466e-b850-64db2f44891f.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY1NjYzMTUsIm5iZiI6MTc2NjU2NjAxNSwicGF0aCI6Ii8xNDA1NDk5OTcvNTI5OTQxNTI4LTRhNDQwYmIzLTg5ODEtNDY2ZS1iODUwLTY0ZGIyZjQ0ODkxZi5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI0JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyNFQwODQ2NTVaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT0yOGQ0NzllZTEzMDgzZmVlYTkwNTY4ZmViMmUyMmY3YTM2NDJlMjExZmUyNmE5YzMwYjE3NmMxY2U4NjBlOWQyJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.Wh_7b4VEuvbKOtC1zTLzoqI9-ik4Yc2m-xzi90d2Nls)
+![Network Topology](https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2FNetwork_Topology.png)
 
 ### 4. Leaderboard
 
@@ -146,7 +148,7 @@ Reputation tracking and earnings forecasting.
 - See `calculateFinal()` - [Lines 197-201](pages/leaderboard.tsx#L163-L167) – (simulator logic)
 - See `useEffect()` - [Lines 61-151](pages/leaderboard.tsx#L61-L151) – (logic & algorithm)
 
-![Credits & Reputation](https://private-user-images.githubusercontent.com/140549997/529942809-728163b2-79be-42ae-8ce8-1325ad83072e.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY1NjYzMjksIm5iZiI6MTc2NjU2NjAyOSwicGF0aCI6Ii8xNDA1NDk5OTcvNTI5OTQyODA5LTcyODE2M2IyLTc5YmUtNDJhZS04Y2U4LTEzMjVhZDgzMDcyZS5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI0JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyNFQwODQ3MDlaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1jNzA1ZjMwMWNiZjZjNjdhNDUwNWVjZjNmZTkxMzNjZmY4MWJlOTYzODk0ZmE0MzQzODQ5Njc3ZDY1M2VmMGIzJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.YnFpWMvtKkELo-ryBjzwjjs_dJndwDNj0dcNcV8Bdj0)
+![Credits & Reputation](https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2FCredits%20%26%20Reputation.png)
 
 ---
 
@@ -154,27 +156,29 @@ Reputation tracking and earnings forecasting.
 
 This project implements a rigorous testing suite to ensure financial accuracy, crash resistance, and system cohesion.
 
-### 🛡️ Crash Protocols (Resilience)
+### Crash Protocols (Resilience)
 We explicitly test for network failures using Mock Service Workers. If the Xandeum RPC or Credits API goes offline, the UI is verified to gracefully degrade to "Cached Mode" or display specific error badges rather than crashing (White Screen of Death). 
 
 - - See [`__tests__/lib/xandeum-brain.test.ts`](__tests__/lib/xandeum-brain.test.ts)
 
-### 📐 Geometric Precision (Economics)
+### Geometric Precision (Economics)
 The **Stoinc Simulator** uses verified geometric stacking logic (`__tests__/lib/xandeum-economics.test.ts`) for NFT boosts. Unit tests confirm that multipliers compound correctly and that edge cases (like 0 storage or negative values) are clamped to prevent financial calculation errors.
 
 - See [`__tests__/lib/xandeum-economics.test.ts`](__tests__/lib/xandeum-economics.test.ts)
 
-### 👻 Ghost Node Handling (Privacy)
+### Ghost Node Handling (Privacy)
 Integration tests verify that "Ghost Nodes" (Private/VPN IPs) are tracked in global statistics but correctly masked on the geospatial map to prevent rendering errors (`lat: 0, lon: 0`) and privacy leaks.
 
-### 🔗 Deep Link Integrity
+- - See [`__tests__/lib/xandeum-brain.test.ts`](__tests__/lib/xandeum-brain.test.ts)
+
+### Deep Link Integrity
 Navigation tests ensure that cross-module links (e.g., clicking a node in the Leaderboard to view it on the Map) correctly preserve state and focus context.
 
 - See [`__tests__/integration/navigation.test.tsx`](__tests__/integration/navigation.test.tsx)
 
 ---
 
-## ✅ Quality Assurance
+## Quality Assurance
 
 This platform includes a comprehensive test suite:
 
