@@ -188,7 +188,17 @@ export default function Leaderboard() {
   }, [router.isReady, router.query.highlight, allNodes, networkFilter]); 
 
 
-  // --- 4. SIMULATOR LOGIC (UPDATED TO USE LIBRARY) ---
+  // --- 4. SIMULATOR LOGIC (UPDATED) ---
+  
+  // Resets the simulator to "Manual Mode"
+  const clearImport = () => {
+    setImportKey('');
+    setImportSuccess(false);
+    setSimMode('NEW');
+    setImportedBaseCredits(0);
+    setImportError(null);
+  };
+
   const handleImportNode = () => {
     setImportError(null);
     setImportSuccess(false);
@@ -205,8 +215,6 @@ export default function Leaderboard() {
     if (node) {
         setImportSuccess(true);
         setSimMode('IMPORT');
-        // IMPORTANT: We store the Base Credits from API, but we DO NOT skip step 2.
-        // User must still apply boosts in Step 2.
         setImportedBaseCredits(node.credits);
 
         setTimeout(() => {
@@ -218,12 +226,10 @@ export default function Leaderboard() {
     }
   };
 
-  // REPLACED OLD FUNCTION WITH USEMEMO HOOK TO LIB
   const metrics = useMemo(() => {
       // Logic for calculating base if using IMPORT mode
-      // If import mode, we use the imported credits as base, else calculate from hardware
       const currentNetworkTotal = allNodes.reduce((sum, n) => sum + n.credits, 0);
-      
+
       const result = calculateStoinc({
           storageVal: simStorageVal,
           storageUnit: simStorageUnit,
@@ -238,10 +244,10 @@ export default function Leaderboard() {
 
       // Override rawCredits if we are in IMPORT mode
       const rawCredits = simMode === 'IMPORT' ? importedBaseCredits : result.userBaseCredits;
-      
+
       // Re-calculate boosted if override happened (simple multiplier since geoMean is returned)
       const boostedCredits = simMode === 'IMPORT' ? (importedBaseCredits * result.geoMean) : result.boostedCredits;
-      
+
       // Re-calculate share/earnings if override happened
       const estimatedNetworkBoostedTotal = (currentNetworkTotal * networkAvgMult) + (simMode === 'NEW' ? boostedCredits : 0);
       const share = estimatedNetworkBoostedTotal > 0 ? boostedCredits / estimatedNetworkBoostedTotal : 0;
@@ -336,7 +342,8 @@ export default function Leaderboard() {
 
           {/* WIZARD CONTENT */}
           {showSim && (
-              <div className="relative min-h-[400px]">
+              // UPDATED: Removed min-h-[400px], added transitions for auto-height scaling
+              <div className="relative transition-all duration-300 ease-in-out">
 
                   {/* SCREEN 1: HARDWARE & IMPORT */}
                   {simStep === 0 && (
@@ -353,14 +360,29 @@ export default function Leaderboard() {
                                       {importSuccess ? 'SUCCESS! STATS LOADED' : importError ? 'ERROR' : 'ALREADY LIVE? PASTE PUBLIC KEY'}
                                   </label>
                                   <div className="flex gap-2 relative">
-                                      <input 
-                                          type="text" 
-                                          placeholder="Paste your Node Public Key..." 
-                                          value={importKey}
-                                          onChange={(e) => { setImportKey(e.target.value); if(importError) setImportError(null); }}
-                                          onKeyDown={(e) => e.key === 'Enter' && handleImportNode()}
-                                          className={`w-full bg-zinc-900 border rounded-lg p-2 text-[10px] md:text-xs text-white font-mono outline-none transition ${importError ? 'border-red-500/50 focus:border-red-500' : 'border-zinc-700 focus:border-blue-500'}`}
-                                      />
+                                      <div className="relative w-full">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Paste your Node Public Key..." 
+                                            value={importKey}
+                                            onChange={(e) => { 
+                                                setImportKey(e.target.value); 
+                                                if(importError) setImportError(null);
+                                                // IMMEDIATE RESET IF CLEARED
+                                                if(e.target.value === '') clearImport();
+                                            }}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleImportNode()}
+                                            className={`w-full bg-zinc-900 border rounded-lg p-2 pr-10 text-[10px] md:text-xs text-white font-mono outline-none transition ${importError ? 'border-red-500/50 focus:border-red-500' : 'border-zinc-700 focus:border-blue-500'}`}
+                                        />
+                                        {importKey && (
+                                            <button 
+                                                onClick={clearImport}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        )}
+                                      </div>
                                       <button 
                                           onClick={handleImportNode}
                                           disabled={importSuccess}
@@ -390,7 +412,17 @@ export default function Leaderboard() {
                                       <div>
                                           <label className="text-[10px] text-zinc-400 uppercase font-bold flex justify-between mb-2"><span>Number of pNodes</span></label>
                                           <div className="relative">
-                                              <input type="number" min="1" value={simNodes} onChange={(e) => setSimNodes(Math.max(1, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none focus:border-yellow-500 transition"/>
+                                              <input 
+                                                type="number" 
+                                                min="1" 
+                                                value={simNodes} 
+                                                onChange={(e) => {
+                                                    setSimNodes(Math.max(1, Number(e.target.value)));
+                                                    // Force mode to NEW when user edits manually
+                                                    if(simMode === 'IMPORT') setSimMode('NEW');
+                                                }} 
+                                                className="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none focus:border-yellow-500 transition"
+                                              />
                                               <span className="absolute right-3 top-2 md:top-3 text-[10px] md:text-sm text-zinc-500 font-bold">NODES</span>
                                           </div>
                                       </div>
@@ -552,15 +584,15 @@ export default function Leaderboard() {
                                             <div className="relative">
                                                 <button onClick={() => setShowNetworkHelp(!showNetworkHelp)} className="text-zinc-500 hover:text-white transition"><Settings2 size={14} /></button>
                                                 {showNetworkHelp && (
-                                                    // FIX: Tooltip anchored to right-0 for mobile visibility
-                                                    <div className="absolute right-0 bottom-full mb-2 w-64 bg-zinc-800 border border-zinc-700 p-4 rounded-xl shadow-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-200">
+                                                    // FIX: Tooltip anchored to left-0 (like Fees) to avoid overflow on mobile
+                                                    <div className="absolute left-0 bottom-full mb-2 w-64 bg-zinc-800 border border-zinc-700 p-4 rounded-xl shadow-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-200">
                                                         <p className="text-[10px] md:text-xs text-zinc-300 leading-relaxed">
                                                             <strong className="text-white block mb-1">Estimation Multiplier</strong>
                                                             We multiply total Base Credits by this factor to estimate the Total Network Boosted Credits. 
                                                             <span className="text-yellow-500 block mt-1">14x accounts for high-impact Titan nodes.</span>
                                                         </p>
-                                                        {/* Arrow aligned to right to match container */}
-                                                        <div className="absolute bottom-[-6px] right-2 w-3 h-3 bg-zinc-800 border-b border-r border-zinc-700 rotate-45"></div>
+                                                        {/* Arrow aligned to left to match container anchor */}
+                                                        <div className="absolute bottom-[-6px] left-1 w-3 h-3 bg-zinc-800 border-b border-r border-zinc-700 rotate-45"></div>
                                                     </div>
                                                 )}
                                             </div>
@@ -608,7 +640,7 @@ export default function Leaderboard() {
                               <button onClick={() => isStep1Valid && setSimStep(simStep + 1)} disabled={!isStep1Valid} className={`px-6 md:px-8 py-2 font-bold text-[10px] md:text-xs rounded-lg transition-colors flex items-center gap-2 ${isStep1Valid ? 'bg-yellow-500 hover:bg-yellow-400 text-black' : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'}`}>NEXT STEP <ArrowUpRight size={14} /></button>
                           ) : null
                       ) : (
-                          <button onClick={() => { setSimStep(0); setBoostCounts({}); setSimMode('NEW'); setShowManualInput(false); setImportKey(''); setSimPerf(1.0); }} className="px-6 md:px-8 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-[10px] md:text-xs rounded-lg transition-colors flex items-center gap-2">RESET <Activity size={14} /></button>
+                          <button onClick={() => { setSimStep(0); setBoostCounts({}); clearImport(); setShowManualInput(false); setSimPerf(1.0); }} className="px-6 md:px-8 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-[10px] md:text-xs rounded-lg transition-colors flex items-center gap-2">RESET <Activity size={14} /></button>
                       )}
                   </div>
               </div>
@@ -620,7 +652,8 @@ export default function Leaderboard() {
         <div className="max-w-5xl mx-auto mb-6 grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-4 rounded-xl backdrop-blur-sm"><div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Users size={12}/> Nodes ({networkFilter})</div><div className="text-lg md:text-2xl font-bold text-white">{filteredAndRanked.length}</div></div>
           <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-4 rounded-xl backdrop-blur-sm"><div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Wallet size={12}/> Total Credits</div><div className="text-lg md:text-2xl font-bold text-yellow-400 mt-1">{(filteredAndRanked.reduce((sum, n) => sum + n.credits, 0) / 1000000).toFixed(1)}M</div></div>
-          <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-4 rounded-xl backdrop-blur-sm"><div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Activity size={12}/> Avg Credits</div><div className="text-lg md:text-2xl font-bold text-white mt-1">{Math.round(filteredAndRanked.reduce((sum, n) => sum + n.credits, 0) / filteredAndRanked.length).toLocaleString(undefined, { notation: 'compact' })}</div></div>
+          {/* UPDATED: Removed compact notation for Avg Credits */}
+          <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-4 rounded-xl backdrop-blur-sm"><div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><Activity size={12}/> Avg Credits</div><div className="text-lg md:text-2xl font-bold text-white mt-1">{Math.round(filteredAndRanked.reduce((sum, n) => sum + n.credits, 0) / filteredAndRanked.length).toLocaleString()}</div></div>
           <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-4 rounded-xl backdrop-blur-sm"><div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold flex items-center gap-2"><BarChart3 size={12}/> Top 10 Dom</div><div className="text-lg md:text-2xl font-bold text-blue-400 mt-1">{(() => { const total = filteredAndRanked.reduce((sum, n) => sum + n.credits, 0); const top10 = filteredAndRanked.slice(0, 10).reduce((sum, n) => sum + n.credits, 0); return total > 0 ? ((top10 / total) * 100).toFixed(1) : 0; })()}%</div></div>
         </div>
       )}
@@ -685,8 +718,9 @@ export default function Leaderboard() {
                             <span>{node.pubkey}</span>
                             <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180 text-cyan-400' : 'text-zinc-600 group-hover:text-zinc-400'}`}><ChevronDown size={16} /></div>
                         </div>
+                        {/* UPDATED: Removed compact notation for Node Credits */}
                         <div className="col-span-4 text-right font-bold font-mono text-xs md:text-base text-yellow-500 flex items-center justify-end gap-2">
-                            {node.credits.toLocaleString(undefined, { notation: 'compact' })}
+                            {node.credits.toLocaleString()}
                             <Wallet size={14} className="text-zinc-600 group-hover:text-yellow-500 transition hidden md:block" />
                         </div>
                     </div>
