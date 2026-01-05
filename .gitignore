@@ -1,1 +1,12 @@
-node_modules
+# dependencies
+node_modules/
+
+# next.js build output
+.next/
+
+# env files (CRITICAL)
+.env
+.env.*
+
+.vercel
+.DS_Store
