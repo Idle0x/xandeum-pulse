@@ -222,10 +222,14 @@ Returns an enriched list of all nodes with calculated health scores.
     "avgBreakdown": { ... }
   }
 }
+```
 
-GET /api/geo
+### `GET /api/geo`
+
 Returns city-level aggregations for map rendering.
-Response structure:
+
+**Response structure:**
+```json
 {
   "locations": [
     {
@@ -239,57 +243,100 @@ Response structure:
     }
   ]
 }
+```
 
-GET /api/credits
+### `GET /api/credits`
+
 Proxies the upstream rewards oracle with a strict timeout to prevent UI blocking.
-Running Locally
-git clone [https://github.com/Idle0x/xandeum-pulse.git](https://github.com/Idle0x/xandeum-pulse.git)
+
+---
+
+## Running Locally
+
+```bash
+git clone https://github.com/Idle0x/xandeum-pulse.git
 cd xandeum-pulse
 npm install
 npm run dev     # Start development server
 npm test        # Run the full engineering test suite
+```
 
 Open http://localhost:3000
-No environment variables required – RPC endpoints are configured in lib/xandeum-brain.ts.
-Tech Stack
- * Framework: Next.js 14 (App Router)
- * Styling: Tailwind CSS
- * Testing: Jest + React Testing Library (Unit & Integration)
- * CI/CD: GitHub Actions
- * Maps: React Simple Maps + D3 Scale
- * Charts: Recharts
- * Imaging: html-to-image (Snapshot generation)
- * Data fetching: Axios with Promise-based failover
- * Deployment: Vercel (serverless functions)
-Design Decisions
-Why client-side geolocation instead of backend?
+
+No environment variables required – RPC endpoints are configured in `lib/xandeum-brain.ts`.
+
+---
+
+## Tech Stack
+
+- **Framework:** Next.js 14 (App Router)
+- **Styling:** Tailwind CSS
+- **Testing:** Jest + React Testing Library (Unit & Integration)
+- **CI/CD:** GitHub Actions
+- **Maps:** React Simple Maps + D3 Scale
+- **Charts:** Recharts
+- **Imaging:** html-to-image (Snapshot generation)
+- **Data fetching:** Axios with Promise-based failover
+- **Deployment:** Vercel (serverless functions)
+
+---
+
+## Design Decisions
+
+### Why client-side geolocation instead of backend?
+
 Initially, all geocoding happened in API routes. This caused two problems:
- * Vercel's 10-second function timeout would fail on large node lists
- * IP-based rate limits applied to the server IP, not per-user
+- Vercel's 10-second function timeout would fail on large node lists
+- IP-based rate limits applied to the server IP, not per-user
+
 Moving geocoding to the client (with deduplication) distributed the rate limit across users and removed the timeout constraint.
-Why not use a database?
+
+### Why not use a database?
+
 The network state changes every ~10 seconds. A database would add:
- * Sync lag (data is stale the moment it's written)
- * Infrastructure cost (hosting + backups)
- * Another failure point
+- Sync lag (data is stale the moment it's written)
+- Infrastructure cost (hosting + backups)
+- Another failure point
+
 Direct RPC queries mean the UI always shows the current network state, and the serverless architecture scales to zero when idle.
-Why calculate scores client-side?
+
+### Why calculate scores client-side?
+
 The Vitality Score requires contextual data (median storage, consensus version) that changes with every fetch. Doing this calculation in the API route would require:
- * Fetch all nodes
- * Calculate context
- * Rescan all nodes to apply scores
- * Return result
+1. Fetch all nodes
+2. Calculate context
+3. Rescan all nodes to apply scores
+4. Return result
+
 This doubles the processing time. Instead, the API returns raw data + context, and the client calculates scores during rendering. The work still happens, but it's parallelized across users' devices.
-Graceful Degradation
+
+---
+
+## Graceful Degradation
+
 When external dependencies fail, the UI adapts rather than breaking:
- * Credits API failure detection: Instead of showing stale data or "N/A", the interface displays "CREDITS API OFFLINE" with a warning icon, making it clear the issue is upstream, not with Pulse itself
- * Automatic score re-weighting: When credits data is unavailable, the Vitality Score algorithm redistributes the 20% reputation weight to other components, ensuring nodes aren't penalized for API downtime
-Known Limitations
- * No historical data: All metrics are point-in-time snapshots (by design – shows current network state)
- * IP geolocation accuracy: ~50-100km margin of error for most providers
- * No authentication: Anyone can view any node's data (intentional for network transparency)
-License
+
+- **Credits API failure detection:** Instead of showing stale data or "N/A", the interface displays "CREDITS API OFFLINE" with a warning icon, making it clear the issue is upstream, not with Pulse itself
+- **Automatic score re-weighting:** When credits data is unavailable, the Vitality Score algorithm redistributes the 20% reputation weight to other components, ensuring nodes aren't penalized for API downtime
+
+---
+
+## Known Limitations
+
+- **No historical data:** All metrics are point-in-time snapshots (by design – shows current network state)
+- **IP geolocation accuracy:** ~50-100km margin of error for most providers
+- **No authentication:** Anyone can view any node's data (intentional for network transparency)
+
+---
+
+## License
+
 MIT
-Author
+
+---
+
+## Author
+
 Built by riot (@33xp_) for the Xandeum ecosystem.
+
 For questions or contributions, open an issue on GitHub.
