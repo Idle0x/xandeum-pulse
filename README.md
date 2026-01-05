@@ -174,7 +174,7 @@ Navigation tests ensure that cross-module links (e.g., clicking a node in the Le
 
 ## Project Structure
 
-
+```
 /
 ├── pages/
 │   ├── index.tsx          # Dashboard UI
@@ -191,6 +191,7 @@ Navigation tests ensure that cross-module links (e.g., clicking a node in the Le
 │   └── xandeum-brain.ts   # Core scoring + failover logic
 │
 └── public/                # Static assets
+```
 
 ---
 
