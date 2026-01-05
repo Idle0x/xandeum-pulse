@@ -20,6 +20,7 @@ interface RankedNode {
   rank: number;
   pubkey: string;
   credits: number;
+  health: number; // Added for tie-breaker logic
   network: 'MAINNET' | 'DEVNET';
   address?: string;
   location?: {
@@ -90,10 +91,15 @@ export default function Leaderboard() {
           axios.get('/api/stats').catch(() => ({ data: { result: { pods: [] } } }))
         ]);
 
-        const metaMap = new Map<string, { address: string, location?: any }>();
+        const metaMap = new Map<string, { address: string, location?: any, health: number }>();
         if (statsRes.data?.result?.pods) {
             statsRes.data.result.pods.forEach((node: any) => {
-                metaMap.set(node.pubkey, { address: node.address, location: node.location });
+                // CAPTURE HEALTH AS TIE-BREAKER
+                metaMap.set(node.pubkey, { 
+                    address: node.address, 
+                    location: node.location,
+                    health: node.health || 0 
+                });
             });
         }
 
@@ -117,6 +123,7 @@ export default function Leaderboard() {
                 return {
                     pubkey: pKey,
                     credits: Number(item.credits || 0),
+                    health: meta?.health || 0, // Assigned from metaMap
                     network: item.network || 'MAINNET',
                     rank: 0,
                     address: meta?.address,
@@ -125,7 +132,12 @@ export default function Leaderboard() {
                 };
             });
 
-            parsedList.sort((a, b) => b.credits - a.credits);
+            // Initial sort for trend calculation
+            parsedList.sort((a, b) => {
+                if (b.credits !== a.credits) return b.credits - a.credits;
+                return b.health - a.health;
+            });
+
             parsedList.forEach((n, i) => {
                 const prevRank = history[n.pubkey];
                 if (prevRank) n.trend = prevRank - (i + 1); 
@@ -146,18 +158,25 @@ export default function Leaderboard() {
     fetchData();
   }, []);
 
-  // --- 2. FILTER & RANKING LOGIC ---
+  // --- 2. DETERMINISTIC FILTER & RANKING LOGIC ---
   const filteredAndRanked = useMemo(() => {
       const filtered = allNodes.filter(n => 
           (networkFilter === 'COMBINED' || n.network === networkFilter) && 
           n.pubkey.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      filtered.sort((a, b) => b.credits - a.credits);
-      let currentRank = 1;
-      return filtered.map((n, i) => {
-          if (i > 0 && n.credits < filtered[i-1].credits) currentRank = i + 1;
-          return { ...n, rank: currentRank };
+      
+      // MULTI-LEVEL SORT (Credits > Health > Pubkey)
+      filtered.sort((a, b) => {
+          if (b.credits !== a.credits) return b.credits - a.credits;
+          if (b.health !== a.health) return b.health - a.health;
+          return a.pubkey.localeCompare(b.pubkey);
       });
+
+      // STRICT SEQUENTIAL NUMBERING (1, 2, 3...)
+      return filtered.map((n, i) => ({
+          ...n,
+          rank: i + 1
+      }));
   }, [allNodes, networkFilter, searchQuery]);
 
   // --- 3. DEEP LINK LOGIC ---
@@ -174,8 +193,14 @@ export default function Leaderboard() {
           }
           setTimeout(() => {
               const listToSearch = networkFilter === 'COMBINED' 
-                ? allNodes.sort((a,b) => b.credits - a.credits)
-                : allNodes.filter(n => n.network === targetNode.network).sort((a,b) => b.credits - a.credits);
+                ? [...allNodes].sort((a,b) => {
+                    if (b.credits !== a.credits) return b.credits - a.credits;
+                    return b.health - a.health;
+                })
+                : allNodes.filter(n => n.network === targetNode.network).sort((a,b) => {
+                    if (b.credits !== a.credits) return b.credits - a.credits;
+                    return b.health - a.health;
+                });
               const idx = listToSearch.findIndex(n => n.pubkey === targetKey);
               if (idx >= visibleCount) setVisibleCount(idx + 20);
               setExpandedNode(targetKey);
