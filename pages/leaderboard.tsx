@@ -298,8 +298,9 @@ export default function Leaderboard() {
       setVisibleCount(prev => prev + 100);
   };
 
-  // UPDATED: Now checks if simNodes is at least 1
-  const isStep1Valid = simPerf >= 0 && simPerf <= 1 && simNodes >= 1;
+  // UPDATED: isStep1Valid only strictly enforces simNodes. 
+  // Other fields show red errors but do not block progression.
+  const isStep1Valid = simNodes >= 1;
 
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-2 md:p-8 selection:bg-yellow-500/30">
@@ -408,7 +409,7 @@ export default function Leaderboard() {
                           {showManualInput && (
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 animate-in slide-in-from-top-2 fade-in duration-300">
                                   <div className="space-y-4 md:space-y-6">
-                                      {/* NODES INPUT (FIXED: ALLOWS DELETING TO 0) */}
+                                      {/* NODES INPUT (VALIDATION: BLOCKS NEXT STEP) */}
                                       <div>
                                           <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simNodes < 1 ? 'text-red-500' : 'text-zinc-400'}`}>
                                             <span>Number of pNodes</span>
@@ -429,19 +430,30 @@ export default function Leaderboard() {
                                               <span className="absolute right-3 top-2 md:top-3 text-[10px] md:text-sm text-zinc-500 font-bold">NODES</span>
                                           </div>
                                       </div>
-                                      {/* STORAGE INPUT */}
+
+                                      {/* STORAGE INPUT (VALIDATION: RED BOX, NO BLOCK) */}
                                       <div>
-                                          <label className="text-[10px] text-zinc-400 uppercase font-bold block mb-2">Total Storage</label>
+                                          <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simStorageVal <= 0 ? 'text-red-500' : 'text-zinc-400'}`}>
+                                            <span>Total Storage</span>
+                                            {simStorageVal <= 0 && <span className="flex items-center gap-1 text-red-500"><AlertTriangle size={10} /> MUST BE > 0</span>}
+                                          </label>
                                           <div className="flex gap-2">
-                                              <input type="number" min="1" value={simStorageVal} onChange={(e) => setSimStorageVal(Math.max(0, Number(e.target.value)))} className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none focus:border-yellow-500 transition"/>
+                                              <input 
+                                                type="number" 
+                                                min="0" 
+                                                value={simStorageVal} 
+                                                onChange={(e) => setSimStorageVal(Number(e.target.value))} 
+                                                className={`flex-1 bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${simStorageVal <= 0 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}
+                                              />
                                               <select value={simStorageUnit} onChange={(e) => setSimStorageUnit(e.target.value as any)} className="bg-zinc-900 border border-zinc-700 rounded-xl p-2 md:p-3 text-[10px] md:text-base text-zinc-300 font-bold outline-none"><option>MB</option><option>GB</option><option>TB</option><option>PB</option></select>
                                           </div>
                                       </div>
-                                      {/* PERFORMANCE INPUT */}
+
+                                      {/* PERFORMANCE INPUT (VALIDATION: RED BOX, NO BLOCK) */}
                                       <div>
-                                          <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simPerf > 1 || simPerf < 0 ? 'text-red-500' : 'text-zinc-400'}`}>
+                                          <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simPerf <= 0 || simPerf > 1 ? 'text-red-500' : 'text-zinc-400'}`}>
                                               <span>Performance Score (0.0 - 1.0)</span>
-                                              {(simPerf > 1 || simPerf < 0) && <span className="flex items-center gap-1 text-red-500"><AlertTriangle size={10} /> INVALID</span>}
+                                              {(simPerf <= 0 || simPerf > 1) && <span className="flex items-center gap-1 text-red-500"><AlertTriangle size={10} /> INVALID</span>}
                                           </label>
                                           <div className="relative">
                                               <input 
@@ -451,15 +463,25 @@ export default function Leaderboard() {
                                                   max="1" 
                                                   value={simPerf} 
                                                   onChange={(e) => setSimPerf(Number(e.target.value))} 
-                                                  className={`w-full bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${simPerf > 1 || simPerf < 0 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}
+                                                  className={`w-full bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${(simPerf <= 0 || simPerf > 1) ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}
                                               />
                                           </div>
                                           <div className="text-[9px] text-zinc-600 mt-1">If performance is 0, rewards will be 0.</div>
                                       </div>
-                                      {/* STAKE INPUT */}
+
+                                      {/* STAKE INPUT (VALIDATION: RED BOX, NO BLOCK) */}
                                       <div>
-                                          <label className="text-[10px] text-zinc-400 uppercase font-bold block mb-2">Total Stake (XAND)</label>
-                                          <input type="number" min="0" value={simStake} onChange={(e) => setSimStake(Math.max(0, Number(e.target.value)))} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none focus:border-yellow-500 transition"/>
+                                          <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simStake <= 0 ? 'text-red-500' : 'text-zinc-400'}`}>
+                                            <span>Total Stake (XAND)</span>
+                                            {simStake <= 0 && <span className="flex items-center gap-1 text-red-500"><AlertTriangle size={10} /> MUST BE > 0</span>}
+                                          </label>
+                                          <input 
+                                            type="number" 
+                                            min="0" 
+                                            value={simStake} 
+                                            onChange={(e) => setSimStake(Number(e.target.value))} 
+                                            className={`w-full bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${simStake <= 0 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}
+                                          />
                                       </div>
                                   </div>
                                   <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 md:p-6 flex flex-col justify-center items-center text-center">
@@ -542,7 +564,7 @@ export default function Leaderboard() {
 
                           <div className="max-w-xl mx-auto space-y-6 md:space-y-8">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  {/* NETWORK FEES INPUT */}
+                                  {/* NETWORK FEES INPUT (VALIDATION: RED BOX, NO BLOCK) */}
                                   <div>
                                       {/* CLICK OUTSIDE LAYER */}
                                       {showFeeHelp && (
@@ -551,7 +573,9 @@ export default function Leaderboard() {
 
                                       <div className="flex justify-between items-end mb-2 relative z-50">
                                           <div className="flex items-center gap-2">
-                                            <label className="text-[10px] text-zinc-400 uppercase font-bold">Total Network Fees</label>
+                                            <label className={`text-[10px] uppercase font-bold ${simNetworkFees <= 0 ? 'text-red-500' : 'text-zinc-400'}`}>
+                                                Total Network Fees
+                                            </label>
                                             <div className="relative">
                                                 <button onClick={() => setShowFeeHelp(!showFeeHelp)} className="text-zinc-500 hover:text-white transition"><Info size={14} /></button>
                                                 {showFeeHelp && (
@@ -569,12 +593,19 @@ export default function Leaderboard() {
                                       </div>
 
                                       <div className="relative">
-                                         <input type="number" min="0" value={simNetworkFees} onChange={(e) => setSimNetworkFees(Number(e.target.value))} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none focus:border-blue-500 transition"/>
+                                         <input 
+                                            type="number" 
+                                            min="0" 
+                                            value={simNetworkFees} 
+                                            onChange={(e) => setSimNetworkFees(Number(e.target.value))} 
+                                            className={`w-full bg-zinc-900 border rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none transition ${simNetworkFees <= 0 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-blue-500'}`}
+                                         />
                                          <span className="absolute right-4 top-3.5 text-[10px] font-bold text-zinc-600">SOL</span>
                                       </div>
+                                      {simNetworkFees <= 0 && <div className="text-[9px] text-red-400 font-bold mt-1.5 flex items-center gap-1"><AlertTriangle size={10} /> Invalid Fee</div>}
                                   </div>
 
-                                  {/* NETWORK AVG MULTIPLIER INPUT (FIXED: ALLOWS DELETING TO 0) */}
+                                  {/* NETWORK AVG MULTIPLIER INPUT (VALIDATION: RED BOX, NO BLOCK) */}
                                   <div>
                                       {/* CLICK OUTSIDE LAYER */}
                                       {showNetworkHelp && (
