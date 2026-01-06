@@ -64,13 +64,16 @@ interface Node {
   last_seen_timestamp?: number;
   is_public?: boolean;
   network?: 'MAINNET' | 'DEVNET' | 'UNKNOWN';
+
   storage_used?: number;
   storage_committed?: number;
   storage_usage_percentage?: string;
   storage_usage_raw?: number;
+
   rank?: number;
   health_rank?: number;
-  credits: number | null; 
+  credits: number | null;
+
   location?: {
     lat: number;
     lon: number;
@@ -78,12 +81,20 @@ interface Node {
     countryCode: string;
     city: string;
   };
+
   health?: number;
   healthBreakdown?: {
     uptime: number;
     version: number;
     reputation: number | null;
     storage: number;
+  };
+
+  // 🔹 NEW: Cluster / Fleet stats (optional, injected at runtime)
+  clusterStats?: {
+    totalGlobal: number;
+    mainnetCount: number;
+    devnetCount: number;
   };
 }
 
@@ -633,84 +644,125 @@ export default function Home() {
       const stats = res.data.stats;
 
       if (stats) {
-          setNetworkStats(stats);
-          setMostCommonVersion(stats.consensusVersion || 'N/A');
-          setAvgNetworkHealth(stats.avgBreakdown?.total || 0);
-          setMedianCommitted(stats.medianStorage || 0);
+        setNetworkStats(stats);
+        setMostCommonVersion(stats.consensusVersion || 'N/A');
+        setAvgNetworkHealth(stats.avgBreakdown?.total || 0);
+        setMedianCommitted(stats.medianStorage || 0);
       }
 
-      // --- NEW DETERMINISTIC SEQUENTIAL RANKING ---
-      // 1. Sort a temporary clone using the Tier-Breaker Logic
-      // Priority: Credits (High to Low) > Health (High to Low) > Pubkey (Alphabetic)
-      const sortedForRank = [...podList].sort((a, b) => {
-          // Primary: Credits
-          const creditsA = a.credits || 0;
-          const creditsB = b.credits || 0;
-          if (creditsB !== creditsA) return creditsB - creditsA;
+      // --------------------------------------------------
+      // 1. SORT FUNCTION (Existing)
+      // --------------------------------------------------
+      const sortFn = (a: Node, b: Node) => {
+        if ((b.credits || 0) !== (a.credits || 0)) return (b.credits || 0) - (a.credits || 0);
+        if ((b.health || 0) !== (a.health || 0)) return (b.health || 0) - (a.health || 0);
+        return (a.pubkey || '').localeCompare(b.pubkey || '');
+      };
 
-          // Secondary: Health Score (Tier-breaker)
-          const healthA = a.health || 0;
-          const healthB = b.health || 0;
-          if (healthB !== healthA) return healthB - healthA;
+      // --------------------------------------------------
+      // 2. NEW: CLUSTER CALCULATION (Sibling Counting)
+      // --------------------------------------------------
+      const clusterMap = new Map<string, { mainnet: number; devnet: number }>();
 
-          // Tertiary: Pubkey (Deterministic fallback)
-          return (a.pubkey || '').localeCompare(b.pubkey || '');
+      podList.forEach(node => {
+        if (!node.pubkey) return;
+        const current = clusterMap.get(node.pubkey) || { mainnet: 0, devnet: 0 };
+        if (node.network === 'MAINNET') current.mainnet++;
+        if (node.network === 'DEVNET') current.devnet++;
+        clusterMap.set(node.pubkey, current);
       });
+      // --------------------------------------------------
 
-      // 2. Create a Map of Pubkey -> Rank (Strict Index + 1)
+      // --------------------------------------------------
+      // 3. SPLIT + SORT BY NETWORK (Existing)
+      // --------------------------------------------------
+      const mainnetNodes = podList.filter(n => n.network === 'MAINNET').sort(sortFn);
+      const devnetNodes = podList.filter(n => n.network === 'DEVNET').sort(sortFn);
+
+      // --------------------------------------------------
+      // 4. RANK MAP (Composite Key)
+      // --------------------------------------------------
       const rankMap = new Map<string, number>();
-      sortedForRank.forEach((node, idx) => {
-          if (node.pubkey) {
-              rankMap.set(node.pubkey, idx + 1);
-          }
+
+      mainnetNodes.forEach((node, idx) => {
+        if (node.pubkey) rankMap.set(`${node.pubkey}-MAINNET`, idx + 1);
       });
 
-      // 3. Process the podList and inject the unique rank
-      podList = podList.map(node => { 
-        const used = node.storage_used || 0; 
-        const cap = node.storage_committed || 0; 
-        let percentStr = "0%";
-        let rawPercent = 0; 
+      devnetNodes.forEach((node, idx) => {
+        if (node.pubkey) rankMap.set(`${node.pubkey}-DEVNET`, idx + 1);
+      });
+
+      // --------------------------------------------------
+      // 5. MAP BACK → Inject Rank + Storage + ClusterStats
+      // --------------------------------------------------
+      podList = podList.map(node => {
+        const used = node.storage_used || 0;
+        const cap = node.storage_committed || 0;
+
+        let percentStr = '0%';
+        let rawPercent = 0;
 
         if (cap > 0 && used > 0) {
           rawPercent = (used / cap) * 100;
-          percentStr = rawPercent < 0.01 ? "< 0.01%" : `${rawPercent.toFixed(2)}%`;
-        } 
+          percentStr = rawPercent < 0.01 ? '< 0.01%' : `${rawPercent.toFixed(2)}%`;
+        }
+
+        const compositeKey = `${node.pubkey}-${node.network}`;
+        const cluster = clusterMap.get(node.pubkey || '') || { mainnet: 0, devnet: 0 };
 
         return {
           ...node,
-          // OVERRIDE with unique rank from map, fallback to original if pubkey missing
-          rank: node.pubkey ? rankMap.get(node.pubkey) : node.rank,
+          rank: node.pubkey ? rankMap.get(compositeKey) || 0 : 0,
           storage_usage_percentage: percentStr,
-          storage_usage_raw: rawPercent
-        }; 
+          storage_usage_raw: rawPercent,
+
+          // 🔹 NEW: CLUSTER STATS (Used by badges + fleet matrix)
+          clusterStats: {
+            totalGlobal: cluster.mainnet + cluster.devnet,
+            mainnetCount: cluster.mainnet,
+            devnetCount: cluster.devnet,
+          },
+        };
       });
 
       setNodes(podList);
 
-        const stableNodes = podList.filter(n => (n.uptime || 0) > 86400).length;
-        setNetworkHealth((podList.length > 0 ? (stableNodes / podList.length) * 100 : 0).toFixed(2));
+      // --------------------------------------------------
+      // 6. REST OF EXISTING STATS LOGIC
+      // --------------------------------------------------
+      const stableNodes = podList.filter(n => (n.uptime || 0) > 86400).length;
+      setNetworkHealth(
+        (podList.length > 0 ? (stableNodes / podList.length) * 100 : 0).toFixed(2)
+      );
 
-        const consensusCount = podList.filter(n => getSafeVersion(n) === stats.consensusVersion).length;
-        setNetworkConsensus((consensusCount / podList.length) * 100);
+      const consensusCount = podList.filter(
+        n => (n.version || 'Unknown') === stats.consensusVersion
+      ).length;
+      setNetworkConsensus((consensusCount / podList.length) * 100);
 
-        const committed = podList.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
-        const used = podList.reduce((sum, n) => sum + (n.storage_used || 0), 0);
+      const committed = podList.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
+      const usedTotal = podList.reduce((sum, n) => sum + (n.storage_used || 0), 0);
 
-        setTotalStorageCommitted(committed);
-        setTotalStorageUsed(used);
+      setTotalStorageCommitted(committed);
+      setTotalStorageUsed(usedTotal);
 
-        setLastSync(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      setLastSync(
+        new Date().toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        })
+      );
 
-        setError('');
-      }
-    } catch (err: any) {
-      console.error("Fetch error:", err);
-      setError('Syncing latest network data...');
-    } finally {
-      setLoading(false);
+      setError('');
     }
-  };
+  } catch (err: any) {
+    console.error('Fetch error:', err);
+    setError('Syncing latest network data...');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const checkIsLatest = (nodeVersion: string | null | undefined) => {
     const cleanVer = (nodeVersion || '').replace(/[^0-9.]/g, '');
@@ -757,13 +809,25 @@ export default function Home() {
 
   const handleLeaderboardNav = (e: React.MouseEvent, node: Node) => {
     e.stopPropagation();
+    
     if ((node as any).isUntracked) {
-       showToast("This node is currently not receiving storage credits from the protocol due to various reasons including: performance thresholds not yet met, the node is in a 'proving' phase, or the associated stake is below the required minimum for rewards. Note that the node is still successfully contributing to the network's total capacity.");
+       showToast("This node is currently not receiving storage credits from the protocol due to various reasons including: performance thresholds not yet met, the node is in a 'proving' phase, or the associated stake is below the required minimum for rewards.");
        return;
     }
-    const url = node.pubkey ? `/leaderboard?highlight=${node.pubkey}` : '/leaderboard';
-    router.push(url);
-  };
+
+    if (node.pubkey) {
+        // Pass Pubkey (Primary), Network (Secondary), AND Address (Tie-Breaker)
+        const netParam = node.network ? `&network=${node.network}` : '';
+        
+        // Sanitize address to ensure it's safe for URL
+        const safeAddr = node.address ? encodeURIComponent(node.address) : '';
+        const addrParam = safeAddr ? `&focusAddr=${safeAddr}` : '';
+
+        router.push(`/leaderboard?highlight=${node.pubkey}${netParam}${addrParam}`);
+    } else {
+        router.push('/leaderboard');
+    }
+};
 
   const handleCardToggle = (view: 'health' | 'storage' | 'identity') => {
     if (modalView === view) {
@@ -2826,53 +2890,132 @@ export default function Home() {
                         )}
 
                         {modalView === 'identity' && (
-                          <div
-                            className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group bg-zinc-900 border-blue-500 ring-1 ring-blue-500`}
-                            onClick={() => handleCardToggle('identity')}
-                          >
-                            <div className="absolute inset-0 bg-gradient-to-b from-blue-900/10 to-transparent pointer-events-none"></div>
-                            <div className="w-full flex justify-between items-start z-10 mb-4">
-                              <div className="flex flex-col">
-                                <h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">
-                                  IDENTITY
-                                </h3>
-                                <div className="text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit bg-blue-500/20 text-blue-400">
-                                  Active View
-                                </div>
-                              </div>
-                              <HelpCircle size={14} className="z-20 text-zinc-500 hover:text-white transition" />
-                            </div>
-                            <div className="relative z-10 flex flex-col items-center gap-4">
-                              {/* NEW: Network Status badge above Shield (Expanded Section) */}
-                              <div className={`text-[10px] font-black tracking-widest px-4 py-1.5 rounded-full border ${
-                                  selectedNode.network === 'MAINNET' ? 'text-green-500 border-green-500/30 bg-green-500/5' : 
-                                  selectedNode.network === 'DEVNET' ? 'text-blue-500 border-blue-500/30 bg-blue-500/5' : 
-                                  'text-zinc-600 border-zinc-800'
-                              }`}>
-                                  {selectedNode.network || 'UNKNOWN'} NETWORK
-                              </div>
-                              <Shield size={64} className="text-blue-500 opacity-80" />
-                              {isSelectedNodeLatest
-                                ? (
-                                <div className="text-[10px] text-green-500 font-bold bg-green-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-green-500/20">
-                                  <CheckCircle size={12} />
-                                  UP TO DATE
-                                </div>
-                              ) : (
-                                <div className="text-[10px] text-orange-500 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-orange-500/20">
-                                  <AlertTriangle size={12} />
-                                  UPDATE NEEDED
-                                </div>
-                              )}
-                            </div>
-                            <div className="mt-6 text-center w-full z-10 flex justify-center">
-                              <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
-                                <Minimize2 size={8} /> CLICK TO COLLAPSE
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+  <div
+    className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group bg-zinc-900 border-blue-500 ring-1 ring-blue-500"
+    onClick={() => handleCardToggle('identity')}
+  >
+    <div className="absolute inset-0 bg-gradient-to-b from-blue-900/10 to-transparent pointer-events-none"></div>
+
+    {/* HEADER */}
+    <div className="w-full flex justify-between items-start z-10 mb-4">
+      <div className="flex flex-col">
+        <h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-400">
+          IDENTITY
+        </h3>
+        <div className="text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit bg-blue-500/20 text-blue-400">
+          Active View
+        </div>
+      </div>
+      <HelpCircle
+        size={14}
+        className="z-20 text-zinc-500 hover:text-white transition"
+      />
+    </div>
+
+    {/* BODY */}
+    <div className="relative z-10 flex flex-col items-center gap-4 w-full">
+      {/* Network Badge */}
+      <div
+        className={`text-[10px] font-black tracking-widest px-4 py-1.5 rounded-full border ${
+          selectedNode.network === 'MAINNET'
+            ? 'text-green-500 border-green-500/30 bg-green-500/5'
+            : selectedNode.network === 'DEVNET'
+            ? 'text-blue-500 border-blue-500/30 bg-blue-500/5'
+            : 'text-zinc-600 border-zinc-800'
+        }`}
+      >
+        {selectedNode.network || 'UNKNOWN'} NETWORK
+      </div>
+
+      <Shield size={64} className="text-blue-500 opacity-80" />
+
+      {/* Update Status */}
+      {isSelectedNodeLatest ? (
+        <div className="text-[10px] text-green-500 font-bold bg-green-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-green-500/20">
+          <CheckCircle size={12} />
+          UP TO DATE
+        </div>
+      ) : (
+        <div className="text-[10px] text-orange-500 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-3 py-1 rounded-full border border-orange-500/20">
+          <AlertTriangle size={12} />
+          UPDATE NEEDED
+        </div>
+      )}
+
+      {/* --- NEW: LEVEL 3 FLEET MATRIX --- */}
+      <div className="w-full mt-6 pt-4 border-t border-blue-500/30 animate-in slide-in-from-bottom-2 fade-in duration-500">
+        <div className="text-[8px] font-bold text-blue-300/60 uppercase tracking-widest text-center mb-3">
+          FLEET TOPOLOGY
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-center">
+          {/* Total Global */}
+          <div className="col-span-2 bg-blue-950/30 rounded-lg p-2 border border-blue-500/20 mb-1">
+            <div className="text-xl font-black text-white leading-none">
+              {selectedNode.clusterStats?.totalGlobal || 1}
+            </div>
+            <div className="text-[7px] text-blue-400 font-bold uppercase tracking-wide mt-1">
+              Total Nodes Owned
+            </div>
+          </div>
+
+          {/* Mainnet */}
+          <div
+            className={`rounded-lg p-2 border ${
+              (selectedNode.clusterStats?.mainnetCount || 0) > 0
+                ? 'bg-green-900/10 border-green-500/20'
+                : 'bg-zinc-900/30 border-zinc-800'
+            }`}
+          >
+            <div
+              className={`text-sm font-bold ${
+                (selectedNode.clusterStats?.mainnetCount || 0) > 0
+                  ? 'text-green-400'
+                  : 'text-zinc-600'
+              }`}
+            >
+              {selectedNode.clusterStats?.mainnetCount || 0}
+            </div>
+            <div className="text-[7px] text-zinc-500 font-bold uppercase">
+              Mainnet
+            </div>
+          </div>
+
+          {/* Devnet */}
+          <div
+            className={`rounded-lg p-2 border ${
+              (selectedNode.clusterStats?.devnetCount || 0) > 0
+                ? 'bg-blue-900/10 border-blue-500/20'
+                : 'bg-zinc-900/30 border-zinc-800'
+            }`}
+          >
+            <div
+              className={`text-sm font-bold ${
+                (selectedNode.clusterStats?.devnetCount || 0) > 0
+                  ? 'text-blue-400'
+                  : 'text-zinc-600'
+              }`}
+            >
+              {selectedNode.clusterStats?.devnetCount || 0}
+            </div>
+            <div className="text-[7px] text-zinc-500 font-bold uppercase">
+              Devnet
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* -------------------------------- */}
+    </div>
+
+    {/* FOOTER */}
+    <div className="mt-6 text-center w-full z-10 flex justify-center">
+      <div className="text-[9px] font-bold uppercase tracking-widest text-red-400/80 group-hover:text-red-300 transition-colors flex items-center gap-1">
+        <Minimize2 size={8} /> CLICK TO COLLAPSE
+      </div>
+    </div>
+  </div>
+)}
+</div>
 
                       <div className="md:col-span-2 h-full">
                         {modalView === 'health' && renderHealthBreakdown()}
@@ -3037,76 +3180,93 @@ export default function Home() {
                         </div>
 
                         {/* 3. IDENTITY & STATUS */}
-                        <div
-                          className={`p-5 rounded-2xl border flex flex-col justify-between relative overflow-hidden cursor-pointer group h-64 ${
-                            zenMode
-                              ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
-                              : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'
-                          }`}
-                          onClick={() => handleCardToggle('identity')}
-                        >
-                          <div className="flex justify-between items-start mb-2 relative z-10">
-                            <div className="flex items-center gap-2">
-                              <div
-                                className={`p-2 rounded-lg ${
-                                  zenMode ? 'bg-zinc-800 text-zinc-400' : 'bg-zinc-800 text-zinc-400'
-                                }`}
-                              >
-                                <Server size={18} />
-                              </div>
-                              <div
-                                className={`text-xs font-bold uppercase ${
-                                  zenMode ? 'text-zinc-400' : 'text-zinc-500'
-                                }`}
-                              >
-                                IDENTITY & STATUS
-                              </div>
-                            </div>
-                            {/* NEW: Network Badge in Circled Area (Modal Overview) */}
-                            <div className={`px-2 py-1 rounded text-[9px] font-black uppercase border ${
-                                selectedNode.network === 'MAINNET' ? 'bg-green-500/10 border-green-500/30 text-green-500' : 
-                                selectedNode.network === 'DEVNET' ? 'bg-blue-500/10 border-blue-500/30 text-blue-500' : 
-                                'bg-zinc-800 border-zinc-700 text-zinc-500'
-                            }`}>
-                                {selectedNode.network || 'UNKNOWN'}
-                            </div>
-                          </div>
+<div
+  className={`p-5 rounded-2xl border flex flex-col justify-between relative overflow-hidden cursor-pointer group h-64 ${
+    zenMode
+      ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
+      : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'
+  }`}
+  onClick={() => handleCardToggle('identity')}
+>
+  <div className="flex justify-between items-start mb-2 relative z-10">
+    <div className="flex items-center gap-2">
+      <div className="p-2 rounded-lg bg-zinc-800 text-zinc-400">
+        <Server size={18} />
+      </div>
+      <div className={`text-xs font-bold uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>
+        IDENTITY & STATUS
+      </div>
+    </div>
 
-                          <div className="mt-auto relative z-10">
-                            <div
-                              className={`text-xl font-mono group-hover:text-blue-400 group-hover:animate-pulse ${
-                                zenMode ? 'text-white' : 'text-white'
-                              }`}
-                            >
-                              {getSafeVersion(selectedNode)}
-                            </div>
+    {/* --- NEW: LEVEL 2 BADGE AREA --- */}
+    <div className="flex flex-col items-end gap-1">
+      {/* Network Badge */}
+      <div
+        className={`px-2 py-1 rounded text-[9px] font-black uppercase border ${
+          selectedNode.network === 'MAINNET'
+            ? 'bg-green-500/10 border-green-500/30 text-green-500'
+            : selectedNode.network === 'DEVNET'
+            ? 'bg-blue-500/10 border-blue-500/30 text-blue-500'
+            : 'bg-zinc-800 border-zinc-700 text-zinc-500'
+        }`}
+      >
+        {selectedNode.network || 'UNKNOWN'}
+      </div>
 
-                            <div className="text-xs text-zinc-500 mt-1 font-mono flex items-center gap-1">
-                              <Clock size={12} className="text-zinc-600" />
-                              Up: <span className="text-zinc-400">{formatUptime(selectedNode.uptime)}</span>
-                            </div>
+      {/* Conditional Sibling Badge */}
+      {(() => {
+        const stats = selectedNode.clusterStats || {
+          mainnetCount: 0,
+          devnetCount: 0,
+        };
 
-                            {isSelectedNodeLatest
-                              ? (
-                              <div className="text-[10px] text-green-500 mt-2 font-bold bg-green-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
-                                <CheckCircle size={10} />
-                                UP TO DATE
-                              </div>
-                            ) : (
-                              <div className="text-[10px] text-orange-500 mt-2 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
-                                <AlertTriangle size={10} />
-                                UPDATE NEEDED
-                              </div>
-                            )}
+        const siblings =
+          selectedNode.network === 'MAINNET'
+            ? stats.mainnetCount - 1
+            : stats.devnetCount - 1;
 
-                            <div className="mt-4 flex justify-center">
-                              <div className="text-[9px] font-bold uppercase tracking-widest text-blue-400/80 animate-pulse group-hover:text-blue-300 transition-colors flex items-center gap-1">
-                                <Maximize2 size={8} /> CLICK TO EXPAND
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+        if (siblings > 0) {
+          return (
+            <span className="text-[9px] font-mono font-bold text-zinc-500 flex items-center gap-1 bg-black/40 px-1.5 py-0.5 rounded border border-zinc-800/50">
+              <Server size={8} /> +{siblings} Instances
+            </span>
+          );
+        }
+        return null;
+      })()}
+    </div>
+    {/* -------------------------------- */}
+  </div>
+
+  <div className="mt-auto relative z-10">
+    <div className="text-xl font-mono text-white group-hover:text-blue-400 group-hover:animate-pulse">
+      {getSafeVersion(selectedNode)}
+    </div>
+
+    <div className="text-xs text-zinc-500 mt-1 font-mono flex items-center gap-1">
+      <Clock size={12} className="text-zinc-600" />
+      Up: <span className="text-zinc-400">{formatUptime(selectedNode.uptime)}</span>
+    </div>
+
+    {isSelectedNodeLatest ? (
+      <div className="text-[10px] text-green-500 mt-2 font-bold bg-green-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
+        <CheckCircle size={10} />
+        UP TO DATE
+      </div>
+    ) : (
+      <div className="text-[10px] text-orange-500 mt-2 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
+        <AlertTriangle size={10} />
+        UPDATE NEEDED
+      </div>
+    )}
+
+    <div className="mt-4 flex justify-center">
+      <div className="text-[9px] font-bold uppercase tracking-widest text-blue-400/80 animate-pulse group-hover:text-blue-300 transition-colors flex items-center gap-1">
+        <Maximize2 size={8} /> CLICK TO EXPAND
+      </div>
+    </div>
+  </div>
+</div>
 
                       {/* --- BOTTOM ROW: 2 CARDS (Reputation, Map) --- */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
