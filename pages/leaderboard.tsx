@@ -179,39 +179,69 @@ export default function Leaderboard() {
       }));
   }, [allNodes, networkFilter, searchQuery]);
 
-  // --- 3. DEEP LINK LOGIC ---
+    // --- 3. DEEP LINK LOGIC (Composite ID Support) ---
   useEffect(() => {
       if (!router.isReady || !router.query.highlight || allNodes.length === 0) return;
-      const targetKey = router.query.highlight as string;
-      if (lastProcessedHighlight.current === targetKey) return;
 
-      const targetNode = allNodes.find(n => n.pubkey === targetKey);
+      const targetKey = router.query.highlight as string;
+      const targetNetwork = router.query.network as string;
+      const targetAddr = router.query.focusAddr as string; // Read the IP
+
+      // Create a unique signature for this specific deep link request
+      const requestSignature = `${targetKey}-${targetNetwork}-${targetAddr}`;
+      if (lastProcessedHighlight.current === requestSignature) return;
+
+      // FIND THE EXACT NODE
+      const targetNode = allNodes.find(n => {
+          const keyMatch = n.pubkey === targetKey;
+          const netMatch = !targetNetwork || n.network === targetNetwork;
+          // If targetAddr is present, it MUST match. If not present in URL, ignore it.
+          const addrMatch = !targetAddr || n.address === decodeURIComponent(targetAddr);
+          
+          return keyMatch && netMatch && addrMatch;
+      });
+
       if (targetNode) {
-          lastProcessedHighlight.current = targetKey;
-          if (networkFilter !== 'COMBINED' && targetNode.network !== networkFilter) {
-              setNetworkFilter(targetNode.network);
+          lastProcessedHighlight.current = requestSignature;
+
+          // Force filter to ensure the node is visible
+          if (targetNode.network !== networkFilter && networkFilter !== 'COMBINED') {
+              setNetworkFilter(targetNode.network as any);
           }
+
           setTimeout(() => {
-              const listToSearch = networkFilter === 'COMBINED' 
-                ? [...allNodes].sort((a,b) => {
+              // Expand using the 3-Part ID
+              const compositeId = `${targetNode.pubkey}-${targetNode.network}-${targetNode.address || 'no-ip'}`;
+              setExpandedNode(compositeId);
+              
+              // Calculate index for "Load More" logic
+              const currentList = networkFilter === 'COMBINED' 
+                ? [...allNodes].sort((a,b) => { /* Your existing sort logic */
                     if (b.credits !== a.credits) return b.credits - a.credits;
                     return b.health - a.health;
                 })
                 : allNodes.filter(n => n.network === targetNode.network).sort((a,b) => {
+                     /* Your existing sort logic */
                     if (b.credits !== a.credits) return b.credits - a.credits;
                     return b.health - a.health;
                 });
-              const idx = listToSearch.findIndex(n => n.pubkey === targetKey);
-              if (idx >= visibleCount) setVisibleCount(idx + 20);
-              setExpandedNode(targetKey);
+
+              // Find exact index
+              const idx = currentList.findIndex(n => 
+                  n.pubkey === targetKey && 
+                  n.network === targetNode.network &&
+                  n.address === targetNode.address
+              );
+              
+              if (idx >= visibleCount) setVisibleCount(idx + 50);
+
               setTimeout(() => {
-                  const el = document.getElementById(`node-${targetKey}`);
+                  const el = document.getElementById(`node-${compositeId}`);
                   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
               }, 100);
-          }, 100);
+          }, 150);
       }
-  }, [router.isReady, router.query.highlight, allNodes, networkFilter]); 
-
+  }, [router.isReady, router.query, allNodes, networkFilter]); 
 
   // --- 4. SIMULATOR LOGIC ---
 
@@ -286,8 +316,10 @@ export default function Leaderboard() {
       setBoostCounts({...boostCounts, [name]: next});
   };
 
-  const handleRowClick = (node: RankedNode) => {
-      setExpandedNode(expandedNode === node.pubkey ? null : node.pubkey);
+    const handleRowClick = (node: RankedNode) => {
+      // 3-Part Unique ID: Pubkey + Network + Address
+      const compositeId = `${node.pubkey}-${node.network}-${node.address || 'no-ip'}`;
+      setExpandedNode(expandedNode === compositeId ? null : compositeId);
   };
 
   const handleUseInSim = (e: React.MouseEvent) => {
@@ -660,13 +692,22 @@ export default function Leaderboard() {
         ) : (
           <div className="divide-y-0 px-2 pb-2">
             {filteredAndRanked.slice(0, visibleCount).map((node) => {
-              const isMyNode = node.address && favorites.includes(node.address);
-              const isExpanded = expandedNode === node.pubkey;
-              const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
+    const isMyNode = node.address && favorites.includes(node.address);
+    
+    // NEW: 3-Part Composite ID Logic
+    const compositeId = `${node.pubkey}-${node.network}-${node.address || 'no-ip'}`;
+    const isExpanded = expandedNode === compositeId; 
 
-              return (
-                <div key={`${node.pubkey}-${node.network}`} id={`node-${node.pubkey}`} className={`relative transition-all duration-300 ease-out mb-2 rounded-xl border ${isExpanded ? 'scale-[1.02] z-10 bg-black border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.15)]' : 'scale-100 bg-zinc-900/30 border-transparent hover:scale-[1.01] hover:bg-zinc-800 hover:border-zinc-600'} ${isMyNode && !isExpanded ? 'border-yellow-500/30 bg-yellow-500/5' : ''}`}>
-                    <div className="grid grid-cols-12 gap-2 md:gap-4 p-3 md:p-4 items-center cursor-pointer" onClick={() => handleRowClick(node)}>
+    const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
+
+    return (
+    <div 
+        key={compositeId} 
+        id={`node-${compositeId}`} // Important for Deep Link scrolling
+        className={`relative transition-all duration-300 ease-out mb-2 rounded-xl border ${isExpanded ? 'scale-[1.02] z-10 bg-black border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.15)]' : 'scale-100 bg-zinc-900/30 border-transparent hover:scale-[1.01] hover:bg-zinc-800 hover:border-zinc-600'} ${isMyNode && !isExpanded ? 'border-yellow-500/30 bg-yellow-500/5' : ''}`}
+    >
+        <div className="grid grid-cols-12 gap-2 md:gap-4 p-3 md:p-4 items-center cursor-pointer" onClick={() => handleRowClick(node)}>
+
                         <div className="col-span-2 md:col-span-1 flex flex-col justify-center items-center gap-1 relative">
                             <div className="flex items-center gap-1">
                                 {node.rank === 1 && <Trophy size={14} className="text-yellow-400" />}
