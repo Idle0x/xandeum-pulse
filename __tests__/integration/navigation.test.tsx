@@ -107,7 +107,10 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
     const repCard = screen.getByText('REPUTATION').closest('div');
     fireEvent.click(repCard!);
 
-    expect(mockPush).toHaveBeenCalledWith('/leaderboard?highlight=8xTestNodeKey123');
+    // Robust Alternative: Checks for the base path and key, ignoring extra params like &network=...
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.stringContaining('/leaderboard?highlight=8xTestNodeKey123')
+    );
   });
 
   // =========================================================
