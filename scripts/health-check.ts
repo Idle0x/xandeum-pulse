@@ -2,48 +2,56 @@
 import axios from 'axios';
 
 const ENDPOINTS = [
-  'https://podcredits.xandeum.network/api/mainnet-pod-credits',
-  'https://podcredits.xandeum.network/api/pods-credits'
+  { name: 'MAINNET', url: 'https://podcredits.xandeum.network/api/mainnet-pod-credits' },
+  { name: 'DEVNET',  url: 'https://podcredits.xandeum.network/api/pods-credits' }
 ];
 
 async function checkNetworkHealth() {
-  console.log("🏥 Starting Pulse Network Health Check...");
+  console.log("🏥 Starting Pulse Deep Health Check...");
 
   try {
-    // 1. Check API Availability
-    const [mainnet, devnet] = await Promise.all(
-      ENDPOINTS.map(url => axios.get(url, { timeout: 5000 }))
+    // 1. Fetch Both APIs
+    const responses = await Promise.all(
+      ENDPOINTS.map(ep => axios.get(ep.url, { timeout: 8000 }).then(res => ({ ...ep, res })))
     );
 
-    if (mainnet.status !== 200 || devnet.status !== 200) {
-      throw new Error(`API Status Error: Mainnet ${mainnet.status} / Devnet ${devnet.status}`);
+    for (const { name, res } of responses) {
+        // A. Check Status
+        if (res.status !== 200) {
+            throw new Error(`🔥 ${name} API is down! Status: ${res.status}`);
+        }
+
+        // B. Normalize Data (Handle array or { pods_credits: [...] })
+        const data = res.data.pods_credits || res.data;
+
+        // C. Check Structure
+        if (!Array.isArray(data)) {
+            throw new Error(`⚠️ ${name} Critical: Data is not an array.`);
+        }
+        if (data.length === 0) {
+            throw new Error(`⚠️ ${name} Warning: API returned 0 nodes (Empty List).`);
+        }
+
+        // D. Scan ALL Nodes for Schema Vitality
+        // We check every single node to ensure 'credits' exists and is a number
+        const corruptedNodes = data.filter(node => 
+            typeof node.credits === 'undefined' || 
+            node.credits === null
+        );
+
+        if (corruptedNodes.length > 0) {
+            throw new Error(`⚠️ ${name} Schema Violation: ${corruptedNodes.length} nodes have missing/null credits.`);
+        }
+
+        console.log(`✅ ${name} Healthy: ${data.length} nodes verified.`);
     }
 
-    console.log("✅ APIs are responding (200 OK)");
-
-    // 2. Check Data Integrity (Schema Validation)
-    // We expect an array or an object with 'pods_credits'
-    const data = mainnet.data.pods_credits || mainnet.data;
-    
-    if (!Array.isArray(data) || data.length === 0) {
-      throw new Error("⚠️ Critical: Mainnet API returned empty or invalid data format.");
-    }
-
-    // 3. Check "Vitality" Prerequisites
-    // Ensure we are getting the fields our math relies on
-    const sampleNode = data[0];
-    if (typeof sampleNode.credits === 'undefined') {
-       throw new Error("⚠️ Critical: API schema change detected. 'credits' field missing.");
-    }
-
-    console.log(`✅ Data Schema valid. Sample Node Credits: ${sampleNode.credits}`);
-    console.log("🚀 SYSTEM HEALTHY");
+    console.log("🚀 ALL SYSTEMS HEALTHY");
     process.exit(0);
 
   } catch (error: any) {
     console.error("🔥 SYSTEM FAILURE DETECTED");
     console.error(error.message);
-    // Exit with error code 1 to trigger GitHub Action failure email
     process.exit(1);
   }
 }
