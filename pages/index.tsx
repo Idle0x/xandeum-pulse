@@ -3141,7 +3141,7 @@ export default function Home() {
                                 <span className={`${(selectedNode as any).isUntracked ? 'text-zinc-500 font-bold' : 'text-yellow-500 font-bold'} font-mono text-xs`}>
                                   {(selectedNode as any).isUntracked 
                                     ? 'NO STORAGE CREDITS' 
-                                    : (selectedNode?.credits !== null ? selectedNode.credits.toLocaleString() : 'API OFFLINE')}
+                                    : (selectedNode?.credits !== null ? selectedNode.credits.toLocaleString() : 'CREDITS API OFFLINE')}
                                 </span>
                               </div>
                             </div>
