@@ -156,4 +156,47 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
     expect(badges[0]).toBeInTheDocument();
   });
 
+  // =========================================================
+  // SCENARIO 5: PRECISION TARGETING (The Critical Fix)
+  // =========================================================
+
+  test('IDENTITY CRISIS: Should distinguish between Mainnet/Devnet siblings with same Pubkey', async () => {
+    // 1. Setup Siblings
+    const MAINNET_NODE = { ...SAMPLE_NODE, network: 'MAINNET', address: '1.1.1.1:6000' };
+    const DEVNET_NODE = { ...SAMPLE_NODE, network: 'DEVNET', address: '2.2.2.2:6000' };
+    
+    // Override the mock return for this specific test
+    mockedAxios.get.mockResolvedValue({
+      data: {
+        result: { pods: [MAINNET_NODE, DEVNET_NODE] },
+        stats: { systemStatus: { credits: true } }
+      }
+    });
+
+    // 2. Request the DEVNET node explicitly
+    mockQuery = { 
+      open: SAMPLE_NODE.pubkey, 
+      network: 'DEVNET', 
+      focusAddr: '2.2.2.2:6000' // NOTE: Must match exact address string
+    };
+
+    await act(async () => {
+      render(<Home />);
+    });
+
+    // 3. Wait for Modal
+    await waitFor(() => expect(screen.getByText('NODE INSPECTOR')).toBeVisible());
+
+    // 4. VERIFICATION
+    // We check that the specific DEVNET IP is visible. 
+    // If the logic failed and opened the Mainnet node (default), we would see 1.1.1.1 instead.
+    expect(screen.getByText('2.2.2.2:6000')).toBeVisible();
+    
+    // We verify a "DEVNET" badge exists. 
+    // We use getAllByText because it might appear multiple times (background + modal).
+    // This confirms we are looking at Devnet data.
+    const badges = screen.getAllByText('DEVNET');
+    expect(badges.length).toBeGreaterThan(0);
+  });
+
 });
