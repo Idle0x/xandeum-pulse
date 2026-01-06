@@ -171,3 +171,43 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
   });
 
 });
+
+  // =========================================================
+  // SCENARIO 6: COMPOSITE KEY INTEGRITY
+  // =========================================================
+
+  test('COMPOSITE KEYS: Siblings should have independent ranks/stats', async () => {
+    // 1. SETUP: Create two nodes with the SAME Pubkey but DIFFERENT Networks
+    const MAINNET_NODE = { 
+      ...SAMPLE_NODE, 
+      network: 'MAINNET', 
+      credits: 100000, // Higher credits
+      pubkey: 'SharedKey123' 
+    };
+    
+    const DEVNET_NODE = { 
+      ...SAMPLE_NODE, 
+      network: 'DEVNET', 
+      credits: 50000,  // Lower credits
+      pubkey: 'SharedKey123' 
+    };
+
+    mockedAxios.get.mockResolvedValue({
+      data: {
+        result: { pods: [MAINNET_NODE, DEVNET_NODE] },
+        stats: { systemStatus: { credits: true } }
+      }
+    });
+
+    // 2. RENDER
+    await act(async () => { render(<Home />); });
+
+    // 3. VERIFY: Both nodes should appear on screen
+    // This proves the dashboard logic didn't merge them into one single node
+    expect(screen.getByText('100,000')).toBeVisible(); // Mainnet credits
+    expect(screen.getByText('50,000')).toBeVisible();  // Devnet credits
+    
+    // We expect the text "SharedKey123" to appear at least twice (once for each card)
+    const cards = screen.getAllByText(/SharedKey123/);
+    expect(cards.length).toBeGreaterThanOrEqual(2);
+  });
