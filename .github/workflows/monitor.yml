@@ -25,5 +25,4 @@ jobs:
         run: npm ci
         
       - name: Run Smoke Test
-        # We use npx to run ts-node without needing it in package.json dependencies
-        run: npx ts-node scripts/health-check.ts
+        run: npx tsx scripts/health-check.ts
