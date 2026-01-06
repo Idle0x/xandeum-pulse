@@ -110,9 +110,8 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
     // VERIFY ALL 3 PARAMETERS ARE PRESENT
     expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('/leaderboard'));
     expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('highlight=8xTestNodeKey123'));
-    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('network=MAINNET')); 
-    // Relaxed check for address to handle potential URL encoding differences
-    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('focusAddr=')); 
+    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('network=MAINNET'));
+    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('focusAddr='));
   });
 
   // =========================================================
@@ -152,7 +151,6 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
     const card = await screen.findByText(/8xTestNode/);
     fireEvent.click(card.closest('.group')!);
 
-    // FIX: Using findAllByText because the badge appears twice (once on the dashboard card, once in the modal)
     const badges = await screen.findAllByText(/API OFFLINE/i);
     expect(badges.length).toBeGreaterThan(0);
     expect(badges[0]).toBeInTheDocument();
@@ -178,7 +176,7 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
     mockQuery = { 
       open: SAMPLE_NODE.pubkey, 
       network: 'DEVNET', 
-      focusAddr: '2.2.2.2:6000' // FIXED: Must include port to match mock exactly
+      focusAddr: '2.2.2.2:6000' // Matches DEVNET_NODE address
     };
 
     await act(async () => {
@@ -188,18 +186,15 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
     // 3. Verify the Modal opened
     await waitFor(() => expect(screen.getByText('NODE INSPECTOR')).toBeVisible());
 
-    // 4. CRITICAL CHECK: Ensure the "DEVNET" badge is visible, NOT Mainnet
-    // The Overview modal displays a badge with just the network name (e.g., "DEVNET")
-    // Use `getAllByText` to be safe if "DEVNET" appears multiple times, or `getByText` if unique enough in context.
-    // We search for the specific badge text content.
-    const badges = screen.getAllByText('DEVNET');
-    expect(badges.length).toBeGreaterThan(0); 
-    
-    // Ensure MAINNET is NOT present in the modal context
-    expect(screen.queryByText('MAINNET')).toBeNull();
-    
-    // 5. Verify IP specific match to confirm we have the correct sibling
+    // 4. CRITICAL CHECK: The *Correct* IP must be visible.
+    // If the logic failed (opened Mainnet), we would see '1.1.1.1:6000' instead.
     expect(screen.getByText('2.2.2.2:6000')).toBeVisible();
+
+    // 5. Verify Network Badge Presence
+    // We check that at least one "DEVNET" badge exists. 
+    // We do NOT check for absence of "MAINNET" because the background list might still show it.
+    const badges = screen.getAllByText('DEVNET');
+    expect(badges.length).toBeGreaterThan(0);
   });
 
 });
