@@ -30,7 +30,7 @@ describe('Xandeum Brain (Unit Logic)', () => {
     test('Should handle equal versions', () => {
       expect(compareVersions('1.2.0', '1.2.0')).toBe(0);
     });
-    
+
     test('Should handle major version jumps', () => {
       expect(compareVersions('2.0.0', '1.9.99')).toBe(1);
     });
@@ -38,7 +38,7 @@ describe('Xandeum Brain (Unit Logic)', () => {
 
   // --- 2. VITALITY ALGORITHM TESTS (The Core) ---
   describe('Vitality Score Algorithm', () => {
-    
+
     // Mock Data Constants
     const MEDIAN_STORAGE = 1000;
     const MEDIAN_CREDITS = 5000;
@@ -58,7 +58,7 @@ describe('Xandeum Brain (Unit Logic)', () => {
         10000, // High Credits
         MEDIAN_STORAGE
       );
-      
+
       expect(result.total).toBe(0);
       expect(result.breakdown.uptime).toBe(0);
     });
