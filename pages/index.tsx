@@ -4,6 +4,10 @@ import { useRouter } from 'next/router';
 import axios from 'axios';
 import Link from 'next/link';
 import { toPng } from 'html-to-image';
+import { RadialProgress } from '../components/RadialProgress';
+import { WelcomeCurtain } from '../components/WelcomeCurtain';
+import { PhysicalLocationBadge } from '../components/PhysicalLocationBadge';
+import { Node } from '../types';
 import {
   Search,
   Download,
@@ -54,185 +58,7 @@ import {
   PlayCircle
 } from 'lucide-react';
 
-// --- TYPES ---
-
-interface Node {
-  address?: string;
-  pubkey?: string;
-  version?: string;
-  uptime?: number;
-  last_seen_timestamp?: number;
-  is_public?: boolean;
-  network?: 'MAINNET' | 'DEVNET' | 'UNKNOWN';
-
-  storage_used?: number;
-  storage_committed?: number;
-  storage_usage_percentage?: string;
-  storage_usage_raw?: number;
-
-  rank?: number;
-  health_rank?: number;
-  credits: number | null;
-
-  location?: {
-    lat: number;
-    lon: number;
-    countryName: string;
-    countryCode: string;
-    city: string;
-  };
-
-  health?: number;
-  healthBreakdown?: {
-    uptime: number;
-    version: number;
-    reputation: number | null;
-    storage: number;
-  };
-
-  // NEW: Cluster / Fleet stats (optional, injected at runtime)
-  clusterStats?: {
-    totalGlobal: number;
-    mainnetCount: number;
-    devnetCount: number;
-  };
-}
-
-// --- WELCOME CURTAIN COMPONENT ---
-const WelcomeCurtain = () => {
-  const [show, setShow] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-
-    const seen = localStorage.getItem('xandeum_pulse_welcome_v1');
-    if (!seen) {
-      setTimeout(() => setShow(true), 100);
-    }
-
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const handleEnter = () => {
-    localStorage.setItem('xandeum_pulse_welcome_v1', 'true');
-    setShow(false);
-  };
-
-  if (!show) return null;
-
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
-      <div className="bg-[#09090b] border border-zinc-800 p-6 md:p-8 rounded-3xl shadow-2xl max-w-md w-full relative overflow-hidden group">
-        <div className="absolute top-0 right-0 p-32 bg-blue-500/10 blur-[80px] rounded-full pointer-events-none"></div>
-
-        <div className="flex justify-center items-center gap-6 mb-6 relative z-10">
-          <div className="flex flex-col items-center gap-2">
-            <div className={`p-3 rounded-xl border border-zinc-800 shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-colors duration-500 ${!isMobile ? 'bg-zinc-800 text-blue-400' : 'bg-zinc-900 text-zinc-600'}`}>
-              <Monitor size={32} />
-            </div>
-            <span className={`text-[9px] font-bold uppercase tracking-widest ${!isMobile ? 'text-blue-400' : 'text-zinc-600'}`}>Desktop</span>
-          </div>
-          <div className="h-px w-8 bg-zinc-800"></div>
-          <div className="flex flex-col items-center gap-2">
-            <div className={`p-3 rounded-xl border border-zinc-800 transition-colors duration-500 ${isMobile ? 'bg-zinc-800 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'bg-zinc-900 text-zinc-600'}`}>
-              <div className="relative">
-                <LayoutDashboard size={24} />
-              </div>
-            </div>
-            <span className={`text-[9px] font-bold uppercase tracking-widest ${isMobile ? 'text-blue-400' : 'text-zinc-600'}`}>Mobile</span>
-          </div>
-        </div>
-
-        <div className="text-center relative z-10 space-y-2 mb-6">
-          <h2 className="text-xl md:text-2xl font-black text-white tracking-tight">
-            Welcome to Pulse
-          </h2>
-          <div className="text-xs text-zinc-400 leading-relaxed px-2 space-y-3">
-            <p>Hi there! This dashboard is packed with real-time data sourced directly from the network.</p>
-            <p className={isMobile ? "text-blue-200" : "text-zinc-300"}>
-              {isMobile 
-                ? "Because of the data complexity, a desktop screen provides the best experience, though we have optimized this mobile view for quick checks on the go."
-                : "You're using a large screen, which is perfect! You are ready to fully explore the interactive map and detailed metrics."
-              }
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-3 text-left relative z-10 mt-6">
-            <Link href="/docs?training=true">
-                <button className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm tracking-wide uppercase transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 group">
-                    <PlayCircle size={16} className="group-hover:scale-110 transition-transform" /> 
-                    Take a Walkthrough
-                </button>
-            </Link>
-
-            <button 
-                onClick={handleEnter}
-                className="w-full py-3.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-xl font-bold text-sm tracking-wide uppercase transition-all border border-zinc-700"
-            >
-                Continue to Dashboard
-            </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // --- SUB-COMPONENTS ---
-
-const PhysicalLocationBadge = ({ node, zenMode }: { node: Node; zenMode: boolean }) => {
-  const ip = node.address ? node.address.split(':')[0] : 'Unknown';
-  const country = node.location?.countryName || 'Unknown Location';
-  const code = node.location?.countryCode;
-
-  return (
-    <div className="flex items-center gap-2 font-mono text-sm mt-1">
-      <span
-        className={`font-bold transition-all duration-1000 ${
-          zenMode ? 'text-blue-400' : 'text-cyan-400'
-        } animate-pulse-glow text-shadow-neon`}
-      >
-        {ip}
-      </span>
-      <span className="text-zinc-600">|</span>
-      <div className="flex items-center gap-2">
-        {code && code !== 'XX' && (
-          <img
-            src={`https://flagcdn.com/w40/${code.toLowerCase()}.png`}
-            alt="flag"
-            className="w-5 h-auto rounded-sm shadow-sm"
-          />
-        )}
-        <span className="text-white font-bold tracking-wide">{country}</span>
-      </div>
-      <style jsx>{`
-        .text-shadow-neon {
-          text-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
-        }
-        .animate-pulse-glow {
-          animation: pulse-glow 2s infinite;
-        }
-        @keyframes pulse-glow {
-          0%,
-          100% {
-            opacity: 1;
-            text-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
-          }
-          50% {
-            opacity: 0.8;
-            text-shadow: 0 0 20px rgba(34, 211, 238, 0.8);
-          }
-        }
-      `}</style>
-    </div>
-  );
-};
 
 const ModalAvatar = ({ node }: { node: Node }) => {
   const code = node.location?.countryCode;
@@ -252,54 +78,6 @@ const ModalAvatar = ({ node }: { node: Node }) => {
   return (
     <div className="w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center font-bold text-xl md:text-2xl shadow-lg border border-white/10 bg-gradient-to-br from-blue-600 to-purple-600 text-white shrink-0">
       {node.pubkey?.slice(0, 2) || '??'}
-    </div>
-  );
-};
-
-const RadialProgress = ({
-  score,
-  size = 160,
-  stroke = 12,
-}: {
-  score: number;
-  size?: number;
-  stroke?: number;
-}) => {
-  const radius = (size - stroke) / 2;
-  const circumference = radius * 2 * Math.PI;
-  const offset = circumference - (score / 100) * circumference;
-  const color = score >= 80 ? '#22c55e' : score >= 50 ? '#eab308' : '#ef4444';
-
-  return (
-    <div className="relative flex items-center justify-center group" style={{ width: size, height: size }}>
-      <svg className="transform -rotate-90 w-full h-full drop-shadow-xl">
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke="#18181b"
-          strokeWidth={stroke}
-          fill="transparent"
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={color}
-          strokeWidth={stroke}
-          fill="transparent"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          className="transition-all duration-1000 ease-out"
-        />
-      </svg>
-      <div className="absolute flex flex-col items-center">
-        <span className="text-4xl font-extrabold text-white tracking-tighter">{score}</span>
-        <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mt-1">
-          Health Score
-        </span>
-      </div>
     </div>
   );
 };
