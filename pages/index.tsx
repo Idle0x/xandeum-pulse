@@ -622,17 +622,50 @@ export default function Home() {
     };
   }, []);
 
-  // Deep Linking
   useEffect(() => {
     if (!loading && nodes.length > 0 && router.query.open) {
       const pubkeyToOpen = router.query.open as string;
-      const targetNode = nodes.find((n) => n.pubkey === pubkeyToOpen);
+      const networkParam = router.query.network as string;
+      const addrParam = router.query.focusAddr as string;
+
+      // SOPHISTICATED 3-SYSTEM MATCHING
+      const targetNode = nodes.find((n) => {
+        // 1. Must match Pubkey
+        const keyMatch = n.pubkey === pubkeyToOpen;
+        
+        // 2. If network param exists, it MUST match
+        const netMatch = networkParam 
+            ? n.network === networkParam 
+            : true;
+
+        // 3. If address param exists, it MUST match (exact or strict IP match)
+        // We decodeURIComponent because IPs might pass as URL encoded
+        const addrMatch = addrParam 
+            ? n.address === decodeURIComponent(addrParam)
+            : true;
+
+        return keyMatch && netMatch && addrMatch;
+      });
+
       if (targetNode) {
+        // Exact match found
         setSelectedNode(targetNode);
         setModalView('overview');
+        
+        // Clean URL without reload
+        router.replace('/', undefined, { shallow: true });
+      } else {
+        // Fallback: If we have a Pubkey match but missed Network/Addr specifics, 
+        // try to find the "best" sibling (e.g. Mainnet preferred)
+        const fallbackNode = nodes.find(n => n.pubkey === pubkeyToOpen);
+        if (fallbackNode) {
+           console.warn("Precise match failed, falling back to Pubkey match");
+           setSelectedNode(fallbackNode);
+           setModalView('overview');
+        }
       }
     }
-  }, [loading, nodes, router.query.open]);
+  }, [loading, nodes, router.query]);
 
   const fetchData = async () => {
   setLoading(true);
