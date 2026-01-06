@@ -11,6 +11,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     nodes.forEach(node => {
       const { city, countryName, countryCode, lat, lon } = node.location;
+      
+      // Skip nodes without valid coordinates
       if (lat === 0 && lon === 0) return; 
 
       const key = `${city}-${countryName}`;
@@ -34,30 +36,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         existing.ips.push(node.address.split(':')[0]);
 
-        // --- TRACKING KINGS ---
+        // --- TRACKING KINGS (UPDATED WITH ADDRESS PRECISION) ---
+        
+        // 1. Storage King
         if (storageGB > existing.bestNodes.storageVal) {
             existing.bestNodes.storageVal = storageGB;
             existing.bestNodes.storagePk = node.pubkey;
             existing.bestNodes.storageNet = network;
+            existing.bestNodes.storageAddr = node.address; // <--- PRECISION FIX
         }
 
+        // 2. Credits King
         // Only update Credit King if this node actually has credits
-        // OR if the existing king has 0 and we want to overwrite (though usually null < 0 is false)
         if (hasCredits && (node.credits || 0) >= existing.bestNodes.creditsVal) {
             existing.bestNodes.creditsVal = node.credits;
             existing.bestNodes.creditsPk = node.pubkey;
             existing.bestNodes.creditsNet = network;
+            existing.bestNodes.creditsAddr = node.address; // <--- PRECISION FIX
             existing.bestNodes.creditsUntracked = false; // Mark as tracked
         }
 
+        // 3. Health King
         if (node.health > existing.bestNodes.healthVal) {
             existing.bestNodes.healthVal = node.health;
             existing.bestNodes.healthPk = node.pubkey;
             existing.bestNodes.healthUptime = node.uptime || 0;
             existing.bestNodes.healthNet = network;
+            existing.bestNodes.healthAddr = node.address; // <--- PRECISION FIX
         }
 
       } else {
+        // INITIALIZE NEW REGION
         cityMap.set(key, {
           name: city,
           country: countryName,
@@ -74,15 +83,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           // Initial Best Nodes
           bestNodes: {
-              storageVal: storageGB, storagePk: node.pubkey, storageNet: network,
-              
-              // Credits King Init
+              // Storage
+              storageVal: storageGB, 
+              storagePk: node.pubkey, 
+              storageNet: network,
+              storageAddr: node.address, // <--- INIT
+
+              // Credits
               creditsVal: node.credits || 0, 
               creditsPk: node.pubkey, 
               creditsNet: network,
+              creditsAddr: node.address, // <--- INIT
               creditsUntracked: !hasCredits, // Mark untracked if initial node is null
 
-              healthVal: node.health, healthPk: node.pubkey, healthUptime: node.uptime || 0, healthNet: network
+              // Health
+              healthVal: node.health, 
+              healthPk: node.pubkey, 
+              healthUptime: node.uptime || 0, 
+              healthNet: network,
+              healthAddr: node.address // <--- INIT
           }
         });
       }
@@ -106,15 +125,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ips: l.ips,
 
           topPerformers: {
-              STORAGE: { pk: l.bestNodes.storagePk, val: l.bestNodes.storageVal, network: l.bestNodes.storageNet },
-              // Pass the isUntracked flag for credits
+              STORAGE: { 
+                  pk: l.bestNodes.storagePk, 
+                  val: l.bestNodes.storageVal, 
+                  network: l.bestNodes.storageNet,
+                  address: l.bestNodes.storageAddr // <--- PASS TO FRONTEND
+              },
               CREDITS: { 
                   pk: l.bestNodes.creditsPk, 
                   val: l.bestNodes.creditsVal, 
                   network: l.bestNodes.creditsNet,
+                  address: l.bestNodes.creditsAddr, // <--- PASS TO FRONTEND
                   isUntracked: l.bestNodes.creditsUntracked 
               },
-              HEALTH:  { pk: l.bestNodes.healthPk, val: l.bestNodes.healthVal, subVal: l.bestNodes.healthUptime, network: l.bestNodes.healthNet }
+              HEALTH: { 
+                  pk: l.bestNodes.healthPk, 
+                  val: l.bestNodes.healthVal, 
+                  subVal: l.bestNodes.healthUptime, 
+                  network: l.bestNodes.healthNet,
+                  address: l.bestNodes.healthAddr // <--- PASS TO FRONTEND
+              }
           }
         };
     });
