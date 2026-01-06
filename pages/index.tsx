@@ -3393,8 +3393,6 @@ export default function Home() {
                       </div>
                     </div>
                   )}
-                </div>
-              )}
 
             {!compareMode && !shareMode && (
               <div className="mt-6 pt-6 border-t border-zinc-800 flex flex-col gap-4">
@@ -3428,10 +3426,6 @@ export default function Home() {
                 </div>
               </div>
             )}
-          </div>
-        </div>
-      </div>
-    )}
 
     {!zenMode && (
       <footer className="border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto text-center">
