@@ -20,7 +20,7 @@ interface TopPerformerData {
     val: number;
     subVal?: number; 
     network?: string;
-    address?: string; // NEW: Precise Address for disambiguation
+    address?: string; 
     isUntracked?: boolean; 
 }
 
@@ -177,18 +177,12 @@ export default function MapPage() {
 
   // --- HELPERS ---
 
-  // NEW: 3-System Precision Link Generator
   const getDeepLink = (data: TopPerformerData, destination: 'DASHBOARD' | 'LEADERBOARD') => {
     const params = new URLSearchParams();
-    
-    // Base Identity
     if (destination === 'DASHBOARD') params.set('open', data.pk);
     else params.set('highlight', data.pk); 
 
-    // Precision Param 1: Network
     if (data.network) params.set('network', data.network);
-    
-    // Precision Param 2: Address (The Tie-Breaker)
     if (data.address) params.set('focusAddr', data.address);
 
     return destination === 'DASHBOARD' 
@@ -231,13 +225,15 @@ export default function MapPage() {
       return `${h}h`;
   };
 
+  // UPDATED: Performer Stats with "No Storage Credits"
   const getPerformerStats = (pkData: TopPerformerData) => {
       if (viewMode === 'STORAGE') {
           return <span className="text-indigo-400 font-bold">{formatStorage(pkData.val)} Committed</span>;
       }
       if (viewMode === 'CREDITS') {
           if (pkData.isUntracked) {
-              return <span className="text-zinc-500 font-bold italic">Untracked</span>;
+              // CHANGE 1: Explicit Label for King Node
+              return <span className="text-orange-400/80 font-bold italic">No Storage Credits</span>;
           }
           return <span className="text-yellow-500 font-bold">{pkData.val.toLocaleString()} Cr Earned</span>;
       }
@@ -322,6 +318,7 @@ export default function MapPage() {
     }
   };
 
+  // UPDATED: Educational X-Ray Stats for Untracked Tiers
   const getXRayStats = (loc: LocationData, index: number, tierColor: string) => {
       const globalShare = ((loc.count / stats.totalNodes) * 100).toFixed(1);
       const rawPercentile = ((locations.length - index) / locations.length) * 100;
@@ -349,16 +346,19 @@ export default function MapPage() {
               const statusColor = isGlobalCreditsOffline ? "text-red-400" : "text-zinc-500";
               const statusIcon = isGlobalCreditsOffline ? <AlertOctagon size={12}/> : <EyeOff size={12}/>;
 
+              // CHANGE 2: Educational Context
               return {
                   labelA: 'Avg Earnings',
-                  valA: <span className={`${statusColor} flex items-center justify-center gap-1 font-bold`}>{statusIcon} {statusText}</span>,
-                  descA: isGlobalCreditsOffline ? "Source endpoint is unreachable." : "This region is not currently tracked by the Credits API.",
+                  valA: <span className={`${statusColor} flex items-center justify-center gap-1 font-bold`}>{statusIcon} No Rewards Active</span>,
+                  descA: "Node is visible via Gossip protocol but has not completed a Storage Proof cycle required for rewards.",
+                  
                   labelB: 'Contribution',
-                  valB: <span className="text-zinc-500 italic">Unknown</span>,
-                  descB: "Data unavailable.",
+                  valB: <span className="text-zinc-400 font-bold">Gossip Active</span>,
+                  descB: "Node contributes to network topology but may be in a proving phase or below stake thresholds.",
+                  
                   labelC: 'Tier Rank',
                   valC: <span className="text-zinc-500 italic">Unknown</span>,
-                  descC: "Cannot calculate rank without data."
+                  descC: "Cannot calculate rank without confirmed credits."
               };
           }
           const avgCred = Math.round(loc.totalCredits / loc.count);
@@ -587,13 +587,12 @@ export default function MapPage() {
                                             <div className="flex flex-col items-center border-l border-zinc-800/50 group/stat"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1 flex items-center gap-1">{xray.labelB}<HelpCircle size={8} className="cursor-help opacity-50"/><div className="absolute bottom-1/2 mb-2 hidden group-hover/stat:block bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-50 w-32">{xray.descB}</div></div><div className="text-white font-mono font-bold">{xray.valB}</div></div>
                                             <div className="flex flex-col items-center border-l border-zinc-800/50 group/stat"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1 flex items-center gap-1">{xray.labelC}<HelpCircle size={8} className="cursor-help opacity-50"/><div className="absolute bottom-1/2 mb-2 hidden group-hover/stat:block bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-50 w-32">{xray.descC}</div></div><div className="font-mono font-bold">{xray.valC}</div></div>
                                         </div>
-                                        {topData && (
-                                            // UPDATE: Use 3-System Precision Link
-                                            <Link href={viewMode === 'CREDITS' 
-                                                ? getDeepLink(topData, 'LEADERBOARD') 
-                                                : getDeepLink(topData, 'DASHBOARD')
-                                            }>
-                                                <div className="w-full bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl p-3 flex items-center justify-between cursor-pointer group/card transition-all">
+                                        {topData && (() => {
+                                            const isUntrackedKing = viewMode === 'CREDITS' && topData.isUntracked;
+                                            
+                                            // CHANGE 3: Conditional Wrapper for King Node Card
+                                            const CardContent = (
+                                                <div className={`w-full bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl p-3 flex items-center justify-between transition-all group/card ${isUntrackedKing ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}>
                                                     <div className="flex items-center gap-3">
                                                         <div className={`p-2 rounded-lg ${MODE_COLORS[viewMode].bg} text-white`}>
                                                             {viewMode === 'STORAGE' ? <Database size={14} /> : viewMode === 'CREDITS' ? <Zap size={14} /> : <Activity size={14} />}
@@ -616,8 +615,33 @@ export default function MapPage() {
                                                         VIEW DETAILS <ArrowRight size={12} />
                                                     </div>
                                                 </div>
-                                            </Link>
-                                        )}
+                                            );
+
+                                            if (isUntrackedKing) {
+                                                return (
+                                                    <div onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setToast({
+                                                            msg: "This node is currently not receiving storage credits from the protocol due to various reasons including: performance thresholds not yet met, the node is in a 'proving' phase, or the associated stake is below the required minimum for rewards.",
+                                                            type: 'info'
+                                                        });
+                                                        setTimeout(() => setToast(null), 8000);
+                                                    }}>
+                                                        {CardContent}
+                                                    </div>
+                                                )
+                                            }
+
+                                            return (
+                                                <Link href={viewMode === 'CREDITS' 
+                                                    ? getDeepLink(topData, 'LEADERBOARD') 
+                                                    : getDeepLink(topData, 'DASHBOARD')
+                                                }>
+                                                    {CardContent}
+                                                </Link>
+                                            )
+                                        })()}
+
                                         <div className="w-full h-1 bg-zinc-800 rounded-full mt-4 overflow-hidden"><div className="h-full bg-white/20" style={{ width: `${(loc.count / stats.totalNodes) * 100}%` }}></div></div>
                                     </div>
                                 )}
