@@ -3267,13 +3267,14 @@ export default function Home() {
     </div>
   </div>
 </div>
+</div>
 
-                      {/* --- BOTTOM ROW: 2 CARDS (Reputation, Map) --- */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+{/* --- BOTTOM ROW: 2 CARDS (Reputation, Map) --- */}
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                        {/* 4. REPUTATION (Leaderboard) */}
-                        <div
-                          onClick={(e) => handleLeaderboardNav(e, selectedNode)}
+  {/* 4. REPUTATION (Leaderboard) */}
+  <div
+    onClick={(e) => handleLeaderboardNav(e, selectedNode)}
                           className={`h-40 p-5 rounded-2xl border group cursor-pointer transition relative overflow-hidden flex flex-col justify-between ${
                             zenMode
                               ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
