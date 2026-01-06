@@ -1,5 +1,3 @@
-// __tests__/lib/xandeum-economics.test.ts
-
 import { calculateStoinc, ERA_BOOSTS, NFT_BOOSTS } from '../../lib/xandeum-economics';
 
 describe('Xandeum Economics (Stoinc Simulator)', () => {
@@ -38,7 +36,7 @@ describe('Xandeum Economics (Stoinc Simulator)', () => {
     // Scenario: 1 Titan (11x) + 1 Dragon (4x)
     // Linear would be: 1 + 11 + 4 = 16x (WRONG)
     // Geometric is: 1 * 11 * 4 = 44x (CORRECT)
-    
+
     const result = calculateStoinc({ 
       ...BASE_INPUT, 
       boosts: { 'Titan': 1, 'Dragon': 1 } 
@@ -51,7 +49,7 @@ describe('Xandeum Economics (Stoinc Simulator)', () => {
   test('Should handle Fleet Root scaling (The "Whale" Check)', () => {
     // If you have 2 nodes, and 2 Titans, you don't get 11*11=121x.
     // You get sqrt(11*11) = 11x average boost per node.
-    
+
     const result = calculateStoinc({ 
       ...BASE_INPUT, 
       nodeCount: 2,
@@ -82,7 +80,7 @@ describe('Xandeum Economics (Stoinc Simulator)', () => {
       networkTotalBase: 0, 
       networkFees: 100 
     });
-    
+
     // If we are the ONLY node, we should get 100% of rewards (approx 94 SOL)
     // Formula: share = our / (0 + our) = 1.0
     expect(result.share).toBeCloseTo(1.0, 5);
