@@ -5,16 +5,13 @@ import axios from 'axios';
 
 // --- MOCKING THE WORLD ---
 
-// 1. Mock Axios
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-// 2. Mock GeoIP
 jest.mock('geoip-lite', () => ({
   lookup: jest.fn().mockReturnValue({ ll: [0, 0], country: 'US', city: 'Test City' }),
 }));
 
-// 3. Mock Next.js Router
 const mockPush = jest.fn();
 let mockQuery = {};
 
@@ -69,26 +66,17 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
     jest.clearAllMocks();
     mockQuery = {};
     mockedAxios.get.mockResolvedValue(MOCK_API_RESPONSE);
-
-    // FIX 1: BYPASS WELCOME CURTAIN
     localStorage.setItem('xandeum_pulse_welcome_v1', 'true');
   });
 
   // =========================================================
-  // SCENARIO 1: DEEP LINKING (Teleportation)
+  // SCENARIO 1: DEEP LINKING
   // =========================================================
 
   test('DASHBOARD AUTO-OPEN: Should open modal if URL has ?open=PUBKEY', async () => {
     mockQuery = { open: '8xTestNodeKey123' };
-
-    await act(async () => {
-      render(<Home />);
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('NODE INSPECTOR')).toBeVisible();
-    });
-
+    await act(async () => { render(<Home />); });
+    await waitFor(() => { expect(screen.getByText('NODE INSPECTOR')).toBeVisible(); });
     expect(screen.getByText(/8xTestNodeKey123/)).toBeInTheDocument();
   });
 
@@ -96,21 +84,20 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
   // SCENARIO 2: NAVIGATION FLOWS
   // =========================================================
 
-  test('LEADERBOARD LINK: Clicking "Reputation" card should navigate to Leaderboard', async () => {
-    await act(async () => {
-      render(<Home />);
-    });
-
+  test('LEADERBOARD LINK: Should generate precise 3-system link', async () => {
+    await act(async () => { render(<Home />); });
+    
     const nodeCard = await screen.findByText(/8xTestNodeKey123/); 
     fireEvent.click(nodeCard.closest('.group')!); 
 
     const repCard = screen.getByText('REPUTATION').closest('div');
     fireEvent.click(repCard!);
 
-    // Robust Alternative: Checks for the base path and key, ignoring extra params like &network=...
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.stringContaining('/leaderboard?highlight=8xTestNodeKey123')
-    );
+    // Verify 3-System Params are attached
+    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('/leaderboard'));
+    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('highlight=8xTestNodeKey123'));
+    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('network=MAINNET'));
+    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('focusAddr='));
   });
 
   // =========================================================
@@ -118,13 +105,9 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
   // =========================================================
 
   test('GHOST NODE: Private nodes should link to map but handle privacy', async () => {
-    await act(async () => {
-      render(<Home />);
-    });
-
+    await act(async () => { render(<Home />); });
     const ghostCardText = await screen.findByText(/GhostNodeVPN/); 
     fireEvent.click(ghostCardText.closest('.group')!);
-
     const mapCard = screen.getByText('PHYSICAL LAYER').closest('div');
     const linkElement = mapCard?.closest('a');
     expect(linkElement).toHaveAttribute('href', '/map?focus=192.168.1.1'); 
@@ -142,30 +125,24 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
         stats: { systemStatus: { credits: false } }
       }
     });
-
-    await act(async () => {
-      render(<Home />);
-    });
-
+    await act(async () => { render(<Home />); });
     const card = await screen.findByText(/8xTestNode/);
     fireEvent.click(card.closest('.group')!);
-
-    // FIX: Using findAllByText because the badge appears twice (once on the dashboard card, once in the modal)
     const badges = await screen.findAllByText(/API OFFLINE/i);
     expect(badges.length).toBeGreaterThan(0);
-    expect(badges[0]).toBeInTheDocument();
   });
 
   // =========================================================
-  // SCENARIO 5: PRECISION TARGETING (The Critical Fix)
+  // SCENARIO 5: PRECISION TARGETING (Identity Crisis Fix)
   // =========================================================
 
   test('IDENTITY CRISIS: Should distinguish between Mainnet/Devnet siblings with same Pubkey', async () => {
-    // 1. Setup Siblings
-    const MAINNET_NODE = { ...SAMPLE_NODE, network: 'MAINNET', address: '1.1.1.1:6000' };
-    const DEVNET_NODE = { ...SAMPLE_NODE, network: 'DEVNET', address: '2.2.2.2:6000' };
+    // 1. SETUP: Siblings with DIFFERENT VERSIONS
+    // We use a unique version string ('9.9.9-DEV') because the Version is ALWAYS visible
+    // in the Overview Modal (Identity Card), whereas the IP address is hidden by default.
+    const MAINNET_NODE = { ...SAMPLE_NODE, network: 'MAINNET', address: '1.1.1.1:6000', version: '1.0.0' };
+    const DEVNET_NODE = { ...SAMPLE_NODE, network: 'DEVNET', address: '2.2.2.2:6000', version: '9.9.9-DEV' };
     
-    // Override the mock return for this specific test
     mockedAxios.get.mockResolvedValue({
       data: {
         result: { pods: [MAINNET_NODE, DEVNET_NODE] },
@@ -173,30 +150,21 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
       }
     });
 
-    // 2. Request the DEVNET node explicitly
+    // 2. REQUEST: Target the DEVNET node explicitly
     mockQuery = { 
       open: SAMPLE_NODE.pubkey, 
       network: 'DEVNET', 
-      focusAddr: '2.2.2.2:6000' // NOTE: Must match exact address string
+      focusAddr: '2.2.2.2:6000' // strict match
     };
 
-    await act(async () => {
-      render(<Home />);
-    });
+    await act(async () => { render(<Home />); });
 
-    // 3. Wait for Modal
+    // 3. VERIFY
     await waitFor(() => expect(screen.getByText('NODE INSPECTOR')).toBeVisible());
 
-    // 4. VERIFICATION
-    // We check that the specific DEVNET IP is visible. 
-    // If the logic failed and opened the Mainnet node (default), we would see 1.1.1.1 instead.
-    expect(screen.getByText('2.2.2.2:6000')).toBeVisible();
-    
-    // We verify a "DEVNET" badge exists. 
-    // We use getAllByText because it might appear multiple times (background + modal).
-    // This confirms we are looking at Devnet data.
-    const badges = screen.getAllByText('DEVNET');
-    expect(badges.length).toBeGreaterThan(0);
+    // 4. PROOF: If we see "9.9.9-DEV", we know the dashboard correctly ignored Mainnet (1.0.0)
+    // and opened the precise Devnet sibling.
+    expect(screen.getByText('9.9.9-DEV')).toBeVisible();
   });
 
 });
