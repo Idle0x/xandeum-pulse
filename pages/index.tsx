@@ -1248,7 +1248,7 @@ export default function Home() {
                    </>
                ) : (
                    <div className="flex items-center gap-2 text-red-400 w-full justify-center font-bold italic text-[9px] md:text-[10px]">
-                     <AlertOctagon size={10}/> API OFFLINE
+                     <AlertOctagon size={10}/> CREDITS API OFFLINE
                    </div>
                )}
             </div>
@@ -1536,23 +1536,25 @@ export default function Home() {
 
           <div className="space-y-5">
             {metrics.map((m) => {
-              if (m.label === 'Reputation Score' && isCreditsOffline) {
-                  return (
-                    <div key={m.label}>
-                        <div className="flex justify-between text-xs mb-2">
-                             <span className="text-zinc-500 font-bold flex items-center gap-2">
-                                {m.label} <span className="text-[9px] font-mono text-zinc-600">(Weighted: 0%)</span>
-                             </span>
-                             <div className="font-mono text-[10px] text-zinc-500 font-bold flex items-center gap-1">
-                                <Info size={10} className="text-zinc-600"/> NO STORAGE CREDITS
-                             </div>
-                        </div>
-                        <div className="h-2 bg-zinc-800/50 rounded-full border border-red-900/30 overflow-hidden">
-                             <div className="h-full w-full bg-red-500/10 pattern-diagonal-lines opacity-50"></div>
-                        </div>
-                    </div>
-                  )
-              }
+              if (m.label === 'Reputation Score') {
+  return (
+    <div key={m.label}>
+      <div className="flex justify-between text-xs mb-2">
+        <span className="text-zinc-400 font-bold">{m.label}</span>
+        <div className="font-mono text-[10px] text-zinc-500 font-bold">
+          {(selectedNode as any).isUntracked 
+            ? 'NO STORAGE CREDITS' 
+            // REVERTED TEXT HERE
+            : isCreditsOffline ? 'CREDITS API OFFLINE' : (m.rawVal! * m.weight).toFixed(2)}
+        </div>
+      </div>
+      <div className="h-2 bg-zinc-800 rounded-full relative">
+        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${m.rawVal || 0}%` }}></div>
+        <div className="absolute top-[-4px] bottom-[-4px] w-0.5 bg-white" style={{ left: `${m.avgRaw}%` }}></div>
+      </div>
+    </div>
+  );
+}
 
               const rawVal = m.rawVal || 0; 
               const rawAvg = m.avgRaw || 0;
