@@ -754,12 +754,12 @@ export default function Leaderboard() {
                 </div>
               );
             })}
-                        {visibleCount < filteredAndRanked.length ? (<div className="p-4 flex justify-center border-t border-zinc-800"><button onClick={handleLoadMore} className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs rounded-xl transition-all"><ChevronIcon size={16} /> LOAD NEXT 100 NODES</button></div>) : filteredAndRanked.length > 0 && (<div className="p-4 text-center border-t border-zinc-800 text-[10px] text-zinc-600 font-mono uppercase">--- END OF LIST ---</div>)}
+                                    {visibleCount < filteredAndRanked.length ? (<div className="p-4 flex justify-center border-t border-zinc-800"><button onClick={handleLoadMore} className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs rounded-xl transition-all"><ChevronIcon size={16} /> LOAD NEXT 100 NODES</button></div>) : filteredAndRanked.length > 0 && (<div className="p-4 text-center border-t border-zinc-800 text-[10px] text-zinc-600 font-mono uppercase">--- END OF LIST ---</div>)}
           </div>
         )}
       </div>
 
-      {/* EXISTING COUNTER: Upscaled Size (Not huge, just legible) */}
+      {/* EXISTING COUNTER: Legible size (text-sm/base) */}
       {!loading && !creditsOffline && (
         <div className="max-w-5xl mx-auto mt-6 text-center text-sm md:text-base text-zinc-500 flex flex-col md:flex-row items-center justify-center gap-2 font-medium">
             <div className="flex items-center gap-2">
@@ -769,23 +769,18 @@ export default function Leaderboard() {
         </div>
       )}
 
-      {/* FOOTER: Adjusted Font Sizes */}
+      {/* FOOTER */}
       {!loading && !creditsOffline && (
         <footer className="max-w-5xl mx-auto mt-8 mb-12 pt-8 border-t border-zinc-900 px-4 text-center animate-in fade-in duration-700">
           
           <div className="max-w-2xl mx-auto space-y-4">
             
-            {/* Disclaimer 1: Tinier */}
+            {/* MERGED DISCLAIMER: Tiny, Italic, Serif style */}
             <p className="text-[10px] md:text-xs text-zinc-600 italic font-serif leading-relaxed">
-              * Participants listed have successfully submitted Storage Proofs and met network stability thresholds.
+              * Participants listed have successfully submitted Storage Proofs and met network stability thresholds. This leaderboard tracks Incentivized Nodes. To be eligible for credits, a node must not only participate in the Gossip protocol but also validate its committed storage via successful Proof cycles.
             </p>
 
-            {/* Disclaimer 2: Slightly Bigger */}
-            <p className="text-sm md:text-base text-zinc-400 leading-relaxed">
-              This leaderboard tracks <span className="font-bold text-zinc-300">Incentivized Nodes</span>. To be eligible for credits, a node must not only participate in the Gossip protocol but also validate its committed storage via successful Proof cycles.
-            </p>
-
-            {/* Links: Unchanged */}
+            {/* Links */}
             <div className="pt-6 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-3 text-xs font-mono text-zinc-600">
               <span className="uppercase tracking-widest opacity-70">Data fetched directly from the Pod Credits API:</span>
               <div className="flex items-center gap-3">
