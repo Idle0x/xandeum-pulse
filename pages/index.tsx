@@ -1229,30 +1229,30 @@ export default function Home() {
           </div>
 
           <div className="pt-1 md:pt-2">
-            <div className="text-[9px] md:text-[10px] text-zinc-600 uppercase font-bold mb-1">Network Rewards</div>
-              <div className={`flex justify-between items-center text-[10px] md:text-xs p-1.5 md:p-2 rounded-lg border transition-colors ${(node as any).isUntracked ? 'bg-zinc-900/50 border-zinc-800' : 'bg-black/40 border-zinc-800/50'}`}>
-               {(node as any).isUntracked ? (
-                   <div className="flex items-center gap-2 text-zinc-500 w-full justify-center font-bold text-[9px] md:text-[10px] tracking-wide">
-                     <AlertTriangle size={10} className="text-zinc-600"/> NO STORAGE CREDITS
-                   </div>
-               ) : node.credits !== null ? (
-                   <>
-                       <div className="flex items-center gap-1.5">
-                         <Medal size={10} className={node.rank===1?'text-yellow-400':'text-zinc-500'} />
-                         <span className="text-zinc-400 font-bold">#{node.rank}</span>
-                       </div>
-                       <div className="flex items-center gap-1.5">
-                         <span className="text-zinc-300 font-mono">{node.credits.toLocaleString()}</span>
-                         <Wallet size={10} className="text-yellow-600"/>
-                       </div>
-                   </>
-               ) : (
-                   <div className="flex items-center gap-2 text-red-400 w-full justify-center font-bold italic text-[9px] md:text-[10px]">
-                     <AlertOctagon size={10}/> CREDITS API OFFLINE
-                   </div>
-               )}
-            </div>
-          </div>
+  <div className="text-[9px] md:text-[10px] text-zinc-600 uppercase font-bold mb-1">Network Rewards</div>
+  <div className={`flex justify-between items-center text-[10px] md:text-xs p-1.5 md:p-2 rounded-lg border transition-colors ${(node as any).isUntracked ? 'bg-zinc-900/50 border-zinc-800' : 'bg-black/40 border-zinc-800/50'}`}>
+    {(node as any).isUntracked ? (
+      <div className="flex items-center gap-2 text-zinc-500 w-full justify-center font-bold text-[9px] md:text-[10px] tracking-wide">
+        <AlertTriangle size={10} className="text-zinc-600"/> NO STORAGE CREDITS
+      </div>
+    ) : node.credits !== null ? (
+      <>
+        <div className="flex items-center gap-1.5">
+          <Medal size={10} className={node.rank===1?'text-yellow-400':'text-zinc-500'} />
+          <span className="text-zinc-400 font-bold">#{node.rank}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-zinc-300 font-mono">{node.credits.toLocaleString()}</span>
+          <Wallet size={10} className="text-yellow-600"/>
+        </div>
+      </>
+    ) : (
+      <div className="flex items-center gap-2 text-red-400 w-full justify-center font-bold italic text-[9px] md:text-[10px]">
+        <AlertOctagon size={10}/> CREDITS API OFFLINE
+      </div>
+    )}
+  </div>
+</div>
 
           <div className="pt-2 md:pt-3 mt-2 md:mt-3 border-t border-white/5 flex justify-between items-end">
             <div>
@@ -1543,8 +1543,7 @@ export default function Home() {
         <span className="text-zinc-400 font-bold">{m.label}</span>
         <div className="font-mono text-[10px] text-zinc-500 font-bold">
           {(selectedNode as any).isUntracked 
-            ? 'NO STORAGE CREDITS' 
-            // REVERTED TEXT HERE
+            ? 'NO STORAGE CREDITS'
             : isCreditsOffline ? 'CREDITS API OFFLINE' : (m.rawVal! * m.weight).toFixed(2)}
         </div>
       </div>
@@ -3134,17 +3133,15 @@ export default function Home() {
                               </span>
                             </div>
                             <div className="bg-zinc-800 shadow-[0_4px_0_0_rgba(0,0,0,0.3)] rounded-lg p-2.5 mt-1.5 border-b border-white/5">
-                              <div className="flex justify-between items-center">
-                                <span className="text-[9px] text-zinc-500 font-mono uppercase">
-                                  Credits Earned
-                                </span>
-                                <span className={`${(selectedNode as any).isUntracked ? 'text-zinc-500 font-bold' : 'text-yellow-500 font-bold'} font-mono text-xs`}>
-                                  {(selectedNode as any).isUntracked 
-                                    ? 'NO STORAGE CREDITS' 
-                                    : (selectedNode?.credits !== null ? selectedNode.credits.toLocaleString() : 'CREDITS API OFFLINE')}
-                                </span>
-                              </div>
-                            </div>
+  <div className="flex justify-between items-center">
+    <span className="text-[9px] text-zinc-500 font-mono uppercase">Credits Earned</span>
+    <span className={`${(selectedNode as any).isUntracked ? 'text-zinc-500' : 'text-yellow-500'} font-mono font-bold text-xs`}>
+      {(selectedNode as any).isUntracked 
+        ? 'NO STORAGE CREDITS'
+        : (selectedNode?.credits !== null ? selectedNode.credits.toLocaleString() : 'CREDITS API OFFLINE')}
+    </span>
+  </div>
+</div>
                           </div>
 
                           <div className="mt-2 flex justify-end">
