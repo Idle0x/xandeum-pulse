@@ -164,7 +164,10 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
 
     // 4. PROOF: If we see "9.9.9-DEV", we know the dashboard correctly ignored Mainnet (1.0.0)
     // and opened the precise Devnet sibling.
-    expect(screen.getByText('9.9.9-DEV')).toBeVisible();
+    // NOTE: Using getAllByText because the version appears in multiple places (header + badge)
+    const versionBadges = screen.getAllByText('9.9.9-DEV');
+    expect(versionBadges.length).toBeGreaterThan(0);
+    expect(versionBadges[0]).toBeVisible();
   });
 
 });
