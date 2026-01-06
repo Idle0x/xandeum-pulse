@@ -197,7 +197,7 @@ export default function Leaderboard() {
           const netMatch = !targetNetwork || n.network === targetNetwork;
           // If targetAddr is present, it MUST match. If not present in URL, ignore it.
           const addrMatch = !targetAddr || n.address === decodeURIComponent(targetAddr);
-          
+
           return keyMatch && netMatch && addrMatch;
       });
 
@@ -213,15 +213,14 @@ export default function Leaderboard() {
               // Expand using the 3-Part ID
               const compositeId = `${targetNode.pubkey}-${targetNode.network}-${targetNode.address || 'no-ip'}`;
               setExpandedNode(compositeId);
-              
+
               // Calculate index for "Load More" logic
               const currentList = networkFilter === 'COMBINED' 
-                ? [...allNodes].sort((a,b) => { /* Your existing sort logic */
+                ? [...allNodes].sort((a,b) => {
                     if (b.credits !== a.credits) return b.credits - a.credits;
                     return b.health - a.health;
                 })
                 : allNodes.filter(n => n.network === targetNode.network).sort((a,b) => {
-                     /* Your existing sort logic */
                     if (b.credits !== a.credits) return b.credits - a.credits;
                     return b.health - a.health;
                 });
@@ -232,7 +231,7 @@ export default function Leaderboard() {
                   n.network === targetNode.network &&
                   n.address === targetNode.address
               );
-              
+
               if (idx >= visibleCount) setVisibleCount(idx + 50);
 
               setTimeout(() => {
@@ -349,6 +348,15 @@ export default function Leaderboard() {
   };
 
   const isStep1Valid = simNodes >= 1;
+
+  // --- NEW: Helper to generate precise Dashboard links ---
+  const getDashboardLink = (n: RankedNode) => {
+    const params = new URLSearchParams();
+    params.set('open', n.pubkey);
+    if (n.network) params.set('network', n.network);
+    if (n.address) params.set('focusAddr', n.address);
+    return `/?${params.toString()}`;
+  };
 
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-2 md:p-8 selection:bg-yellow-500/30">
@@ -693,7 +701,7 @@ export default function Leaderboard() {
           <div className="divide-y-0 px-2 pb-2">
             {filteredAndRanked.slice(0, visibleCount).map((node) => {
     const isMyNode = node.address && favorites.includes(node.address);
-    
+
     // NEW: 3-Part Composite ID Logic
     const compositeId = `${node.pubkey}-${node.network}-${node.address || 'no-ip'}`;
     const isExpanded = expandedNode === compositeId; 
@@ -740,7 +748,7 @@ export default function Leaderboard() {
                                             </button>
                                         </Link>
                                     )}
-                                    <Link href={`/?open=${node.pubkey}`} className="col-span-3">
+                                    <Link href={getDashboardLink(node)} className="col-span-3">
                                         <button className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-[10px] font-bold text-white">
                                             <Activity size={12} className="text-green-400" /> DIAGNOSTICS
                                         </button>
@@ -768,7 +776,7 @@ export default function Leaderboard() {
                                                 </button>
                                             </Link>
                                         )}
-                                        <Link href={`/?open=${node.pubkey}`}>
+                                        <Link href={getDashboardLink(node)}>
                                             <button className="w-full md:w-auto flex items-center justify-center gap-2 px-3 py-2 md:px-5 md:py-3 rounded-lg md:rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-[10px] md:text-xs font-bold text-white transition-all whitespace-nowrap">
                                                 <Activity size={12} className="text-green-400" />DIAGNOSTICS
                                             </button>
@@ -813,9 +821,9 @@ export default function Leaderboard() {
       {/* FOOTER */}
       {!loading && !creditsOffline && (
         <footer className="max-w-5xl mx-auto mt-8 mb-12 pt-8 border-t border-zinc-900 px-4 text-center animate-in fade-in duration-700">
-          
+
           <div className="max-w-2xl mx-auto space-y-4">
-            
+
             {/* MERGED DISCLAIMER: Tiny, Italic, Serif style */}
             <p className="text-[10px] md:text-xs text-zinc-600 italic font-serif leading-relaxed">
               * Participants listed have successfully submitted Storage Proofs and met network stability thresholds. This leaderboard tracks Incentivized Nodes. To be eligible for credits, a node must not only participate in the Gossip protocol but also validate its committed storage via successful Proof cycles.
