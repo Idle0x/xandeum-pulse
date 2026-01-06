@@ -70,7 +70,7 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
     mockQuery = {};
     mockedAxios.get.mockResolvedValue(MOCK_API_RESPONSE);
 
-    // BYPASS WELCOME CURTAIN
+    // FIX 1: BYPASS WELCOME CURTAIN
     localStorage.setItem('xandeum_pulse_welcome_v1', 'true');
   });
 
@@ -107,12 +107,11 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
     const repCard = screen.getByText('REPUTATION').closest('div');
     fireEvent.click(repCard!);
 
-    // VERIFY ALL 3 PARAMETERS ARE PRESENT (Identity Precision)
+    // VERIFY ALL 3 PARAMETERS ARE PRESENT
     expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('/leaderboard'));
     expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('highlight=8xTestNodeKey123'));
-    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('network=MAINNET')); 
-    // Address check (URL encoded or plain)
-    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('focusAddr=')); 
+    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('network=MAINNET'));
+    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('focusAddr='));
   });
 
   // =========================================================
@@ -152,7 +151,6 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
     const card = await screen.findByText(/8xTestNode/);
     fireEvent.click(card.closest('.group')!);
 
-    // Check for badge occurrence
     const badges = await screen.findAllByText(/API OFFLINE/i);
     expect(badges.length).toBeGreaterThan(0);
     expect(badges[0]).toBeInTheDocument();
@@ -178,7 +176,7 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
     mockQuery = { 
       open: SAMPLE_NODE.pubkey, 
       network: 'DEVNET', 
-      focusAddr: '2.2.2.2' 
+      focusAddr: '2.2.2.2:6000' // <--- FIXED: Must match exact mock address
     };
 
     await act(async () => {
@@ -189,7 +187,6 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
     await waitFor(() => expect(screen.getByText('NODE INSPECTOR')).toBeVisible());
 
     // 4. CRITICAL CHECK: Ensure the "DEVNET" badge is visible, NOT Mainnet
-    // This confirms the dashboard filtered strictly and didn't just grab the first node with the Pubkey
     expect(screen.getByText('DEVNET NETWORK')).toBeVisible();
     expect(screen.queryByText('MAINNET NETWORK')).toBeNull();
     
