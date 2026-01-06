@@ -90,7 +90,7 @@ interface Node {
     storage: number;
   };
 
-  // 🔹 NEW: Cluster / Fleet stats (optional, injected at runtime)
+  // NEW: Cluster / Fleet stats (optional, injected at runtime)
   clusterStats?: {
     totalGlobal: number;
     mainnetCount: number;
@@ -716,7 +716,7 @@ export default function Home() {
           storage_usage_percentage: percentStr,
           storage_usage_raw: rawPercent,
 
-          // 🔹 NEW: CLUSTER STATS (Used by badges + fleet matrix)
+          // NEW: CLUSTER STATS (Used by badges + fleet matrix)
           clusterStats: {
             totalGlobal: cluster.mainnet + cluster.devnet,
             mainnetCount: cluster.mainnet,
@@ -1246,7 +1246,7 @@ export default function Home() {
 
     return (
       <div
-        key={`\( {node.pubkey}- \){node.network}-${i}`}
+        key={`${node.pubkey}-${node.network}-${i}`}
         onClick={() => { setSelectedNode(node); setModalView('overview'); }}
         className={`group relative border rounded-xl p-3 md:p-5 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${
           zenMode ? 'bg-black border-zinc-800 hover:border-zinc-600' : isFav ? 'bg-gradient-to-b from-zinc-900 to-black border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.1)]' : 'bg-gradient-to-b from-zinc-900 to-black border-zinc-800 hover:border-blue-500/50'
@@ -3393,6 +3393,8 @@ export default function Home() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
 
             {!compareMode && !shareMode && (
               <div className="mt-6 pt-6 border-t border-zinc-800 flex flex-col gap-4">
@@ -3426,6 +3428,10 @@ export default function Home() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+    )}
 
     {!zenMode && (
       <footer className="border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto text-center">
