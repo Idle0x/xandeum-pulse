@@ -164,7 +164,7 @@ export default function Leaderboard() {
           (networkFilter === 'COMBINED' || n.network === networkFilter) && 
           n.pubkey.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      
+
       // MULTI-LEVEL SORT (Credits > Health > Pubkey)
       filtered.sort((a, b) => {
           if (b.credits !== a.credits) return b.credits - a.credits;
@@ -214,7 +214,7 @@ export default function Leaderboard() {
 
 
   // --- 4. SIMULATOR LOGIC ---
-  
+
   const clearImport = () => {
     setImportKey('');
     setImportSuccess(false);
@@ -688,7 +688,7 @@ export default function Leaderboard() {
                     {isExpanded && (
                         <div className="border-t border-zinc-800/50 p-3 md:p-4 animate-in slide-in-from-top-2 duration-200">
                             <div className="flex flex-col gap-4">
-                                
+
                                 {/* --- MOBILE ONLY VIEW (Grid 2x3) --- */}
                                 <div className="grid grid-cols-6 gap-2 md:hidden">
                                     {/* Row 1 */}
@@ -759,27 +759,26 @@ export default function Leaderboard() {
         )}
       </div>
 
-            {!loading && !creditsOffline && (
+      {!loading && !creditsOffline && (<div className="max-w-5xl mx-auto mt-6 text-center text-[10px] text-zinc-600 flex flex-col md:flex-row items-center justify-center gap-2"><div className="flex items-center gap-2"><Eye size={12} /><span>Showing <span className="text-zinc-400 font-bold">{Math.min(visibleCount, filteredAndRanked.length)}</span> of <span className="text-zinc-400 font-bold">{filteredAndRanked.length}</span> nodes.</span></div></div>)}
+
+      {/* NEW FOOTER */}
+      {!loading && !creditsOffline && (
         <footer className="max-w-5xl mx-auto mt-16 mb-12 pt-10 border-t border-zinc-900 px-4 text-center animate-in fade-in duration-700">
           
-          {/* 1. Big Counter */}
           <h2 className="text-3xl md:text-4xl font-bold text-zinc-700 mb-8 tracking-tight">
             Showing <span className="text-zinc-200">{Math.min(visibleCount, filteredAndRanked.length)}</span> of <span className="text-zinc-200">{filteredAndRanked.length}</span> nodes
           </h2>
 
           <div className="max-w-2xl mx-auto space-y-6">
             
-            {/* 2. Asterisk Note (Italic/Serif) */}
             <p className="text-sm md:text-base text-zinc-500 italic font-serif leading-relaxed">
               * Participants listed have successfully submitted Storage Proofs and met network stability thresholds.
             </p>
 
-            {/* 3. Explanation (Grammar Corrected) */}
             <p className="text-xs md:text-sm text-zinc-400 leading-relaxed">
               This leaderboard tracks <span className="font-bold text-zinc-300">Incentivized Nodes</span>. To be eligible for credits, a node must not only participate in the Gossip protocol but also validate its committed storage via successful Proof cycles.
             </p>
 
-            {/* 4. API Links */}
             <div className="pt-6 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-3 text-xs font-mono text-zinc-600">
               <span className="uppercase tracking-widest opacity-70">Data fetched directly from the Pod Credits API:</span>
               <div className="flex items-center gap-3">
@@ -806,3 +805,7 @@ export default function Leaderboard() {
           </div>
         </footer>
       )}
+
+    </div>
+  );
+}
