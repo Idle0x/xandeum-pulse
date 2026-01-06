@@ -1537,19 +1537,47 @@ export default function Home() {
           <div className="space-y-5">
             {metrics.map((m) => {
               if (m.label === 'Reputation Score') {
+  const weightedVal = (m.rawVal! * m.weight).toFixed(2);
+  const weightedAvg = (m.avgRaw! * m.weight).toFixed(2);
+  
+  const barColor = (m.rawVal || 0) >= 80 
+    ? 'bg-green-500' 
+    : (m.rawVal || 0) >= 50 
+    ? 'bg-yellow-500' 
+    : 'bg-red-500';
+
   return (
     <div key={m.label}>
       <div className="flex justify-between text-xs mb-2">
-        <span className="text-zinc-400 font-bold">{m.label}</span>
+        <span className="text-zinc-400 font-bold flex items-center gap-2">
+          {m.label}
+          <span className="text-[9px] font-mono text-zinc-600 font-normal">
+            (Base: {m.rawVal})
+          </span>
+        </span>
         <div className="font-mono text-[10px] text-zinc-500 font-bold">
-          {(selectedNode as any).isUntracked 
-            ? 'NO STORAGE CREDITS'
-            : isCreditsOffline ? 'CREDITS API OFFLINE' : (m.rawVal! * m.weight).toFixed(2)}
+          {(selectedNode as any).isUntracked ? (
+            'NO STORAGE CREDITS'
+          ) : isCreditsOffline ? (
+            'CREDITS API OFFLINE'
+          ) : (
+            <>
+              <span className="text-white font-bold">{weightedVal}</span>
+              <span className="text-zinc-600 mx-1">/</span>
+              <span className="text-zinc-500">Avg: {weightedAvg}</span>
+            </>
+          )}
         </div>
       </div>
       <div className="h-2 bg-zinc-800 rounded-full relative">
-        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${m.rawVal || 0}%` }}></div>
-        <div className="absolute top-[-4px] bottom-[-4px] w-0.5 bg-white" style={{ left: `${m.avgRaw}%` }}></div>
+        <div
+          className={`h-full rounded-full ${barColor}`} 
+          style={{ width: `${m.rawVal || 0}%` }}
+        ></div>
+        <div
+          className="absolute top-[-4px] bottom-[-4px] w-0.5 bg-white"
+          style={{ left: `${m.avgRaw}%` }}
+        ></div>
       </div>
     </div>
   );
