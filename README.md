@@ -45,7 +45,37 @@ This prevents the UI from hanging on slow or dead endpoints while maintaining da
 
 ---
 
-### 2. Vitality Score Algorithm
+### 2. Multi-Network Identity Resolution ("Identity Crisis" Protocol)
+
+In distributed systems, a single operator may run multiple node instances (e.g., one Mainnet, one Devnet) using the same Public Key. A naive dashboard would merge these into a single corrupted entry.
+
+Pulse implements a **3-System Matching Logic** to ensure atomic precision:
+1.  **Primary Match:** Public Key
+2.  **Context Match:** Network ID (Mainnet vs. Devnet)
+3.  **Physical Match:** IP Address / Port
+
+This ensures that "Sibling Nodes" are treated as distinct entities with their own metrics, ranking, and history.
+
+**Test Verification:** [`__tests__/integration/navigation.test.tsx`](__tests__/integration/navigation.test.tsx) – *Scenario 5: Precision Targeting*
+
+---
+
+### 3. Continuous Network Auditing (The Pulse Monitor)
+
+Beyond a dashboard, this repository acts as an automated network watchdog. A standalone script runs hourly via GitHub Actions to audit the Xandeum API for data corruption.
+
+- **Frequency:** Every 60 minutes (`0 * * * *`)
+- **Scope:** Scans 100% of nodes on both Mainnet and Devnet
+- **Checks:** Validates data schema integrity, non-null credit values, and API status codes
+
+If the Xandeum data feed sends corrupted values (e.g., `credits: null` or negative storage), the system alerts maintainers immediately, preventing "silent failures" on the dashboard.
+
+**The Script:** [`scripts/health-check.ts`](scripts/health-check.ts)  
+**The Workflow:** [`.github/workflows/monitor.yml`](.github/workflows/monitor.yml)
+
+---
+
+### 4. Vitality Score Algorithm
 
 Node health is scored 0-100 using four weighted components. The challenge was making diverse metrics (storage bytes, uptime seconds, version strings) directly comparable.
 
@@ -69,26 +99,26 @@ When the Credits API is unreachable, the Reputation weight (20%) is redistribute
 | Reputation | 0% (excluded) |
 | Version | 20% (+5%) |
 
-The system detects API failures by checking for `null` responses, then recalculates all scores using the adjusted weights.
-
 **Implementation:** [`lib/xandeum-brain.ts`](lib/xandeum-brain.ts#L95-L155) – `calculateVitalityScore()`
 
 ---
 
-### 3. Geographic Resolution & Caching
+### 5. Geographic Resolution & Topological Selection
 
-Displaying 1000+ nodes on a map without rate-limiting requires careful API management:
+Displaying 1000+ nodes on a map requires smart aggregation.
 
-#### Request Deduplication
-When 500 concurrent users load the map, they might all request the same IP address. Instead of firing 500 geocoding requests, we group them into a single promise that all callers await.
+#### Topological Representative Selection (The "King" Node)
+When aggregating nodes by city (e.g., "Tokyo"), the system doesn't just pick a random node to represent the cluster. It runs a selection algorithm to identify the "King" node for that specific view mode:
+* **Storage Mode:** Picks the node with the highest committed storage.
+* **Credits Mode:** Picks the node with the highest lifetime earnings.
 
-#### LRU Cache
-Previously resolved locations are stored in a `Map` with O(1) lookup. When the cache exceeds its limit, the least-recently-used entries are evicted to maintain stable memory usage.
+This ensures that clicking a map pin deep-links you to the *most relevant* node in that region, preserving the context of your investigation.
 
-#### Private IP Handling
-Nodes behind VPNs or CGNAT return non-routable addresses. These are assigned coordinates `(0, 0)` and flagged so they contribute to statistics but don't render invalid map pins.
+**Backend Logic:** [`pages/api/geo.ts`](pages/api/geo.ts)  
+**Test Verification:** [`__tests__/api/geo.test.ts`](__tests__/api/geo.test.ts) – *See `KING SELECTION` test case*
 
-**Implementation:** [`lib/xandeum-brain.ts`](lib/xandeum-brain.ts#L185-L200) – `resolveLocations()`
+#### Private IP Handling (Ghost Nodes)
+Nodes behind VPNs or CGNAT return non-routable addresses. These are assigned coordinates `(0, 0)` and flagged so they contribute to global statistics but do not render as invalid map pins.
 
 ---
 
@@ -100,25 +130,25 @@ The primary monitoring interface for node operators.
 
 - **Cyclic metrics:** Cards rotate between Storage → Uptime → Health every 5 seconds to maximize data density without clutter
 - **Visual mode toggle:** "Zen Mode" strips gradients/animations for OLED displays in 24/7 monitoring environments
+- **Modular Components:** Critical UI elements like the [`RadialProgress`](components/RadialProgress.tsx) chart are abstracted for performance and isolated testing.
 
 **Code:** [`pages/index.tsx`](pages/index.tsx)
-- See `renderZenCard()` - [Lines 1049-1097](pages/index.tsx#L1049-L1097) - (zen mode toggle)
+- See `renderZenCard()` - [Lines 1049-1097](pages/index.tsx#L1049-L1097)
 
 ![Dashboard](https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2Fdashboard.png)
 
 ### 2. Deep Node Inspection
 
 Clicking any node opens a granular diagnostic modal designed for detailed analysis.
- * Health Diagnostics: Breaks down the Vitality Score into its weighted components, overlaid with network average benchmarks.
- * Storage Analytics: Visualizes committed capacity against the network median, highlighting surplus or deficit gaps.
- * Head to Head Comparison: Evaluates two nodes side-by-side to identify performance differentials.
- * Proof of Pulse: Generates a PNG snapshot of the node's current metrics for social sharing.
- * Identity Panel: Exposes full metadata including RPC endpoints, public keys, and version consensus status.
+ * **Health Diagnostics:** Breaks down the Vitality Score into its weighted components.
+ * **Storage Analytics:** Visualizes committed capacity against the network median.
+ * **Head to Head Comparison:** Evaluates two nodes side-by-side to identify performance differentials.
+ * **Proof of Pulse:** Generates a PNG snapshot of the node's current metrics for social sharing.
+ * **Identity Panel:** Exposes full metadata including RPC endpoints and version consensus.
 
 **Code:** [`pages/index.tsx`](pages/index.tsx)
-- See `renderComparisonRow` - [Line 900-933](pages/index.tsx#L900-L933) - (versus Mode)
-- See `handleDownloadProof()` - [Lines 800-814](pages/index.tsx#L800-L814) - (proof generation)
-- See renderStorageAnalysis - [Line 1395-1521](pages/index.tsx#L1395-L1521) - (storage calculation)
+- See `renderComparisonRow` - [Line 900-933](pages/index.tsx#L900-L933) - (Versus Mode)
+- See `handleDownloadProof()` - [Lines 800-814](pages/index.tsx#L800-L814) - (Proof Generation)
 
 ![Inspector Modal](https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2FInspector%20Modal.png)
 
@@ -126,13 +156,11 @@ Clicking any node opens a granular diagnostic modal designed for detailed analys
 
 Visualizes the physical distribution of network infrastructure.
 
-- **Dynamic thresholds:** Color tiers are calculated from live percentiles rather than hardcoded values, so the map remains meaningful as the network grows
-- **Context-aware inspector:** Clicking a region shows different metrics depending on the selected view mode (Storage Density vs. Economic Share)
-- **Marker density:** Pin sizes scale with the number of nodes in each city
+- **Dynamic thresholds:** Color tiers are calculated from live percentiles rather than hardcoded values.
+- **Deep Linking:** Supports direct navigation via URL parameters (e.g., `?focus=1.2.3.4`) to instantly lock onto a specific node's physical location.
 
-**Code:** [`pages/map.tsx`](pages/map.tsx)
-- See `useEffect()` - [Lines 103-172](pages/map.tsx#L103-L172) - (percentile calculation & spatial intelligence)
-- See `getXRayStats()` - [Lines 301-365](pages/map.tsx#L301-L365) - (region inspector)
+**Code:** [`pages/map.tsx`](pages/map.tsx)  
+**Test Verification:** [`__tests__/pages/map.test.tsx`](__tests__/pages/map.test.tsx) – *Verifies deep linking and D3 rendering*
 
 ![Network Topology](https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2FNetwork_Topology.png)
 
@@ -140,13 +168,11 @@ Visualizes the physical distribution of network infrastructure.
 
 Reputation tracking and earnings forecasting.
 
-- **Rank history:** Tracks position changes over time using `localStorage` to show momentum (rising/falling)
-- **Earnings simulator:** Input hardware specs to estimate rewards based on geometric stacking of multipliers (Era boosts × NFT boosts)
-- **Identity bridging:** Merges anonymous blockchain addresses with physical node IPs by cross-referencing two separate APIs
+- **Earnings simulator:** Input hardware specs to estimate rewards based on geometric stacking of multipliers (Era boosts × NFT boosts).
+- **Identity bridging:** Merges anonymous blockchain addresses with physical node IPs.
 
 **Code:** [`pages/leaderboard.tsx`](pages/leaderboard.tsx)
-- See `calculateFinal()` - [Lines 197-201](pages/leaderboard.tsx#L163-L167) – (simulator logic)
-- See `useEffect()` - [Lines 61-151](pages/leaderboard.tsx#L61-L151) – (logic & algorithm)
+- See `calculateFinal()` - [Lines 197-201](pages/leaderboard.tsx#L163-L167)
 
 ![Credits & Reputation](https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2FCredits%20%26%20Reputation.png)
 
@@ -154,48 +180,23 @@ Reputation tracking and earnings forecasting.
 
 ## Engineering Standards & Quality Assurance
 
-This project implements a rigorous testing suite to ensure financial accuracy, crash resistance, and system cohesion.
+This project maintains a professional-grade testing environment with **31 passing tests** across 5 distinct suites, covering Logic, UI, API, and Integration layers.
 
 ### Crash Protocols (Resilience)
-We explicitly test for network failures using Mock Service Workers. If the Xandeum RPC or Credits API goes offline, the UI is verified to gracefully degrade to "Cached Mode" or display specific error badges rather than crashing (White Screen of Death). 
-
+We explicitly test for network failures. If the Xandeum RPC or Credits API goes offline, the UI is verified to gracefully degrade to "Cached Mode" or display specific error badges rather than crashing.
 - See [`__tests__/lib/xandeum-brain.test.ts`](__tests__/lib/xandeum-brain.test.ts)
 
 ### Geometric Precision (Economics)
-The **Stoinc Simulator** uses verified geometric stacking logic (`__tests__/lib/xandeum-economics.test.ts`) for NFT boosts. Unit tests confirm that multipliers compound correctly and that edge cases (like 0 storage or negative values) are clamped to prevent financial calculation errors.
-
+The **Stoinc Simulator** uses verified geometric stacking logic for NFT boosts. Unit tests confirm that multipliers compound correctly and that edge cases are clamped to prevent financial calculation errors.
 - See [`__tests__/lib/xandeum-economics.test.ts`](__tests__/lib/xandeum-economics.test.ts)
 
-### Ghost Node Handling (Privacy)
-Integration tests verify that "Ghost Nodes" (Private/VPN IPs) are tracked in global statistics but correctly masked on the geospatial map to prevent rendering errors (`lat: 0, lon: 0`) and privacy leaks.
+### Spatial Logic Verification
+Backend tests ensure that the aggregation logic correctly identifies high-value nodes ("Kings") in a city while filtering out "Ghost Nodes" (VPNs) to prevent map corruption.
+- See [`__tests__/api/geo.test.ts`](__tests__/api/geo.test.ts)
 
-- See [`__tests__/lib/xandeum-brain.test.ts`](__tests__/lib/xandeum-brain.test.ts)
-
-### Deep Link Integrity
-Navigation tests ensure that cross-module links (e.g., clicking a node in the Leaderboard to view it on the Map) correctly preserve state and focus context.
-
+### UI & Integration
+We simulate full user journeys, including clicking through from the Leaderboard to the Map and ensuring deep links preserve state.
 - See [`__tests__/integration/navigation.test.tsx`](__tests__/integration/navigation.test.tsx)
-
----
-
-## Quality Assurance
-
-This platform includes a comprehensive test suite:
-
-- **23 passing tests** covering core algorithms
-- **3 test suites** (Unit + Integration)
-- **~85% code coverage** on critical paths
-- **<6 second execution** time
-
-Run tests locally:
-
-```
-npm test              # Watch mode
-npm run test:ci       # CI mode
-npm run test:coverage # With coverage report
-```
-
-All tests passing on latest commit
 
 ---
 
@@ -204,28 +205,34 @@ All tests passing on latest commit
 ```
 /
 ├── .github/
-│   └── workflows/ci.yml     # Automated CI/CD Pipeline
+│   └── workflows/
+│       ├── ci.yml           # Automated Test Pipeline
+│       └── monitor.yml      # Hourly Network Health Check
 │
-├── __tests__/               # Engineering Test Suite
+├── __tests__/               # Engineering Test Suite (31 Tests)
 │   ├── integration/         # Deep-link & Routing verification
-│   └── lib/                 # Unit tests for Math & Logic
+│   ├── lib/                 # Unit tests for Math & Logic
+│   ├── api/                 # Backend logic verification
+│   └── pages/               # UI rendering tests
+│
+├── components/              # Reusable UI Blocks
+│   ├── RadialProgress.tsx   # Health score visualization
+│   └── WelcomeCurtain.tsx   # Intro animation
+│
+├── scripts/
+│   └── health-check.ts      # Standalone API Auditor
 │
 ├── pages/
 │   ├── index.tsx            # Dashboard UI
 │   ├── map.tsx              # Geographic visualizer
 │   ├── leaderboard.tsx      # Reputation rankings
-│   └── docs.tsx             # Interactive documentation
-│
-├── pages/api/
-│   ├── stats.ts             # Main data aggregation endpoint
-│   ├── geo.ts               # Geographic clustering logic
-│   └── credits.ts           # Reputation API proxy
+│   └── api/                 # Serverless Functions
 │
 ├── lib/
 │   ├── xandeum-brain.ts     # Vitality scoring + failover logic
 │   └── xandeum-economics.ts # Stoinc Simulator math engine
 │
-└── public/                  # Static assets
+└── types/                   # Shared TypeScript Definitions
 ```
 
 ---
@@ -233,60 +240,12 @@ All tests passing on latest commit
 ## API Endpoints
 
 ### `GET /api/stats`
-
 Returns an enriched list of all nodes with calculated health scores.
 
-**Response structure:**
-```json
-{
-  "result": {
-    "pods": [
-      {
-        "pubkey": "8x...2A",
-        "address": "192.168.1.1:6000",
-        "health": 81,
-        "healthBreakdown": {
-          "uptime": 92,
-          "storage": 78,
-          "reputation": 65,
-          "version": 100
-        },
-        "credits": 5200000,
-        "rank": 3
-      }
-    ]
-  },
-  "stats": {
-    "consensusVersion": "1.2.3",
-    "totalNodes": 1247,
-    "avgBreakdown": { ... }
-  }
-}
-```
-
 ### `GET /api/geo`
-
-Returns city-level aggregations for map rendering.
-
-**Response structure:**
-```json
-{
-  "locations": [
-    {
-      "name": "Lisbon",
-      "country": "Portugal",
-      "lat": 38.7223,
-      "lon": -9.1393,
-      "count": 42,
-      "totalStorage": 1200000000000,
-      "avgHealth": 87
-    }
-  ]
-}
-```
+Returns city-level aggregations for map rendering with "King" node metadata.
 
 ### `GET /api/credits`
-
 Proxies the upstream rewards oracle with a strict timeout to prevent UI blocking.
 
 ---
@@ -294,7 +253,7 @@ Proxies the upstream rewards oracle with a strict timeout to prevent UI blocking
 ## Running Locally
 
 ```bash
-git clone https://github.com/Idle0x/xandeum-pulse.git
+git clone [https://github.com/Idle0x/xandeum-pulse.git](https://github.com/Idle0x/xandeum-pulse.git)
 cd xandeum-pulse
 npm install
 npm run dev     # Start development server
@@ -309,63 +268,15 @@ No environment variables required – RPC endpoints are configured in `lib/xande
 
 ## Tech Stack
 
-- **Framework:** Next.js 14 (App Router)
+- **Framework:** Next.js 16 (App Router)
 - **Styling:** Tailwind CSS
 - **Testing:** Jest + React Testing Library (Unit & Integration)
-- **CI/CD:** GitHub Actions
+- **CI/CD:** GitHub Actions (CI + Cron Monitoring)
 - **Maps:** React Simple Maps + D3 Scale
 - **Charts:** Recharts
 - **Imaging:** html-to-image (Snapshot generation)
 - **Data fetching:** Axios with Promise-based failover
 - **Deployment:** Vercel (serverless functions)
-
----
-
-## Design Decisions
-
-### Why client-side geolocation instead of backend?
-
-Initially, all geocoding happened in API routes. This caused two problems:
-- Vercel's 10-second function timeout would fail on large node lists
-- IP-based rate limits applied to the server IP, not per-user
-
-Moving geocoding to the client (with deduplication) distributed the rate limit across users and removed the timeout constraint.
-
-### Why not use a database?
-
-The network state changes every ~10 seconds. A database would add:
-- Sync lag (data is stale the moment it's written)
-- Infrastructure cost (hosting + backups)
-- Another failure point
-
-Direct RPC queries mean the UI always shows the current network state, and the serverless architecture scales to zero when idle.
-
-### Why calculate scores client-side?
-
-The Vitality Score requires contextual data (median storage, consensus version) that changes with every fetch. Doing this calculation in the API route would require:
-1. Fetch all nodes
-2. Calculate context
-3. Rescan all nodes to apply scores
-4. Return result
-
-This doubles the processing time. Instead, the API returns raw data + context, and the client calculates scores during rendering. The work still happens, but it's parallelized across users' devices.
-
----
-
-## Graceful Degradation
-
-When external dependencies fail, the UI adapts rather than breaking:
-
-- **Credits API failure detection:** Instead of showing stale data or "N/A", the interface displays "CREDITS API OFFLINE" with a warning icon, making it clear the issue is upstream, not with Pulse itself
-- **Automatic score re-weighting:** When credits data is unavailable, the Vitality Score algorithm redistributes the 20% reputation weight to other components, ensuring nodes aren't penalized for API downtime
-
----
-
-## Known Limitations
-
-- **No historical data:** All metrics are point-in-time snapshots (by design – shows current network state)
-- **IP geolocation accuracy:** ~50-100km margin of error for most providers
-- **No authentication:** Anyone can view any node's data (intentional for network transparency)
 
 ---
 
