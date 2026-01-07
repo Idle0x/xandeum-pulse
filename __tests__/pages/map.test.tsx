@@ -25,14 +25,23 @@ jest.mock('next/router', () => ({
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-// 3. IMPORTANT: Mock react-simple-maps
-// Rendering D3 maps in JSDOM is flaky. We mock it to ensure the logic runs without SVG errors.
+// 3. Mock react-simple-maps (UI Library)
 jest.mock('react-simple-maps', () => ({
   ComposableMap: ({ children }: any) => <div data-testid="geo-map">{children}</div>,
   ZoomableGroup: ({ children }: any) => <div>{children}</div>,
-  Geographies: ({ children }: any) => <div>{children({ geographies: [] })}</div>, // Return empty geos
+  Geographies: ({ children }: any) => <div>{children({ geographies: [] })}</div>,
   Geography: () => <div />,
   Marker: ({ onClick, children }: any) => <div data-testid="map-marker" onClick={onClick}>{children}</div>
+}));
+
+// 4. [NEW] Mock d3-scale to bypass ESM errors
+// This prevents Jest from trying to compile the D3 library
+jest.mock('d3-scale', () => ({
+  scaleSqrt: () => ({
+    domain: () => ({
+      range: () => () => 10 // Returns a function that always sets circle size to 10px
+    })
+  })
 }));
 
 describe('Map Page - UI & Deep Linking', () => {
@@ -75,15 +84,8 @@ describe('Map Page - UI & Deep Linking', () => {
     
     render(<MapPage />);
 
-    // Logic: 
-    // 1. Page loads
-    // 2. useEffect checks router.query.focus
-    // 3. Matches IP '1.2.3.4' to 'Berlin'
-    // 4. Sets 'activeLocation' to Berlin (triggers split view)
-
     await waitFor(() => {
-        // If split view opens, the "Open Live Stats" button disappears or the list becomes visible
-        // We check if the marker became "active" logic or if the specific Berlin card is highlighted
+        // We check if the marker became "active" or the Berlin card is highlighted
         const berlinItem = screen.getByText('Berlin, Germany').closest('.group');
         expect(berlinItem).toHaveClass('bg-zinc-800'); // Active class check
     });
