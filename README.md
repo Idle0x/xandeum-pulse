@@ -281,6 +281,54 @@ No environment variables required – RPC endpoints are configured in `lib/xande
 
 ---
 
+## Design Decisions
+
+### Why client-side geolocation instead of backend?
+
+Initially, all geocoding happened in API routes. This caused two problems:
+- Vercel's 10-second function timeout would fail on large node lists
+- IP-based rate limits applied to the server IP, not per-user
+
+Moving geocoding to the client (with deduplication) distributed the rate limit across users and removed the timeout constraint.
+
+### Why not use a database?
+
+The network state changes every ~10 seconds. A database would add:
+- Sync lag (data is stale the moment it's written)
+- Infrastructure cost (hosting + backups)
+- Another failure point
+
+Direct RPC queries mean the UI always shows the current network state, and the serverless architecture scales to zero when idle.
+
+### Why calculate scores client-side?
+
+The Vitality Score requires contextual data (median storage, consensus version) that changes with every fetch. Doing this calculation in the API route would require:
+1. Fetch all nodes
+2. Calculate context
+3. Rescan all nodes to apply scores
+4. Return result
+
+This doubles the processing time. Instead, the API returns raw data + context, and the client calculates scores during rendering. The work still happens, but it's parallelized across users' devices.
+
+---
+
+## Graceful Degradation
+
+When external dependencies fail, the UI adapts rather than breaking:
+
+- **Credits API failure detection:** Instead of showing stale data or "N/A", the interface displays "CREDITS API OFFLINE" with a warning icon, making it clear the issue is upstream, not with Pulse itself
+- **Automatic score re-weighting:** When credits data is unavailable, the Vitality Score algorithm redistributes the 20% reputation weight to other components, ensuring nodes aren't penalized for API downtime
+
+---
+
+## Known Limitations
+
+- **No historical data:** All metrics are point-in-time snapshots (by design – shows current network state)
+- **IP geolocation accuracy:** ~50-100km margin of error for most providers
+- **No authentication:** Anyone can view any node's data (intentional for network transparency)
+
+---
+
 ## Further Reading
 
 For a deep dive into the system's engineering—including the "Identity Crisis" resolution protocols, mathematical scoring models, automated auditing workflows, and version consensus algorithms—please check out the full technical documentation:
