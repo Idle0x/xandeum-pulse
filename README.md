@@ -9,7 +9,8 @@
 
 Real-time network monitor and analytics dashboard for the Xandeum distributed storage protocol.
 
-**check it out:** https://xandeum-pulse.vercel.app
+**Live Dashboard:** https://xandeum-pulse.vercel.app  
+**Documentation:** [Read the full DOCUMENTATION.md](DOCUMENTATION.md)
 
 ![Homepage](https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2Fhomepage.png)
 
@@ -277,6 +278,14 @@ No environment variables required – RPC endpoints are configured in `lib/xande
 - **Imaging:** html-to-image (Snapshot generation)
 - **Data fetching:** Axios with Promise-based failover
 - **Deployment:** Vercel (serverless functions)
+
+---
+
+## Further Reading
+
+For a deep dive into the system's engineering—including the "Identity Crisis" resolution protocols, mathematical scoring models, automated auditing workflows, and version consensus algorithms—please check out the full technical documentation:
+
+**[DOCUMENTATION.md](DOCUMENTATION.md)**
 
 ---
 
