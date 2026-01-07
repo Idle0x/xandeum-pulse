@@ -509,6 +509,40 @@ const resolveLocations = async (ips) => {
             </div>
         </section>
 
+        {/* ==========================================
+            DOCS LINK SECTION
+           ========================================== */}
+        <section className="py-24 border-t border-zinc-900 bg-[#050505] text-center">
+            <div className="max-w-2xl mx-auto px-6">
+                <div className="inline-flex items-center justify-center p-1 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 mb-8">
+                    <div className="bg-black rounded-full px-6 py-2">
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 font-bold text-xs uppercase tracking-widest">
+                            Official Documentation
+                        </span>
+                    </div>
+                </div>
+                
+                <h2 className="text-3xl md:text-4xl font-extrabold text-white mb-6">
+                    Ready to Go Deeper?
+                </h2>
+                
+                <p className="text-zinc-400 mb-10 text-sm leading-relaxed max-w-lg mx-auto">
+                    Access the complete technical specifications, including full API references, vitality algorithms, and integration guides.
+                </p>
+
+                <a 
+                    href="https://github.com/Idle0x/xandeum-pulse/blob/main/DOCUMENTATION.md" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-3 px-8 py-4 bg-white text-black rounded-full font-bold text-sm hover:bg-zinc-200 transition-all group"
+                >
+                    <Terminal size={18} />
+                    <span>READ DOCUMENTATION.MD</span>
+                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                </a>
+            </div>
+        </section>
+
       </main>
 
       {/* Footer */}
