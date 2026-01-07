@@ -2,9 +2,9 @@ name: 🏥 Pulse Monitor
 
 on:
   schedule:
-    # Runs at minute 0 of every hour (24 times a day)
+    # Runs at minute 23 of every hour (24 times a day)
     # This consumes ~360 minutes/month (only 18% of free GitHub quota)
-    - cron: '0 * * * *'
+    - cron: '23 * * * *'
   # Allows you to click "Run Now" manually in GitHub
   workflow_dispatch:
 
