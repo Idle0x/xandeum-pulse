@@ -5,14 +5,15 @@
 1. [System Overview](#system-overview)
 2. [Architecture](#architecture)
 3. [Vitality Score Model](#vitality-score-model)
-4. [Core Mathematics](#core-mathematics)
-5. [Health Score Algorithm](#health-score-algorithm)
-6. [Data Pipeline](#data-pipeline)
-7. [API Reference](#api-reference)
-8. [UI/UX Design Principles](#uiux-design-principles)
-9. [Platform Walkthrough](#platform-walkthrough)
-10. [Performance & Optimization](#performance--optimization)
-11. [Error Handling & Resilience](#error-handling--resilience)
+4. [Consensus & Identity Protocols](#consensus--identity-protocols)
+5. [Core Mathematics](#core-mathematics)
+6. [Quality Assurance Architecture](#quality-assurance-architecture)
+7. [Data Pipeline](#data-pipeline)
+8. [API Reference](#api-reference)
+9. [UI/UX Design Principles](#uiux-design-principles)
+10. [Platform Walkthrough](#platform-walkthrough)
+11. [Performance & Optimization](#performance--optimization)
+12. [Error Handling & Resilience](#error-handling--resilience)
 
 ---
 
@@ -31,6 +32,7 @@ Xandeum Pulse is a real-time network monitoring dashboard for the Xandeum blockc
 - **Zero External Database**: All state managed client-side or via ephemeral caching
 - **Dynamic Thresholds**: Percentile-based tiering adapts to network growth
 - **Deep Linking**: Share direct links to specific nodes or map regions
+- **Continuous Auditing**: Automated hourly scripts verify network data integrity
 
 ---
 
@@ -70,20 +72,25 @@ Xandeum Pulse is a real-time network monitoring dashboard for the Xandeum blockc
 ### Component Breakdown
 
 #### Frontend Layer
-- **Next.js 13+**: Server-side rendering for SEO, client-side reactivity for real-time updates
+- **Next.js 16+**: Server-side rendering for SEO, client-side reactivity for real-time updates
 - **Tailwind CSS**: Utility-first styling with custom animations
 - **React Simple Maps**: D3-powered geographic visualization
 - **Lucide React**: Consistent icon system
+- **Modular Components**: Critical UI elements like `RadialProgress.tsx` are isolated for performance
 
 #### API Layer (`/pages/api/`)
 - **`stats.ts`**: Main telemetry endpoint, returns enriched node data + network statistics
-- **`geo.ts`**: Geographic aggregation for map view
+- **`geo.ts`**: Geographic aggregation for map view with "King Node" selection logic
 - **`credits.ts`**: Proxy for reputation data with timeout handling
 
 #### Brain (`/lib/xandeum-brain.ts`)
 - **Data Fetching**: Multi-source failover (primary + 6 backup nodes)
 - **Enrichment Pipeline**: Geolocation, health scoring, rank calculation
 - **Mathematical Engine**: Implements all scoring algorithms
+
+#### Watchdog (`/scripts/health-check.ts`)
+- **Automated Auditor**: Standalone script runs hourly via CI/CD
+- **Deep Scan**: Validates 100% of nodes for data corruption or schema violations
 
 ---
 
@@ -212,31 +219,21 @@ Vitality Score =
 
 Scores are clamped to 0–100 after aggregation.
 
-#### 📊 Example Calculation
+---
 
-**Node Profile:**
-- Uptime: 15 Days
-- Storage: 500 GB Committed (Median is ~100GB)
-- Credits: "Average" (Node has ~38k, Median is ~42k)
-- Version: Latest
+## Consensus & Identity Protocols
 
-**Breakdown:**
-- Uptime (15 days): 83 pts × 0.35 = 29.05
-- Storage (500 GB vs 100 GB Median): 100 pts (High cap) × 0.30 = 30.0
-- Version (Latest): 100 pts × 0.15 = 15.0
-- Reputation (~0.9x Median): ~70 pts × 0.20 = 14.0
+### Multi-Network Identity Resolution ("Identity Crisis")
 
-**Total Score:** 29.05 + 30.0 + 15.0 + 14.0 = 88.05 → **88 (Excellent Health)**
+In distributed systems, a single operator may run multiple node instances (e.g., one Mainnet, one Devnet) using the same Public Key. A naive dashboard would merge these into a single corrupted entry.
 
-#### 🔁 Dynamic Re-Weighting (Fallback Mode)
+Pulse implements a **3-Factor Matching Logic** to ensure atomic precision:
 
-If the Reputation / Credits API is offline, weights automatically shift to:
-- Uptime: 45%
-- Storage: 35%
-- Version: 20%
-- Reputation: 0%
+1.  **Primary Match (Key):** Public Key
+2.  **Context Match (Network):** Mainnet vs. Devnet
+3.  **Physical Match (Origin):** IP Address / Port
 
-This guarantees continuity and fair ranking during upstream outages.
+This ensures that "Sibling Nodes" are treated as distinct entities with their own metrics, ranking, and history, preventing data collisions in the dashboard.
 
 ---
 
@@ -285,14 +282,6 @@ U = 100 / (1 + e^(-k(t - m)))
 - If `t < 1 day`: Cap score at 20 (regardless of sigmoid output)
 - This prevents brand-new nodes from gaming the system
 
-**Example Values:**
-| Uptime | Raw Sigmoid | Final Score |
-|--------|-------------|-------------|
-| 1 day  | 38.4        | **20** (capped) |
-| 7 days | 50.0        | 50 |
-| 14 days| 76.2        | 76 |
-| 30 days| 98.8        | 98 |
-
 ---
 
 ### 3. Storage Score (Logarithmic + Bonus)
@@ -306,8 +295,7 @@ Where:
 - `C` = node's committed storage (bytes)
 - `M` = network median committed storage
 
-**Why Logarithmic?**  
-Linear scoring would allow mega-nodes to dominate. Log₂ compression ensures diminishing returns:
+**Why Logarithmic?** Linear scoring would allow mega-nodes to dominate. Log₂ compression ensures diminishing returns:
 
 | Ratio (C/M) | Score |
 |-------------|-------|
@@ -330,12 +318,6 @@ S_total = S_base + Bonus
 
 **Can exceed 100** (e.g., 115) to reward active usage. The final Total Health clamps at 100, but the breakdown shows the raw value.
 
-**Example:**
-- Node A: 4TB committed, 500GB used
-  - Base: 100 (4× median)
-  - Bonus: 14.8 (high usage)
-  - **Total: 115** ✅
-
 ---
 
 ### 4. Reputation Score (Linear Percentile)
@@ -348,8 +330,7 @@ Where:
 - `C` = node's credits earned
 - `M_cr` = network median credits
 
-**Why × 2?**  
-Reaching the median = 50 points. Doubles the median = 100 points. This scales gracefully as the network matures.
+**Why × 2?** Reaching the median = 50 points. Doubles the median = 100 points. This scales gracefully as the network matures.
 
 **Null Handling:**
 - If Credits API is offline: `R = null` → triggers re-weighting
@@ -376,13 +357,6 @@ V = f(distance from consensus)
 | -5 versions | 10 | Ancient |
 | -6+ versions | 0-9 | Dead node |
 
-**Implementation:**
-```typescript
-const consensusIndex = sortedVersions.indexOf(consensusVersion);
-const nodeIndex = sortedVersions.indexOf(nodeVersion);
-const distance = nodeIndex - consensusIndex;
-```
-
 ---
 
 ### 6. Map Tiering (Percentile-Based)
@@ -406,49 +380,35 @@ T₄ = 40-60 (Shaky)
 T₅ = < 40  (Critical)
 ```
 
-**Color Mapping:**
-```typescript
-const TIER_COLORS = [
-  "#f59e0b", // Tier 1 (Amber)
-  "#ec4899", // Tier 2 (Pink)
-  "#a855f7", // Tier 3 (Purple)
-  "#3b82f6", // Tier 4 (Blue)
-  "#22d3ee"  // Tier 5 (Cyan)
-];
-```
-
 ---
 
-## Health Score Algorithm
+## Quality Assurance Architecture
 
-### Full Calculation Flow
+The platform's reliability is guaranteed by a multi-layered testing strategy comprising **31 automated tests** across 5 suites.
 
-```mermaid
-graph TD
-    A[Raw Node Data] --> B{Storage > 0?}
-    B -->|No| C[Return 0]
-    B -->|Yes| D[Calculate Uptime Score]
-    D --> E[Calculate Storage Score]
-    E --> F{Credits Available?}
-    F -->|Yes| G[Calculate Reputation Score]
-    F -->|No| H[Set Reputation = null]
-    G --> I[Calculate Version Score]
-    H --> I
-    I --> J{Credits API Online?}
-    J -->|Yes| K[Weighted Sum: Full Mode]
-    J -->|No| L[Weighted Sum: Outage Mode]
-    K --> M[Clamp Total to 0-100]
-    L --> M
-    M --> N[Return Final Score + Breakdown]
-```
+### 1. Mathematical Verification
+- **Focus:** `lib/xandeum-economics.ts`, `lib/xandeum-brain.ts`
+- **Method:** Unit tests verify that:
+    - Geometric stacking of NFT boosts calculates correctly to the 8th decimal.
+    - Vitality scores clamp correctly (0-100) even with negative inputs.
+    - Fallback weights trigger automatically when API simulates failure.
 
-### Edge Cases Handled
+### 2. Spatial Logic Verification
+- **Focus:** `api/geo.ts`
+- **Method:** Backend tests confirm:
+    - **Ghost Node Filtering:** VPN/Private IPs (`lat: 0`) are excluded from map rendering.
+    - **King Selection:** The aggregation engine correctly picks the highest-value node to represent a city cluster.
 
-1. **Zero Storage Commitment**: Instant disqualification (`total = 0`)
-2. **Negative Values**: Clamped to 0 before processing
-3. **NaN/Infinity**: Replaced with safe defaults (0 or 1)
-4. **Credits Outage**: Automatic re-weighting without manual intervention
-5. **Version Parsing Errors**: Defaults to `0.0.0` (worst score)
+### 3. UI & Integration Tests
+- **Focus:** `pages/map.tsx`, `integration/navigation.test.tsx`
+- **Method:** Simulates user journeys:
+    - Clicking a deep link (`?focus=1.2.3.4`) correctly zooms the map.
+    - Switching view modes updates D3 render layers without crashing.
+
+### 4. The Pulse Monitor (Continuous Auditing)
+Beyond tests, a live **Health Check Script** (`scripts/health-check.ts`) runs hourly via GitHub Actions.
+- **Scope:** Pings 100% of network nodes.
+- **Rule:** If any node returns corrupted schema (e.g., `credits: null`), alerts are triggered immediately.
 
 ---
 
@@ -467,7 +427,7 @@ graph TD
    └─ Timeout: 6 seconds each
 
 3. CREDITS API (parallel)
-   ├─ URL: https://podcredits.xandeum.network/api/pods-credits
+   ├─ URL: [https://podcredits.xandeum.network/api/pods-credits](https://podcredits.xandeum.network/api/pods-credits)
    ├─ Timeout: 4 seconds
    └─ On failure: Set creditsSystemOnline = false
 
@@ -552,7 +512,7 @@ graph TD
 
 **LocationData Fields:**
 - `totalCredits`: **Nullable** if no valid credit data exists for region
-- `topPks`: Object mapping `{ STORAGE, CREDITS, HEALTH }` to leader pubkeys
+- `topPerformers`: Object mapping `{ STORAGE, CREDITS, HEALTH }` to "King" node metadata
 
 ---
 
@@ -948,9 +908,9 @@ useEffect(() => {
 
 ### Testing Protocol
 
-1. **Unit Tests**: (Not yet implemented)
-2. **Integration Tests**: Manual QA checklist
-3. **Load Testing**: 1000+ concurrent users (future)
+1. **Unit Tests**: Full coverage for `lib/` mathematics
+2. **Integration Tests**: Navigation & Deep-linking coverage
+3. **Automated Audits**: Hourly network integrity checks via CI/CD
 
 ### Performance Budgets
 
@@ -971,5 +931,4 @@ useEffect(() => {
 
 ---
 
-*Documentation last updated: December 2024*  
-*For questions, open an issue on GitHub or reach out on X.*
+*Documentation last updated: January 2026 (v2.0 Architecture)* *For questions, open an issue on GitHub or reach out on X.*
