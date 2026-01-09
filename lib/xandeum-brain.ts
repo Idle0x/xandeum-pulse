@@ -2,21 +2,12 @@ import axios from 'axios';
 import geoip from 'geoip-lite'; 
 
 // --- CONFIGURATION ---
-// 1. CHILLXAND (HTTPS, No port, No /rpc suffix unless specified)
-const CHILLXAND_RPC = 'https://rpc1.chillxand.com';
-
-// 2. PUBLIC SWARM (HTTP, Port 6000, Needs /rpc)
-const PUBLIC_SWARM = [
-  'http://173.212.203.145:6000',
-  'http://161.97.97.41:6000',
-  'http://192.190.136.36:6000',
-  'http://192.190.136.38:6000',
-  'http://207.244.255.1:6000',
-  'http://192.190.136.28:6000',
-  'http://192.190.136.29:6000'
+// 1. ONLY CHILLXAND (Isolated for testing)
+const ALL_RPCS = [
+  'https://rpc1.chillxand.com'
 ];
 
-const TIMEOUT_RPC = 6000;
+const TIMEOUT_RPC = 8000; // Giving it plenty of time
 const TIMEOUT_CREDITS = 8000;
 
 // Grab the key from environment
@@ -27,7 +18,7 @@ const API_CREDITS_DEVNET  = 'https://podcredits.xandeum.network/api/pods-credits
 
 const geoCache = new Map<string, { lat: number; lon: number; country: string; countryCode: string; city: string }>();
 
-// --- INTERFACES & HELPERS (Kept same as before) ---
+// --- INTERFACES ---
 export interface EnrichedNode {
   address: string;
   pubkey: string;
@@ -41,13 +32,25 @@ export interface EnrichedNode {
   storage_committed: number; 
   credits: number | null; 
   health: number;
-  healthBreakdown: { uptime: number; version: number; reputation: number | null; storage: number; };
-  location: { lat: number; lon: number; countryName: string; countryCode: string; city: string; };
+  healthBreakdown: {
+      uptime: number;
+      version: number;
+      reputation: number | null;
+      storage: number;
+  };
+  location: {
+    lat: number;
+    lon: number;
+    countryName: string;
+    countryCode: string;
+    city: string;
+  };
   rank?: number;        
   health_rank?: number;
   rpc_source?: string;
 }
 
+// --- HELPERS ---
 export const cleanSemver = (v: string) => v ? v.split('-')[0].replace(/[^0-9.]/g, '') : '0.0.0';
 
 export const compareVersions = (v1: string, v2: string) => {
@@ -126,70 +129,60 @@ const AXIOS_CONFIG_CREDITS = {
     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json, text/plain, */*' }
 };
 
-// --- AGGRESSIVE FETCHING ---
+// --- STRICT CHILLXAND FETCHING ---
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
 
-  // 1. Build Request List manually to control URLs precisely
-  const requests = [];
+  console.log(`[PULSE] Connecting ONLY to ChillXand... Key Present? ${CHILL_KEY ? 'YES' : 'NO'}`);
 
-  // A. ChillXand Request (No /rpc suffix modification)
-  console.log(`[PULSE] Connecting to ChillXand: ${CHILLXAND_RPC}`);
-  requests.push(
-    axios.post(CHILLXAND_RPC, payload, {
+  const requests = ALL_RPCS.map(url => {
+    // 1. Prepare Header
+    const config: any = { 
         timeout: TIMEOUT_RPC,
         headers: { 
             'Content-Type': 'application/json',
             'X-API-Key': CHILL_KEY 
         }
-    })
-    .then(res => ({ status: 'fulfilled' as const, url: CHILLXAND_RPC, pods: res.data?.result?.pods || [] }))
-    .catch(err => ({ status: 'rejected' as const, url: CHILLXAND_RPC, error: err.message, code: err.response?.status }))
-  );
+    };
 
-  // B. Public Swarm Requests (Force /rpc)
-  PUBLIC_SWARM.forEach(node => {
-      const url = `${node}/rpc`; 
-      requests.push(
-        axios.post(url, payload, { timeout: TIMEOUT_RPC })
-          .then(res => ({ status: 'fulfilled' as const, url, pods: res.data?.result?.pods || [] }))
-          .catch(err => ({ status: 'rejected' as const, url, error: err.message, code: err.response?.status }))
-      );
+    // 2. Fire Request (NO /rpc suffix forced)
+    return axios.post(url, payload, config)
+      .then(res => ({
+        status: 'fulfilled' as const,
+        url,
+        pods: res.data?.result?.pods || []
+      }))
+      .catch(err => ({
+        status: 'rejected' as const,
+        url,
+        error: err.message,
+        code: err.response?.status // Capture 403/404 explicitly
+      }));
   });
 
-  // 2. Wait for all
   const results = await Promise.all(requests);
 
-  // 3. Process
   const allPods: any[] = [];
-  const successfulRPCs: string[] = [];
+  let success = false;
 
   results.forEach(r => {
     if (r.status === 'fulfilled' && Array.isArray(r.pods)) {
-      if (r.pods.length > 0) {
-        successfulRPCs.push(r.url);
-        const labeledPods = r.pods.map((p: any) => ({ ...p, rpc_source: r.url }));
+        console.log(`[PULSE] SUCCESS: ChillXand returned ${r.pods.length} nodes.`);
+        success = true;
+        // Tag and Push
+        const labeledPods = r.pods.map((p: any) => ({ ...p, rpc_source: 'ChillXand' }));
         allPods.push(...labeledPods);
-      }
     } else {
-      // LOG THE SPECIFIC ERROR CODE (403 vs 404)
-      const errCode = (r as any).code || 'Unknown';
-      console.warn(`[PULSE] Failed ${r.url} -> Status: ${errCode} | Msg: ${(r as any).error}`);
+        const errCode = (r as any).code || 'Unknown';
+        console.error(`[PULSE] FATAL: ChillXand Failed -> Status: ${errCode} | Msg: ${(r as any).error}`);
     }
   });
 
-  console.log(`[PULSE] Connected to: ${successfulRPCs.length} RPCs. Total Nodes: ${allPods.length}`);
-
-  let sourceLabel = 'No Connection';
-  if (successfulRPCs.length > 0) {
-    if (successfulRPCs.some(u => u.includes('chillxand'))) {
-      sourceLabel = successfulRPCs.length > 1 ? 'Global Union (ChillXand+)' : 'ChillXand Only';
-    } else {
-      sourceLabel = `Public Swarm (${successfulRPCs.length})`;
-    }
+  if (!success) {
+      console.warn("[PULSE] Critical Failure: ChillXand did not return data.");
   }
 
-  return { pods: allPods, source: sourceLabel };
+  return { pods: allPods, source: success ? 'ChillXand Only' : 'Offline' };
 }
 
 async function fetchCredits() {
@@ -233,31 +226,29 @@ async function resolveLocations(ips: string[]) {
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
   const [{ pods: rawPods, source }, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
   
-  if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable (0 Nodes Found)");
+  // IF CHILLXAND FAILS, WE SHOW ERROR
+  if (!rawPods || rawPods.length === 0) throw new Error("ChillXand Connection Failed (0 Nodes)");
 
   const mainnetMap = new Map<string, number>();
   const devnetMap = new Map<string, number>();
-  const mainnetValues: number[] = [];
-  const devnetValues: number[] = [];
-
-  // Populate Credits Maps
+  
   if (Array.isArray(creditsData.mainnet)) {
       creditsData.mainnet.forEach((c: any) => {
           const val = parseFloat(c.credits || c.amount || '0');
           const key = c.pod_id || c.pubkey || c.node;
-          if (key && !isNaN(val)) { mainnetMap.set(key, val); mainnetValues.push(val); }
+          if (key && !isNaN(val)) mainnetMap.set(key, val);
       });
   }
   if (Array.isArray(creditsData.devnet)) {
       creditsData.devnet.forEach((c: any) => {
           const val = parseFloat(c.credits || c.amount || '0');
           const key = c.pod_id || c.pubkey || c.node;
-          if (key && !isNaN(val)) { devnetMap.set(key, val); devnetValues.push(val); }
+          if (key && !isNaN(val)) devnetMap.set(key, val);
       });
   }
 
-  mainnetValues.sort((a, b) => a - b);
-  devnetValues.sort((a, b) => a - b);
+  const mainnetValues = Array.from(mainnetMap.values()).sort((a, b) => a - b);
+  const devnetValues = Array.from(devnetMap.values()).sort((a, b) => a - b);
   const medianMainnet = mainnetValues.length ? mainnetValues[Math.floor(mainnetValues.length / 2)] : 0;
   const medianStorage = rawPods.length ? rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b)[Math.floor(rawPods.length / 2)] : 1;
 
@@ -316,7 +307,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       }
       if (inDevnet) {
           const credits = devnetMap.get(key) || 0;
-          expandedNodes.push(scoreNode(pod, 'DEVNET', credits, medianMainnet, false)); // Note: Fallback to mainnet median if devnet empty
+          expandedNodes.push(scoreNode(pod, 'DEVNET', credits, medianMainnet, false));
       }
       if (!inMainnet && !inDevnet) {
           const isUntracked = creditsData.mainnet.length > 0;
@@ -328,12 +319,13 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const devnetNodes = expandedNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const unknownNodes = expandedNodes.filter(n => n.network === 'UNKNOWN');
 
-  // Ranking Logic
+  // Ranking
   let r = 1; mainnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (mainnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
   r = 1; devnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (devnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
 
   const finalNodes = [...mainnetNodes, ...devnetNodes, ...unknownNodes];
 
+  // Health Rank
   const healthSorted = [...finalNodes].sort((a, b) => b.health - a.health);
   let hr = 1;
   healthSorted.forEach((n, i) => { if (i > 0 && n.health < healthSorted[i-1].health) hr = i + 1; n.health_rank = hr; });
