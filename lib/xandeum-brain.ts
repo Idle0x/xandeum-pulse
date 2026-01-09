@@ -3,19 +3,18 @@ import geoip from 'geoip-lite';
 
 // --- CONFIGURATION ---
 
-// 1. PRIVATE TUNNEL (Priority Source for Hidden Mainnet Nodes)
-const PRIVATE_RPC = 'https://arkansas-collect-loving-rather.trycloudflare.com';
+// 1. PRIVATE TUNNEL (Source of Truth for MAINNET)
+const PRIVATE_RPC = 'https://arkansas-collect-loving-rather.trycloudflare.com/rpc';
 
-// 2. PUBLIC SWARM (For Devnet & Public Connectivity)
-const PUBLIC_IPS = [
-  '173.212.203.145', '161.97.97.41', '192.190.136.36', '192.190.136.38',
+// 2. PUBLIC SWARM (Source of Truth for DEVNET)
+const PUBLIC_RPC_NODES = [
+  '161.97.97.41', '192.190.136.36', '192.190.136.38',
   '207.244.255.1', '192.190.136.28', '192.190.136.29', '159.195.4.138', '152.53.155.30'
 ];
 
-const TIMEOUT_RPC = 6000;
+const TIMEOUT_RPC = 5000;
 const TIMEOUT_CREDITS = 8000;
 
-// CORRECT API ENDPOINTS
 const API_CREDITS_MAINNET = 'https://podcredits.xandeum.network/api/mainnet-pod-credits';
 const API_CREDITS_DEVNET  = 'https://podcredits.xandeum.network/api/pods-credits';
 
@@ -48,13 +47,12 @@ export interface EnrichedNode {
     countryCode: string;
     city: string;
   };
-  rank?: number;        // REPUTATION RANK
-  health_rank?: number; // HEALTH RANK
-  rpc_source?: string;  // Track source for debugging
+  rank?: number;
+  health_rank?: number;
+  rpc_source?: string;
 }
 
 // --- HELPERS ---
-
 export const cleanSemver = (v: string) => {
   if (!v) return '0.0.0';
   const mainVer = v.split('-')[0]; 
@@ -84,40 +82,27 @@ export const calculateLogScore = (value: number, median: number, maxScore: numbe
 export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedCleanVersions: string[]) => {
     const cleanNode = cleanSemver(nodeVersion);
     const cleanConsensus = cleanSemver(consensusVersion);
-
     if (compareVersions(cleanNode, cleanConsensus) >= 0) return 100;
-
     const consensusIndex = sortedCleanVersions.indexOf(cleanConsensus);
     const nodeIndex = sortedCleanVersions.indexOf(cleanNode);
-
     if (nodeIndex === -1) return 0;
-
     const distance = nodeIndex - consensusIndex;
-
     if (distance <= 0) return 100; 
     if (distance === 1) return 90;
     if (distance === 2) return 70;
     if (distance === 3) return 50;
     if (distance === 4) return 30;
     if (distance === 5) return 10;
-
     return Math.max(0, 10 - (distance - 5));
 };
 
-// --- SCORING FACTORY ---
 export const calculateVitalityScore = (
-    storageCommitted: number, 
-    storageUsed: number,
-    uptimeSeconds: number, 
-    version: string, 
-    consensusVersion: string, 
-    sortedCleanVersions: string[], 
-    medianCredits: number, 
-    credits: number | null, 
-    medianStorage: number
+    storageCommitted: number, storageUsed: number, uptimeSeconds: number, version: string, 
+    consensusVersion: string, sortedCleanVersions: string[], medianCredits: number, 
+    credits: number | null, medianStorage: number
 ) => {
   if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
-
+  
   const uptimeDays = uptimeSeconds / 86400;
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
   if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
@@ -141,88 +126,44 @@ export const calculateVitalityScore = (
 
   return {
       total: Math.max(0, Math.min(100, total)),
-      breakdown: {
-          uptime: Math.round(uptimeScore),
-          version: Math.round(versionScore),
-          reputation: reputationScore,
-          storage: Math.round(totalStorageScore)
-      }
+      breakdown: { uptime: Math.round(uptimeScore), version: Math.round(versionScore), reputation: reputationScore, storage: Math.round(totalStorageScore) }
   };
 };
 
-// --- FETCHING ---
+// --- FETCHING LOGIC ---
 const AXIOS_CONFIG = {
     timeout: TIMEOUT_CREDITS,
-    headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*'
-    }
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json, text/plain, */*' }
 };
 
-// --- HYBRID FETCHING (Private + Public) ---
+// *** THE FIX: Explicitly fetch BOTH networks and combine them ***
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
   
-  // 1. Build List of ALL sources (Private Tunnel + Public Swarm)
-  const sources = [ PRIVATE_RPC ];
-  PUBLIC_IPS.forEach(ip => sources.push(`http://${ip}:6000`));
+  // Task 1: Fetch Mainnet (Your Tunnel)
+  const mainnetPromise = axios.post(PRIVATE_RPC, payload, { timeout: TIMEOUT_RPC })
+    .then(r => r.data?.result?.pods || [])
+    .catch(e => {
+        console.error('[PULSE] Mainnet Tunnel Failed:', e.message);
+        return [];
+    });
 
-  // 2. Helper to format URL (handle https vs http)
-  const formatUrl = (base: string) => base.endsWith('/rpc') ? base : `${base}/rpc`;
+  // Task 2: Fetch Devnet (Public Swarm)
+  // We try 3 random public nodes. The first one that answers gives us the Devnet list.
+  const shuffled = PUBLIC_RPC_NODES.sort(() => 0.5 - Math.random()).slice(0, 3);
+  const devnetPromise = Promise.any(shuffled.map(ip => 
+      axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC })
+           .then(r => r.data?.result?.pods || [])
+  )).catch(() => []);
 
-  console.log(`[PULSE] Hybrid Scan: Querying ${sources.length} RPCs...`);
+  // Execute Both in Parallel
+  const [mainnetPods, devnetPods] = await Promise.all([mainnetPromise, devnetPromise]);
 
-  // 3. Fire requests to ALL sources simultaneously
-  const requests = sources.map(url => 
-    axios.post(formatUrl(url), payload, { timeout: TIMEOUT_RPC })
-      .then(res => ({ status: 'fulfilled' as const, url, pods: res.data?.result?.pods || [] }))
-      .catch(err => ({ status: 'rejected' as const, url, error: err.message }))
-  );
+  console.log(`[PULSE] Fetched: ${mainnetPods.length} Mainnet Nodes + ${devnetPods.length} Devnet Nodes`);
 
-  const results = await Promise.all(requests);
-
-  // 4. Merge & Deduplicate Results
-  // This ensures we get Mainnet nodes from your tunnel AND Devnet nodes from public IPs
-  const uniquePodsMap = new Map<string, any>();
-  let successCount = 0;
-
-  results.forEach(r => {
-    if (r.status === 'fulfilled' && Array.isArray(r.pods)) {
-      if (r.pods.length > 0) {
-        successCount++;
-        const isPrivate = r.url.includes('trycloudflare');
-        
-        r.pods.forEach((pod: any) => {
-          const key = pod.pubkey || pod.public_key;
-          if (key) {
-            // If new, add it. If existing, overwrite ONLY if source is Private (Trust Private data more)
-            if (!uniquePodsMap.has(key) || isPrivate) {
-                uniquePodsMap.set(key, { ...pod, rpc_source: isPrivate ? 'Private RPC' : 'Public Swarm' });
-            }
-          }
-        });
-      }
-    }
-  });
-
-  const mergedList = Array.from(uniquePodsMap.values());
-  console.log(`[PULSE] Connected to ${successCount} RPCs. Found ${mergedList.length} unique nodes.`);
-  
-  // Return OBJECT with pods AND source string
-  let sourceLabel = 'Offline';
-  if (successCount > 0) {
-      const hasPrivate = successfulRPCs(results); // Helper check
-      sourceLabel = hasPrivate 
-        ? `Hybrid (${mergedList.length} Nodes)` 
-        : `Public Only (${mergedList.length} Nodes)`;
-  }
-
-  return { pods: mergedList, source: sourceLabel };
-}
-
-// Small helper to check if private RPC succeeded (for the label)
-function successfulRPCs(results: any[]) {
-    return results.some(r => r.status === 'fulfilled' && r.url.includes('trycloudflare'));
+  // COMBINE THEM (No Deduplication)
+  // This ensures you see everything from both worlds.
+  return [...mainnetPods, ...devnetPods];
 }
 
 async function fetchCredits() {
@@ -268,10 +209,10 @@ async function resolveLocations(ips: string[]) {
 // --- MAIN EXPORT ---
 
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  // --- CORRECT DESTRUCTURING ---
-  // We extract 'pods' (renamed to rawPods) and 'source' from the object returned by fetchRawData
-  const [{ pods: rawPods, source }, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
+  // fetchRawData now returns a flat array of ALL pods from BOTH sources
+  const [rawPods, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
   
+  // Only fail if BOTH sources returned nothing
   if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable");
 
   const mainnetMap = new Map<string, number>();
@@ -279,7 +220,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const mainnetValues: number[] = [];
   const devnetValues: number[] = [];
 
-  // Populate Mainnet
+  // Populate Mainnet Credits
   if (Array.isArray(creditsData.mainnet)) {
       creditsData.mainnet.forEach((c: any) => {
           const val = parseFloat(c.credits || c.amount || '0');
@@ -288,7 +229,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       });
   }
 
-  // Populate Devnet
+  // Populate Devnet Credits
   if (Array.isArray(creditsData.devnet)) {
       creditsData.devnet.forEach((c: any) => {
           const val = parseFloat(c.credits || c.amount || '0');
@@ -305,7 +246,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const storageArray: number[] = rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
   const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
 
-  // --- VERSION CONSENSUS LOGIC ---
+  // --- CONSENSUS LOGIC ---
   const rawVersionCounts: Record<string, number> = {}; 
   const uniqueCleanVersionsSet = new Set<string>();
 
@@ -323,6 +264,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
 
   const expandedNodes: EnrichedNode[] = [];
 
+  // --- SCORING & TAGGING ---
   const scoreNode = (pod: any, network: 'MAINNET' | 'DEVNET' | 'UNKNOWN', credits: number | null, medianCredits: number, isUntracked: boolean) => {
       const ip = pod.address.split(':')[0];
       const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
@@ -348,8 +290,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
           healthBreakdown: vitality.breakdown, 
           location: { 
               lat: loc.lat, lon: loc.lon, countryName: loc.country, countryCode: loc.countryCode, city: loc.city 
-          },
-          rpc_source: pod.rpc_source
+          }
       };
   };
 
@@ -363,6 +304,8 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
           expandedNodes.push(scoreNode(pod, 'MAINNET', credits, medianMainnet, false));
       }
 
+      // Note: We check independently. If a node is in BOTH maps, it gets pushed TWICE.
+      // This is intentional to show both "personas" of the node if applicable.
       if (inDevnet) {
           const credits = devnetMap.get(key) || 0;
           expandedNodes.push(scoreNode(pod, 'DEVNET', credits, medianDevnet, false));
@@ -415,6 +358,9 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const nodeCount = finalNodes.length || 1;
   const avgHealth = Math.round(finalNodes.reduce((a, b) => a + b.health, 0) / nodeCount);
 
+  // We add 'connectedNode' stats to indicate success
+  const connectionStatus = `Mainnet: ${mainnetNodes.length} | Devnet: ${devnetNodes.length}`;
+
   return { 
     nodes: finalNodes, 
     stats: { 
@@ -422,7 +368,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
         medianCredits: medianMainnet, 
         medianStorage,
         totalNodes: finalNodes.length,
-        connectedNode: source,
+        connectedNode: connectionStatus, 
         systemStatus: {
             credits: creditsData.mainnet.length > 0 || creditsData.devnet.length > 0, 
             rpc: true 
