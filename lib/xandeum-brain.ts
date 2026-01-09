@@ -2,10 +2,10 @@ import axios from 'axios';
 import geoip from 'geoip-lite'; 
 
 // --- CONFIGURATION ---
-
-// UPDATED: Using full URLs now to support ChillXand (HTTPS) + standard IPs
-const RPC_ENDPOINTS = [
-  'https://rpc-mgr.chillxand.com', // ChillXand Managed RPC
+// UPDATED: Added ChillXand as the Primary (Index 0).
+// We use full URLs now so we can mix HTTPS (ChillXand) and HTTP (Standard Nodes).
+const RPC_NODES = [
+  'https://rpc-mgr.chillxand.com', // Primary: Managed Service (likely sees all nodes)
   'http://173.212.203.145:6000',
   'http://161.97.97.41:6000',
   'http://192.190.136.36:6000',
@@ -15,7 +15,7 @@ const RPC_ENDPOINTS = [
   'http://192.190.136.29:6000'
 ];
 
-const TIMEOUT_RPC = 5000; // Increased slightly for HTTPS handshakes
+const TIMEOUT_RPC = 5000; // 5s timeout
 const TIMEOUT_CREDITS = 8000;
 
 // CORRECT API ENDPOINTS
@@ -51,8 +51,8 @@ export interface EnrichedNode {
     countryCode: string;
     city: string;
   };
-  rank?: number;        
-  health_rank?: number; 
+  rank?: number;        // REPUTATION RANK
+  health_rank?: number; // HEALTH RANK
 }
 
 // --- HELPERS ---
@@ -87,8 +87,10 @@ export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: str
     const cleanNode = cleanSemver(nodeVersion);
     const cleanConsensus = cleanSemver(consensusVersion);
 
+    // 1. If newer or same as consensus -> 100
     if (compareVersions(cleanNode, cleanConsensus) >= 0) return 100;
 
+    // 2. Find positions in the Master List
     const consensusIndex = sortedCleanVersions.indexOf(cleanConsensus);
     const nodeIndex = sortedCleanVersions.indexOf(cleanNode);
 
@@ -96,6 +98,7 @@ export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: str
 
     const distance = nodeIndex - consensusIndex;
 
+    // 3. Apply Distance Decay Table
     if (distance <= 0) return 100; 
     if (distance === 1) return 90;
     if (distance === 2) return 70;
@@ -118,25 +121,32 @@ export const calculateVitalityScore = (
     credits: number | null, 
     medianStorage: number
 ) => {
+  // ⛔ Gatekeeper Rule
   if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
 
+  // 1️⃣ Uptime Score
   const uptimeDays = uptimeSeconds / 86400;
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
   if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
 
+  // 2️⃣ Storage Score
   const baseStorageScore = calculateLogScore(storageCommitted, medianStorage, 100);
   const utilizationBonus = storageUsed > 0 ? Math.min(15, 5 * Math.log2((storageUsed / (1024 ** 3)) + 2)) : 0;
   const totalStorageScore = baseStorageScore + utilizationBonus;
 
+  // 4️⃣ Version Score
   const versionScore = getVersionScoreByRank(version, consensusVersion, sortedCleanVersions);
 
   let total = 0;
   let reputationScore: number | null = null;
 
+  // 🔁 Dynamic Re-Weighting Logic
   if (credits !== null && medianCredits > 0) {
+      // 3️⃣ Reputation Score
       reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
       total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15));
   } else {
+      // Fallback Weights
       total = Math.round((uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20));
       reputationScore = null; 
   }
@@ -161,36 +171,31 @@ const AXIOS_CONFIG = {
     }
 };
 
-// UPDATED: "Merge & Deduplicate" Strategy
+// RESTORED: Original "Race" Logic (No Merging)
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
+  
+  // 1. Helper to format URL
+  const formatUrl = (node: string) => node.endsWith('/rpc') ? node : `${node}/rpc`;
 
-  // Query ALL endpoints in parallel
-  const results = await Promise.allSettled(
-      RPC_ENDPOINTS.map(baseUrl => {
-          // Normalize URL: Ensure it ends with /rpc if needed
-          const url = baseUrl.endsWith('/rpc') ? baseUrl : `${baseUrl}/rpc`;
-          return axios.post(url, payload, { timeout: TIMEOUT_RPC })
+  // 2. Try PRIMARY node (ChillXand)
+  try {
+      // FIX: Use formatUrl instead of hardcoded `http://${RPC_NODES[0]}:6000/rpc`
+      const res = await axios.post(formatUrl(RPC_NODES[0]), payload, { timeout: TIMEOUT_RPC });
+      if (res.data?.result?.pods) return res.data.result.pods;
+  } catch (e) { 
+    // Fallthrough to swarm if primary fails
+  }
+
+  // 3. Fallback: Race 3 random nodes from the rest of the list
+  const shuffled = RPC_NODES.slice(1).sort(() => 0.5 - Math.random()).slice(0, 3);
+  try {
+      const winner = await Promise.any(shuffled.map(node => 
+          axios.post(formatUrl(node), payload, { timeout: TIMEOUT_RPC })
                .then(r => r.data?.result?.pods || [])
-               .catch(() => []); // Return empty on error
-      })
-  );
-
-  const uniquePodsMap = new Map<string, any>();
-
-  results.forEach(res => {
-      if (res.status === 'fulfilled' && Array.isArray(res.value)) {
-          res.value.forEach((pod: any) => {
-              // Deduplicate by Public Key
-              const key = pod.pubkey || pod.public_key;
-              if (key && !uniquePodsMap.has(key)) {
-                  uniquePodsMap.set(key, pod);
-              }
-          });
-      }
-  });
-
-  return Array.from(uniquePodsMap.values());
+      ));
+      return winner;
+  } catch (e) { return []; }
 }
 
 async function fetchCredits() {
