@@ -2,33 +2,21 @@ import axios from 'axios';
 import geoip from 'geoip-lite'; 
 
 // --- CONFIGURATION ---
-
-// 1. CHILLXAND: HTTPS, No Port, Root URL
-const CHILLXAND_RPC = 'https://rpc1.chillxand.com';
-
-// 2. PUBLIC SWARM: HTTP, Port 6000, Needs /rpc
-const PUBLIC_NODES = [
-  'http://173.212.203.145:6000',
-  'http://161.97.97.41:6000',
-  'http://192.190.136.36:6000',
-  'http://192.190.136.38:6000',
-  'http://207.244.255.1:6000',
-  'http://192.190.136.28:6000',
-  'http://192.190.136.29:6000'
+const RPC_NODES = [
+  '173.212.203.145', '161.97.97.41', '192.190.136.36', '192.190.136.38',
+  '207.244.255.1', '192.190.136.28', '192.190.136.29'
 ];
 
-const TIMEOUT_RPC = 6000;
+const TIMEOUT_RPC = 4000;
 const TIMEOUT_CREDITS = 8000;
 
-// Grab key from env
-const CHILL_KEY = process.env.CHILLXAND_API_KEY || '';
-
+// CORRECT API ENDPOINTS
 const API_CREDITS_MAINNET = 'https://podcredits.xandeum.network/api/mainnet-pod-credits';
 const API_CREDITS_DEVNET  = 'https://podcredits.xandeum.network/api/pods-credits';
 
 const geoCache = new Map<string, { lat: number; lon: number; country: string; countryCode: string; city: string }>();
 
-// --- INTERFACES & HELPERS ---
+// --- INTERFACES ---
 export interface EnrichedNode {
   address: string;
   pubkey: string;
@@ -42,14 +30,31 @@ export interface EnrichedNode {
   storage_committed: number; 
   credits: number | null; 
   health: number;
-  healthBreakdown: { uptime: number; version: number; reputation: number | null; storage: number; };
-  location: { lat: number; lon: number; countryName: string; countryCode: string; city: string; };
-  rank?: number;        
-  health_rank?: number;
-  rpc_source?: string;
+  healthBreakdown: {
+      uptime: number;
+      version: number;
+      reputation: number | null;
+      storage: number;
+  };
+  location: {
+    lat: number;
+    lon: number;
+    countryName: string;
+    countryCode: string;
+    city: string;
+  };
+  rank?: number;        // REPUTATION RANK (Based on Credits) - Used for Leaderboard
+  health_rank?: number; // HEALTH RANK (Based on Vitality) - Used for Diagnostics
 }
 
-export const cleanSemver = (v: string) => v ? v.split('-')[0].replace(/[^0-9.]/g, '') : '0.0.0';
+// --- HELPERS ---
+
+// STRIP suffixes: "1.2-trynet" -> "1.2", "0.8.0-beta" -> "0.8.0"
+export const cleanSemver = (v: string) => {
+  if (!v) return '0.0.0';
+  const mainVer = v.split('-')[0]; 
+  return mainVer.replace(/[^0-9.]/g, '');
+};
 
 export const compareVersions = (v1: string, v2: string) => {
   const p1 = cleanSemver(v1).split('.').map(Number);
@@ -71,144 +76,121 @@ export const calculateLogScore = (value: number, median: number, maxScore: numbe
     return Math.min(maxScore, (maxScore / 2) * Math.log2((value / median) + 1));
 };
 
+// NEW: Exact Lookup Table based on v2.0 Spec (Uses CLEAN versions for distance)
 export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedCleanVersions: string[]) => {
     const cleanNode = cleanSemver(nodeVersion);
     const cleanConsensus = cleanSemver(consensusVersion);
+
+    // 1. If newer or same as consensus -> 100
     if (compareVersions(cleanNode, cleanConsensus) >= 0) return 100;
+
+    // 2. Find positions in the Master List
     const consensusIndex = sortedCleanVersions.indexOf(cleanConsensus);
     const nodeIndex = sortedCleanVersions.indexOf(cleanNode);
+
+    // If version is unknown/weird and not in list, punish severely
     if (nodeIndex === -1) return 0;
+
     const distance = nodeIndex - consensusIndex;
+
+    // 3. Apply Distance Decay Table
     if (distance <= 0) return 100; 
     if (distance === 1) return 90;
     if (distance === 2) return 70;
     if (distance === 3) return 50;
     if (distance === 4) return 30;
     if (distance === 5) return 10;
+
+    // 4. "Death Zone" (6+ versions behind)
     return Math.max(0, 10 - (distance - 5));
 };
 
+// --- SCORING FACTORY ---
 export const calculateVitalityScore = (
-    storageCommitted: number, storageUsed: number, uptimeSeconds: number, version: string, 
-    consensusVersion: string, sortedCleanVersions: string[], medianCredits: number, 
-    credits: number | null, medianStorage: number
+    storageCommitted: number, 
+    storageUsed: number,
+    uptimeSeconds: number, 
+    version: string, 
+    consensusVersion: string, 
+    sortedCleanVersions: string[], 
+    medianCredits: number, 
+    credits: number | null, 
+    medianStorage: number
 ) => {
+  // ⛔ Gatekeeper Rule: Hard Constraint
   if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
-  
+
+  // 1️⃣ Uptime Score (Sigmoid)
   const uptimeDays = uptimeSeconds / 86400;
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
+  // Cap score at 20 for nodes younger than 1 day
   if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
 
+  // 2️⃣ Storage Score (Logarithmic + Bonus)
   const baseStorageScore = calculateLogScore(storageCommitted, medianStorage, 100);
   const utilizationBonus = storageUsed > 0 ? Math.min(15, 5 * Math.log2((storageUsed / (1024 ** 3)) + 2)) : 0;
   const totalStorageScore = baseStorageScore + utilizationBonus;
 
+  // 4️⃣ Version Score (Distance-Based)
   const versionScore = getVersionScoreByRank(version, consensusVersion, sortedCleanVersions);
 
   let total = 0;
   let reputationScore: number | null = null;
 
+  // 🔁 Dynamic Re-Weighting Logic
   if (credits !== null && medianCredits > 0) {
+      // 3️⃣ Reputation Score (Standard Mode)
       reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
+
+      // Standard Weights: U(35%) + S(30%) + R(20%) + V(15%)
       total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15));
   } else {
+      // Fallback Weights: U(45%) + S(35%) + V(20%)
       total = Math.round((uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20));
       reputationScore = null; 
   }
 
   return {
       total: Math.max(0, Math.min(100, total)),
-      breakdown: { uptime: Math.round(uptimeScore), version: Math.round(versionScore), reputation: reputationScore, storage: Math.round(totalStorageScore) }
+      breakdown: {
+          uptime: Math.round(uptimeScore),
+          version: Math.round(versionScore),
+          reputation: reputationScore,
+          storage: Math.round(totalStorageScore)
+      }
   };
 };
 
-const AXIOS_CONFIG_CREDITS = {
+// --- FETCHING ---
+const AXIOS_CONFIG = {
     timeout: TIMEOUT_CREDITS,
-    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json, text/plain, */*' }
+    headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*'
+    }
 };
 
-// --- AGGRESSIVE FETCHING (NO DEDUPLICATION) ---
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
-  
-  // 1. Build Request List: ChillXand + All Public Nodes
-  const requests = [];
+  try {
+      const res = await axios.post(`http://${RPC_NODES[0]}:6000/rpc`, payload, { timeout: TIMEOUT_RPC });
+      if (res.data?.result?.pods) return res.data.result.pods;
+  } catch (e) { /* fallthrough */ }
 
-  // A. ChillXand: Use Root URL + API Key
-  console.log(`[PULSE] Querying ChillXand (${CHILLXAND_RPC})...`);
-  requests.push(
-    axios.post(CHILLXAND_RPC, payload, {
-        timeout: TIMEOUT_RPC,
-        headers: { 
-            'Content-Type': 'application/json',
-            'X-API-Key': CHILL_KEY 
-        }
-    })
-    .then(res => ({ status: 'fulfilled' as const, url: CHILLXAND_RPC, pods: res.data?.result?.pods || [] }))
-    .catch(err => ({ 
-        status: 'rejected' as const, 
-        url: CHILLXAND_RPC, 
-        error: err.message, 
-        code: err.response?.status 
-    }))
-  );
-
-  // B. Public Swarm: Use /rpc Suffix + No Auth
-  // (Using map loop to create requests array)
-  const swarmRequests = PUBLIC_NODES.map(node => {
-      const url = `${node}/rpc`; 
-      return axios.post(url, payload, { timeout: TIMEOUT_RPC })
-          .then(res => ({ status: 'fulfilled' as const, url, pods: res.data?.result?.pods || [] }))
-          .catch(err => ({ status: 'rejected' as const, url, error: err.message }));
-  });
-  
-  requests.push(...swarmRequests);
-
-  // 2. Wait for everything
-  const results = await Promise.all(requests);
-
-  // 3. AGGREGATE EVERYTHING (NO FILTERING)
-  const allPods: any[] = [];
-  const successfulSources: string[] = [];
-
-  results.forEach(r => {
-    if (r.status === 'fulfilled' && Array.isArray(r.pods)) {
-      if (r.pods.length > 0) {
-        successfulSources.push(r.url);
-        
-        // Tag every pod with its source so you can see where it came from
-        const label = r.url.includes('chillxand') ? 'ChillXand' : `Public (${r.url})`;
-        const labeledPods = r.pods.map((p: any) => ({ ...p, rpc_source: label }));
-        
-        // PUSH EVERYTHING (Including Duplicates)
-        allPods.push(...labeledPods);
-      }
-    } else {
-        // Safe logging with type casting
-        if (r.url.includes('chillxand')) {
-            console.error(`[PULSE] ChillXand Error ${(r as any).code || 'Unknown'}: ${(r as any).error}`);
-        }
-    }
-  });
-
-  console.log(`[PULSE] Connected Sources: ${successfulSources.length}. Total RAW Nodes: ${allPods.length}`);
-
-  let sourceLabel = 'Offline';
-  if (successfulSources.length > 0) {
-      if (successfulSources.some(s => s.includes('chillxand'))) {
-          sourceLabel = `ChillXand + ${successfulSources.length - 1} Public`;
-      } else {
-          sourceLabel = `Public Swarm Only (${successfulSources.length})`;
-      }
-  }
-
-  return { pods: allPods, source: sourceLabel };
+  const shuffled = RPC_NODES.slice(1).sort(() => 0.5 - Math.random()).slice(0, 3);
+  try {
+      const winner = await Promise.any(shuffled.map(ip => 
+          axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC })
+               .then(r => r.data?.result?.pods || [])
+      ));
+      return winner;
+  } catch (e) { return []; }
 }
 
 async function fetchCredits() {
     const [mainnetRes, devnetRes] = await Promise.allSettled([
-        axios.get(API_CREDITS_MAINNET, AXIOS_CONFIG_CREDITS),
-        axios.get(API_CREDITS_DEVNET, AXIOS_CONFIG_CREDITS)
+        axios.get(API_CREDITS_MAINNET, AXIOS_CONFIG),
+        axios.get(API_CREDITS_DEVNET, AXIOS_CONFIG)
     ]);
     const parseData = (res: PromiseSettledResult<any>) => {
         if (res.status !== 'fulfilled') return [];
@@ -217,7 +199,10 @@ async function fetchCredits() {
         if (Array.isArray(d)) return d;
         return [];
     };
-    return { mainnet: parseData(mainnetRes), devnet: parseData(devnetRes) };
+    return {
+        mainnet: parseData(mainnetRes),
+        devnet: parseData(devnetRes)
+    };
 }
 
 async function resolveLocations(ips: string[]) {
@@ -243,44 +228,61 @@ async function resolveLocations(ips: string[]) {
 }
 
 // --- MAIN EXPORT ---
+
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  const [{ pods: rawPods, source }, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
-  
-  if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable (0 Nodes Found)");
+  const [rawPods, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
+  if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable");
 
   const mainnetMap = new Map<string, number>();
   const devnetMap = new Map<string, number>();
-  
+  const mainnetValues: number[] = [];
+  const devnetValues: number[] = [];
+
+  // Populate Mainnet
   if (Array.isArray(creditsData.mainnet)) {
       creditsData.mainnet.forEach((c: any) => {
           const val = parseFloat(c.credits || c.amount || '0');
           const key = c.pod_id || c.pubkey || c.node;
-          if (key && !isNaN(val)) mainnetMap.set(key, val);
+          if (key && !isNaN(val)) { mainnetMap.set(key, val); mainnetValues.push(val); }
       });
   }
+
+  // Populate Devnet
   if (Array.isArray(creditsData.devnet)) {
       creditsData.devnet.forEach((c: any) => {
           const val = parseFloat(c.credits || c.amount || '0');
           const key = c.pod_id || c.pubkey || c.node;
-          if (key && !isNaN(val)) devnetMap.set(key, val);
+          if (key && !isNaN(val)) { devnetMap.set(key, val); devnetValues.push(val); }
       });
   }
 
-  const mainnetValues = Array.from(mainnetMap.values()).sort((a, b) => a - b);
-  const devnetValues = Array.from(devnetMap.values()).sort((a, b) => a - b);
+  mainnetValues.sort((a, b) => a - b);
+  devnetValues.sort((a, b) => a - b);
   const medianMainnet = mainnetValues.length ? mainnetValues[Math.floor(mainnetValues.length / 2)] : 0;
-  const medianStorage = rawPods.length ? rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b)[Math.floor(rawPods.length / 2)] : 1;
+  const medianDevnet = devnetValues.length ? devnetValues[Math.floor(devnetValues.length / 2)] : 0;
 
-  // Consensus
+  const storageArray: number[] = rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
+  const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
+
+  // --- VERSION CONSENSUS LOGIC (TWO-TRACK STRATEGY) ---
   const rawVersionCounts: Record<string, number> = {}; 
   const uniqueCleanVersionsSet = new Set<string>();
+
   rawPods.forEach((p: any) => { 
       const rawV = (p.version || '0.0.0'); 
       const cleanV = cleanSemver(rawV);
+
+      // Track 1: Vote using EXACT RAW string (Strict Mode Consensus)
       rawVersionCounts[rawV] = (rawVersionCounts[rawV] || 0) + 1;
+
+      // Track 2: Build the simplified ladder (Semantic Ranking)
       uniqueCleanVersionsSet.add(cleanV);
   });
+
+  // Consensus is the most common RAW version
   const consensusVersion = Object.keys(rawVersionCounts).sort((a, b) => rawVersionCounts[b] - rawVersionCounts[a])[0] || '0.0.0';
+
+  // Master List sorted Descending
   const sortedCleanVersions = Array.from(uniqueCleanVersionsSet).sort((a, b) => compareVersions(b, a));
 
   await resolveLocations([...new Set(rawPods.map((p: any) => p.address.split(':')[0]))] as string[]);
@@ -310,8 +312,9 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
           isUntracked,
           health: vitality.total,
           healthBreakdown: vitality.breakdown, 
-          location: { lat: loc.lat, lon: loc.lon, countryName: loc.country, countryCode: loc.countryCode, city: loc.city },
-          rpc_source: pod.rpc_source 
+          location: { 
+              lat: loc.lat, lon: loc.lon, countryName: loc.country, countryCode: loc.countryCode, city: loc.city 
+          }
       };
   };
 
@@ -324,37 +327,59 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
           const credits = mainnetMap.get(key) || 0;
           expandedNodes.push(scoreNode(pod, 'MAINNET', credits, medianMainnet, false));
       }
+
       if (inDevnet) {
           const credits = devnetMap.get(key) || 0;
-          expandedNodes.push(scoreNode(pod, 'DEVNET', credits, medianMainnet, false)); 
+          expandedNodes.push(scoreNode(pod, 'DEVNET', credits, medianDevnet, false));
       }
+
       if (!inMainnet && !inDevnet) {
           const isUntracked = creditsData.mainnet.length > 0;
           expandedNodes.push(scoreNode(pod, 'UNKNOWN', null, medianMainnet, isUntracked));
       }
   });
 
+  // --- REPUTATION RANKING (Original Logic) ---
   const mainnetNodes = expandedNodes.filter(n => n.network === 'MAINNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const devnetNodes = expandedNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const unknownNodes = expandedNodes.filter(n => n.network === 'UNKNOWN');
 
-  // Ranking Logic
-  let r = 1; mainnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (mainnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
-  r = 1; devnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (devnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
+  let r = 1;
+  mainnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (mainnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
+
+  r = 1;
+  devnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (devnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
 
   const finalNodes = [...mainnetNodes, ...devnetNodes, ...unknownNodes];
 
+  // --- HEALTH RANKING (New Logic) ---
+  // Rank the entire network based on health score, independent of network type
   const healthSorted = [...finalNodes].sort((a, b) => b.health - a.health);
   let hr = 1;
-  healthSorted.forEach((n, i) => { if (i > 0 && n.health < healthSorted[i-1].health) hr = i + 1; n.health_rank = hr; });
+  healthSorted.forEach((n, i) => {
+      // If health matches previous node, share the rank
+      if (i > 0 && n.health < healthSorted[i-1].health) {
+          hr = i + 1;
+      }
+      n.health_rank = hr;
+  });
 
-  // Averages
-  let totalUptime = 0, totalVersion = 0, totalReputation = 0, reputationCount = 0, totalStorage = 0;
+  // CALCULATE REAL AVERAGES FOR BREAKDOWN
+  let totalUptime = 0;
+  let totalVersion = 0;
+  let totalReputation = 0;
+  let reputationCount = 0;
+  let totalStorage = 0;
+
   finalNodes.forEach(node => {
     totalUptime += node.healthBreakdown.uptime;
     totalVersion += node.healthBreakdown.version;
     totalStorage += node.healthBreakdown.storage;
-    if (node.healthBreakdown.reputation !== null) { totalReputation += node.healthBreakdown.reputation; reputationCount++; }
+
+    if (node.healthBreakdown.reputation !== null) {
+      totalReputation += node.healthBreakdown.reputation;
+      reputationCount++;
+    }
   });
 
   const nodeCount = finalNodes.length || 1;
@@ -363,9 +388,21 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   return { 
     nodes: finalNodes, 
     stats: { 
-        consensusVersion, medianCredits: medianMainnet, medianStorage, totalNodes: finalNodes.length, connectedNode: source,
-        systemStatus: { credits: creditsData.mainnet.length > 0 || creditsData.devnet.length > 0, rpc: true },
-        avgBreakdown: { total: avgHealth, uptime: Math.round(totalUptime / nodeCount), version: Math.round(totalVersion / nodeCount), reputation: reputationCount > 0 ? Math.round(totalReputation / reputationCount) : null, storage: Math.round(totalStorage / nodeCount) }
+        consensusVersion, 
+        medianCredits: medianMainnet, 
+        medianStorage,
+        totalNodes: finalNodes.length,
+        systemStatus: {
+            credits: creditsData.mainnet.length > 0 || creditsData.devnet.length > 0, 
+            rpc: true 
+        },
+        avgBreakdown: {
+            total: avgHealth,
+            uptime: Math.round(totalUptime / nodeCount),
+            version: Math.round(totalVersion / nodeCount),
+            reputation: reputationCount > 0 ? Math.round(totalReputation / reputationCount) : null,
+            storage: Math.round(totalStorage / nodeCount)
+        }
     } 
   };
 }
