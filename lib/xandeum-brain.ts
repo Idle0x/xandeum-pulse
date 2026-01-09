@@ -3,7 +3,7 @@ import geoip from 'geoip-lite';
 
 // --- CONFIGURATION ---
 const ALL_RPCS = [
-  'https://rpc-mgr.chillxand.com', 
+  'https://rpc1.chillxand.com', // UPDATED: Correct Endpoint from your docs
   'http://173.212.203.145:6000',
   'http://161.97.97.41:6000',
   'http://192.190.136.36:6000',
@@ -15,6 +15,9 @@ const ALL_RPCS = [
 
 const TIMEOUT_RPC = 6000; 
 const TIMEOUT_CREDITS = 8000;
+
+// API Key for ChillXand (Best practice: use process.env)
+const CHILL_KEY = process.env.CHILLXAND_API_KEY || 'PLACEHOLDER_KEY_IF_NO_ENV';
 
 const API_CREDITS_MAINNET = 'https://podcredits.xandeum.network/api/mainnet-pod-credits';
 const API_CREDITS_DEVNET  = 'https://podcredits.xandeum.network/api/pods-credits';
@@ -50,7 +53,7 @@ export interface EnrichedNode {
   };
   rank?: number;        
   health_rank?: number;
-  rpc_source?: string; // Added to help you see which RPC reported this specific duplicate
+  rpc_source?: string;
 }
 
 // --- HELPERS ---
@@ -142,7 +145,7 @@ export const calculateVitalityScore = (
   };
 };
 
-const AXIOS_CONFIG = {
+const AXIOS_CONFIG_CREDITS = {
     timeout: TIMEOUT_CREDITS,
     headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -150,16 +153,29 @@ const AXIOS_CONFIG = {
     }
 };
 
-// --- RAW UNFILTERED COLLECTION ---
+// --- AUTHENTICATED FETCHING ---
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
+  
   const formatUrl = (node: string) => node.endsWith('/rpc') ? node : `${node}/rpc`;
 
   console.log(`[PULSE] Connecting to ${ALL_RPCS.length} RPCs...`);
 
-  // 1. Launch requests to EVERYONE
-  const requests = ALL_RPCS.map(url => 
-    axios.post(formatUrl(url), payload, { timeout: TIMEOUT_RPC })
+  // 1. Launch requests with CONDITIONAL HEADERS
+  const requests = ALL_RPCS.map(url => {
+    // Basic Config
+    const config: any = { 
+        timeout: TIMEOUT_RPC,
+        headers: { 'Content-Type': 'application/json' }
+    };
+
+    // INJECT KEY IF CHILLXAND
+    if (url.includes('chillxand')) {
+        config.headers['X-API-Key'] = CHILL_KEY;
+        console.log(`[PULSE] Injecting Auth Header for: ${url}`);
+    }
+
+    return axios.post(formatUrl(url), payload, config)
       .then(res => ({
         status: 'fulfilled' as const,
         url,
@@ -169,13 +185,13 @@ async function fetchRawData() {
         status: 'rejected' as const,
         url,
         error: err.message
-      }))
-  );
+      }));
+  });
 
   // 2. Wait for all results
   const results = await Promise.all(requests);
 
-  // 3. AGGREGATE EVERYTHING (NO DEDUPLICATION)
+  // 3. AGGREGATE EVERYTHING (NO DEDUPLICATION as requested)
   const allPods: any[] = [];
   const successfulRPCs: string[] = [];
 
@@ -183,10 +199,8 @@ async function fetchRawData() {
     if (r.status === 'fulfilled' && Array.isArray(r.pods)) {
       if (r.pods.length > 0) {
         successfulRPCs.push(r.url);
-        // Tag the pod with its source so you can distinguish duplicates in testing
+        // Tag source for debugging
         const labeledPods = r.pods.map((p: any) => ({ ...p, rpc_source: r.url }));
-        
-        // PUSH ALL OF THEM
         allPods.push(...labeledPods);
       }
     } else {
@@ -195,7 +209,7 @@ async function fetchRawData() {
   });
 
   console.log(`[PULSE] Connected to: ${successfulRPCs.length}/${ALL_RPCS.length} RPCs`);
-  console.log(`[PULSE] Total RAW Nodes (Includes Duplicates): ${allPods.length}`);
+  console.log(`[PULSE] Total RAW Nodes: ${allPods.length}`);
 
   let sourceLabel = 'No Connection';
   if (successfulRPCs.length > 0) {
@@ -207,8 +221,8 @@ async function fetchRawData() {
 
 async function fetchCredits() {
     const [mainnetRes, devnetRes] = await Promise.allSettled([
-        axios.get(API_CREDITS_MAINNET, AXIOS_CONFIG),
-        axios.get(API_CREDITS_DEVNET, AXIOS_CONFIG)
+        axios.get(API_CREDITS_MAINNET, AXIOS_CONFIG_CREDITS),
+        axios.get(API_CREDITS_DEVNET, AXIOS_CONFIG_CREDITS)
     ]);
     const parseData = (res: PromiseSettledResult<any>) => {
         if (res.status !== 'fulfilled') return [];
@@ -327,7 +341,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
           location: { 
               lat: loc.lat, lon: loc.lon, countryName: loc.country, countryCode: loc.countryCode, city: loc.city 
           },
-          rpc_source: pod.rpc_source // Pass through the source label
+          rpc_source: pod.rpc_source 
       };
   };
 
