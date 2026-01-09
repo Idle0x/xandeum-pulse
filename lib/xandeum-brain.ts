@@ -2,11 +2,10 @@ import axios from 'axios';
 import geoip from 'geoip-lite'; 
 
 // --- CONFIGURATION ---
-// We define ChillXand separately to ensure it is ALWAYS queried
-const CHILLXAND_RPC = 'https://rpc-mgr.chillxand.com';
-
-const PUBLIC_SWARM = [
-  'http://173.212.203.145:6000',
+// LIST ALL KNOWN RPCs HERE
+const ALL_RPCS = [
+  'https://rpc-mgr.chillxand.com', // ChillXand (HTTPS)
+  'http://173.212.203.145:6000',   // Public Node 1
   'http://161.97.97.41:6000',
   'http://192.190.136.36:6000',
   'http://192.190.136.38:6000',
@@ -15,7 +14,7 @@ const PUBLIC_SWARM = [
   'http://192.190.136.29:6000'
 ];
 
-const TIMEOUT_RPC = 5000;
+const TIMEOUT_RPC = 6000; // Increased to 6s to allow slower nodes to answer
 const TIMEOUT_CREDITS = 8000;
 
 const API_CREDITS_MAINNET = 'https://podcredits.xandeum.network/api/mainnet-pod-credits';
@@ -151,64 +150,70 @@ const AXIOS_CONFIG = {
     }
 };
 
-// --- UPDATED FETCH LOGIC (UNION STRATEGY) ---
+// --- AGGRESSIVE UNION FETCHING ---
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
   
+  // Helper to ensure correct URL format
   const formatUrl = (node: string) => node.endsWith('/rpc') ? node : `${node}/rpc`;
 
-  // 1. Prepare Request List: Always ChillXand + 3 Random Public Nodes
-  // We query 4 nodes total to get a wide "net" over the network.
-  const targetNodes = [
-      CHILLXAND_RPC,
-      ...PUBLIC_SWARM.slice().sort(() => 0.5 - Math.random()).slice(0, 3)
-  ];
+  console.log(`[PULSE] Connecting to ${ALL_RPCS.length} RPCs...`);
 
-  console.log(`[PULSE] Querying Network Union: ${targetNodes.join(', ')}`);
-
-  // 2. Fire all requests in parallel
-  const results = await Promise.allSettled(
-      targetNodes.map(node => 
-          axios.post(formatUrl(node), payload, { timeout: TIMEOUT_RPC })
-               .then(r => ({ pods: r.data?.result?.pods || [], source: node }))
-      )
+  // 1. Launch requests to EVERYONE simultaneously
+  const requests = ALL_RPCS.map(url => 
+    axios.post(formatUrl(url), payload, { timeout: TIMEOUT_RPC })
+      .then(res => ({
+        status: 'fulfilled' as const,
+        url,
+        pods: res.data?.result?.pods || []
+      }))
+      .catch(err => ({
+        status: 'rejected' as const,
+        url,
+        error: err.message
+      }))
   );
 
-  // 3. Merge & Deduplicate
-  const uniquePodsMap = new Map<string, any>();
-  let successfulSources: string[] = [];
+  // 2. Wait for all to finish (Success or Fail)
+  const results = await Promise.all(requests);
 
-  results.forEach(res => {
-      if (res.status === 'fulfilled') {
-          const { pods, source } = res.value;
-          if (Array.isArray(pods) && pods.length > 0) {
-              successfulSources.push(source);
-              pods.forEach((pod: any) => {
-                  const key = pod.pubkey || pod.public_key;
-                  // Only add if we haven't seen this PubKey yet
-                  if (key && !uniquePodsMap.has(key)) {
-                      uniquePodsMap.set(key, pod);
-                  }
-              });
+  // 3. Process Results
+  const uniquePodsMap = new Map<string, any>();
+  const successfulRPCs: string[] = [];
+
+  results.forEach(r => {
+    if (r.status === 'fulfilled' && Array.isArray(r.pods)) {
+      if (r.pods.length > 0) {
+        successfulRPCs.push(r.url);
+        // Merge nodes into Map (Deduplication by PubKey)
+        r.pods.forEach((pod: any) => {
+          const key = pod.pubkey || pod.public_key;
+          if (key && !uniquePodsMap.has(key)) {
+            uniquePodsMap.set(key, pod);
           }
+        });
       }
+    } else {
+      console.warn(`[PULSE] Failed to connect to ${r.url}: ${(r as any).error}`);
+    }
   });
 
   const mergedList = Array.from(uniquePodsMap.values());
-  
-  if (mergedList.length === 0) {
-      console.warn("[PULSE] Network Unreachable (All RPCs failed)");
-      return { pods: [], source: 'None' };
+
+  console.log(`[PULSE] Connected to: ${successfulRPCs.length}/${ALL_RPCS.length} RPCs`);
+  console.log(`[PULSE] Total Unique Nodes Found: ${mergedList.length}`);
+
+  // Create a descriptive label for the UI
+  let sourceLabel = 'No Connection';
+  if (successfulRPCs.length > 0) {
+    if (successfulRPCs.some(u => u.includes('chillxand'))) {
+      sourceLabel = successfulRPCs.length > 1 ? 'Global Union (ChillXand+)' : 'ChillXand Only';
+    } else {
+      sourceLabel = `Public Swarm (${successfulRPCs.length})`;
+    }
   }
 
-  // Determine label: "ChillXand + Swarm" or just "Swarm"
-  const label = successfulSources.some(s => s.includes('chillxand')) 
-      ? 'ChillXand + Swarm' 
-      : 'Public Swarm';
-
-  console.log(`[PULSE] Merge Complete. Sources: ${successfulSources.length}. Total Unique Nodes: ${mergedList.length}`);
-
-  return { pods: mergedList, source: label };
+  return { pods: mergedList, source: sourceLabel };
 }
 
 async function fetchCredits() {
@@ -254,17 +259,18 @@ async function resolveLocations(ips: string[]) {
 // --- MAIN EXPORT ---
 
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  // Destructure the merged list and the source label
+  // 1. Fetch RAW data (Nodes) and CREDITS data simultaneously
   const [{ pods: rawPods, source }, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
   
-  if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable");
+  // Only throw if we found literally ZERO nodes across all RPCs
+  if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable (0 Nodes Found)");
 
   const mainnetMap = new Map<string, number>();
   const devnetMap = new Map<string, number>();
   const mainnetValues: number[] = [];
   const devnetValues: number[] = [];
 
-  // Populate Mainnet
+  // Populate Mainnet Credits
   if (Array.isArray(creditsData.mainnet)) {
       creditsData.mainnet.forEach((c: any) => {
           const val = parseFloat(c.credits || c.amount || '0');
@@ -273,7 +279,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       });
   }
 
-  // Populate Devnet
+  // Populate Devnet Credits
   if (Array.isArray(creditsData.devnet)) {
       creditsData.devnet.forEach((c: any) => {
           const val = parseFloat(c.credits || c.amount || '0');
@@ -406,8 +412,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
         medianCredits: medianMainnet, 
         medianStorage,
         totalNodes: finalNodes.length,
-        // Pass the Source Label to the UI so you know you are seeing the UNION
-        connectedNode: source, 
+        connectedNode: source,
         systemStatus: {
             credits: creditsData.mainnet.length > 0 || creditsData.devnet.length > 0, 
             rpc: true 
