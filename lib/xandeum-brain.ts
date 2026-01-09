@@ -155,7 +155,7 @@ async function fetchRawData() {
 
   // B. Public Swarm: Use /rpc Suffix + No Auth
   PUBLIC_NODES.forEach(node => {
-      const url = `${node}/rpc`; // Standard nodes usually require /rpc
+      const url = `${node}/rpc`; 
       requests.push(
         axios.post(url, payload, { timeout: TIMEOUT_RPC })
           .then(res => ({ status: 'fulfilled' as const, url, pods: res.data?.result?.pods || [] }))
@@ -184,9 +184,9 @@ async function fetchRawData() {
         });
       }
     } else {
-        // Only log errors for ChillXand to keep console clean
+        // --- FIXED: Cast 'r' to 'any' to safely access .code ---
         if (r.url.includes('chillxand')) {
-            console.error(`[PULSE] ChillXand Error ${r.code || ''}: ${(r as any).error}`);
+            console.error(`[PULSE] ChillXand Error ${(r as any).code || 'Unknown'}: ${(r as any).error}`);
         }
     }
   });
@@ -268,6 +268,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   }
 
   const mainnetValues = Array.from(mainnetMap.values()).sort((a, b) => a - b);
+  const devnetValues = Array.from(devnetMap.values()).sort((a, b) => a - b);
   const medianMainnet = mainnetValues.length ? mainnetValues[Math.floor(mainnetValues.length / 2)] : 0;
   const medianStorage = rawPods.length ? rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b)[Math.floor(rawPods.length / 2)] : 1;
 
@@ -348,6 +349,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   let hr = 1;
   healthSorted.forEach((n, i) => { if (i > 0 && n.health < healthSorted[i-1].health) hr = i + 1; n.health_rank = hr; });
 
+  // Averages
   let totalUptime = 0, totalVersion = 0, totalReputation = 0, reputationCount = 0, totalStorage = 0;
   finalNodes.forEach(node => {
     totalUptime += node.healthBreakdown.uptime;
