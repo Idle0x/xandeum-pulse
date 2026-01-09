@@ -2,10 +2,9 @@ import axios from 'axios';
 import geoip from 'geoip-lite'; 
 
 // --- CONFIGURATION ---
-// LIST ALL KNOWN RPCs HERE
 const ALL_RPCS = [
-  'https://rpc-mgr.chillxand.com', // ChillXand (HTTPS)
-  'http://173.212.203.145:6000',   // Public Node 1
+  'https://rpc-mgr.chillxand.com', 
+  'http://173.212.203.145:6000',
   'http://161.97.97.41:6000',
   'http://192.190.136.36:6000',
   'http://192.190.136.38:6000',
@@ -14,7 +13,7 @@ const ALL_RPCS = [
   'http://192.190.136.29:6000'
 ];
 
-const TIMEOUT_RPC = 6000; // Increased to 6s to allow slower nodes to answer
+const TIMEOUT_RPC = 6000; 
 const TIMEOUT_CREDITS = 8000;
 
 const API_CREDITS_MAINNET = 'https://podcredits.xandeum.network/api/mainnet-pod-credits';
@@ -50,7 +49,8 @@ export interface EnrichedNode {
     city: string;
   };
   rank?: number;        
-  health_rank?: number; 
+  health_rank?: number;
+  rpc_source?: string; // Added to help you see which RPC reported this specific duplicate
 }
 
 // --- HELPERS ---
@@ -150,16 +150,14 @@ const AXIOS_CONFIG = {
     }
 };
 
-// --- AGGRESSIVE UNION FETCHING ---
+// --- RAW UNFILTERED COLLECTION ---
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
-  
-  // Helper to ensure correct URL format
   const formatUrl = (node: string) => node.endsWith('/rpc') ? node : `${node}/rpc`;
 
   console.log(`[PULSE] Connecting to ${ALL_RPCS.length} RPCs...`);
 
-  // 1. Launch requests to EVERYONE simultaneously
+  // 1. Launch requests to EVERYONE
   const requests = ALL_RPCS.map(url => 
     axios.post(formatUrl(url), payload, { timeout: TIMEOUT_RPC })
       .then(res => ({
@@ -174,46 +172,37 @@ async function fetchRawData() {
       }))
   );
 
-  // 2. Wait for all to finish (Success or Fail)
+  // 2. Wait for all results
   const results = await Promise.all(requests);
 
-  // 3. Process Results
-  const uniquePodsMap = new Map<string, any>();
+  // 3. AGGREGATE EVERYTHING (NO DEDUPLICATION)
+  const allPods: any[] = [];
   const successfulRPCs: string[] = [];
 
   results.forEach(r => {
     if (r.status === 'fulfilled' && Array.isArray(r.pods)) {
       if (r.pods.length > 0) {
         successfulRPCs.push(r.url);
-        // Merge nodes into Map (Deduplication by PubKey)
-        r.pods.forEach((pod: any) => {
-          const key = pod.pubkey || pod.public_key;
-          if (key && !uniquePodsMap.has(key)) {
-            uniquePodsMap.set(key, pod);
-          }
-        });
+        // Tag the pod with its source so you can distinguish duplicates in testing
+        const labeledPods = r.pods.map((p: any) => ({ ...p, rpc_source: r.url }));
+        
+        // PUSH ALL OF THEM
+        allPods.push(...labeledPods);
       }
     } else {
       console.warn(`[PULSE] Failed to connect to ${r.url}: ${(r as any).error}`);
     }
   });
 
-  const mergedList = Array.from(uniquePodsMap.values());
-
   console.log(`[PULSE] Connected to: ${successfulRPCs.length}/${ALL_RPCS.length} RPCs`);
-  console.log(`[PULSE] Total Unique Nodes Found: ${mergedList.length}`);
+  console.log(`[PULSE] Total RAW Nodes (Includes Duplicates): ${allPods.length}`);
 
-  // Create a descriptive label for the UI
   let sourceLabel = 'No Connection';
   if (successfulRPCs.length > 0) {
-    if (successfulRPCs.some(u => u.includes('chillxand'))) {
-      sourceLabel = successfulRPCs.length > 1 ? 'Global Union (ChillXand+)' : 'ChillXand Only';
-    } else {
-      sourceLabel = `Public Swarm (${successfulRPCs.length})`;
-    }
+    sourceLabel = `Multi-RPC Raw (${successfulRPCs.length} endpoints)`;
   }
 
-  return { pods: mergedList, source: sourceLabel };
+  return { pods: allPods, source: sourceLabel };
 }
 
 async function fetchCredits() {
@@ -259,10 +248,8 @@ async function resolveLocations(ips: string[]) {
 // --- MAIN EXPORT ---
 
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  // 1. Fetch RAW data (Nodes) and CREDITS data simultaneously
   const [{ pods: rawPods, source }, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
   
-  // Only throw if we found literally ZERO nodes across all RPCs
   if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable (0 Nodes Found)");
 
   const mainnetMap = new Map<string, number>();
@@ -270,7 +257,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const mainnetValues: number[] = [];
   const devnetValues: number[] = [];
 
-  // Populate Mainnet Credits
+  // Populate Mainnet
   if (Array.isArray(creditsData.mainnet)) {
       creditsData.mainnet.forEach((c: any) => {
           const val = parseFloat(c.credits || c.amount || '0');
@@ -279,7 +266,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       });
   }
 
-  // Populate Devnet Credits
+  // Populate Devnet
   if (Array.isArray(creditsData.devnet)) {
       creditsData.devnet.forEach((c: any) => {
           const val = parseFloat(c.credits || c.amount || '0');
@@ -339,7 +326,8 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
           healthBreakdown: vitality.breakdown, 
           location: { 
               lat: loc.lat, lon: loc.lon, countryName: loc.country, countryCode: loc.countryCode, city: loc.city 
-          }
+          },
+          rpc_source: pod.rpc_source // Pass through the source label
       };
   };
 
