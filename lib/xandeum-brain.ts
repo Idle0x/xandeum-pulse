@@ -2,12 +2,20 @@ import axios from 'axios';
 import geoip from 'geoip-lite'; 
 
 // --- CONFIGURATION ---
-const RPC_NODES = [
-  '173.212.203.145', '161.97.97.41', '192.190.136.36', '192.190.136.38',
-  '207.244.255.1', '192.190.136.28', '192.190.136.29'
+
+// UPDATED: Using full URLs now to support ChillXand (HTTPS) + standard IPs
+const RPC_ENDPOINTS = [
+  'https://rpc-mgr.chillxand.com', // ChillXand Managed RPC
+  'http://173.212.203.145:6000',
+  'http://161.97.97.41:6000',
+  'http://192.190.136.36:6000',
+  'http://192.190.136.38:6000',
+  'http://207.244.255.1:6000',
+  'http://192.190.136.28:6000',
+  'http://192.190.136.29:6000'
 ];
 
-const TIMEOUT_RPC = 4000;
+const TIMEOUT_RPC = 5000; // Increased slightly for HTTPS handshakes
 const TIMEOUT_CREDITS = 8000;
 
 // CORRECT API ENDPOINTS
@@ -43,13 +51,12 @@ export interface EnrichedNode {
     countryCode: string;
     city: string;
   };
-  rank?: number;        // REPUTATION RANK (Based on Credits) - Used for Leaderboard
-  health_rank?: number; // HEALTH RANK (Based on Vitality) - Used for Diagnostics
+  rank?: number;        
+  health_rank?: number; 
 }
 
 // --- HELPERS ---
 
-// STRIP suffixes: "1.2-trynet" -> "1.2", "0.8.0-beta" -> "0.8.0"
 export const cleanSemver = (v: string) => {
   if (!v) return '0.0.0';
   const mainVer = v.split('-')[0]; 
@@ -76,24 +83,19 @@ export const calculateLogScore = (value: number, median: number, maxScore: numbe
     return Math.min(maxScore, (maxScore / 2) * Math.log2((value / median) + 1));
 };
 
-// NEW: Exact Lookup Table based on v2.0 Spec (Uses CLEAN versions for distance)
 export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedCleanVersions: string[]) => {
     const cleanNode = cleanSemver(nodeVersion);
     const cleanConsensus = cleanSemver(consensusVersion);
 
-    // 1. If newer or same as consensus -> 100
     if (compareVersions(cleanNode, cleanConsensus) >= 0) return 100;
 
-    // 2. Find positions in the Master List
     const consensusIndex = sortedCleanVersions.indexOf(cleanConsensus);
     const nodeIndex = sortedCleanVersions.indexOf(cleanNode);
 
-    // If version is unknown/weird and not in list, punish severely
     if (nodeIndex === -1) return 0;
 
     const distance = nodeIndex - consensusIndex;
 
-    // 3. Apply Distance Decay Table
     if (distance <= 0) return 100; 
     if (distance === 1) return 90;
     if (distance === 2) return 70;
@@ -101,7 +103,6 @@ export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: str
     if (distance === 4) return 30;
     if (distance === 5) return 10;
 
-    // 4. "Death Zone" (6+ versions behind)
     return Math.max(0, 10 - (distance - 5));
 };
 
@@ -117,35 +118,25 @@ export const calculateVitalityScore = (
     credits: number | null, 
     medianStorage: number
 ) => {
-  // ⛔ Gatekeeper Rule: Hard Constraint
   if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
 
-  // 1️⃣ Uptime Score (Sigmoid)
   const uptimeDays = uptimeSeconds / 86400;
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
-  // Cap score at 20 for nodes younger than 1 day
   if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
 
-  // 2️⃣ Storage Score (Logarithmic + Bonus)
   const baseStorageScore = calculateLogScore(storageCommitted, medianStorage, 100);
   const utilizationBonus = storageUsed > 0 ? Math.min(15, 5 * Math.log2((storageUsed / (1024 ** 3)) + 2)) : 0;
   const totalStorageScore = baseStorageScore + utilizationBonus;
 
-  // 4️⃣ Version Score (Distance-Based)
   const versionScore = getVersionScoreByRank(version, consensusVersion, sortedCleanVersions);
 
   let total = 0;
   let reputationScore: number | null = null;
 
-  // 🔁 Dynamic Re-Weighting Logic
   if (credits !== null && medianCredits > 0) {
-      // 3️⃣ Reputation Score (Standard Mode)
       reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
-
-      // Standard Weights: U(35%) + S(30%) + R(20%) + V(15%)
       total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15));
   } else {
-      // Fallback Weights: U(45%) + S(35%) + V(20%)
       total = Math.round((uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20));
       reputationScore = null; 
   }
@@ -170,21 +161,36 @@ const AXIOS_CONFIG = {
     }
 };
 
+// UPDATED: "Merge & Deduplicate" Strategy
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
-  try {
-      const res = await axios.post(`http://${RPC_NODES[0]}:6000/rpc`, payload, { timeout: TIMEOUT_RPC });
-      if (res.data?.result?.pods) return res.data.result.pods;
-  } catch (e) { /* fallthrough */ }
 
-  const shuffled = RPC_NODES.slice(1).sort(() => 0.5 - Math.random()).slice(0, 3);
-  try {
-      const winner = await Promise.any(shuffled.map(ip => 
-          axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC })
+  // Query ALL endpoints in parallel
+  const results = await Promise.allSettled(
+      RPC_ENDPOINTS.map(baseUrl => {
+          // Normalize URL: Ensure it ends with /rpc if needed
+          const url = baseUrl.endsWith('/rpc') ? baseUrl : `${baseUrl}/rpc`;
+          return axios.post(url, payload, { timeout: TIMEOUT_RPC })
                .then(r => r.data?.result?.pods || [])
-      ));
-      return winner;
-  } catch (e) { return []; }
+               .catch(() => []); // Return empty on error
+      })
+  );
+
+  const uniquePodsMap = new Map<string, any>();
+
+  results.forEach(res => {
+      if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+          res.value.forEach((pod: any) => {
+              // Deduplicate by Public Key
+              const key = pod.pubkey || pod.public_key;
+              if (key && !uniquePodsMap.has(key)) {
+                  uniquePodsMap.set(key, pod);
+              }
+          });
+      }
+  });
+
+  return Array.from(uniquePodsMap.values());
 }
 
 async function fetchCredits() {
@@ -264,25 +270,18 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const storageArray: number[] = rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
   const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
 
-  // --- VERSION CONSENSUS LOGIC (TWO-TRACK STRATEGY) ---
+  // --- VERSION CONSENSUS LOGIC ---
   const rawVersionCounts: Record<string, number> = {}; 
   const uniqueCleanVersionsSet = new Set<string>();
 
   rawPods.forEach((p: any) => { 
       const rawV = (p.version || '0.0.0'); 
       const cleanV = cleanSemver(rawV);
-
-      // Track 1: Vote using EXACT RAW string (Strict Mode Consensus)
       rawVersionCounts[rawV] = (rawVersionCounts[rawV] || 0) + 1;
-
-      // Track 2: Build the simplified ladder (Semantic Ranking)
       uniqueCleanVersionsSet.add(cleanV);
   });
 
-  // Consensus is the most common RAW version
   const consensusVersion = Object.keys(rawVersionCounts).sort((a, b) => rawVersionCounts[b] - rawVersionCounts[a])[0] || '0.0.0';
-
-  // Master List sorted Descending
   const sortedCleanVersions = Array.from(uniqueCleanVersionsSet).sort((a, b) => compareVersions(b, a));
 
   await resolveLocations([...new Set(rawPods.map((p: any) => p.address.split(':')[0]))] as string[]);
@@ -339,7 +338,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       }
   });
 
-  // --- REPUTATION RANKING (Original Logic) ---
   const mainnetNodes = expandedNodes.filter(n => n.network === 'MAINNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const devnetNodes = expandedNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const unknownNodes = expandedNodes.filter(n => n.network === 'UNKNOWN');
@@ -352,19 +350,15 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
 
   const finalNodes = [...mainnetNodes, ...devnetNodes, ...unknownNodes];
 
-  // --- HEALTH RANKING (New Logic) ---
-  // Rank the entire network based on health score, independent of network type
   const healthSorted = [...finalNodes].sort((a, b) => b.health - a.health);
   let hr = 1;
   healthSorted.forEach((n, i) => {
-      // If health matches previous node, share the rank
       if (i > 0 && n.health < healthSorted[i-1].health) {
           hr = i + 1;
       }
       n.health_rank = hr;
   });
 
-  // CALCULATE REAL AVERAGES FOR BREAKDOWN
   let totalUptime = 0;
   let totalVersion = 0;
   let totalReputation = 0;
