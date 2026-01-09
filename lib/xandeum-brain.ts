@@ -2,12 +2,12 @@ import axios from 'axios';
 import geoip from 'geoip-lite'; 
 
 // --- CONFIGURATION ---
-const RPC_NODES = [
-  '173.212.203.145', '161.97.97.41', '192.190.136.36', '192.190.136.38',
-  '207.244.255.1', '192.190.136.28', '192.190.136.29', '159.195.4.138', '152.53.155.30'
-];
 
-const TIMEOUT_RPC = 4000;
+// YOUR PRIVATE "GOD MODE" NODE (Via Cloudflare Tunnel)
+// This points directly to localhost:6000 on your VPS
+const PRIVATE_RPC_URL = 'https://arkansas-collect-loving-rather.trycloudflare.com/rpc';
+
+const TIMEOUT_RPC = 6000; // Increased slightly for tunnel latency
 const TIMEOUT_CREDITS = 8000;
 
 // CORRECT API ENDPOINTS
@@ -43,8 +43,8 @@ export interface EnrichedNode {
     countryCode: string;
     city: string;
   };
-  rank?: number;        // REPUTATION RANK (Based on Credits) - Used for Leaderboard
-  health_rank?: number; // HEALTH RANK (Based on Vitality) - Used for Diagnostics
+  rank?: number;        // REPUTATION RANK (Based on Credits)
+  health_rank?: number; // HEALTH RANK (Based on Vitality)
 }
 
 // --- HELPERS ---
@@ -172,19 +172,24 @@ const AXIOS_CONFIG = {
 
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
-  try {
-      const res = await axios.post(`http://${RPC_NODES[0]}:6000/rpc`, payload, { timeout: TIMEOUT_RPC });
-      if (res.data?.result?.pods) return res.data.result.pods;
-  } catch (e) { /* fallthrough */ }
+  
+  console.log(`[PULSE] Connecting to Private Node: ${PRIVATE_RPC_URL}`);
 
-  const shuffled = RPC_NODES.slice(1).sort(() => 0.5 - Math.random()).slice(0, 3);
   try {
-      const winner = await Promise.any(shuffled.map(ip => 
-          axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC })
-               .then(r => r.data?.result?.pods || [])
-      ));
-      return winner;
-  } catch (e) { return []; }
+      // Direct connection to your tunnel (HTTPS handled by Cloudflare)
+      const res = await axios.post(PRIVATE_RPC_URL, payload, { timeout: TIMEOUT_RPC });
+      
+      if (res.data?.result?.pods) {
+          console.log(`[PULSE] Success! Retrieved ${res.data.result.pods.length} nodes.`);
+          return res.data.result.pods;
+      }
+  } catch (e: any) { 
+      console.error(`[PULSE] RPC Failure: ${e.message}`);
+      // Fallback is empty because we have no other source for this data
+      return [];
+  }
+  
+  return [];
 }
 
 async function fetchCredits() {
@@ -231,6 +236,7 @@ async function resolveLocations(ips: string[]) {
 
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
   const [rawPods, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
+  
   if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable");
 
   const mainnetMap = new Map<string, number>();
@@ -264,25 +270,18 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const storageArray: number[] = rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
   const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
 
-  // --- VERSION CONSENSUS LOGIC (TWO-TRACK STRATEGY) ---
+  // --- VERSION CONSENSUS LOGIC ---
   const rawVersionCounts: Record<string, number> = {}; 
   const uniqueCleanVersionsSet = new Set<string>();
 
   rawPods.forEach((p: any) => { 
       const rawV = (p.version || '0.0.0'); 
       const cleanV = cleanSemver(rawV);
-
-      // Track 1: Vote using EXACT RAW string (Strict Mode Consensus)
       rawVersionCounts[rawV] = (rawVersionCounts[rawV] || 0) + 1;
-
-      // Track 2: Build the simplified ladder (Semantic Ranking)
       uniqueCleanVersionsSet.add(cleanV);
   });
 
-  // Consensus is the most common RAW version
   const consensusVersion = Object.keys(rawVersionCounts).sort((a, b) => rawVersionCounts[b] - rawVersionCounts[a])[0] || '0.0.0';
-
-  // Master List sorted Descending
   const sortedCleanVersions = Array.from(uniqueCleanVersionsSet).sort((a, b) => compareVersions(b, a));
 
   await resolveLocations([...new Set(rawPods.map((p: any) => p.address.split(':')[0]))] as string[]);
@@ -339,7 +338,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       }
   });
 
-  // --- REPUTATION RANKING (Original Logic) ---
   const mainnetNodes = expandedNodes.filter(n => n.network === 'MAINNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const devnetNodes = expandedNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const unknownNodes = expandedNodes.filter(n => n.network === 'UNKNOWN');
@@ -352,19 +350,15 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
 
   const finalNodes = [...mainnetNodes, ...devnetNodes, ...unknownNodes];
 
-  // --- HEALTH RANKING (New Logic) ---
-  // Rank the entire network based on health score, independent of network type
   const healthSorted = [...finalNodes].sort((a, b) => b.health - a.health);
   let hr = 1;
   healthSorted.forEach((n, i) => {
-      // If health matches previous node, share the rank
       if (i > 0 && n.health < healthSorted[i-1].health) {
           hr = i + 1;
       }
       n.health_rank = hr;
   });
 
-  // CALCULATE REAL AVERAGES FOR BREAKDOWN
   let totalUptime = 0;
   let totalVersion = 0;
   let totalReputation = 0;
