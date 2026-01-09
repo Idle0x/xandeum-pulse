@@ -3,7 +3,7 @@ import geoip from 'geoip-lite';
 
 // --- CONFIGURATION ---
 
-// 1. CHILLXAND: HTTPS, No Port, Root URL (Based on your docs)
+// 1. CHILLXAND: HTTPS, No Port, Root URL
 const CHILLXAND_RPC = 'https://rpc1.chillxand.com';
 
 // 2. PUBLIC SWARM: HTTP, Port 6000, Needs /rpc
@@ -127,7 +127,7 @@ const AXIOS_CONFIG_CREDITS = {
     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json, text/plain, */*' }
 };
 
-// --- SMART FETCHING LOGIC ---
+// --- AGGRESSIVE FETCHING (NO DEDUPLICATION) ---
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
   
@@ -154,45 +154,44 @@ async function fetchRawData() {
   );
 
   // B. Public Swarm: Use /rpc Suffix + No Auth
-  PUBLIC_NODES.forEach(node => {
+  // (Using map loop to create requests array)
+  const swarmRequests = PUBLIC_NODES.map(node => {
       const url = `${node}/rpc`; 
-      requests.push(
-        axios.post(url, payload, { timeout: TIMEOUT_RPC })
+      return axios.post(url, payload, { timeout: TIMEOUT_RPC })
           .then(res => ({ status: 'fulfilled' as const, url, pods: res.data?.result?.pods || [] }))
-          .catch(err => ({ status: 'rejected' as const, url, error: err.message }))
-      );
+          .catch(err => ({ status: 'rejected' as const, url, error: err.message }));
   });
+  
+  requests.push(...swarmRequests);
 
   // 2. Wait for everything
   const results = await Promise.all(requests);
 
-  // 3. Merge Results (Deduplicate by PubKey)
-  const uniquePodsMap = new Map<string, any>();
+  // 3. AGGREGATE EVERYTHING (NO FILTERING)
+  const allPods: any[] = [];
   const successfulSources: string[] = [];
 
   results.forEach(r => {
     if (r.status === 'fulfilled' && Array.isArray(r.pods)) {
       if (r.pods.length > 0) {
         successfulSources.push(r.url);
-        r.pods.forEach((pod: any) => {
-          const key = pod.pubkey || pod.public_key;
-          // Strategy: First Come, First Served. 
-          // (ChillXand is first in list, so its data takes priority if duplicate)
-          if (key && !uniquePodsMap.has(key)) {
-            uniquePodsMap.set(key, { ...pod, rpc_source: r.url.includes('chillxand') ? 'ChillXand' : 'Public Swarm' });
-          }
-        });
+        
+        // Tag every pod with its source so you can see where it came from
+        const label = r.url.includes('chillxand') ? 'ChillXand' : `Public (${r.url})`;
+        const labeledPods = r.pods.map((p: any) => ({ ...p, rpc_source: label }));
+        
+        // PUSH EVERYTHING (Including Duplicates)
+        allPods.push(...labeledPods);
       }
     } else {
-        // --- FIXED: Cast 'r' to 'any' to safely access .code ---
+        // Safe logging with type casting
         if (r.url.includes('chillxand')) {
             console.error(`[PULSE] ChillXand Error ${(r as any).code || 'Unknown'}: ${(r as any).error}`);
         }
     }
   });
 
-  const mergedList = Array.from(uniquePodsMap.values());
-  console.log(`[PULSE] Connected Sources: ${successfulSources.length}. Total Nodes: ${mergedList.length}`);
+  console.log(`[PULSE] Connected Sources: ${successfulSources.length}. Total RAW Nodes: ${allPods.length}`);
 
   let sourceLabel = 'Offline';
   if (successfulSources.length > 0) {
@@ -203,7 +202,7 @@ async function fetchRawData() {
       }
   }
 
-  return { pods: mergedList, source: sourceLabel };
+  return { pods: allPods, source: sourceLabel };
 }
 
 async function fetchCredits() {
