@@ -159,6 +159,7 @@ const AXIOS_CONFIG = {
     }
 };
 
+// --- HYBRID FETCHING (Private + Public) ---
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
   
@@ -207,7 +208,21 @@ async function fetchRawData() {
   const mergedList = Array.from(uniquePodsMap.values());
   console.log(`[PULSE] Connected to ${successCount} RPCs. Found ${mergedList.length} unique nodes.`);
   
-  return mergedList;
+  // Return OBJECT with pods AND source string
+  let sourceLabel = 'Offline';
+  if (successCount > 0) {
+      const hasPrivate = successfulRPCs(results); // Helper check
+      sourceLabel = hasPrivate 
+        ? `Hybrid (${mergedList.length} Nodes)` 
+        : `Public Only (${mergedList.length} Nodes)`;
+  }
+
+  return { pods: mergedList, source: sourceLabel };
+}
+
+// Small helper to check if private RPC succeeded (for the label)
+function successfulRPCs(results: any[]) {
+    return results.some(r => r.status === 'fulfilled' && r.url.includes('trycloudflare'));
 }
 
 async function fetchCredits() {
@@ -253,8 +268,9 @@ async function resolveLocations(ips: string[]) {
 // --- MAIN EXPORT ---
 
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  // Use Promise.all to fetch RPC data and Credits in parallel
-  const [rawPods, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
+  // --- CORRECT DESTRUCTURING ---
+  // We extract 'pods' (renamed to rawPods) and 'source' from the object returned by fetchRawData
+  const [{ pods: rawPods, source }, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
   
   if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable");
 
@@ -406,6 +422,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
         medianCredits: medianMainnet, 
         medianStorage,
         totalNodes: finalNodes.length,
+        connectedNode: source,
         systemStatus: {
             credits: creditsData.mainnet.length > 0 || creditsData.devnet.length > 0, 
             rpc: true 
