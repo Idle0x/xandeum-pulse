@@ -3,11 +3,16 @@ import geoip from 'geoip-lite';
 
 // --- CONFIGURATION ---
 
-// YOUR PRIVATE "GOD MODE" NODE (Via Cloudflare Tunnel)
-// This points directly to localhost:6000 on your VPS
-const PRIVATE_RPC_URL = 'https://arkansas-collect-loving-rather.trycloudflare.com/rpc';
+// 1. YOUR PRIVATE TUNNEL (For Hidden Mainnet Nodes)
+const PRIVATE_NODE = 'https://arkansas-collect-loving-rather.trycloudflare.com';
 
-const TIMEOUT_RPC = 6000; // Increased slightly for tunnel latency
+// 2. PUBLIC SWARM (For Devnet & Public Mainnet Nodes)
+const PUBLIC_IPS = [
+  '173.212.203.145', '161.97.97.41', '192.190.136.36', '192.190.136.38',
+  '207.244.255.1', '192.190.136.28', '192.190.136.29', '159.195.4.138', '152.53.155.30'
+];
+
+const TIMEOUT_RPC = 6000;
 const TIMEOUT_CREDITS = 8000;
 
 // CORRECT API ENDPOINTS
@@ -43,13 +48,12 @@ export interface EnrichedNode {
     countryCode: string;
     city: string;
   };
-  rank?: number;        // REPUTATION RANK (Based on Credits)
-  health_rank?: number; // HEALTH RANK (Based on Vitality)
+  rank?: number;
+  health_rank?: number;
+  rpc_source?: string; // To track where we found this node
 }
 
 // --- HELPERS ---
-
-// STRIP suffixes: "1.2-trynet" -> "1.2", "0.8.0-beta" -> "0.8.0"
 export const cleanSemver = (v: string) => {
   if (!v) return '0.0.0';
   const mainVer = v.split('-')[0]; 
@@ -76,120 +80,126 @@ export const calculateLogScore = (value: number, median: number, maxScore: numbe
     return Math.min(maxScore, (maxScore / 2) * Math.log2((value / median) + 1));
 };
 
-// NEW: Exact Lookup Table based on v2.0 Spec (Uses CLEAN versions for distance)
 export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedCleanVersions: string[]) => {
     const cleanNode = cleanSemver(nodeVersion);
     const cleanConsensus = cleanSemver(consensusVersion);
-
-    // 1. If newer or same as consensus -> 100
     if (compareVersions(cleanNode, cleanConsensus) >= 0) return 100;
-
-    // 2. Find positions in the Master List
     const consensusIndex = sortedCleanVersions.indexOf(cleanConsensus);
     const nodeIndex = sortedCleanVersions.indexOf(cleanNode);
-
-    // If version is unknown/weird and not in list, punish severely
     if (nodeIndex === -1) return 0;
-
     const distance = nodeIndex - consensusIndex;
-
-    // 3. Apply Distance Decay Table
     if (distance <= 0) return 100; 
     if (distance === 1) return 90;
     if (distance === 2) return 70;
     if (distance === 3) return 50;
     if (distance === 4) return 30;
     if (distance === 5) return 10;
-
-    // 4. "Death Zone" (6+ versions behind)
     return Math.max(0, 10 - (distance - 5));
 };
 
-// --- SCORING FACTORY ---
 export const calculateVitalityScore = (
-    storageCommitted: number, 
-    storageUsed: number,
-    uptimeSeconds: number, 
-    version: string, 
-    consensusVersion: string, 
-    sortedCleanVersions: string[], 
-    medianCredits: number, 
-    credits: number | null, 
-    medianStorage: number
+    storageCommitted: number, storageUsed: number, uptimeSeconds: number, version: string, 
+    consensusVersion: string, sortedCleanVersions: string[], medianCredits: number, 
+    credits: number | null, medianStorage: number
 ) => {
-  // ⛔ Gatekeeper Rule: Hard Constraint
   if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
-
-  // 1️⃣ Uptime Score (Sigmoid)
+  
   const uptimeDays = uptimeSeconds / 86400;
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
-  // Cap score at 20 for nodes younger than 1 day
   if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
 
-  // 2️⃣ Storage Score (Logarithmic + Bonus)
   const baseStorageScore = calculateLogScore(storageCommitted, medianStorage, 100);
   const utilizationBonus = storageUsed > 0 ? Math.min(15, 5 * Math.log2((storageUsed / (1024 ** 3)) + 2)) : 0;
   const totalStorageScore = baseStorageScore + utilizationBonus;
 
-  // 4️⃣ Version Score (Distance-Based)
   const versionScore = getVersionScoreByRank(version, consensusVersion, sortedCleanVersions);
 
   let total = 0;
   let reputationScore: number | null = null;
 
-  // 🔁 Dynamic Re-Weighting Logic
   if (credits !== null && medianCredits > 0) {
-      // 3️⃣ Reputation Score (Standard Mode)
       reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
-
-      // Standard Weights: U(35%) + S(30%) + R(20%) + V(15%)
       total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15));
   } else {
-      // Fallback Weights: U(45%) + S(35%) + V(20%)
       total = Math.round((uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20));
       reputationScore = null; 
   }
 
   return {
       total: Math.max(0, Math.min(100, total)),
-      breakdown: {
-          uptime: Math.round(uptimeScore),
-          version: Math.round(versionScore),
-          reputation: reputationScore,
-          storage: Math.round(totalStorageScore)
-      }
+      breakdown: { uptime: Math.round(uptimeScore), version: Math.round(versionScore), reputation: reputationScore, storage: Math.round(totalStorageScore) }
   };
 };
 
 // --- FETCHING ---
 const AXIOS_CONFIG = {
     timeout: TIMEOUT_CREDITS,
-    headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*'
-    }
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json, text/plain, */*' }
 };
 
+// --- HYBRID FETCHING (Private + Public) ---
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
   
-  console.log(`[PULSE] Connecting to Private Node: ${PRIVATE_RPC_URL}`);
+  // 1. Construct Source List
+  // Private Node: Needs full URL
+  const sources = [ PRIVATE_NODE ];
+  // Public Nodes: Need http:// + :6000
+  PUBLIC_IPS.forEach(ip => sources.push(`http://${ip}:6000`));
 
-  try {
-      // Direct connection to your tunnel (HTTPS handled by Cloudflare)
-      const res = await axios.post(PRIVATE_RPC_URL, payload, { timeout: TIMEOUT_RPC });
-      
-      if (res.data?.result?.pods) {
-          console.log(`[PULSE] Success! Retrieved ${res.data.result.pods.length} nodes.`);
-          return res.data.result.pods;
+  console.log(`[PULSE] Hybrid Scan: Querying ${sources.length} RPCs...`);
+
+  // 2. Helper to formatting URLs safely
+  const formatUrl = (base: string) => base.endsWith('/rpc') ? base : `${base}/rpc`;
+
+  // 3. Fire Requests
+  const requests = sources.map(url => 
+    axios.post(formatUrl(url), payload, { timeout: TIMEOUT_RPC })
+      .then(res => ({ status: 'fulfilled' as const, url, pods: res.data?.result?.pods || [] }))
+      .catch(err => ({ status: 'rejected' as const, url, error: err.message }))
+  );
+
+  const results = await Promise.all(requests);
+
+  // 4. Merge & Deduplicate
+  const uniquePodsMap = new Map<string, any>();
+  const successfulRPCs: string[] = [];
+
+  results.forEach(r => {
+    if (r.status === 'fulfilled' && Array.isArray(r.pods)) {
+      if (r.pods.length > 0) {
+        successfulRPCs.push(r.url);
+        
+        const isPrivateSource = r.url.includes('trycloudflare');
+        const sourceLabel = isPrivateSource ? 'Private RPC' : 'Public Swarm';
+
+        r.pods.forEach((pod: any) => {
+          const key = pod.pubkey || pod.public_key;
+          
+          if (key) {
+            // Logic: If we already have this pod, ONLY overwrite if the new data comes from Private RPC
+            // (Private RPC data is trusted more for hidden mainnet nodes)
+            if (!uniquePodsMap.has(key) || isPrivateSource) {
+               uniquePodsMap.set(key, { ...pod, rpc_source: sourceLabel });
+            }
+          }
+        });
       }
-  } catch (e: any) { 
-      console.error(`[PULSE] RPC Failure: ${e.message}`);
-      // Fallback is empty because we have no other source for this data
-      return [];
+    }
+  });
+
+  const mergedList = Array.from(uniquePodsMap.values());
+  console.log(`[PULSE] Connected: ${successfulRPCs.length}/${sources.length}. Total Unique Nodes: ${mergedList.length}`);
+
+  let sourceLabel = 'Offline';
+  if (successfulRPCs.length > 0) {
+      const hasPrivate = successfulRPCs.some(u => u.includes('trycloudflare'));
+      sourceLabel = hasPrivate 
+        ? `Hybrid (${mergedList.length} Nodes)` 
+        : `Public Only (${mergedList.length} Nodes)`;
   }
-  
-  return [];
+
+  return { pods: mergedList, source: sourceLabel };
 }
 
 async function fetchCredits() {
@@ -313,7 +323,8 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
           healthBreakdown: vitality.breakdown, 
           location: { 
               lat: loc.lat, lon: loc.lon, countryName: loc.country, countryCode: loc.countryCode, city: loc.city 
-          }
+          },
+          rpc_source: pod.rpc_source
       };
   };
 
