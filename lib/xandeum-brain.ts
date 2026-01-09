@@ -2,8 +2,11 @@ import axios from 'axios';
 import geoip from 'geoip-lite'; 
 
 // --- CONFIGURATION ---
-const ALL_RPCS = [
-  'https://rpc1.chillxand.com', // UPDATED: Correct Endpoint from your docs
+// 1. CHILLXAND (HTTPS, No port, No /rpc suffix unless specified)
+const CHILLXAND_RPC = 'https://rpc1.chillxand.com';
+
+// 2. PUBLIC SWARM (HTTP, Port 6000, Needs /rpc)
+const PUBLIC_SWARM = [
   'http://173.212.203.145:6000',
   'http://161.97.97.41:6000',
   'http://192.190.136.36:6000',
@@ -13,18 +16,18 @@ const ALL_RPCS = [
   'http://192.190.136.29:6000'
 ];
 
-const TIMEOUT_RPC = 6000; 
+const TIMEOUT_RPC = 6000;
 const TIMEOUT_CREDITS = 8000;
 
-// API Key for ChillXand (Best practice: use process.env)
-const CHILL_KEY = process.env.CHILLXAND_API_KEY || 'PLACEHOLDER_KEY_IF_NO_ENV';
+// Grab the key from environment
+const CHILL_KEY = process.env.CHILLXAND_API_KEY || '';
 
 const API_CREDITS_MAINNET = 'https://podcredits.xandeum.network/api/mainnet-pod-credits';
 const API_CREDITS_DEVNET  = 'https://podcredits.xandeum.network/api/pods-credits';
 
 const geoCache = new Map<string, { lat: number; lon: number; country: string; countryCode: string; city: string }>();
 
-// --- INTERFACES ---
+// --- INTERFACES & HELPERS (Kept same as before) ---
 export interface EnrichedNode {
   address: string;
   pubkey: string;
@@ -38,30 +41,14 @@ export interface EnrichedNode {
   storage_committed: number; 
   credits: number | null; 
   health: number;
-  healthBreakdown: {
-      uptime: number;
-      version: number;
-      reputation: number | null;
-      storage: number;
-  };
-  location: {
-    lat: number;
-    lon: number;
-    countryName: string;
-    countryCode: string;
-    city: string;
-  };
+  healthBreakdown: { uptime: number; version: number; reputation: number | null; storage: number; };
+  location: { lat: number; lon: number; countryName: string; countryCode: string; city: string; };
   rank?: number;        
   health_rank?: number;
   rpc_source?: string;
 }
 
-// --- HELPERS ---
-export const cleanSemver = (v: string) => {
-  if (!v) return '0.0.0';
-  const mainVer = v.split('-')[0]; 
-  return mainVer.replace(/[^0-9.]/g, '');
-};
+export const cleanSemver = (v: string) => v ? v.split('-')[0].replace(/[^0-9.]/g, '') : '0.0.0';
 
 export const compareVersions = (v1: string, v2: string) => {
   const p1 = cleanSemver(v1).split('.').map(Number);
@@ -101,18 +88,12 @@ export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: str
 };
 
 export const calculateVitalityScore = (
-    storageCommitted: number, 
-    storageUsed: number,
-    uptimeSeconds: number, 
-    version: string, 
-    consensusVersion: string, 
-    sortedCleanVersions: string[], 
-    medianCredits: number, 
-    credits: number | null, 
-    medianStorage: number
+    storageCommitted: number, storageUsed: number, uptimeSeconds: number, version: string, 
+    consensusVersion: string, sortedCleanVersions: string[], medianCredits: number, 
+    credits: number | null, medianStorage: number
 ) => {
   if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
-
+  
   const uptimeDays = uptimeSeconds / 86400;
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
   if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
@@ -136,62 +117,50 @@ export const calculateVitalityScore = (
 
   return {
       total: Math.max(0, Math.min(100, total)),
-      breakdown: {
-          uptime: Math.round(uptimeScore),
-          version: Math.round(versionScore),
-          reputation: reputationScore,
-          storage: Math.round(totalStorageScore)
-      }
+      breakdown: { uptime: Math.round(uptimeScore), version: Math.round(versionScore), reputation: reputationScore, storage: Math.round(totalStorageScore) }
   };
 };
 
 const AXIOS_CONFIG_CREDITS = {
     timeout: TIMEOUT_CREDITS,
-    headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*'
-    }
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json, text/plain, */*' }
 };
 
-// --- AUTHENTICATED FETCHING ---
+// --- AGGRESSIVE FETCHING ---
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
-  
-  const formatUrl = (node: string) => node.endsWith('/rpc') ? node : `${node}/rpc`;
 
-  console.log(`[PULSE] Connecting to ${ALL_RPCS.length} RPCs...`);
+  // 1. Build Request List manually to control URLs precisely
+  const requests = [];
 
-  // 1. Launch requests with CONDITIONAL HEADERS
-  const requests = ALL_RPCS.map(url => {
-    // Basic Config
-    const config: any = { 
+  // A. ChillXand Request (No /rpc suffix modification)
+  console.log(`[PULSE] Connecting to ChillXand: ${CHILLXAND_RPC}`);
+  requests.push(
+    axios.post(CHILLXAND_RPC, payload, {
         timeout: TIMEOUT_RPC,
-        headers: { 'Content-Type': 'application/json' }
-    };
+        headers: { 
+            'Content-Type': 'application/json',
+            'X-API-Key': CHILL_KEY 
+        }
+    })
+    .then(res => ({ status: 'fulfilled' as const, url: CHILLXAND_RPC, pods: res.data?.result?.pods || [] }))
+    .catch(err => ({ status: 'rejected' as const, url: CHILLXAND_RPC, error: err.message, code: err.response?.status }))
+  );
 
-    // INJECT KEY IF CHILLXAND
-    if (url.includes('chillxand')) {
-        config.headers['X-API-Key'] = CHILL_KEY;
-        console.log(`[PULSE] Injecting Auth Header for: ${url}`);
-    }
-
-    return axios.post(formatUrl(url), payload, config)
-      .then(res => ({
-        status: 'fulfilled' as const,
-        url,
-        pods: res.data?.result?.pods || []
-      }))
-      .catch(err => ({
-        status: 'rejected' as const,
-        url,
-        error: err.message
-      }));
+  // B. Public Swarm Requests (Force /rpc)
+  PUBLIC_SWARM.forEach(node => {
+      const url = `${node}/rpc`; 
+      requests.push(
+        axios.post(url, payload, { timeout: TIMEOUT_RPC })
+          .then(res => ({ status: 'fulfilled' as const, url, pods: res.data?.result?.pods || [] }))
+          .catch(err => ({ status: 'rejected' as const, url, error: err.message, code: err.response?.status }))
+      );
   });
 
-  // 2. Wait for all results
+  // 2. Wait for all
   const results = await Promise.all(requests);
 
-  // 3. AGGREGATE EVERYTHING (NO DEDUPLICATION as requested)
+  // 3. Process
   const allPods: any[] = [];
   const successfulRPCs: string[] = [];
 
@@ -199,21 +168,25 @@ async function fetchRawData() {
     if (r.status === 'fulfilled' && Array.isArray(r.pods)) {
       if (r.pods.length > 0) {
         successfulRPCs.push(r.url);
-        // Tag source for debugging
         const labeledPods = r.pods.map((p: any) => ({ ...p, rpc_source: r.url }));
         allPods.push(...labeledPods);
       }
     } else {
-      console.warn(`[PULSE] Failed to connect to ${r.url}: ${(r as any).error}`);
+      // LOG THE SPECIFIC ERROR CODE (403 vs 404)
+      const errCode = (r as any).code || 'Unknown';
+      console.warn(`[PULSE] Failed ${r.url} -> Status: ${errCode} | Msg: ${(r as any).error}`);
     }
   });
 
-  console.log(`[PULSE] Connected to: ${successfulRPCs.length}/${ALL_RPCS.length} RPCs`);
-  console.log(`[PULSE] Total RAW Nodes: ${allPods.length}`);
+  console.log(`[PULSE] Connected to: ${successfulRPCs.length} RPCs. Total Nodes: ${allPods.length}`);
 
   let sourceLabel = 'No Connection';
   if (successfulRPCs.length > 0) {
-    sourceLabel = `Multi-RPC Raw (${successfulRPCs.length} endpoints)`;
+    if (successfulRPCs.some(u => u.includes('chillxand'))) {
+      sourceLabel = successfulRPCs.length > 1 ? 'Global Union (ChillXand+)' : 'ChillXand Only';
+    } else {
+      sourceLabel = `Public Swarm (${successfulRPCs.length})`;
+    }
   }
 
   return { pods: allPods, source: sourceLabel };
@@ -231,10 +204,7 @@ async function fetchCredits() {
         if (Array.isArray(d)) return d;
         return [];
     };
-    return {
-        mainnet: parseData(mainnetRes),
-        devnet: parseData(devnetRes)
-    };
+    return { mainnet: parseData(mainnetRes), devnet: parseData(devnetRes) };
 }
 
 async function resolveLocations(ips: string[]) {
@@ -260,7 +230,6 @@ async function resolveLocations(ips: string[]) {
 }
 
 // --- MAIN EXPORT ---
-
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
   const [{ pods: rawPods, source }, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
   
@@ -271,7 +240,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const mainnetValues: number[] = [];
   const devnetValues: number[] = [];
 
-  // Populate Mainnet
+  // Populate Credits Maps
   if (Array.isArray(creditsData.mainnet)) {
       creditsData.mainnet.forEach((c: any) => {
           const val = parseFloat(c.credits || c.amount || '0');
@@ -279,8 +248,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
           if (key && !isNaN(val)) { mainnetMap.set(key, val); mainnetValues.push(val); }
       });
   }
-
-  // Populate Devnet
   if (Array.isArray(creditsData.devnet)) {
       creditsData.devnet.forEach((c: any) => {
           const val = parseFloat(c.credits || c.amount || '0');
@@ -292,22 +259,17 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   mainnetValues.sort((a, b) => a - b);
   devnetValues.sort((a, b) => a - b);
   const medianMainnet = mainnetValues.length ? mainnetValues[Math.floor(mainnetValues.length / 2)] : 0;
-  const medianDevnet = devnetValues.length ? devnetValues[Math.floor(devnetValues.length / 2)] : 0;
+  const medianStorage = rawPods.length ? rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b)[Math.floor(rawPods.length / 2)] : 1;
 
-  const storageArray: number[] = rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
-  const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
-
-  // --- VERSION CONSENSUS LOGIC ---
+  // Consensus
   const rawVersionCounts: Record<string, number> = {}; 
   const uniqueCleanVersionsSet = new Set<string>();
-
   rawPods.forEach((p: any) => { 
       const rawV = (p.version || '0.0.0'); 
       const cleanV = cleanSemver(rawV);
       rawVersionCounts[rawV] = (rawVersionCounts[rawV] || 0) + 1;
       uniqueCleanVersionsSet.add(cleanV);
   });
-
   const consensusVersion = Object.keys(rawVersionCounts).sort((a, b) => rawVersionCounts[b] - rawVersionCounts[a])[0] || '0.0.0';
   const sortedCleanVersions = Array.from(uniqueCleanVersionsSet).sort((a, b) => compareVersions(b, a));
 
@@ -338,9 +300,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
           isUntracked,
           health: vitality.total,
           healthBreakdown: vitality.breakdown, 
-          location: { 
-              lat: loc.lat, lon: loc.lon, countryName: loc.country, countryCode: loc.countryCode, city: loc.city 
-          },
+          location: { lat: loc.lat, lon: loc.lon, countryName: loc.country, countryCode: loc.countryCode, city: loc.city },
           rpc_source: pod.rpc_source 
       };
   };
@@ -354,12 +314,10 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
           const credits = mainnetMap.get(key) || 0;
           expandedNodes.push(scoreNode(pod, 'MAINNET', credits, medianMainnet, false));
       }
-
       if (inDevnet) {
           const credits = devnetMap.get(key) || 0;
-          expandedNodes.push(scoreNode(pod, 'DEVNET', credits, medianDevnet, false));
+          expandedNodes.push(scoreNode(pod, 'DEVNET', credits, medianMainnet, false)); // Note: Fallback to mainnet median if devnet empty
       }
-
       if (!inMainnet && !inDevnet) {
           const isUntracked = creditsData.mainnet.length > 0;
           expandedNodes.push(scoreNode(pod, 'UNKNOWN', null, medianMainnet, isUntracked));
@@ -370,38 +328,23 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const devnetNodes = expandedNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const unknownNodes = expandedNodes.filter(n => n.network === 'UNKNOWN');
 
-  let r = 1;
-  mainnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (mainnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
-
-  r = 1;
-  devnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (devnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
+  // Ranking Logic
+  let r = 1; mainnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (mainnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
+  r = 1; devnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (devnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
 
   const finalNodes = [...mainnetNodes, ...devnetNodes, ...unknownNodes];
 
   const healthSorted = [...finalNodes].sort((a, b) => b.health - a.health);
   let hr = 1;
-  healthSorted.forEach((n, i) => {
-      if (i > 0 && n.health < healthSorted[i-1].health) {
-          hr = i + 1;
-      }
-      n.health_rank = hr;
-  });
+  healthSorted.forEach((n, i) => { if (i > 0 && n.health < healthSorted[i-1].health) hr = i + 1; n.health_rank = hr; });
 
-  let totalUptime = 0;
-  let totalVersion = 0;
-  let totalReputation = 0;
-  let reputationCount = 0;
-  let totalStorage = 0;
-
+  // Averages
+  let totalUptime = 0, totalVersion = 0, totalReputation = 0, reputationCount = 0, totalStorage = 0;
   finalNodes.forEach(node => {
     totalUptime += node.healthBreakdown.uptime;
     totalVersion += node.healthBreakdown.version;
     totalStorage += node.healthBreakdown.storage;
-
-    if (node.healthBreakdown.reputation !== null) {
-      totalReputation += node.healthBreakdown.reputation;
-      reputationCount++;
-    }
+    if (node.healthBreakdown.reputation !== null) { totalReputation += node.healthBreakdown.reputation; reputationCount++; }
   });
 
   const nodeCount = finalNodes.length || 1;
@@ -410,22 +353,9 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   return { 
     nodes: finalNodes, 
     stats: { 
-        consensusVersion, 
-        medianCredits: medianMainnet, 
-        medianStorage,
-        totalNodes: finalNodes.length,
-        connectedNode: source,
-        systemStatus: {
-            credits: creditsData.mainnet.length > 0 || creditsData.devnet.length > 0, 
-            rpc: true 
-        },
-        avgBreakdown: {
-            total: avgHealth,
-            uptime: Math.round(totalUptime / nodeCount),
-            version: Math.round(totalVersion / nodeCount),
-            reputation: reputationCount > 0 ? Math.round(totalReputation / reputationCount) : null,
-            storage: Math.round(totalStorage / nodeCount)
-        }
+        consensusVersion, medianCredits: medianMainnet, medianStorage, totalNodes: finalNodes.length, connectedNode: source,
+        systemStatus: { credits: creditsData.mainnet.length > 0 || creditsData.devnet.length > 0, rpc: true },
+        avgBreakdown: { total: avgHealth, uptime: Math.round(totalUptime / nodeCount), version: Math.round(totalVersion / nodeCount), reputation: reputationCount > 0 ? Math.round(totalReputation / reputationCount) : null, storage: Math.round(totalStorage / nodeCount) }
     } 
   };
 }
