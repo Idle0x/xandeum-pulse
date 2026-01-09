@@ -50,7 +50,7 @@ export interface EnrichedNode {
   };
   rank?: number;
   health_rank?: number;
-  rpc_source?: string; // To track where we found this node
+  rpc_source?: string;
 }
 
 // --- HELPERS ---
@@ -177,8 +177,7 @@ async function fetchRawData() {
           const key = pod.pubkey || pod.public_key;
           
           if (key) {
-            // Logic: If we already have this pod, ONLY overwrite if the new data comes from Private RPC
-            // (Private RPC data is trusted more for hidden mainnet nodes)
+            // Priority: Trust Private RPC data over Public Swarm if duplicate
             if (!uniquePodsMap.has(key) || isPrivateSource) {
                uniquePodsMap.set(key, { ...pod, rpc_source: sourceLabel });
             }
@@ -245,7 +244,8 @@ async function resolveLocations(ips: string[]) {
 // --- MAIN EXPORT ---
 
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  const [rawPods, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
+  // --- FIX IS HERE: Destructure the object returned by fetchRawData ---
+  const [{ pods: rawPods, source }, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
   
   if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable");
 
@@ -397,6 +397,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
         medianCredits: medianMainnet, 
         medianStorage,
         totalNodes: finalNodes.length,
+        connectedNode: source, // Pass source label to UI
         systemStatus: {
             credits: creditsData.mainnet.length > 0 || creditsData.devnet.length > 0, 
             rpc: true 
