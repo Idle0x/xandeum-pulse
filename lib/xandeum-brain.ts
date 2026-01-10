@@ -180,7 +180,7 @@ async function fetchPublicSwarmNodes(mode: 'fast' | 'swarm') {
             const results = await Promise.all(requests);
             const aggregatedPods: any[] = [];
             results.forEach(pods => aggregatedPods.push(...pods));
-            // IMPORTANT: We do NOT deduplicate public swarm results here anymore.
+            // We do NOT deduplicate public swarm results here.
             // We pass everything to the main function to handle "Same User, Different Node" logic.
             return aggregatedPods;
         }
@@ -297,16 +297,18 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
           health: 0, 
           healthBreakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 },
           location: { 
-              lat: loc.lat, lon: loc.lon, countryName: loc.country, countryCode: loc.countryCode, city: loc.city 
+              lat: loc.lat, 
+              lon: loc.lon, 
+              countryName: loc.country, // This 'loc' comes from geoCache which uses .country
+              countryCode: loc.countryCode, 
+              city: loc.city 
           }
       };
   };
 
   // A. PROCESS PRIVATE RPC (Strictly Mainnet)
-  // Logic: Anything coming from here is Mainnet. No debate.
   rawPrivateNodes.forEach((pod: any) => {
       const key = getUniqueKey(pod);
-      // Even if public swarm finds this later, this is the 'authoritative' version of this specific node instance
       finalNodesMap.set(key, createNode(pod, 'MAINNET'));
   });
 
@@ -315,20 +317,12 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const key = getUniqueKey(pod);
       const pubkey = pod.pubkey || pod.public_key;
 
-      // 1. Do we already have this EXACT node (Pubkey+IP) from the Private RPC?
-      if (finalNodesMap.has(key)) {
-          return; // Skip. We prefer the Private RPC data for stability.
-      }
+      if (finalNodesMap.has(key)) return; // Already have this exact instance
 
-      // 2. It's a new node instance found in the wild. Let's classify it.
-      // CHECK: Does this Pubkey exist in the Mainnet Bank?
       const isMainnetIdentity = mainnetCreditMap.has(pubkey);
-      
       if (isMainnetIdentity) {
-          // It is a Mainnet node that our Private RPC missed. Tag it MAINNET.
           finalNodesMap.set(key, createNode(pod, 'MAINNET'));
       } else {
-          // It is not in the Mainnet Bank. Tag it DEVNET.
           finalNodesMap.set(key, createNode(pod, 'DEVNET'));
       }
   });
@@ -382,9 +376,19 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
           medianStorage
       );
 
+      // SAFE ACCESS: Check both 'country' (from cache) and 'countryName' (from node.location)
+      // We use 'as any' to bypass the strict type check because we know one of them exists.
+      const safeCountry = (loc as any).country || (loc as any).countryName || 'Unknown';
+
       return {
           ...node,
-          location: { lat: loc.lat, lon: loc.lon, countryName: loc.country, countryCode: loc.countryCode, city: loc.city },
+          location: { 
+              lat: loc.lat, 
+              lon: loc.lon, 
+              countryName: safeCountry, 
+              countryCode: loc.countryCode, 
+              city: loc.city 
+          },
           health: vitality.total,
           healthBreakdown: vitality.breakdown
       };
@@ -394,11 +398,9 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   // 5. RANKING & FORMATTING
   // ---------------------------------------------------------
 
-  // Separate for ranking (credits based)
   const mainnetNodes = allNodes.filter(n => n.network === 'MAINNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const devnetNodes = allNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
 
-  // Assign Rank (Network Specific)
   const assignRank = (list: EnrichedNode[]) => {
       let r = 1;
       list.forEach((n, i) => { 
@@ -409,10 +411,8 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   assignRank(mainnetNodes);
   assignRank(devnetNodes);
 
-  // Combine back
   const finalNodes = [...mainnetNodes, ...devnetNodes];
 
-  // Assign Global Health Rank
   finalNodes.sort((a, b) => b.health - a.health);
   let hr = 1;
   finalNodes.forEach((n, i) => {
