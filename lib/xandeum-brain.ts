@@ -2,19 +2,15 @@ import axios from 'axios';
 import geoip from 'geoip-lite'; 
 
 // --- CONFIGURATION ---
-
-// 1. PRIVATE TUNNEL (Source of Truth for MAINNET)
-const PRIVATE_RPC = 'https://arkansas-collect-loving-rather.trycloudflare.com/rpc';
-
-// 2. PUBLIC SWARM (Source of Truth for DEVNET)
-const PUBLIC_RPC_NODES = [
-  '161.97.97.41', '192.190.136.36', '192.190.136.38',
+const RPC_NODES = [
+  '173.212.203.145', '161.97.97.41', '192.190.136.36', '192.190.136.38',
   '207.244.255.1', '192.190.136.28', '192.190.136.29', '159.195.4.138', '152.53.155.30'
 ];
 
-const TIMEOUT_RPC = 5000;
+const TIMEOUT_RPC = 4000;
 const TIMEOUT_CREDITS = 8000;
 
+// CORRECT API ENDPOINTS
 const API_CREDITS_MAINNET = 'https://podcredits.xandeum.network/api/mainnet-pod-credits';
 const API_CREDITS_DEVNET  = 'https://podcredits.xandeum.network/api/pods-credits';
 
@@ -47,12 +43,13 @@ export interface EnrichedNode {
     countryCode: string;
     city: string;
   };
-  rank?: number;
-  health_rank?: number;
-  rpc_source?: string;
+  rank?: number;        // REPUTATION RANK (Based on Credits) - Used for Leaderboard
+  health_rank?: number; // HEALTH RANK (Based on Vitality) - Used for Diagnostics
 }
 
 // --- HELPERS ---
+
+// STRIP suffixes: "1.2-trynet" -> "1.2", "0.8.0-beta" -> "0.8.0"
 export const cleanSemver = (v: string) => {
   if (!v) return '0.0.0';
   const mainVer = v.split('-')[0]; 
@@ -79,91 +76,115 @@ export const calculateLogScore = (value: number, median: number, maxScore: numbe
     return Math.min(maxScore, (maxScore / 2) * Math.log2((value / median) + 1));
 };
 
+// NEW: Exact Lookup Table based on v2.0 Spec (Uses CLEAN versions for distance)
 export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedCleanVersions: string[]) => {
     const cleanNode = cleanSemver(nodeVersion);
     const cleanConsensus = cleanSemver(consensusVersion);
+
+    // 1. If newer or same as consensus -> 100
     if (compareVersions(cleanNode, cleanConsensus) >= 0) return 100;
+
+    // 2. Find positions in the Master List
     const consensusIndex = sortedCleanVersions.indexOf(cleanConsensus);
     const nodeIndex = sortedCleanVersions.indexOf(cleanNode);
+
+    // If version is unknown/weird and not in list, punish severely
     if (nodeIndex === -1) return 0;
+
     const distance = nodeIndex - consensusIndex;
+
+    // 3. Apply Distance Decay Table
     if (distance <= 0) return 100; 
     if (distance === 1) return 90;
     if (distance === 2) return 70;
     if (distance === 3) return 50;
     if (distance === 4) return 30;
     if (distance === 5) return 10;
+
+    // 4. "Death Zone" (6+ versions behind)
     return Math.max(0, 10 - (distance - 5));
 };
 
+// --- SCORING FACTORY ---
 export const calculateVitalityScore = (
-    storageCommitted: number, storageUsed: number, uptimeSeconds: number, version: string, 
-    consensusVersion: string, sortedCleanVersions: string[], medianCredits: number, 
-    credits: number | null, medianStorage: number
+    storageCommitted: number, 
+    storageUsed: number,
+    uptimeSeconds: number, 
+    version: string, 
+    consensusVersion: string, 
+    sortedCleanVersions: string[], 
+    medianCredits: number, 
+    credits: number | null, 
+    medianStorage: number
 ) => {
+  // ⛔ Gatekeeper Rule: Hard Constraint
   if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
-  
+
+  // 1️⃣ Uptime Score (Sigmoid)
   const uptimeDays = uptimeSeconds / 86400;
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
+  // Cap score at 20 for nodes younger than 1 day
   if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
 
+  // 2️⃣ Storage Score (Logarithmic + Bonus)
   const baseStorageScore = calculateLogScore(storageCommitted, medianStorage, 100);
   const utilizationBonus = storageUsed > 0 ? Math.min(15, 5 * Math.log2((storageUsed / (1024 ** 3)) + 2)) : 0;
   const totalStorageScore = baseStorageScore + utilizationBonus;
 
+  // 4️⃣ Version Score (Distance-Based)
   const versionScore = getVersionScoreByRank(version, consensusVersion, sortedCleanVersions);
 
   let total = 0;
   let reputationScore: number | null = null;
 
+  // 🔁 Dynamic Re-Weighting Logic
   if (credits !== null && medianCredits > 0) {
+      // 3️⃣ Reputation Score (Standard Mode)
       reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
+
+      // Standard Weights: U(35%) + S(30%) + R(20%) + V(15%)
       total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15));
   } else {
+      // Fallback Weights: U(45%) + S(35%) + V(20%)
       total = Math.round((uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20));
       reputationScore = null; 
   }
 
   return {
       total: Math.max(0, Math.min(100, total)),
-      breakdown: { uptime: Math.round(uptimeScore), version: Math.round(versionScore), reputation: reputationScore, storage: Math.round(totalStorageScore) }
+      breakdown: {
+          uptime: Math.round(uptimeScore),
+          version: Math.round(versionScore),
+          reputation: reputationScore,
+          storage: Math.round(totalStorageScore)
+      }
   };
 };
 
-// --- FETCHING LOGIC ---
+// --- FETCHING ---
 const AXIOS_CONFIG = {
     timeout: TIMEOUT_CREDITS,
-    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json, text/plain, */*' }
+    headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*'
+    }
 };
 
-// *** THE FIX: Explicitly fetch BOTH networks and combine them ***
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
-  
-  // Task 1: Fetch Mainnet (Your Tunnel)
-  const mainnetPromise = axios.post(PRIVATE_RPC, payload, { timeout: TIMEOUT_RPC })
-    .then(r => r.data?.result?.pods || [])
-    .catch(e => {
-        console.error('[PULSE] Mainnet Tunnel Failed:', e.message);
-        return [];
-    });
+  try {
+      const res = await axios.post(`http://${RPC_NODES[0]}:6000/rpc`, payload, { timeout: TIMEOUT_RPC });
+      if (res.data?.result?.pods) return res.data.result.pods;
+  } catch (e) { /* fallthrough */ }
 
-  // Task 2: Fetch Devnet (Public Swarm)
-  // We try 3 random public nodes. The first one that answers gives us the Devnet list.
-  const shuffled = PUBLIC_RPC_NODES.sort(() => 0.5 - Math.random()).slice(0, 3);
-  const devnetPromise = Promise.any(shuffled.map(ip => 
-      axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC })
-           .then(r => r.data?.result?.pods || [])
-  )).catch(() => []);
-
-  // Execute Both in Parallel
-  const [mainnetPods, devnetPods] = await Promise.all([mainnetPromise, devnetPromise]);
-
-  console.log(`[PULSE] Fetched: ${mainnetPods.length} Mainnet Nodes + ${devnetPods.length} Devnet Nodes`);
-
-  // COMBINE THEM (No Deduplication)
-  // This ensures you see everything from both worlds.
-  return [...mainnetPods, ...devnetPods];
+  const shuffled = RPC_NODES.slice(1).sort(() => 0.5 - Math.random()).slice(0, 3);
+  try {
+      const winner = await Promise.any(shuffled.map(ip => 
+          axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC })
+               .then(r => r.data?.result?.pods || [])
+      ));
+      return winner;
+  } catch (e) { return []; }
 }
 
 async function fetchCredits() {
@@ -209,10 +230,7 @@ async function resolveLocations(ips: string[]) {
 // --- MAIN EXPORT ---
 
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  // fetchRawData now returns a flat array of ALL pods from BOTH sources
   const [rawPods, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
-  
-  // Only fail if BOTH sources returned nothing
   if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable");
 
   const mainnetMap = new Map<string, number>();
@@ -220,7 +238,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const mainnetValues: number[] = [];
   const devnetValues: number[] = [];
 
-  // Populate Mainnet Credits
+  // Populate Mainnet
   if (Array.isArray(creditsData.mainnet)) {
       creditsData.mainnet.forEach((c: any) => {
           const val = parseFloat(c.credits || c.amount || '0');
@@ -229,7 +247,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       });
   }
 
-  // Populate Devnet Credits
+  // Populate Devnet
   if (Array.isArray(creditsData.devnet)) {
       creditsData.devnet.forEach((c: any) => {
           const val = parseFloat(c.credits || c.amount || '0');
@@ -246,25 +264,31 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const storageArray: number[] = rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
   const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
 
-  // --- CONSENSUS LOGIC ---
+  // --- VERSION CONSENSUS LOGIC (TWO-TRACK STRATEGY) ---
   const rawVersionCounts: Record<string, number> = {}; 
   const uniqueCleanVersionsSet = new Set<string>();
 
   rawPods.forEach((p: any) => { 
       const rawV = (p.version || '0.0.0'); 
       const cleanV = cleanSemver(rawV);
+
+      // Track 1: Vote using EXACT RAW string (Strict Mode Consensus)
       rawVersionCounts[rawV] = (rawVersionCounts[rawV] || 0) + 1;
+
+      // Track 2: Build the simplified ladder (Semantic Ranking)
       uniqueCleanVersionsSet.add(cleanV);
   });
 
+  // Consensus is the most common RAW version
   const consensusVersion = Object.keys(rawVersionCounts).sort((a, b) => rawVersionCounts[b] - rawVersionCounts[a])[0] || '0.0.0';
+
+  // Master List sorted Descending
   const sortedCleanVersions = Array.from(uniqueCleanVersionsSet).sort((a, b) => compareVersions(b, a));
 
   await resolveLocations([...new Set(rawPods.map((p: any) => p.address.split(':')[0]))] as string[]);
 
   const expandedNodes: EnrichedNode[] = [];
 
-  // --- SCORING & TAGGING ---
   const scoreNode = (pod: any, network: 'MAINNET' | 'DEVNET' | 'UNKNOWN', credits: number | null, medianCredits: number, isUntracked: boolean) => {
       const ip = pod.address.split(':')[0];
       const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
@@ -304,8 +328,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
           expandedNodes.push(scoreNode(pod, 'MAINNET', credits, medianMainnet, false));
       }
 
-      // Note: We check independently. If a node is in BOTH maps, it gets pushed TWICE.
-      // This is intentional to show both "personas" of the node if applicable.
       if (inDevnet) {
           const credits = devnetMap.get(key) || 0;
           expandedNodes.push(scoreNode(pod, 'DEVNET', credits, medianDevnet, false));
@@ -317,6 +339,7 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       }
   });
 
+  // --- REPUTATION RANKING (Original Logic) ---
   const mainnetNodes = expandedNodes.filter(n => n.network === 'MAINNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const devnetNodes = expandedNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const unknownNodes = expandedNodes.filter(n => n.network === 'UNKNOWN');
@@ -329,15 +352,19 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
 
   const finalNodes = [...mainnetNodes, ...devnetNodes, ...unknownNodes];
 
+  // --- HEALTH RANKING (New Logic) ---
+  // Rank the entire network based on health score, independent of network type
   const healthSorted = [...finalNodes].sort((a, b) => b.health - a.health);
   let hr = 1;
   healthSorted.forEach((n, i) => {
+      // If health matches previous node, share the rank
       if (i > 0 && n.health < healthSorted[i-1].health) {
           hr = i + 1;
       }
       n.health_rank = hr;
   });
 
+  // CALCULATE REAL AVERAGES FOR BREAKDOWN
   let totalUptime = 0;
   let totalVersion = 0;
   let totalReputation = 0;
@@ -358,9 +385,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const nodeCount = finalNodes.length || 1;
   const avgHealth = Math.round(finalNodes.reduce((a, b) => a + b.health, 0) / nodeCount);
 
-  // We add 'connectedNode' stats to indicate success
-  const connectionStatus = `Mainnet: ${mainnetNodes.length} | Devnet: ${devnetNodes.length}`;
-
   return { 
     nodes: finalNodes, 
     stats: { 
@@ -368,7 +392,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
         medianCredits: medianMainnet, 
         medianStorage,
         totalNodes: finalNodes.length,
-        connectedNode: connectionStatus, 
         systemStatus: {
             credits: creditsData.mainnet.length > 0 || creditsData.devnet.length > 0, 
             rpc: true 
