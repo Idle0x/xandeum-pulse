@@ -1710,65 +1710,69 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- SIDE NAVIGATION (Z-INDEX FIXED) --- */}
+      {/* --- SIDE NAVIGATION (REPAIRED & INTERACTIVE) --- */}
       <div
         className={`fixed inset-y-0 left-0 w-72 bg-[#09090b] border-r border-zinc-800 z-[200] transform transition-transform duration-300 ease-in-out ${
           isMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="p-6 flex flex-col h-full">
-          <div className="flex justify-between items-center mb-8">
+        <div className="p-6 flex flex-col h-full relative overflow-hidden">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-8 shrink-0 relative z-10">
             <h2 className="font-bold text-white tracking-widest uppercase flex items-center gap-2">
               <Activity className="text-blue-500" size={18} />
               Menu
             </h2>
             <button
               onClick={() => setIsMenuOpen(false)}
-              className="text-zinc-500 hover:text-white p-2 rounded-lg bg-zinc-900 border border-zinc-800"
+              className="text-zinc-500 hover:text-white p-2 rounded-lg bg-zinc-900 border border-zinc-800 transition-colors cursor-pointer"
             >
               <X size={24} />
             </button>
           </div>
 
-<div className="px-2 mb-8">
-  <div className="bg-zinc-900/80 border border-white/5 p-4 rounded-2xl relative overflow-hidden group">
-    <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition-all duration-700"></div>
-    
-    <div className="flex items-center gap-2 mb-3 relative z-10">
-      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
-      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">Protocol Context</span>
-    </div>
+          {/* Protocol Context Block */}
+          <div className="mb-8 shrink-0 relative z-20">
+            <div className="bg-zinc-900/80 border border-white/5 p-4 rounded-2xl relative overflow-hidden group">
+              {/* Background Glow - pointer-events-none is critical here */}
+              <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition-all duration-700 pointer-events-none"></div>
+              
+              <div className="flex items-center gap-2 mb-3 relative z-10">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">Protocol Context</span>
+              </div>
 
-    <div className="relative z-10">
-      <NetworkSwitcher current={networkFilter} onChange={setNetworkFilter} />
-    </div>
+              <div className="relative z-30">
+                <NetworkSwitcher current={networkFilter} onChange={setNetworkFilter} />
+              </div>
 
-    <div className="mt-4 flex items-center justify-between relative z-10">
-      <span className="text-[9px] text-zinc-600 font-mono font-bold uppercase tracking-tight">Active Stream</span>
-      <span className={`text-[9px] font-mono font-bold ${networkFilter === 'MAINNET' ? 'text-green-500' : networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-zinc-400'}`}>
-        LIVE_SYNC_READY
-      </span>
-    </div>
-  </div>
-</div>
+              <div className="mt-4 flex items-center justify-between relative z-10">
+                <span className="text-[9px] text-zinc-600 font-mono font-bold uppercase tracking-tight">Active Stream</span>
+                <span className={`text-[9px] font-mono font-bold ${networkFilter === 'MAINNET' ? 'text-green-500' : networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-zinc-400'}`}>
+                  LIVE_SYNC_READY
+                </span>
+              </div>
+            </div>
+          </div>
 
-          <nav className="flex-grow space-y-2">
+          {/* Navigation Links - Explicit z-index and relative position */}
+          <nav className="flex-grow space-y-2 relative z-30 overflow-y-auto scrollbar-hide">
             <Link href="/">
-              <div className="flex items-center gap-3 p-3 bg-zinc-900/50 text-white rounded-lg border border-zinc-700 cursor-pointer">
+              <div className="flex items-center gap-3 p-3 bg-zinc-900/50 text-white rounded-lg border border-zinc-700 cursor-pointer hover:bg-zinc-800 transition-colors">
                 <LayoutDashboard size={18} />
                 <span className="text-sm font-bold">Dashboard</span>
               </div>
             </Link>
 
             <Link href="/map">
-              <div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer">
+              <div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800">
                 <MapIcon size={18} />
                 <span className="text-sm font-bold">Global Map</span>
               </div>
             </Link>
 
             <Link href={selectedNode?.pubkey ? `/leaderboard?highlight=${selectedNode.pubkey}` : '/leaderboard'}>
-              <div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer">
+              <div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800">
                 <Trophy size={18} />
                 <span className="text-sm font-bold">Leaderboard</span>
               </div>
@@ -1776,28 +1780,29 @@ export default function Home() {
 
             <button
               onClick={handleCompareLink}
-              className="w-full text-left flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer"
+              className="w-full text-left flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800"
             >
               <Swords size={18} />
               <span className="text-sm font-bold">Compare Nodes</span>
             </button>
 
             <Link href="/docs">
-              <div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer">
+              <div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800">
                 <BookOpen size={18} />
                 <span className="text-sm font-bold">Documentation</span>
               </div>
             </Link>
           </nav>
 
-          <div className="mt-auto border-t border-zinc-800 pt-6 space-y-4">
+          {/* Quick Actions Footer */}
+          <div className="mt-auto border-t border-zinc-800 pt-6 space-y-4 shrink-0 relative z-10">
             <div className="bg-zinc-900 p-4 rounded-xl border border-zinc-800">
               <div className="text-[10px] text-zinc-500 uppercase font-bold mb-2">
                 Quick Actions
               </div>
               <button
                 onClick={exportCSV}
-                className="w-full py-2 bg-black border border-zinc-700 rounded-lg text-xs font-bold text-zinc-300 hover:text-white hover:border-zinc-500 transition flex items-center justify-center gap-2"
+                className="w-full py-2 bg-black border border-zinc-700 rounded-lg text-xs font-bold text-zinc-300 hover:text-white hover:border-zinc-500 transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Download size={14} />
                 Export Data
