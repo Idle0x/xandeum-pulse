@@ -369,6 +369,7 @@ export default function MapPage() {
   };
 
   const getXRayStats = (loc: LocationData, index: number, tierColor: string) => {
+      // DRAWER: 1 Decimal Place (Original)
       const globalShare = ((loc.count / stats.totalNodes) * 100).toFixed(1);
       const rawPercentile = ((locations.length - index) / locations.length) * 100;
       const topPercent = 100 - rawPercentile;
@@ -580,7 +581,6 @@ export default function MapPage() {
               } else {
                 primaryShare = c.avgHealth; 
                 metricLabel = 'Health';
-                // CHANGED: 2 decimal places as requested
                 metricValue = c.avgHealth.toFixed(2) + '%';
               }
 
@@ -610,11 +610,11 @@ export default function MapPage() {
                     
                     <div className="flex justify-between items-center text-[9px] font-mono uppercase tracking-wide text-zinc-500">
                       <span>
-                        {/* CHANGED: 2 decimal places as requested */}
+                        {/* 2 Decimal Places in Modal */}
                         <span className={textColor}>{primaryShare.toFixed(2)}%</span> of {metricLabel}
                       </span>
                       <span>
-                        {/* CHANGED: 2 decimal places as requested */}
+                        {/* 2 Decimal Places in Modal */}
                         Hosts <span className="text-zinc-300">{nodeShare.toFixed(2)}%</span> of Total Nodes
                       </span>
                     </div>
@@ -671,9 +671,33 @@ export default function MapPage() {
                     <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{viewMode} Mode</span>
                 </div>
                 {!loading && (
-                    <button onClick={() => { setToast({ msg: `${privateNodes} nodes are running on Private Networks/VPNs, preventing public geolocation. Their data is tracked, but their map pin is hidden.`, type: 'private' }); setTimeout(() => setToast(null), 6000); }} className="hidden md:flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors cursor-help">
-                        <HelpCircle size={12} className="text-zinc-500" />
-                        <span className="text-xs md:text-sm font-bold tracking-tight">Tracking {visibleNodes} <span className="text-zinc-600">/ {stats.totalNodes} Nodes</span></span>
+                    <button 
+                        onClick={() => { 
+                            setToast({ 
+                                msg: `${privateNodes} nodes are running on Private Networks/VPNs, preventing public geolocation. Their data is tracked, but their map pin is hidden.`, 
+                                type: 'private' 
+                            }); 
+                            setTimeout(() => setToast(null), 6000); 
+                        }} 
+                        className="flex md:items-center gap-1.5 text-zinc-400 hover:text-white transition-colors cursor-help group text-right"
+                    >
+                        {/* DESKTOP VIEW (Single Line) */}
+                        <div className="hidden md:flex items-center gap-1.5">
+                            <HelpCircle size={12} className="text-zinc-500" />
+                            <span className="text-xs md:text-sm font-bold tracking-tight">
+                                Tracking {visibleNodes} <span className="text-zinc-600">/ {stats.totalNodes} Nodes</span>
+                            </span>
+                        </div>
+
+                        {/* MOBILE VIEW (Stacked 2 Rows) */}
+                        <div className="md:hidden flex flex-col items-end leading-none mt-0.5">
+                            <span className="text-[7px] font-bold uppercase tracking-widest text-zinc-600 mb-0.5">
+                                Tracking
+                            </span>
+                            <span className="text-[9px] font-mono font-bold text-zinc-300">
+                                {visibleNodes} <span className="text-zinc-600">/</span> {stats.totalNodes} Nodes
+                            </span>
+                        </div>
                     </button>
                 )}
             </div>
