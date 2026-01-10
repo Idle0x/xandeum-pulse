@@ -95,6 +95,7 @@ export default function Leaderboard() {
         if (statsRes.data?.result?.pods) {
             statsRes.data.result.pods.forEach((node: any) => {
                 // CAPTURE HEALTH AS TIE-BREAKER
+                // Note: If duplicates exist, this overwrites, which is why we use relaxed deep linking
                 metaMap.set(node.pubkey, { 
                     address: node.address, 
                     location: node.location,
@@ -179,43 +180,49 @@ export default function Leaderboard() {
       }));
   }, [allNodes, networkFilter, searchQuery]);
 
-    // --- 3. DEEP LINK LOGIC (Composite ID Support + Loading Wait) ---
+  // --- 3. DEEP LINK LOGIC (Identity-First Fallback Strategy) ---
   useEffect(() => {
       // WAITING FOR LOADING IS CRITICAL HERE
       if (loading || !router.isReady || !router.query.highlight || allNodes.length === 0) return;
 
       const targetKey = router.query.highlight as string;
       const targetNetwork = router.query.network as string;
-      const targetAddr = router.query.focusAddr as string; // Read the IP
+      const targetAddr = router.query.focusAddr as string; 
 
       // Create a unique signature for this specific deep link request
       const requestSignature = `${targetKey}-${targetNetwork}-${targetAddr}`;
       if (lastProcessedHighlight.current === requestSignature) return;
 
-      // FIND THE EXACT NODE
+      // STRATEGY: Identity First.
+      // We look for the Pubkey + Network. 
+      // The IP address in the URL is treated as "preferred context" but not a hard filter.
+      // This solves the issue where the Leaderboard might display Instance A's IP 
+      // while you are linking from Instance B (same Pubkey).
+      
       const targetNode = allNodes.find(n => {
           const keyMatch = n.pubkey === targetKey;
+          // If network is specified, it must match. If not, ignore network.
           const netMatch = !targetNetwork || n.network === targetNetwork;
-          // If targetAddr is present, it MUST match. If not present in URL, ignore it.
-          const addrMatch = !targetAddr || n.address === decodeURIComponent(targetAddr);
-
-          return keyMatch && netMatch && addrMatch;
+          return keyMatch && netMatch;
       });
 
       if (targetNode) {
           lastProcessedHighlight.current = requestSignature;
 
           // Force filter to ensure the node is visible
+          // If the found node is DEVNET but filter is MAINNET, switch it.
           if (targetNode.network !== networkFilter && networkFilter !== 'COMBINED') {
               setNetworkFilter(targetNode.network as any);
           }
 
           setTimeout(() => {
-              // Expand using the 3-Part ID
+              // Expand using the ID present in the Leaderboard Data (which might differ from URL IP)
+              // This ensures the DOM ID matches exactly what is rendered
               const compositeId = `${targetNode.pubkey}-${targetNode.network}-${targetNode.address || 'no-ip'}`;
               setExpandedNode(compositeId);
 
               // Calculate index for "Load More" logic
+              // We reconstruct the current view's sorting to find where this node sits
               const currentList = networkFilter === 'COMBINED' 
                 ? [...allNodes].sort((a,b) => {
                     if (b.credits !== a.credits) return b.credits - a.credits;
@@ -226,22 +233,18 @@ export default function Leaderboard() {
                     return b.health - a.health;
                 });
 
-              // Find exact index
-              const idx = currentList.findIndex(n => 
-                  n.pubkey === targetKey && 
-                  n.network === targetNode.network &&
-                  n.address === targetNode.address
-              );
+              // Find exact index of the displayed node
+              const idx = currentList.findIndex(n => n.pubkey === targetNode.pubkey);
 
               if (idx >= visibleCount) setVisibleCount(idx + 50);
 
               setTimeout(() => {
                   const el = document.getElementById(`node-${compositeId}`);
                   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }, 300); // Increased delay slightly to allow DOM render
+              }, 300);
           }, 150);
       }
-  }, [loading, router.isReady, router.query, allNodes, networkFilter]); // Added 'loading' dependency
+  }, [loading, router.isReady, router.query, allNodes, networkFilter]);
 
   // --- 4. SIMULATOR LOGIC ---
 
