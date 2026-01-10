@@ -4,7 +4,6 @@ import geoip from 'geoip-lite';
 // --- CONFIGURATION ---
 
 const PRIVATE_MAINNET_RPC = 'https://persian-starts-sounds-colon.trycloudflare.com/rpc';
-// Public Swarm IPs
 const PUBLIC_RPC_NODES = [
   '173.212.203.145', '161.97.97.41', '192.190.136.36', '192.190.136.38',
   '207.244.255.1', '192.190.136.28', '192.190.136.29', '159.195.4.138', '152.53.155.30'
@@ -163,18 +162,13 @@ async function fetchPrivateMainnetNodes() {
 
 async function fetchPublicSwarmNodes(mode: 'fast' | 'swarm') {
     const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
-
-    // We strictly use Promise.any for speed and uniqueness
     const requests = PUBLIC_RPC_NODES.map(ip => 
         axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC })
              .then(r => r.data?.result?.pods || [])
-             .catch(() => {
-                 throw new Error(ip); 
-             })
+             .catch(() => { throw new Error(ip); })
     );
 
     try {
-        // Hero Mode: Return the first valid list we get.
         const winner = await Promise.any(requests);
         return winner;
     } catch (e) {
@@ -228,10 +222,6 @@ async function resolveLocations(ips: string[]) {
 
 export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<{ nodes: EnrichedNode[], stats: any }> {
 
-  // ---------------------------------------------------------
-  // PHASE 1: COLLECTION
-  // ---------------------------------------------------------
-
   const [rawPrivateNodes, rawPublicNodes, creditsData] = await Promise.all([ 
       fetchPrivateMainnetNodes(), 
       fetchPublicSwarmNodes(mode), 
@@ -242,7 +232,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       return { nodes: [], stats: { consensusVersion: '0.0.0', totalNodes: 0, systemStatus: { rpc: false, credits: false }, avgBreakdown: { total: 0, uptime: 0, version: 0, reputation: 0, storage: 0 } } };
   }
 
-  // Build the Bank (Credits Maps)
   const mainnetCreditMap = new Map<string, number>();
   const devnetCreditMap = new Map<string, number>();
   const mainnetValues: number[] = [];
@@ -263,38 +252,27 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   const medianMainnet = mainnetValues.sort((a, b) => a - b)[Math.floor(mainnetValues.length / 2)] || 0;
   const medianDevnet = devnetValues.sort((a, b) => a - b)[Math.floor(devnetValues.length / 2)] || 0;
 
-  // ---------------------------------------------------------
-  // PHASE 2 & 3: THE STRICT 7-FILTER SYSTEM
-  // ---------------------------------------------------------
-
   const processedNodes: EnrichedNode[] = [];
 
-  // Fingerprint Generator
   const getFingerprint = (p: any, assumedNetwork: 'MAINNET' | 'DEVNET') => {
       const key = p.pubkey || p.public_key;
-      // Note: We use strict checks here so undefined is different from 0
-      const credVal = assumedNetwork === 'MAINNET' 
-          ? mainnetCreditMap.get(key)
-          : devnetCreditMap.get(key);
+      const credVal = assumedNetwork === 'MAINNET' ? mainnetCreditMap.get(key) : devnetCreditMap.get(key);
       const credits = credVal !== undefined ? credVal : 'NULL'; 
-
       return `${key}|${p.address}|${p.storage_committed}|${p.storage_used}|${p.version}|${p.is_public}|${credits}`;
   };
 
   const mainnetFingerprints = new Set<string>();
 
-  // A. PROCESS PRIVATE RPC (ANCHOR) -> ALWAYS MAINNET
+  // A. PROCESS PRIVATE RPC (ANCHOR)
   rawPrivateNodes.forEach((pod: any) => {
       const pubkey = pod.pubkey || pod.public_key;
       const ip = pod.address.split(':')[0];
       const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
-
-      // FIX: Don't default to 0. Allow null to flow through.
       const rawCreds = mainnetCreditMap.get(pubkey);
       const credits = rawCreds !== undefined ? rawCreds : null;
 
       const node: EnrichedNode = {
-          uid: `${pubkey}-MAINNET`, // <--- NEW: Unique ID for Frontend
+          uid: `${pubkey}-MAINNET`, // <--- ID GENERATION
           ...pod,
           pubkey: pubkey,
           network: 'MAINNET',
@@ -320,22 +298,17 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   // B. PROCESS PUBLIC SWARM (SUBTRACTION)
   rawPublicNodes.forEach((pod: any) => {
       const potentialMainnetFingerprint = getFingerprint(pod, 'MAINNET');
-
-      if (mainnetFingerprints.has(potentialMainnetFingerprint)) {
-          return;
-      }
+      if (mainnetFingerprints.has(potentialMainnetFingerprint)) return;
 
       const pubkey = pod.pubkey || pod.public_key;
       const ip = pod.address.split(':')[0];
       const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
 
       let network: 'MAINNET' | 'DEVNET' = 'DEVNET';
-      let credits: number | null = null; // Default to null (untracked)
-
+      let credits: number | null = null;
       const mainnetVal = mainnetCreditMap.get(pubkey);
       const devnetVal = devnetCreditMap.get(pubkey);
 
-      // FIX: Strict undefined checks to distinguish 0 from missing
       if (mainnetVal !== undefined && devnetVal === undefined) {
           network = 'MAINNET';
           credits = mainnetVal;
@@ -345,7 +318,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       }
 
       const node: EnrichedNode = {
-          uid: `${pubkey}-${network}`, // <--- NEW: Unique ID for Frontend
+          uid: `${pubkey}-${network}`, // <--- ID GENERATION
           ...pod,
           pubkey: pubkey,
           network: network,
@@ -363,28 +336,20 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
               city: loc.city 
           }
       };
-
       processedNodes.push(node);
   });
 
-  // ---------------------------------------------------------
-  // PHASE 5: THE "GHOST PROTOCOL" (REWRITE / CLONE)
-  // ---------------------------------------------------------
-
+  // PHASE 5: GHOST PROTOCOL
   const devnetPubkeys = new Set(devnetCreditMap.keys());
-
   devnetPubkeys.forEach(pubkey => {
       const hasDevnetNode = processedNodes.some(n => n.pubkey === pubkey && n.network === 'DEVNET');
-
       if (!hasDevnetNode) {
           const mainnetNode = processedNodes.find(n => n.pubkey === pubkey && n.network === 'MAINNET');
-
           if (mainnetNode) {
               const clonedNode: EnrichedNode = {
                   ...mainnetNode,
                   network: 'DEVNET',
-                  uid: `${pubkey}-DEVNET`, // <--- NEW: Unique ID for the Ghost Clone
-                  // FIX: Use null coalescing so undefined becomes null, not 0
+                  uid: `${pubkey}-DEVNET`, // <--- ID GENERATION FOR CLONE
                   credits: devnetCreditMap.get(pubkey) ?? null,
               };
               processedNodes.push(clonedNode);
@@ -392,10 +357,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       }
   });
 
-  // ---------------------------------------------------------
   // PHASE 6: SCORING & STATS
-  // ---------------------------------------------------------
-
   const rawVersionCounts: Record<string, number> = {}; 
   const uniqueCleanVersionsSet = new Set<string>();
 
@@ -439,7 +401,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       };
   });
 
-  // Ranking & Sorting
   const mainnetList = finalNodes.filter(n => n.network === 'MAINNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const devnetList = finalNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
 
@@ -455,7 +416,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
 
   const allSorted = [...mainnetList, ...devnetList];
 
-  // Health Rank
   allSorted.sort((a, b) => b.health - a.health);
   let hr = 1;
   allSorted.forEach((n, i) => {
@@ -463,7 +423,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       n.health_rank = hr;
   });
 
-  // Global Stats
   let totalUptime = 0, totalVersion = 0, totalReputation = 0, reputationCount = 0, totalStorage = 0;
   allSorted.forEach(node => {
     totalUptime += node.healthBreakdown.uptime;
