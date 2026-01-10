@@ -159,19 +159,51 @@ async function fetchPrivateMainnetNodes() {
     return [];
 }
 
-async function fetchPublicSwarmNodes() {
+// ----------------------------------------------------
+// DUAL MODE FETCHING STRATEGY
+// 'fast' = Hero Mode (Promise.any) - Instant
+// 'swarm' = Aggregation Mode (Promise.all) - Comprehensive
+// ----------------------------------------------------
+async function fetchPublicSwarmNodes(mode: 'fast' | 'swarm') {
     const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
-    const promises = PUBLIC_RPC_NODES.map(ip => 
+    
+    // Prepare all requests
+    const requests = PUBLIC_RPC_NODES.map(ip => 
         axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC })
              .then(r => r.data?.result?.pods || [])
-             .catch(() => { throw new Error(ip); }) 
+             .catch(() => {
+                 // In swarm mode, we just return empty array on fail.
+                 // In fast mode, Promise.any handles the errors until one succeeds.
+                 if (mode === 'swarm') return []; 
+                 throw new Error(ip); 
+             })
     );
 
     try {
-        const winner = await Promise.any(promises);
-        return winner;
+        if (mode === 'fast') {
+            // HERO MODE: Return the first one that replies.
+            // Fast, but incomplete (only sees what that specific node sees)
+            const winner = await Promise.any(requests);
+            return winner;
+        } else {
+            // SWARM MODE: Wait for everyone.
+            // Slow, but complete.
+            const results = await Promise.all(requests);
+            const aggregatedPods: any[] = [];
+            results.forEach(pods => aggregatedPods.push(...pods));
+
+            // Internal Swarm Deduplication (Address based)
+            const uniqueMap = new Map<string, any>();
+            aggregatedPods.forEach(pod => {
+                if (pod.address && !uniqueMap.has(pod.address)) {
+                    uniqueMap.set(pod.address, pod);
+                }
+            });
+            console.log(`[SWARM] Aggregated ${aggregatedPods.length} records into ${uniqueMap.size} unique nodes.`);
+            return Array.from(uniqueMap.values());
+        }
     } catch (e) {
-        console.error("All Public Swarm nodes failed.");
+        console.error("Public Swarm fetch failed.");
         return [];
     }
 }
@@ -219,11 +251,11 @@ async function resolveLocations(ips: string[]) {
 
 // --- MAIN EXPORT ---
 
-export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  // 1. Fetch RAW data
+export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<{ nodes: EnrichedNode[], stats: any }> {
+  // 1. Fetch RAW data (Pass mode to public fetcher)
   const [rawMainnet, rawDevnet, creditsData] = await Promise.all([ 
       fetchPrivateMainnetNodes(), 
-      fetchPublicSwarmNodes(), 
+      fetchPublicSwarmNodes(mode), 
       fetchCredits() 
   ]);
 
@@ -235,18 +267,13 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   // 2. THE STRICT 6-POINT FILTER (Identity-Aware Deduplication)
   // ---------------------------------------------------------
   
-  // Helper to generate the Strict Fingerprint
-  // Includes PUBLIC KEY to ensure different users with similar data are NOT deleted.
   const getStrictFingerprint = (p: any) => {
     const key = p.pubkey || p.public_key;
-    // 1. Pubkey (Identity) | 2. Address (Location) | 3. Storage Com | 4. Storage Used | 5. Version | 6. Public
     return `${key}|${p.address}|${p.storage_committed}|${p.storage_used}|${p.version}|${p.is_public}`;
   };
 
-  // A. Create a Set of fingerprints from the Private Mainnet (Source of Truth)
   const mainnetFingerprints = new Set(rawMainnet.map(getStrictFingerprint));
 
-  // B. Filter Devnet: Remove ONLY exact 6-point matches.
   const uniqueDevnetPods = rawDevnet.filter((p: any) => {
       const fp = getStrictFingerprint(p);
       return !mainnetFingerprints.has(fp);
@@ -254,7 +281,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
 
   // ---------------------------------------------------------
 
-  // Prepare Credits
   const mainnetCreditMap = new Map<string, number>();
   const devnetCreditMap = new Map<string, number>();
   const mainnetValues: number[] = [];
@@ -275,7 +301,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const medianMainnet = mainnetValues.sort((a, b) => a - b)[Math.floor(mainnetValues.length / 2)] || 0;
   const medianDevnet = devnetValues.sort((a, b) => a - b)[Math.floor(devnetValues.length / 2)] || 0;
 
-  // Stats use the combined UNIQUE list
   const allUniquePods = [...rawMainnet, ...uniqueDevnetPods];
 
   const storageArray: number[] = allUniquePods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
@@ -298,7 +323,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
 
   const expandedNodes: EnrichedNode[] = [];
 
-  // --- SCORING FACTORY ---
   const scoreNode = (pod: any, network: 'MAINNET' | 'DEVNET') => {
       const key = pod.pubkey || pod.public_key;
       const ip = pod.address.split(':')[0];
@@ -340,17 +364,9 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       };
   };
 
-  // 3. Add ALL Mainnet Nodes
-  rawMainnet.forEach((pod: any) => {
-      expandedNodes.push(scoreNode(pod, 'MAINNET'));
-  });
+  rawMainnet.forEach((pod: any) => expandedNodes.push(scoreNode(pod, 'MAINNET')));
+  uniqueDevnetPods.forEach((pod: any) => expandedNodes.push(scoreNode(pod, 'DEVNET')));
 
-  // 4. Add STRICTLY FILTERED Devnet Nodes
-  uniqueDevnetPods.forEach((pod: any) => {
-      expandedNodes.push(scoreNode(pod, 'DEVNET'));
-  });
-
-  // --- RANKING ---
   const mainnetNodes = expandedNodes.filter(n => n.network === 'MAINNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const devnetNodes = expandedNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
 
@@ -362,7 +378,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
 
   const finalNodes = [...mainnetNodes, ...devnetNodes];
 
-  // Global Health Rank
   const healthSorted = [...finalNodes].sort((a, b) => b.health - a.health);
   let hr = 1;
   healthSorted.forEach((n, i) => {
@@ -370,7 +385,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       n.health_rank = hr;
   });
 
-  // Averages
   let totalUptime = 0, totalVersion = 0, totalReputation = 0, reputationCount = 0, totalStorage = 0;
   finalNodes.forEach(node => {
     totalUptime += node.healthBreakdown.uptime;
