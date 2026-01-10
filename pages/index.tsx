@@ -640,11 +640,19 @@ export default function Home() {
   const handleLeaderboardNav = (e: React.MouseEvent, node: Node) => {
     e.stopPropagation();
 
+    // Priority 1: Check if node is explicitly untracked (API is UP, but node is missing)
     if ((node as any).isUntracked) {
        showToast("This node is currently not receiving storage credits from the protocol due to various reasons including: performance thresholds not yet met, the node is in a 'proving' phase, or the associated stake is below the required minimum for rewards.");
        return;
     }
 
+    // Priority 2: Check if API is globally offline (Credits are null but NOT untracked)
+    if (node.credits === null) {
+       showToast("The Credits API is currently offline or unreachable. Leaderboard data is unavailable.");
+       return;
+    }
+
+    // Priority 3: Navigate to Leaderboard
     if (node.pubkey) {
         // Pass Pubkey (Primary), Network (Secondary), AND Address (Tie-Breaker)
         const netParam = node.network ? `&network=${node.network}` : '';
@@ -657,7 +665,7 @@ export default function Home() {
     } else {
         router.push('/leaderboard');
     }
-};
+  };
 
   const handleCardToggle = (view: 'health' | 'storage' | 'identity') => {
     if (modalView === view) {
@@ -1124,27 +1132,33 @@ export default function Home() {
 
           <div className="pt-1 md:pt-2">
             <div className="text-[9px] md:text-[10px] text-zinc-600 uppercase font-bold mb-1">Network Rewards</div>
-            <div className={`flex justify-between items-center text-[10px] md:text-xs p-1.5 md:p-2 rounded-lg border transition-colors ${(node as any).isUntracked ? 'bg-zinc-900/50 border-zinc-800' : 'bg-black/40 border-zinc-800/50'}`}>
+            <div className={`flex justify-between items-center text-[10px] md:text-xs p-1.5 md:p-2 rounded-lg border transition-colors ${
+              (node as any).isUntracked 
+                ? 'bg-zinc-900/50 border-zinc-800' 
+                : node.credits !== null 
+                  ? 'bg-black/40 border-zinc-800/50' 
+                  : 'bg-red-900/10 border-red-500/20'
+            }`}>
               {(node as any).isUntracked ? (
-        <div className="flex items-center gap-2 text-zinc-500 w-full justify-center font-bold text-[9px] md:text-[10px] tracking-wide">
-          <AlertTriangle size={10} className="text-zinc-600"/> NO STORAGE CREDITS
-        </div>
-      ) : node.credits !== null ? (
-        <>
-          <div className="flex items-center gap-1.5">
-            <Medal size={10} className={node.rank===1?'text-yellow-400':'text-zinc-500'} />
-            <span className="text-zinc-400 font-bold">#{node.rank}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-zinc-300 font-mono">{node.credits.toLocaleString()}</span>
-            <Wallet size={10} className="text-yellow-600"/>
-          </div>
-        </>
-      ) : (
-        <div className="flex items-center gap-2 text-red-400 w-full justify-center font-bold italic text-[9px] md:text-[10px]">
-          <AlertOctagon size={10}/> CREDITS API OFFLINE
-        </div>
-      )}
+                <div className="flex items-center gap-2 text-zinc-500 w-full justify-center font-bold text-[9px] md:text-[10px] tracking-wide">
+                  <AlertTriangle size={10} className="text-zinc-600"/> NO STORAGE CREDITS
+                </div>
+              ) : node.credits !== null ? (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <Medal size={10} className={node.rank===1?'text-yellow-400':'text-zinc-500'} />
+                    <span className="text-zinc-400 font-bold">#{node.rank}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-zinc-300 font-mono">{node.credits.toLocaleString()}</span>
+                    <Wallet size={10} className="text-yellow-600"/>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 text-red-400 w-full justify-center font-bold italic text-[9px] md:text-[10px]">
+                  <AlertOctagon size={10}/> CREDITS API OFFLINE
+                </div>
+              )}
             </div>
           </div>
 
@@ -1313,7 +1327,7 @@ export default function Home() {
     );
   };
 
-    const renderHealthBreakdown = () => {
+  const renderHealthBreakdown = () => {
     const health = selectedNode?.health || 0;
     const bd = selectedNode?.healthBreakdown || {
       uptime: health,
@@ -1334,7 +1348,8 @@ export default function Home() {
     const netAvgHealth = avgs.total || 50;
     const diff = health - netAvgHealth;
 
-    const isCreditsOffline = selectedNode?.credits === null;
+    // We check specifically for API Offline to determine weighting
+    const isCreditsOffline = selectedNode?.credits === null && !(selectedNode as any).isUntracked;
 
     const weights = isCreditsOffline 
         ? { uptime: 0.45, storage: 0.35, reputation: 0, version: 0.20 }
@@ -1451,16 +1466,16 @@ export default function Home() {
                    </span>
                    <div className="font-mono text-[10px] text-zinc-500 font-bold">
                      {(selectedNode as any).isUntracked ? (
-                 'NO STORAGE CREDITS'
-               ) : isCreditsOffline ? (
-                 'CREDITS API OFFLINE'
-               ) : (
-                 <>
-                   <span className="text-white font-bold">{weightedVal}</span>
-                   <span className="text-zinc-600 mx-1">/</span>
-                   <span className="text-zinc-500">Avg: {weightedAvg}</span>
-                 </>
-               )}
+                       <span className="text-zinc-500">NO STORAGE CREDITS</span>
+                     ) : selectedNode.credits === null ? (
+                       <span className="text-red-400">CREDITS API OFFLINE</span>
+                     ) : (
+                       <>
+                         <span className="text-white font-bold">{weightedVal}</span>
+                         <span className="text-zinc-600 mx-1">/</span>
+                         <span className="text-zinc-500">Avg: {weightedAvg}</span>
+                       </>
+                     )}
                    </div>
                  </div>
                  <div className="h-2 bg-zinc-800 rounded-full relative">
