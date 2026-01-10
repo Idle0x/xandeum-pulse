@@ -2839,7 +2839,7 @@ export default function Home() {
                     </div>
                   ) : (
                     <div className="flex flex-col gap-4 h-full">
-                      {/* --- TOP ROW: 3 CARDS (Mobile Optimized) --- */}
+                      {/* --- TOP ROW: 3 CARDS (Mobile Optimized with Heartbeat) --- */}
 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
 
   {/* 1. SYSTEM DIAGNOSTICS (Health) */}
@@ -2853,7 +2853,7 @@ export default function Home() {
   >
     <div className={`absolute inset-0 bg-gradient-to-b from-transparent pointer-events-none ${zenMode ? 'to-green-900/10' : 'to-blue-900/10'}`}></div>
     
-    {/* DESKTOP VIEW (Original Tall Layout) */}
+    {/* DESKTOP VIEW */}
     <div className="hidden md:flex flex-col h-full justify-between z-10">
        <div className="w-full flex justify-between items-start mb-4">
         <div className="flex flex-col">
@@ -2876,7 +2876,7 @@ export default function Home() {
       </div>
     </div>
 
-    {/* MOBILE COMPACT VIEW (New Horizontal Layout) */}
+    {/* MOBILE COMPACT VIEW */}
     <div className="flex md:hidden flex-col justify-between h-full z-10 w-full gap-2">
        <div className="flex justify-between items-start">
           <div className="flex flex-col">
@@ -2886,13 +2886,17 @@ export default function Home() {
              </div>
           </div>
           <div className="flex flex-col items-end gap-2">
-             <Maximize2 size={12} className="text-zinc-600" />
+             {/* ANIMATED PULSE ICON */}
+             <div className="bg-green-500/10 p-1.5 rounded-lg border border-green-500/20">
+                <Maximize2 size={12} className="text-green-400 animate-pulse" />
+             </div>
+             
              <div className={`text-[9px] font-bold px-2 py-1 rounded border ${(selectedNode.health || 0) >= avgNetworkHealth ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
                 {(selectedNode.health || 0) >= avgNetworkHealth ? 'ABOVE AVG' : 'BELOW AVG'}
              </div>
           </div>
        </div>
-       {/* Linear Progress Bar for Mobile */}
+       {/* Linear Progress Bar */}
        <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
           <div 
             className={`h-full ${(selectedNode.health || 0) >= 80 ? 'bg-green-500' : 'bg-yellow-500'}`} 
@@ -2968,7 +2972,11 @@ export default function Home() {
               <Database size={14} className="text-blue-500" />
               <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Storage</span>
            </div>
-           <Maximize2 size={12} className="text-zinc-600" />
+           
+           {/* ANIMATED PULSE ICON */}
+           <div className="bg-purple-500/10 p-1.5 rounded-lg border border-purple-500/20">
+             <Maximize2 size={12} className="text-purple-400 animate-pulse" />
+           </div>
         </div>
         
         <div className="grid grid-cols-2 gap-4 items-end">
@@ -3063,7 +3071,11 @@ export default function Home() {
              <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${selectedNode.network === 'MAINNET' ? 'bg-green-500/10 border-green-500/30 text-green-500' : 'bg-blue-500/10 border-blue-500/30 text-blue-500'}`}>
                {selectedNode.network}
              </div>
-             <Maximize2 size={12} className="text-zinc-600" />
+             
+             {/* ANIMATED PULSE ICON */}
+             <div className="bg-blue-500/10 p-1.5 rounded-lg border border-blue-500/20">
+               <Maximize2 size={12} className="text-blue-400 animate-pulse" />
+             </div>
           </div>
           {isSelectedNodeLatest ? (
              <div className="flex items-center gap-1 text-[9px] font-bold text-green-500"><CheckCircle size={10}/> OK</div>
