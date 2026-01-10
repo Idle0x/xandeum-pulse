@@ -5,8 +5,7 @@ import geoip from 'geoip-lite';
 
 // 1. YOUR PRIVATE TUNNEL (Source of Truth for Mainnet)
 // Note: We include /rpc here because the tunnel root points to port 6000
-const PRIVATE_RPC = 'https://persian-starts-sounds-colon.trycloudflare.co
-m/rpc';
+const PRIVATE_RPC = 'https://persian-starts-sounds-colon.trycloudflare.com/rpc';
 
 // 2. PUBLIC SWARM (Source of Truth for Devnet)
 const PUBLIC_SWARM = [
