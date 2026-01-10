@@ -3,7 +3,7 @@ import geoip from 'geoip-lite';
 
 // --- CONFIGURATION ---
 
-// 1. PRIVATE TUNNEL (Source of Truth for Mainnet)
+// 1. YOUR PRIVATE TUNNEL (Source of Truth for Mainnet)
 const PRIVATE_RPC = 'https://persian-starts-sounds-colon.trycloudflare.com/rpc';
 
 // 2. PUBLIC SWARM (Source of Truth for Devnet)
@@ -125,32 +125,35 @@ const AXIOS_CONFIG_CREDITS = {
     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json, text/plain, */*' }
 };
 
-// --- FETCHING LOGIC ---
+// --- FETCHING WITH STRICT DEDUPLICATION ---
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
 
-  // 1. Fetch Private Tunnel (The "God Mode" Source)
+  // 1. Fetch Private Tunnel (Priority)
   const privateReq = axios.post(PRIVATE_RPC, payload, { timeout: TIMEOUT_RPC })
-    .then(r => ({ pods: r.data?.result?.pods || [], source: 'Private RPC' }))
-    .catch(() => ({ pods: [], source: 'Private RPC' }));
+    .then(r => r.data?.result?.pods || [])
+    .catch(e => {
+        console.error('[PULSE] Tunnel Error:', e.message);
+        return [];
+    });
 
-  // 2. Fetch Public Swarm (The "Gossip" Source)
-  // We grab ALL public nodes we can find, not just one winner
+  // 2. Fetch Public Swarm
   const publicReqs = PUBLIC_SWARM.map(url => 
     axios.post(`${url}/rpc`, payload, { timeout: TIMEOUT_RPC })
       .then(r => r.data?.result?.pods || [])
       .catch(() => [])
   );
 
-  const [privateResult, ...publicResults] = await Promise.all([privateReq, ...publicReqs]);
+  const [privatePods, ...publicResults] = await Promise.all([privateReq, ...publicReqs]);
 
-  // 3. Build the Master Lists
-  const privatePods = privateResult.pods;
+  // 3. Flatten Public Results
   let publicPods: any[] = [];
   publicResults.forEach(pods => publicPods.push(...pods));
 
-  // 4. THE STRICT DEDUPLICATOR
+  // 4. THE EXACT MATCH FILTER
   // We trust the Private list first. We create a "Fingerprint Set" of exactly what we already have.
+  // Note: JSON.stringify is order-dependent, but RPC responses are usually consistent.
+  // Ideally, we'd sort keys, but for this specific API, exact string matching is usually sufficient.
   const privateFingerprints = new Set(privatePods.map((p: any) => JSON.stringify(p)));
 
   const finalPublicPods: any[] = [];
@@ -161,13 +164,13 @@ async function fetchRawData() {
     // If it matches exactly, we skip it (because the Private list already has it).
     if (!privateFingerprints.has(fingerprint)) {
       finalPublicPods.push(pod);
-      // Add to set to prevent duplicates strictly within the public list too
-      privateFingerprints.add(fingerprint); 
+      // Optional: Add to set to prevent duplicates strictly within the public list too?
+      // For now, we only dedupe against Private to be safe.
+      // privateFingerprints.add(fingerprint); 
     }
   });
 
   // 5. Label and Merge
-  // We apply the source label AFTER the comparison so it doesn't break the JSON match
   const labeledPrivate = privatePods.map((p: any) => ({ ...p, rpc_source: 'Private RPC' }));
   const labeledPublic = finalPublicPods.map((p: any) => ({ ...p, rpc_source: 'Public Swarm' }));
 
