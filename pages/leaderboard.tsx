@@ -9,7 +9,8 @@ import {
   Calculator, Zap, ChevronDown, 
   ArrowUpRight, Eye, MapPin, Copy, Check, Share2,
   AlertOctagon, ChevronDown as ChevronIcon,
-  Layers, Info, AlertTriangle, Settings2
+  Layers, Info, AlertTriangle, Settings2,
+  Timer
 } from 'lucide-react';
 
 // IMPORT THE NEW ECONOMICS ENGINE
@@ -20,7 +21,7 @@ interface RankedNode {
   rank: number;
   pubkey: string;
   credits: number;
-  health: number; // Added for tie-breaker logic
+  health: number; 
   network: 'MAINNET' | 'DEVNET';
   address?: string;
   location?: {
@@ -54,6 +55,7 @@ export default function Leaderboard() {
   const [importKey, setImportKey] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
+  const [autoPilotCountdown, setAutoPilotCountdown] = useState<number | null>(null);
 
   // Manual Inputs
   const [simNodes, setSimNodes] = useState<number>(1);
@@ -62,17 +64,10 @@ export default function Leaderboard() {
   const [simStake, setSimStake] = useState<number>(1000); 
   const [simPerf, setSimPerf] = useState<number>(1.0);
 
-  // Imported Base Credit State
   const [importedBaseCredits, setImportedBaseCredits] = useState<number>(0);
-
-  // Step 2 Inputs (Boosts)
   const [boostCounts, setBoostCounts] = useState<Record<string, number>>({});
-
-  // Step 3 Inputs (Network & Fees)
   const [simNetworkFees, setSimNetworkFees] = useState<number>(100); 
   const [showFeeHelp, setShowFeeHelp] = useState(false); 
-
-  // Network Estimation Inputs
   const [networkAvgMult, setNetworkAvgMult] = useState<number>(14); 
   const [showNetworkHelp, setShowNetworkHelp] = useState(false);
 
@@ -82,7 +77,7 @@ export default function Leaderboard() {
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const lastProcessedHighlight = useRef<string | null>(null);
 
-  // --- 1. DATA FETCHING ---
+  // --- DATA FETCHING ---
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -131,10 +126,7 @@ export default function Leaderboard() {
                 };
             });
 
-            parsedList.sort((a, b) => {
-                if (b.credits !== a.credits) return b.credits - a.credits;
-                return b.health - a.health;
-            });
+            parsedList.sort((a, b) => b.credits - a.credits || b.health - a.health);
 
             parsedList.forEach((n, i) => {
                 const prevRank = history[n.pubkey];
@@ -156,73 +148,48 @@ export default function Leaderboard() {
     fetchData();
   }, []);
 
-  // --- 2. DETERMINISTIC FILTER & RANKING LOGIC (Preserving global rank during search) ---
   const filteredAndRanked = useMemo(() => {
-      // Step A: First, filter ONLY by network to establish the correct rank pool
-      const networkList = allNodes.filter(n => 
-          (networkFilter === 'COMBINED' || n.network === networkFilter)
-      );
-
-      // Step B: Sort strictly by Credits > Health > Pubkey (Deterministic)
-      networkList.sort((a, b) => {
-          if (b.credits !== a.credits) return b.credits - a.credits;
-          if (b.health !== a.health) return b.health - a.health;
-          return a.pubkey.localeCompare(b.pubkey);
-      });
-
-      // Step C: Assign sequential Ranks based on the Global Network View
-      const rankedList = networkList.map((n, i) => ({
-          ...n,
-          rank: i + 1
-      }));
-
-      // Step D: Apply Search Filter to the already-ranked list
+      const networkList = allNodes.filter(n => (networkFilter === 'COMBINED' || n.network === networkFilter));
+      networkList.sort((a, b) => b.credits - a.credits || b.health - a.health || a.pubkey.localeCompare(b.pubkey));
+      const rankedList = networkList.map((n, i) => ({ ...n, rank: i + 1 }));
       if (!searchQuery) return rankedList;
-      
       const searchLower = searchQuery.toLowerCase();
-      return rankedList.filter(n => 
-          n.pubkey.toLowerCase().includes(searchLower) ||
-          (n.address && n.address.toLowerCase().includes(searchLower))
-      );
+      return rankedList.filter(n => n.pubkey.toLowerCase().includes(searchLower) || (n.address && n.address.toLowerCase().includes(searchLower)));
   }, [allNodes, networkFilter, searchQuery]);
 
-  // --- 3. DEEP LINK LOGIC ---
+  // --- AUTOPILOT TIMER LOGIC ---
+  useEffect(() => {
+    if (autoPilotCountdown === null) return;
+    if (autoPilotCountdown <= 0) {
+      setSimStep(1);
+      setAutoPilotCountdown(null);
+      return;
+    }
+    const timer = setTimeout(() => setAutoPilotCountdown(autoPilotCountdown - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [autoPilotCountdown]);
+
+  // --- DEEP LINK LOGIC ---
   useEffect(() => {
       if (loading || !router.isReady || !router.query.highlight || allNodes.length === 0) return;
-
       const targetKey = router.query.highlight as string;
       const targetNetwork = router.query.network as string;
       const targetAddr = router.query.focusAddr as string; 
-
       const requestSignature = `${targetKey}-${targetNetwork}-${targetAddr}`;
       if (lastProcessedHighlight.current === requestSignature) return;
-
-      const targetNode = allNodes.find(n => {
-          const keyMatch = n.pubkey === targetKey;
-          const netMatch = !targetNetwork || n.network === targetNetwork;
-          return keyMatch && netMatch;
-      });
+      const targetNode = allNodes.find(n => n.pubkey === targetKey && (!targetNetwork || n.network === targetNetwork));
 
       if (targetNode) {
           lastProcessedHighlight.current = requestSignature;
-
-          if (targetNode.network !== networkFilter && networkFilter !== 'COMBINED') {
-              setNetworkFilter(targetNode.network as any);
-          }
-
+          if (targetNode.network !== networkFilter && networkFilter !== 'COMBINED') setNetworkFilter(targetNode.network as any);
           setTimeout(() => {
               const compositeId = `${targetNode.pubkey}-${targetNode.network}-${targetNode.address || 'no-ip'}`;
               setExpandedNode(compositeId);
-
-              // Correct sorting for visibleCount logic
               const currentList = networkFilter === 'COMBINED' 
                 ? [...allNodes].sort((a,b) => b.credits - a.credits || b.health - a.health)
                 : allNodes.filter(n => n.network === targetNode.network).sort((a,b) => b.credits - a.credits || b.health - a.health);
-
               const idx = currentList.findIndex(n => n.pubkey === targetNode.pubkey);
-
               if (idx >= visibleCount) setVisibleCount(idx + 50);
-
               setTimeout(() => {
                   const el = document.getElementById(`node-${compositeId}`);
                   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -231,37 +198,29 @@ export default function Leaderboard() {
       }
   }, [loading, router.isReady, router.query, allNodes, networkFilter]);
 
-  // --- 4. SIMULATOR LOGIC ---
+  // --- SIMULATOR FUNCTIONS ---
   const clearImport = () => {
     setImportKey('');
     setImportSuccess(false);
     setSimMode('NEW');
     setImportedBaseCredits(0);
     setImportError(null);
+    setAutoPilotCountdown(null);
   };
 
-  const handleImportNode = () => {
+  const handleImportNode = (keyToImport?: string) => {
     setImportError(null);
     setImportSuccess(false);
-    const key = importKey.trim();
+    const key = keyToImport || importKey.trim();
 
     if (!key) { setImportError("Please enter a public key."); return; }
-    const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-    if (!base58Regex.test(key)) {
-        setImportError("Invalid format. Public keys are Base58 strings.");
-        return;
-    }
-
     const node = allNodes.find(n => n.pubkey === key);
     if (node) {
+        setImportKey(key);
         setImportSuccess(true);
         setSimMode('IMPORT');
         setImportedBaseCredits(node.credits);
-
-        setTimeout(() => {
-            setSimStep(1); 
-            setImportSuccess(false);
-        }, 800);
+        setAutoPilotCountdown(5); // Start the 5s auto-pilot
     } else {
         setImportError("Key not found in active leaderboard.");
     }
@@ -269,7 +228,6 @@ export default function Leaderboard() {
 
   const metrics = useMemo(() => {
       const currentNetworkTotal = allNodes.reduce((sum, n) => sum + n.credits, 0);
-
       const result = calculateStoinc({
           storageVal: simStorageVal,
           storageUnit: simStorageUnit,
@@ -281,20 +239,12 @@ export default function Leaderboard() {
           networkAvgMult: networkAvgMult,
           networkFees: simNetworkFees
       });
-
-      const rawCredits = simMode === 'IMPORT' ? importedBaseCredits : result.userBaseCredits;
+      constRawCredits = simMode === 'IMPORT' ? importedBaseCredits : result.userBaseCredits;
       const boostedCredits = simMode === 'IMPORT' ? (importedBaseCredits * result.geoMean) : result.boostedCredits;
       const estimatedNetworkBoostedTotal = (currentNetworkTotal * networkAvgMult) + (simMode === 'NEW' ? boostedCredits : 0);
       const share = estimatedNetworkBoostedTotal > 0 ? boostedCredits / estimatedNetworkBoostedTotal : 0;
       const stoinc = simNetworkFees * 0.94 * share;
-
-      return { 
-          rawCredits, 
-          geoMean: result.geoMean, 
-          boostedCredits, 
-          share, 
-          stoinc 
-      };
+      return { rawCredits, geoMean: result.geoMean, boostedCredits, share, stoinc };
   }, [simStorageVal, simStorageUnit, simNodes, simPerf, simStake, boostCounts, allNodes, networkAvgMult, simNetworkFees, simMode, importedBaseCredits]);
 
   const toggleBoostCount = (name: string, delta: number) => {
@@ -303,16 +253,17 @@ export default function Leaderboard() {
       setBoostCounts({...boostCounts, [name]: next});
   };
 
-  const handleRowClick = (node: RankedNode) => {
-      const compositeId = `${node.pubkey}-${node.network}-${node.address || 'no-ip'}`;
-      setExpandedNode(expandedNode === compositeId ? null : compositeId);
-  };
-
-  const handleUseInSim = (e: React.MouseEvent) => {
+  const handleUseInSim = (e: React.MouseEvent, nodeKey: string) => {
       e.stopPropagation();
       setShowSim(true);
       setSimStep(0);
+      handleImportNode(nodeKey); // Auto-paste and trigger logic
       window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleRowClick = (node: RankedNode) => {
+      const compositeId = `${node.pubkey}-${node.network}-${node.address || 'no-ip'}`;
+      setExpandedNode(expandedNode === compositeId ? null : compositeId);
   };
 
   const handleCopyKey = (e: React.MouseEvent, key: string) => {
@@ -330,11 +281,7 @@ export default function Leaderboard() {
       setTimeout(() => setCopiedLink(null), 2000);
   };
 
-  const handleLoadMore = () => {
-      setVisibleCount(prev => prev + 100);
-  };
-
-  const isStep1Valid = simNodes >= 1;
+  const handleLoadMore = () => setVisibleCount(prev => prev + 100);
 
   const getDashboardLink = (n: RankedNode) => {
     const params = new URLSearchParams();
@@ -386,7 +333,21 @@ export default function Leaderboard() {
           {showSim && (
               <div className="relative transition-all duration-300 ease-in-out">
                   {simStep === 0 && (
-                      <div className="p-4 md:p-8 animate-in slide-in-from-right-4 fade-in duration-300">
+                      <div className="p-4 md:p-8 animate-in slide-in-from-right-4 fade-in duration-300 relative">
+                          {/* AUTO-PILOT OVERLAY */}
+                          {autoPilotCountdown !== null && (
+                              <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-6 animate-in fade-in duration-500">
+                                  <div className="w-16 h-16 mb-4 relative">
+                                      <div className="absolute inset-0 border-4 border-yellow-500/20 rounded-full"></div>
+                                      <div className="absolute inset-0 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+                                      <div className="absolute inset-0 flex items-center justify-center font-mono text-xl font-black text-yellow-500">{autoPilotCountdown}</div>
+                                  </div>
+                                  <h3 className="text-lg font-black text-white uppercase tracking-tighter">Node Identified!</h3>
+                                  <p className="text-xs text-zinc-400 mt-1 mb-4">Auto-syncing configuration and moving to Step 2...</p>
+                                  <button onClick={() => setAutoPilotCountdown(null)} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-bold rounded-lg border border-zinc-700 transition">STOP AUTOPILOT</button>
+                              </div>
+                          )}
+
                           <div className="mb-6 text-center">
                               <h3 className="text-lg md:text-xl font-bold text-white uppercase tracking-wider">Step 1: Configure Fleet</h3>
                               <p className="text-[10px] md:text-xs text-zinc-500 mt-1">Load your live stats or simulate a new setup.</p>
@@ -417,11 +378,10 @@ export default function Leaderboard() {
                                             </button>
                                         )}
                                       </div>
-                                      <button onClick={handleImportNode} disabled={importSuccess} className={`font-bold text-[10px] px-3 md:px-4 rounded-lg uppercase transition whitespace-nowrap ${importSuccess ? 'bg-green-500 text-black' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}>
+                                      <button onClick={() => handleImportNode()} disabled={importSuccess} className={`font-bold text-[10px] px-3 md:px-4 rounded-lg uppercase transition whitespace-nowrap ${importSuccess ? 'bg-green-500 text-black' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}>
                                           {importSuccess ? <Check size={14} /> : 'LOAD'}
                                       </button>
                                   </div>
-
                                   <div className="mt-3">
                                       <button onClick={() => { setShowManualInput(!showManualInput); setSimMode('NEW'); }} className="text-[10px] md:text-xs text-zinc-500 hover:text-white underline underline-offset-2 transition-colors font-medium">
                                         Are your keys unavailable? Calculate manually instead
@@ -439,21 +399,10 @@ export default function Leaderboard() {
                                             {simNodes < 1 && <span className="flex items-center gap-1 text-red-500"><AlertTriangle size={10} /> MUST BE ≥ 1</span>}
                                           </label>
                                           <div className="relative">
-                                              <input 
-                                                type="number" 
-                                                min="0" 
-                                                value={simNodes} 
-                                                onChange={(e) => {
-                                                    const val = e.target.value === '' ? 0 : Number(e.target.value);
-                                                    setSimNodes(val);
-                                                    if(simMode === 'IMPORT') setSimMode('NEW');
-                                                }} 
-                                                className={`w-full bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${simNodes < 1 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}
-                                              />
+                                              <input type="number" min="0" value={simNodes} onChange={(e) => { const val = e.target.value === '' ? 0 : Number(e.target.value); setSimNodes(val); if(simMode === 'IMPORT') setSimMode('NEW'); }} className={`w-full bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${simNodes < 1 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`} />
                                               <span className="absolute right-3 top-2 md:top-3 text-[10px] md:text-sm text-zinc-500 font-bold">NODES</span>
                                           </div>
                                       </div>
-
                                       <div>
                                           <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simStorageVal <= 0 ? 'text-red-500' : 'text-zinc-400'}`}>
                                             <span>Total Storage</span>
@@ -464,7 +413,6 @@ export default function Leaderboard() {
                                               <select value={simStorageUnit} onChange={(e) => setSimStorageUnit(e.target.value as any)} className="bg-zinc-900 border border-zinc-700 rounded-xl p-2 md:p-3 text-[10px] md:text-base text-zinc-300 font-bold outline-none"><option>MB</option><option>GB</option><option>TB</option><option>PB</option></select>
                                           </div>
                                       </div>
-
                                       <div>
                                           <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simPerf <= 0 || simPerf > 1 ? 'text-red-500' : 'text-zinc-400'}`}>
                                               <span>Performance Score (0.0 - 1.0)</span>
@@ -474,7 +422,6 @@ export default function Leaderboard() {
                                               <input type="number" step="0.01" min="0" max="1" value={simPerf} onChange={(e) => setSimPerf(Number(e.target.value))} className={`w-full bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${(simPerf <= 0 || simPerf > 1) ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}/>
                                           </div>
                                       </div>
-
                                       <div>
                                           <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simStake <= 0 ? 'text-red-500' : 'text-zinc-400'}`}>
                                             <span>Total Stake (XAND)</span>
@@ -504,7 +451,6 @@ export default function Leaderboard() {
                                 </div>
                               )}
                           </div>
-
                           <div className="flex flex-col md:grid md:grid-cols-2 gap-4 md:gap-8 flex-grow min-h-0">
                               <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar space-y-3 md:space-y-4">
                                   <div className="space-y-1 md:space-y-2">
@@ -534,7 +480,6 @@ export default function Leaderboard() {
                                       ))}
                                   </div>
                               </div>
-
                               <div className="shrink-0 md:h-full flex flex-row md:flex-col gap-2 md:gap-4 border-t md:border-t-0 pt-2 md:pt-0 border-zinc-800">
                                   <div className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-lg md:rounded-xl p-2 md:p-6 flex flex-col justify-center items-center text-center">
                                       <div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold mb-0.5 md:mb-2 whitespace-nowrap">Geo Mean</div>
@@ -555,11 +500,9 @@ export default function Leaderboard() {
                               <h3 className="text-lg md:text-xl font-bold text-white uppercase tracking-wider">Step 3: Income</h3>
                               <p className="text-[10px] md:text-xs text-zinc-500 mt-1">Estimate Network Share</p>
                           </div>
-
                           <div className="max-w-xl mx-auto space-y-6 md:space-y-8">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                   <div>
-                                      {showFeeHelp && <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowFeeHelp(false)}></div>}
                                       <div className="flex justify-between items-end mb-2 relative z-50">
                                           <div className="flex items-center gap-2">
                                             <label className={`text-[10px] uppercase font-bold ${simNetworkFees <= 0 ? 'text-red-500' : 'text-zinc-400'}`}>Total Network Fees</label>
@@ -578,11 +521,8 @@ export default function Leaderboard() {
                                          <input type="number" min="0" value={simNetworkFees} onChange={(e) => setSimNetworkFees(Number(e.target.value))} className={`w-full bg-zinc-900 border rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none transition ${simNetworkFees <= 0 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-blue-500'}`}/>
                                          <span className="absolute right-4 top-3.5 text-[10px] font-bold text-zinc-600">SOL</span>
                                       </div>
-                                      {simNetworkFees <= 0 && <div className="text-[9px] text-red-400 font-bold mt-1.5 flex items-center gap-1"><AlertTriangle size={10} /> Invalid Fee</div>}
                                   </div>
-
                                   <div>
-                                      {showNetworkHelp && <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowNetworkHelp(false)}></div>}
                                       <div className="flex justify-between items-end mb-2 relative z-50">
                                           <div className="flex items-center gap-2">
                                             <label className={`text-[10px] uppercase font-bold ${networkAvgMult < 1 ? 'text-red-500' : 'text-zinc-400'}`}>Est. Total Boosted Credits</label>
@@ -601,10 +541,8 @@ export default function Leaderboard() {
                                          <input type="number" min="0" step="0.1" value={networkAvgMult} onChange={(e) => { const val = e.target.value === '' ? 0 : Number(e.target.value); setNetworkAvgMult(val); }} className={`w-full bg-zinc-900 border rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none transition ${networkAvgMult < 1 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-purple-500'}`}/>
                                          <span className="absolute right-4 top-3.5 text-[10px] font-bold text-zinc-600">AVG X</span>
                                       </div>
-                                      {networkAvgMult < 1 && <div className="text-[9px] text-red-400 font-bold mt-1.5 flex items-center gap-1"><AlertTriangle size={10} /> Invalid Multiplier (Must be ≥ 1)</div>}
                                   </div>
                               </div>
-
                               <div className="bg-gradient-to-br from-zinc-900 to-black border border-yellow-500/30 rounded-xl md:rounded-2xl p-6 md:p-8 relative overflow-hidden group">
                                   <div className="relative z-10 flex flex-col items-center text-center space-y-4 md:space-y-6">
                                       <div>
@@ -685,18 +623,14 @@ export default function Leaderboard() {
         ) : (
           <div className="divide-y-0 px-2 pb-2">
             {filteredAndRanked.slice(0, visibleCount).map((node) => {
-    const isMyNode = node.address && favorites.includes(node.address);
-    const compositeId = `${node.pubkey}-${node.network}-${node.address || 'no-ip'}`;
-    const isExpanded = expandedNode === compositeId; 
-    const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
+                const isMyNode = node.address && favorites.includes(node.address);
+                const compositeId = `${node.pubkey}-${node.network}-${node.address || 'no-ip'}`;
+                const isExpanded = expandedNode === compositeId; 
+                const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
 
-    return (
-    <div 
-        key={compositeId} 
-        id={`node-${compositeId}`} 
-        className={`relative transition-all duration-300 ease-out mb-2 rounded-xl border ${isExpanded ? 'scale-[1.02] z-10 bg-black border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.15)]' : 'scale-100 bg-zinc-900/30 border-transparent hover:scale-[1.01] hover:bg-zinc-800 hover:border-zinc-600'} ${isMyNode && !isExpanded ? 'border-yellow-500/30 bg-yellow-500/5' : ''}`}
-    >
-        <div className="grid grid-cols-12 gap-2 md:gap-4 p-3 md:p-4 items-center cursor-pointer" onClick={() => handleRowClick(node)}>
+                return (
+                <div key={compositeId} id={`node-${compositeId}`} className={`relative transition-all duration-300 ease-out mb-2 rounded-xl border ${isExpanded ? 'scale-[1.02] z-10 bg-black border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.15)]' : 'scale-100 bg-zinc-900/30 border-transparent hover:scale-[1.01] hover:bg-zinc-800 hover:border-zinc-600'} ${isMyNode && !isExpanded ? 'border-yellow-500/30 bg-yellow-500/5' : ''}`}>
+                    <div className="grid grid-cols-12 gap-2 md:gap-4 p-3 md:p-4 items-center cursor-pointer" onClick={() => handleRowClick(node)}>
                         <div className="col-span-2 md:col-span-1 flex flex-col justify-center items-center gap-1 relative">
                             <div className="flex items-center gap-1">
                                 {node.rank === 1 && <Trophy size={14} className="text-yellow-400" />}
@@ -731,7 +665,7 @@ export default function Leaderboard() {
                                             <Activity size={12} className="text-green-400" /> DIAGNOSTICS
                                         </button>
                                     </Link>
-                                    <button onClick={(e) => handleUseInSim(e)} className="col-span-2 flex items-center justify-center gap-2 px-1 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-[10px] font-bold text-yellow-500">
+                                    <button onClick={(e) => handleUseInSim(e, node.pubkey)} className="col-span-2 flex items-center justify-center gap-2 px-1 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-[10px] font-bold text-yellow-500">
                                         <Calculator size={12} /> CALC
                                     </button>
                                     <button onClick={(e) => handleCopyKey(e, node.pubkey)} className="col-span-2 flex items-center justify-center gap-1 px-0.5 py-3 bg-zinc-800/50 rounded-xl text-[10px] font-bold text-zinc-400">
@@ -756,7 +690,7 @@ export default function Leaderboard() {
                                                 <Activity size={12} className="text-green-400" />DIAGNOSTICS
                                             </button>
                                         </Link>
-                                        <button onClick={(e) => handleUseInSim(e)} className="w-full md:w-auto flex items-center justify-center gap-2 px-3 py-2 md:px-5 md:py-3 rounded-lg md:rounded-xl bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/20 text-[10px] md:text-xs font-bold text-yellow-500 transition-all whitespace-nowrap">
+                                        <button onClick={(e) => handleUseInSim(e, node.pubkey)} className="w-full md:w-auto flex items-center justify-center gap-2 px-3 py-2 md:px-5 md:py-3 rounded-lg md:rounded-xl bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/20 text-[10px] md:text-xs font-bold text-yellow-500 transition-all whitespace-nowrap">
                                             <Calculator size={12} />CALCULATE
                                         </button>
                                     </div>
@@ -777,27 +711,17 @@ export default function Leaderboard() {
                 </div>
               );
             })}
-                                    {visibleCount < filteredAndRanked.length ? (<div className="p-4 flex justify-center border-t border-zinc-800"><button onClick={handleLoadMore} className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs rounded-xl transition-all"><ChevronIcon size={16} /> LOAD NEXT 100 NODES</button></div>) : filteredAndRanked.length > 0 && (<div className="p-4 text-center border-t border-zinc-800 text-[10px] text-zinc-600 font-mono uppercase">--- END OF LIST ---</div>)}
+            {visibleCount < filteredAndRanked.length ? (<div className="p-4 flex justify-center border-t border-zinc-800"><button onClick={handleLoadMore} className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs rounded-xl transition-all"><ChevronIcon size={16} /> LOAD NEXT 100 NODES</button></div>) : filteredAndRanked.length > 0 && (<div className="p-4 text-center border-t border-zinc-800 text-[10px] text-zinc-600 font-mono uppercase">--- END OF LIST ---</div>)}
           </div>
         )}
       </div>
-
-      {/* EXISTING COUNTER */}
-      {!loading && !creditsOffline && (
-        <div className="max-w-5xl mx-auto mt-6 text-center text-sm md:text-base text-zinc-500 flex flex-col md:flex-row items-center justify-center gap-2 font-medium">
-            <div className="flex items-center gap-2">
-                <Eye size={16} />
-                <span>Showing <span className="text-zinc-300 font-bold">{Math.min(visibleCount, filteredAndRanked.length)}</span> of <span className="text-zinc-300 font-bold">{filteredAndRanked.length}</span> nodes.</span>
-            </div>
-        </div>
-      )}
 
       {/* FOOTER */}
       {!loading && !creditsOffline && (
         <footer className="max-w-5xl mx-auto mt-8 mb-12 pt-8 border-t border-zinc-900 px-4 text-center animate-in fade-in duration-700">
           <div className="max-w-2xl mx-auto space-y-4">
             <p className="text-[10px] md:text-xs text-zinc-600 italic font-serif leading-relaxed">
-              * Participants listed have successfully submitted Storage Proofs and met network stability thresholds. This leaderboard tracks Incentivized Nodes. To be eligible for credits, a node must not only participate in the Gossip protocol but also validate its committed storage via successful Proof cycles.
+              * Participants listed have successfully submitted Storage Proofs and met network stability thresholds. This leaderboard tracks Incentivized Nodes.
             </p>
             <div className="pt-6 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-3 text-xs font-mono text-zinc-600">
               <span className="uppercase tracking-widest opacity-70">Data fetched directly from the Pod Credits API:</span>
