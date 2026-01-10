@@ -2,7 +2,7 @@ import * as React from 'react';
 
 // --- MAIN INTERFACE ---
 export interface Node {
-  uid?: string; // <--- NEW: Unique ID
+  uid?: string; // <--- Unique ID
   address?: string;
   pubkey?: string;
   version?: string;
@@ -39,10 +39,9 @@ export interface Node {
 }
 
 // --- MODULE DECLARATIONS ---
+// Only declare this module ONCE. 
 
 declare module 'react-simple-maps' {
-  // NOTE: React is now imported at the top of the file, so we don't need to import it here.
-  
   export interface ComposableMapProps {
     width?: number;
     height?: number;
