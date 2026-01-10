@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
+import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react'; // Added useLayoutEffect
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -82,7 +82,6 @@ export default function MapPage() {
   const [locations, setLocations] = useState<LocationData[]>([]);
   const [stats, setStats] = useState<MapStats>({ totalNodes: 0, countries: 0, topRegion: 'Scanning...', topRegionMetric: 0 });
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // View State
   const [viewMode, setViewMode] = useState<ViewMode>('STORAGE');
@@ -97,35 +96,13 @@ export default function MapPage() {
   const [copiedCoords, setCopiedCoords] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
-  // Refs for Scroll Preservation
   const listRef = useRef<HTMLDivElement>(null);
-  const modalScrollRef = useRef<HTMLDivElement>(null);
-  const scrollTracker = useRef<number>(0);
-  const modalScrollTracker = useRef<number>(0);
-
   const hasDeepLinked = useRef(false);
 
   const [dynamicThresholds, setDynamicThresholds] = useState<number[]>([0, 0, 0, 0]);
 
   const visibleNodes = useMemo(() => locations.reduce((sum, loc) => sum + loc.count, 0), [locations]);
   const privateNodes = Math.max(0, stats.totalNodes - visibleNodes);
-
-  // --- SCROLL PRESERVATION LOGIC ---
-  
-  // Track scroll position of Split View List
-  const onListScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    scrollTracker.current = e.currentTarget.scrollTop;
-  };
-
-  // Track scroll position of Country Modal
-  const onModalScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    modalScrollTracker.current = e.currentTarget.scrollTop;
-  };
-
-  useLayoutEffect(() => {
-    if (listRef.current) listRef.current.scrollTop = scrollTracker.current;
-    if (modalScrollRef.current) modalScrollRef.current.scrollTop = modalScrollTracker.current;
-  }, [locations]); // Whenever data updates, restore scroll anchors
 
   // --- AGGREGATION LOGIC (Country Breakdown) ---
   const countryBreakdown = useMemo(() => {
@@ -138,6 +115,7 @@ export default function MapPage() {
       healthSum: number;
     }>();
 
+    // Aggregation Loop
     locations.forEach(loc => {
       const code = loc.countryCode || 'XX';
       const current = map.get(code) || { 
@@ -152,11 +130,12 @@ export default function MapPage() {
       current.count += loc.count;
       current.storage += loc.totalStorage;
       current.credits += (loc.totalCredits || 0);
-      current.healthSum += (loc.avgHealth * loc.count); 
+      current.healthSum += (loc.avgHealth * loc.count); // Weighted sum
 
       map.set(code, current);
     });
 
+    // Convert to Array & Sort
     return Array.from(map.values()).map(c => ({
       ...c,
       avgHealth: c.healthSum / (c.count || 1)
@@ -167,6 +146,7 @@ export default function MapPage() {
     });
   }, [locations, viewMode]);
 
+  // Global Totals for Percentage Calculation
   const globalTotals = useMemo(() => {
     return {
       storage: countryBreakdown.reduce((sum, c) => sum + c.storage, 0),
@@ -175,12 +155,13 @@ export default function MapPage() {
     };
   }, [countryBreakdown]);
 
+  // --- GLOBAL API HEALTH CHECK ---
   const isGlobalCreditsOffline = useMemo(() => {
       if (locations.length === 0) return false; 
       return !locations.some(l => l.totalCredits !== null);
   }, [locations]);
 
-  // Scroll to active marker effect (Only if not currently being manually scrolled)
+  // Scroll to Active Effect
   useEffect(() => {
       if (activeLocation && isSplitView) {
           const timer = setTimeout(() => {
@@ -191,12 +172,9 @@ export default function MapPage() {
       }
   }, [viewMode, activeLocation, isSplitView]);
 
-  // --- FETCH LOOP (Optimized for Scroll Stability) ---
+  // Fetch Loop
   useEffect(() => {
-    const fetchGeo = async (isInitial = false) => {
-      if (isInitial) setLoading(true);
-      else setIsRefreshing(true);
-
+    const fetchGeo = async () => {
       try {
         const res = await axios.get('/api/geo');
         if (res.data) {
@@ -217,14 +195,11 @@ export default function MapPage() {
               }
           }
         }
-      } catch (err) { console.error(err); } finally { 
-          setLoading(false); 
-          setIsRefreshing(false);
-      }
+      } catch (err) { console.error(err); } finally { setLoading(false); }
     };
 
-    fetchGeo(true);
-    const interval = setInterval(() => fetchGeo(false), 10000);
+    fetchGeo();
+    const interval = setInterval(fetchGeo, 10000);
     return () => clearInterval(interval);
   }, [router.isReady, router.query.focus]); 
 
@@ -258,9 +233,13 @@ export default function MapPage() {
     const params = new URLSearchParams();
     if (destination === 'DASHBOARD') params.set('open', data.pk);
     else params.set('highlight', data.pk); 
+
     if (data.network) params.set('network', data.network);
     if (data.address) params.set('focusAddr', data.address);
-    return destination === 'DASHBOARD' ? `/?${params.toString()}` : `/leaderboard?${params.toString()}`;
+
+    return destination === 'DASHBOARD' 
+        ? `/?${params.toString()}` 
+        : `/leaderboard?${params.toString()}`;
   };
 
   const getTierIndex = (loc: LocationData): number => {
@@ -299,15 +278,20 @@ export default function MapPage() {
   };
 
   const getPerformerStats = (pkData: TopPerformerData) => {
-      if (viewMode === 'STORAGE') return <span className="text-indigo-400 font-bold">{formatStorage(pkData.val)} Committed</span>;
+      if (viewMode === 'STORAGE') {
+          return <span className="text-indigo-400 font-bold">{formatStorage(pkData.val)} Committed</span>;
+      }
       if (viewMode === 'CREDITS') {
-          if (pkData.isUntracked) return <span className="text-orange-400/80 font-bold italic">No Storage Credits</span>;
+          if (pkData.isUntracked) {
+              return <span className="text-orange-400/80 font-bold italic">No Storage Credits</span>;
+          }
           return <span className="text-yellow-500 font-bold">{pkData.val.toLocaleString()} Cr Earned</span>;
       }
       if (viewMode === 'HEALTH') {
           const score = pkData.val;
           const uptime = pkData.subVal || 0;
           const color = score >= 80 ? 'text-green-400' : score >= 50 ? 'text-yellow-400' : 'text-red-400';
+
           return (
             <span className={`font-bold flex items-center gap-2 ${color}`}>
                  {score}% <span className="text-zinc-600">|</span> <span className="text-blue-300">{formatUptime(uptime)} Up</span>
@@ -377,12 +361,15 @@ export default function MapPage() {
         case 'STORAGE': return formatStorage(loc.totalStorage);
         case 'HEALTH': return `${loc.avgHealth}% Health`;
         case 'CREDITS': 
-            if (loc.totalCredits === null) return isGlobalCreditsOffline ? "API OFFLINE" : "UNTRACKED";
+            if (loc.totalCredits === null) {
+                return isGlobalCreditsOffline ? "API OFFLINE" : "UNTRACKED";
+            }
             return `${loc.totalCredits.toLocaleString()} Cr`;
     }
   };
 
   const getXRayStats = (loc: LocationData, index: number, tierColor: string) => {
+      // DRAWER: 1 Decimal Place (Original)
       const globalShare = ((loc.count / stats.totalNodes) * 100).toFixed(1);
       const rawPercentile = ((locations.length - index) / locations.length) * 100;
       const topPercent = 100 - rawPercentile;
@@ -408,13 +395,16 @@ export default function MapPage() {
               const statusText = isGlobalCreditsOffline ? "API OFFLINE" : "UNTRACKED";
               const statusColor = isGlobalCreditsOffline ? "text-red-400" : "text-zinc-500";
               const statusIcon = isGlobalCreditsOffline ? <AlertOctagon size={12}/> : <EyeOff size={12}/>;
+
               return {
                   labelA: 'Avg Earnings',
                   valA: <span className={`${statusColor} flex items-center justify-center gap-1 font-bold`}>{statusIcon} No Rewards Active</span>,
-                  descA: "Node has not completed a Storage Proof cycle required for rewards.",
+                  descA: "Node is visible via Gossip protocol but has not completed a Storage Proof cycle required for rewards.",
+
                   labelB: 'Contribution',
                   valB: <span className="text-zinc-400 font-bold">Gossip Active</span>,
-                  descB: "Node contributes to network topology but may be in a proving phase.",
+                  descB: "Node contributes to network topology but may be in a proving phase or below stake thresholds.",
+
                   labelC: 'Tier Rank',
                   valC: <span className="text-zinc-500 italic">Unknown</span>,
                   descC: "Cannot calculate rank without confirmed credits."
@@ -516,6 +506,7 @@ export default function MapPage() {
   );
 
   const RegionTrigger = ({ className = "" }: { className?: string }) => {
+    // Get top 3 flags safely
     const topFlags = countryBreakdown.slice(0, 3).map(c => c.code.toLowerCase());
     const count = Math.max(0, countryBreakdown.length - 3);
 
@@ -524,7 +515,9 @@ export default function MapPage() {
         onClick={() => setIsCountryModalOpen(true)}
         className={`relative overflow-hidden bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-500/50 rounded-xl px-3 py-2 transition-all cursor-pointer group items-center gap-3 backdrop-blur-md shadow-lg ${className}`}
       >
+        {/* SCANNER LIGHT EFFECT */}
         <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/10 to-transparent animate-scanner pointer-events-none" />
+
         <div className="flex -space-x-2 relative z-10">
           {topFlags.map(code => (
             <div key={code} className="w-5 h-5 rounded-full border border-zinc-900 overflow-hidden relative z-0 group-hover:z-10 transition-all shadow-sm">
@@ -541,64 +534,113 @@ export default function MapPage() {
   };
 
   const CountryBreakdownModal = () => {
+    // 1. Create a ref to access the DOM element for the scrollable list
+    const modalListRef = useRef<HTMLDivElement>(null);
+
+    // 2. Create a ref to store the current scroll position.
+    // We use a ref instead of state because we don't want to trigger re-renders on scroll.
+    const scrollPosRef = useRef(0);
+
+    // 3. The "Fix": useLayoutEffect fires synchronously after the DOM updates but before painting.
+    // If 'countryBreakdown' changes (new live data), this hook immediately restores the scroll position.
+    useLayoutEffect(() => {
+        if (modalListRef.current) {
+            modalListRef.current.scrollTop = scrollPosRef.current;
+        }
+    }, [countryBreakdown]);
+
+    // 4. Update the stored scroll position whenever the user scrolls
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        scrollPosRef.current = e.currentTarget.scrollTop;
+    };
+
     if (!isCountryModalOpen) return null;
 
     return (
       <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setIsCountryModalOpen(false)}>
         <div className="bg-[#09090b] border border-zinc-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
 
+          {/* Header with Integrated Toggles */}
           <div className="p-5 border-b border-zinc-800 flex flex-col gap-4 bg-zinc-900/50">
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <Globe size={18} className="text-blue-500" /> Global Breakdown
                 </h3>
-                <p className="text-xs text-zinc-500 mt-0.5">Ranking {countryBreakdown.length} active regions.</p>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Ranking {countryBreakdown.length} active regions.
+                </p>
               </div>
               <button onClick={() => setIsCountryModalOpen(false)} className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-full text-zinc-400 hover:text-white transition">
                 <X size={18} />
               </button>
             </div>
+
+            {/* Filter Toggles Inside Modal */}
             <div className="w-full">
                <ViewToggles className="w-full justify-between bg-black/40 border-zinc-800" />
             </div>
           </div>
 
-          {/* LIST WITH SCROLL TRACKING */}
+          {/* List with Ref and Scroll Handler */}
           <div 
-            ref={modalScrollRef}
-            onScroll={onModalScroll}
+            ref={modalListRef}
+            onScroll={handleScroll}
             className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar"
           >
             {countryBreakdown.map((c, i) => {
-              let primaryShare = 0; let metricLabel = ''; let metricValue = '';
+              // Calculate Dynamic Percentages
+              let primaryShare = 0;
+              let metricLabel = '';
+              let metricValue = '';
+
               if (viewMode === 'STORAGE') {
                 primaryShare = (c.storage / (globalTotals.storage || 1)) * 100;
-                metricLabel = 'Capacity'; metricValue = formatStorage(c.storage);
+                metricLabel = 'Capacity';
+                metricValue = formatStorage(c.storage);
               } else if (viewMode === 'CREDITS') {
                 primaryShare = (c.credits / (globalTotals.credits || 1)) * 100;
-                metricLabel = 'Earnings'; metricValue = formatCredits(c.credits);
+                metricLabel = 'Earnings';
+                metricValue = formatCredits(c.credits);
               } else {
-                primaryShare = c.avgHealth; metricLabel = 'Health'; metricValue = c.avgHealth.toFixed(2) + '%';
+                primaryShare = c.avgHealth; 
+                metricLabel = 'Health';
+                metricValue = c.avgHealth.toFixed(2) + '%';
               }
+
               const nodeShare = (c.count / (globalTotals.nodes || 1)) * 100;
+              const barColor = MODE_COLORS[viewMode].bg;
+              const textColor = MODE_COLORS[viewMode].tailwind;
+
               return (
-                <div key={`${c.code}-${c.name}`} className="p-3 rounded-xl bg-zinc-900/30 border border-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-700 transition flex flex-col gap-2">
+                <div key={c.code} className="p-3 rounded-xl bg-zinc-900/30 border border-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-700 transition flex flex-col gap-2">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-mono text-zinc-600 w-4">#{i + 1}</span>
                       <img src={`https://flagcdn.com/w40/${c.code.toLowerCase()}.png`} alt={c.code} className="w-5 rounded-[2px]" />
                       <span className="text-sm font-bold text-zinc-200">{c.name}</span>
                     </div>
-                    <div className={`text-sm font-mono font-bold ${MODE_COLORS[viewMode].tailwind}`}>{metricValue}</div>
+                    <div className={`text-sm font-mono font-bold ${textColor}`}>
+                      {metricValue}
+                    </div>
                   </div>
+
+                  {/* Dual Data Bar */}
                   <div className="space-y-1.5">
                     <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden flex">
-                      <div className={`h-full ${MODE_COLORS[viewMode].bg} shadow-[0_0_10px_currentColor]`} style={{ width: `${Math.max(2, primaryShare)}%` }}></div>
+                      {/* Primary Metric Bar */}
+                      <div className={`h-full ${barColor} shadow-[0_0_10px_currentColor]`} style={{ width: `${Math.max(2, primaryShare)}%` }}></div>
                     </div>
+
                     <div className="flex justify-between items-center text-[9px] font-mono uppercase tracking-wide text-zinc-500">
-                      <span><span className={MODE_COLORS[viewMode].tailwind}>{primaryShare.toFixed(2)}%</span> of {metricLabel}</span>
-                      <span>Hosts <span className="text-zinc-300">{nodeShare.toFixed(2)}%</span> of Total Nodes</span>
+                      <span>
+                        {/* 2 Decimal Places in Modal */}
+                        <span className={textColor}>{primaryShare.toFixed(2)}%</span> of {metricLabel}
+                      </span>
+                      <span>
+                        {/* 2 Decimal Places in Modal */}
+                        Hosts <span className="text-zinc-300">{nodeShare.toFixed(2)}%</span> of Total Nodes
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -615,12 +657,16 @@ export default function MapPage() {
       <Head>
         <title>Xandeum Command Center</title>
         <style>{`
-          @keyframes scanner { 0% { transform: translateX(-100%) skewX(-15deg); } 50%, 100% { transform: translateX(200%) skewX(-15deg); } }
-          .animate-scanner { animation: scanner 3s ease-in-out infinite; }
-          .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-          .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-          .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-          @supports (padding: max(0px)) { .pb-safe { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); } }
+          @keyframes scanner {
+            0% { transform: translateX(-100%) skewX(-15deg); }
+            50%, 100% { transform: translateX(200%) skewX(-15deg); }
+          }
+          .animate-scanner {
+            animation: scanner 3s ease-in-out infinite;
+          }
+          @supports (padding: max(0px)) { 
+            .pb-safe { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); } 
+          }
         `}</style>
       </Head>
 
@@ -633,9 +679,10 @@ export default function MapPage() {
           </div>
       )}
 
+      {/* RENDER THE MODAL */}
       <CountryBreakdownModal />
 
-      {/* HEADER */}
+      {/* HEADER COMPONENT */}
       <div className="shrink-0 w-full z-50 flex flex-col gap-3 px-4 md:px-6 py-3 bg-[#09090b] border-b border-zinc-800/30">
         <div className="flex items-center justify-between w-full">
             <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all cursor-pointer">
@@ -644,44 +691,81 @@ export default function MapPage() {
             </Link>
             <div className="flex flex-col items-end gap-1">
                 <div className="flex items-center gap-2">
-                    {isRefreshing && <div className="flex items-center gap-1.5 animate-pulse"><RotateCcw size={10} className="animate-spin text-blue-500" /><span className="text-[8px] text-blue-400 font-bold uppercase">Syncing...</span></div>}
                     <div className={`w-1.5 h-1.5 rounded-full animate-pulse`} style={{ backgroundColor: MODE_COLORS[viewMode].hex }}></div>
                     <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{viewMode} Mode</span>
                 </div>
                 {!loading && (
-                    <button onClick={() => { setToast({ msg: `${privateNodes} nodes are running on Private Networks/VPNs. Map pin is hidden.`, type: 'private' }); setTimeout(() => setToast(null), 6000); }} className="flex md:items-center gap-1.5 text-zinc-400 hover:text-white transition-colors cursor-help group text-right">
-                        <div className="hidden md:flex items-center gap-1.5"><HelpCircle size={12} className="text-zinc-500" /><span className="text-xs md:text-sm font-bold tracking-tight">Tracking {visibleNodes} <span className="text-zinc-600">/ {stats.totalNodes} Nodes</span></span></div>
-                        <div className="md:hidden flex flex-col items-end leading-none mt-0.5"><span className="text-[7px] font-bold uppercase tracking-widest text-zinc-600 mb-0.5">Tracking</span><span className="text-[9px] font-mono font-bold text-zinc-300">{visibleNodes} <span className="text-zinc-600">/</span> {stats.totalNodes} Nodes</span></div>
+                    <button 
+                        onClick={() => { 
+                            setToast({ 
+                                msg: `${privateNodes} nodes are running on Private Networks/VPNs, preventing public geolocation. Their data is tracked, but their map pin is hidden.`, 
+                                type: 'private' 
+                            }); 
+                            setTimeout(() => setToast(null), 6000); 
+                        }} 
+                        className="flex md:items-center gap-1.5 text-zinc-400 hover:text-white transition-colors cursor-help group text-right"
+                    >
+                        {/* DESKTOP VIEW (Single Line) */}
+                        <div className="hidden md:flex items-center gap-1.5">
+                            <HelpCircle size={12} className="text-zinc-500" />
+                            <span className="text-xs md:text-sm font-bold tracking-tight">
+                                Tracking {visibleNodes} <span className="text-zinc-600">/ {stats.totalNodes} Nodes</span>
+                            </span>
+                        </div>
+
+                        {/* MOBILE VIEW (Stacked 2 Rows) */}
+                        <div className="md:hidden flex flex-col items-end leading-none mt-0.5">
+                            <span className="text-[7px] font-bold uppercase tracking-widest text-zinc-600 mb-0.5">
+                                Tracking
+                            </span>
+                            <span className="text-[9px] font-mono font-bold text-zinc-300">
+                                {visibleNodes} <span className="text-zinc-600">/</span> {stats.totalNodes} Nodes
+                            </span>
+                        </div>
                     </button>
                 )}
             </div>
         </div>
+
+        {/* TITLE ROW WITH INTEGRATED DESKTOP TRIGGER */}
         <div className="flex justify-between items-end">
-            <div><h1 className="text-lg md:text-2xl font-bold tracking-tight text-white leading-tight">{getDynamicTitle()}</h1><p className="text-xs text-zinc-400 leading-relaxed mt-1 max-w-2xl">{getDynamicSubtitle()}</p></div>
+            <div>
+                <h1 className="text-lg md:text-2xl font-bold tracking-tight text-white leading-tight">{getDynamicTitle()}</h1>
+                <p className="text-xs text-zinc-400 leading-relaxed mt-1 max-w-2xl">{getDynamicSubtitle()}</p>
+            </div>
+
+            {/* DESKTOP TRIGGER (Fills the empty space on the right) */}
             {!loading && <RegionTrigger className="hidden md:flex" />}
         </div>
+
+        {/* MOBILE TRIGGER (Sits below title) */}
         {!loading && <RegionTrigger className="flex md:hidden w-full justify-center bg-zinc-900/50" />}
       </div>
 
-      {/* MAP VIEWPORT */}
       <div className={`relative w-full bg-[#080808] ${isSplitView ? 'h-[40vh] shrink-0' : 'flex-1 basis-0 min-h-0'}`}>
             {loading ? (
                 <div className="absolute inset-0 flex items-center justify-center z-20"><Globe className="animate-pulse text-blue-500" /></div>
             ) : (
-                <ComposableMap projectionConfig={{ scale: 170 }} className="w-full h-full">
+                <ComposableMap projectionConfig={{ scale: 170 }} className="w-full h-full" style={{ width: "100%", height: "100%" }}>
                 <ZoomableGroup zoom={position.zoom} center={position.coordinates as [number, number]} onMoveEnd={handleMoveEnd} maxZoom={5}>
                     <Geographies geography={GEO_URL}>
-                    {({ geographies }: { geographies: any }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#1f1f1f" stroke="#333" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { fill: "#333", outline: "none" }}} />))}
+                    {({ geographies }: { geographies: any }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#1f1f1f" stroke="#333" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { fill: "#333", outline: "none" }, pressed: { outline: "none" }}} />))}
                     </Geographies>
                     {locationsForMap.map((loc) => {
-                    const tier = getTierIndex(loc); const size = sizeScale(loc.count); const isActive = activeLocation === loc.name;
-                    const tierColor = viewMode === 'CREDITS' && loc.totalCredits === null ? '#52525b' : TIER_COLORS[tier];
-                    const pingColor = isActive ? '#22c55e' : tierColor;
+                    const size = sizeScale(loc.count);
+                    const isActive = activeLocation === loc.name;
+                    const tier = getTierIndex(loc);
+                    const isMissingData = viewMode === 'CREDITS' && loc.totalCredits === null;
+                    const tierColor = isMissingData ? '#52525b' : TIER_COLORS[tier];
+                    const opacity = activeLocation && !isActive ? 0.3 : 1;
+                    const pingColor = isMissingData ? '#52525b' : (isActive ? '#22c55e' : tierColor);
+
                     return (
                         <Marker key={loc.name} coordinates={[loc.lon, loc.lat]} onClick={() => lockTarget(loc.name, loc.lat, loc.lon)}>
-                        <g className="group cursor-pointer transition-all duration-500" style={{ opacity: activeLocation && !isActive ? 0.3 : 1 }}>
-                            <circle r={size * 2.5} fill={pingColor} className="animate-ping opacity-20" />
-                            {isActive ? (<polygon points="0,-12 3,-4 11,-4 5,1 7,9 0,5 -7,9 -5,1 -11,-4 -3,-4" transform={`scale(${size/6})`} fill="#52525b" stroke="#22c55e" strokeWidth={1.5} />) : (<>{viewMode === 'STORAGE' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={tierColor} stroke="#fff" />}{viewMode === 'CREDITS' && <circle r={size} fill={tierColor} stroke="#fff" />}{viewMode === 'HEALTH' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={tierColor} stroke="#fff" className="rotate-45" />}</>)}
+                        <g className="group cursor-pointer transition-all duration-500" style={{ opacity }}>
+                            <circle r={size * 2.5} fill={pingColor} className="animate-ping opacity-20" style={{ animationDuration: isActive ? '1s' : '3s' }} />
+                            {isActive ? (<polygon points="0,-12 3,-4 11,-4 5,1 7,9 0,5 -7,9 -5,1 -11,-4 -3,-4" transform={`scale(${size/6})`} fill="#52525b" stroke="#22c55e" strokeWidth={1.5} className="drop-shadow-[0_0_15px_rgba(34,197,94,1)]" />) : (<>{viewMode === 'STORAGE' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={tierColor} stroke="#fff" strokeWidth={1} />}{viewMode === 'CREDITS' && <circle r={size} fill={tierColor} stroke="#fff" strokeWidth={1} />}{viewMode === 'HEALTH' && <rect x={-size} y={-size} width={size * 2} height={size * 2} fill={tierColor} stroke="#fff" strokeWidth={1} className="rotate-45" />}</>)}
+                            {isActive && (<g transform={`translate(0, ${-size - 18})`}><rect x="-60" y="-20" width="120" height="24" rx="4" fill="black" fillOpacity="0.8" stroke="#22c55e" strokeWidth="1" className="drop-shadow-lg" /><text y="-4" textAnchor="middle" className="font-mono text-[10px] fill-white font-bold uppercase tracking-widest pointer-events-none dominant-baseline-central">{loc.name}</text><path d="M -5 4 L 0 9 L 5 4" fill="black" stroke="#22c55e" strokeWidth="1" strokeDasharray="0,14,3" /></g>)}
                         </g>
                         </Marker>
                     );
@@ -689,70 +773,135 @@ export default function MapPage() {
                 </ZoomableGroup>
                 </ComposableMap>
             )}
+            {/* ZOOM CONTROLS */}
             <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-30">
                 <button onClick={handleZoomIn} className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Plus size={16} /></button>
                 <button onClick={handleZoomOut} className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Minus size={16} /></button>
-                {(position.zoom > 1.2 || activeLocation) && <button onClick={resetView} className="p-2 md:p-3 bg-red-900/80 border border-red-500/50 text-red-200 rounded-xl"><RotateCcw size={16} /></button>}
+                {(position.zoom > 1.2 || activeLocation) && <button onClick={resetView} className="p-2 md:p-3 bg-red-900/80 border border-red-500/50 text-red-200 rounded-xl hover:text-white"><RotateCcw size={16} /></button>}
             </div>
       </div>
 
-      {/* FOOTER LIST */}
       <div className={`shrink-0 bg-[#09090b] relative z-50 flex flex-col ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
+            <div className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4 ${isSplitView ? 'hidden' : 'flex'}`}>
+                <div className="w-full md:w-auto flex justify-center md:justify-start"><ViewToggles /></div>
+                <div className="w-full md:w-auto bg-zinc-900/30 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3">
+                    <div className="flex flex-col gap-2 max-w-xl">
+                        <div className="flex items-start gap-2"><Info size={12} className="text-blue-400 mt-0.5 shrink-0" /><p className="text-[10px] text-zinc-400 leading-tight"><strong className="text-zinc-200">{getLegendContext()}</strong> {viewMode === 'STORAGE' || viewMode === 'CREDITS' ? "Thresholds are dynamic (percentile-based)." : "Thresholds are fixed."}</p></div>
+                    </div>
+                    <div className="grid grid-cols-3 md:grid-cols-5 gap-3 w-full">
+                        {getLegendLabels().map((label, idx) => (<div key={idx} className="flex flex-col items-center gap-1.5"><div className="w-8 h-1.5 rounded-full" style={{ backgroundColor: TIER_COLORS[idx] }}></div><span className="text-[9px] font-mono text-zinc-500 font-bold whitespace-nowrap">{label}</span></div>))}
+                    </div>
+                </div>
+            </div>
+
+            <div className={`flex flex-col h-full overflow-hidden ${isSplitView ? 'flex' : 'hidden'}`}>
+                 <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-zinc-800/30 bg-[#09090b]">
+                    <div className="flex items-center gap-3"><h2 className="text-sm font-bold text-white flex items-center gap-2"><Activity size={14} className="text-green-500" /> Live Data</h2><div className="hidden md:block scale-90 origin-left"><ViewToggles /></div></div>
+                    <div className="flex items-center gap-2">
+                        <div className="md:hidden scale-75 origin-right"><ViewToggles /></div>
+                        <button onClick={handleCloseDrawer} className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg"><X size={20} /></button>
+                    </div>
+                 </div>
+
+                 <div ref={listRef} className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar bg-[#09090b]">
+                    {sortedLocations.map((loc, i) => {
+                        const tier = getTierIndex(loc);
+                        const isMissingData = viewMode === 'CREDITS' && loc.totalCredits === null;
+                        const tierColor = isMissingData ? '#71717a' : TIER_COLORS[tier];
+                        const isExpanded = expandedLocation === loc.name;
+                        const xray = getXRayStats(loc, i, tierColor);
+                        const sampleIp = loc.ips && loc.ips.length > 0 ? loc.ips[0] : null;
+                        const topData = loc.topPerformers ? loc.topPerformers[viewMode] : null;
+
+                        return (
+                            <div id={`list-item-${loc.name}`} key={loc.name} onClick={(e) => { e.stopPropagation(); toggleExpansion(loc.name, loc.lat, loc.lon); }} className={`group rounded-2xl border transition-all cursor-pointer overflow-hidden ${activeLocation === loc.name ? 'bg-zinc-800 border-green-500/50' : 'bg-zinc-900/50 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800'}`}>
+                                <div className="p-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`flex items-center justify-center w-8 h-8 rounded-full font-mono text-xs font-bold ${activeLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'}`}>{i + 1}</div>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-zinc-200 group-hover:text-white flex items-center gap-2">{loc.countryCode && <img src={`https://flagcdn.com/w20/${loc.countryCode.toLowerCase()}.png`} className="w-4 h-auto rounded-sm" />}{loc.name}, {loc.country}</span>
+                                            <span onClick={(e) => { e.stopPropagation(); handleCopyCoords(loc.lat, loc.lon, loc.name); }} className="text-[10px] text-zinc-500 flex items-center gap-1 hover:text-blue-400 cursor-copy transition-colors"><MapPin size={10} /> {copiedCoords === loc.name ? <span className="text-green-500 font-bold">Copied!</span> : `${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}`}</span>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className={`text-sm font-mono font-bold ${isMissingData ? (isGlobalCreditsOffline ? 'text-red-400' : 'text-zinc-500 italic') : ''}`} style={isMissingData ? {} : { color: tierColor }}>{getMetricText(loc)}</div>
+                                        <div className="text-[10px] text-zinc-500">{loc.count} Nodes</div>
+                                    </div>
+                                </div>
+                                {isExpanded && (
+                                    <div className="bg-black/30 border-t border-white/5 p-4 animate-in slide-in-from-top-2 duration-300">
+                                        <div className="flex justify-between items-center mb-4"><div className="text-[10px] md:text-sm font-bold uppercase tracking-widest px-3 py-1 rounded border bg-black/50" style={{ color: tierColor, borderColor: `${tierColor}40` }}>{isMissingData ? (isGlobalCreditsOffline ? 'API ERROR' : 'UNTRACKED') : TIER_LABELS[viewMode][tier]} TIER</div><div className="flex gap-2">{sampleIp && (<button onClick={(e) => handleShareLink(e, sampleIp, loc.name)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold hover:bg-blue-500/20 transition">{copiedLink === loc.name ? <Check size={12} /> : <Share2 size={12} />}{copiedLink === loc.name ? 'Link Copied' : 'Share Region'}</button>)}</div></div>
+                                        <div className="grid grid-cols-3 gap-2 text-xs md:text-sm text-center mb-4">
+                                            <div className="flex flex-col items-center group/stat"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1 flex items-center gap-1">{xray.labelA}<HelpCircle size={8} className="cursor-help opacity-50"/><div className="absolute bottom-1/2 mb-2 hidden group-hover/stat:block bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-50 w-32">{xray.descA}</div></div><div className="font-mono font-bold">{xray.valA}</div></div>
+                                            <div className="flex flex-col items-center border-l border-zinc-800/50 group/stat"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1 flex items-center gap-1">{xray.labelB}<HelpCircle size={8} className="cursor-help opacity-50"/><div className="absolute bottom-1/2 mb-2 hidden group-hover/stat:block bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-50 w-32">{xray.descB}</div></div><div className="text-white font-mono font-bold">{xray.valB}</div></div>
+                                            <div className="flex flex-col items-center border-l border-zinc-800/50 group/stat"><div className="text-zinc-500 text-[9px] md:text-[10px] uppercase mb-1 flex items-center gap-1">{xray.labelC}<HelpCircle size={8} className="cursor-help opacity-50"/><div className="absolute bottom-1/2 mb-2 hidden group-hover/stat:block bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-50 w-32">{xray.descC}</div></div><div className="font-mono font-bold">{xray.valC}</div></div>
+                                        </div>
+                                        {topData && (() => {
+                                            const isUntrackedKing = viewMode === 'CREDITS' && topData.isUntracked;
+
+                                            const CardContent = (
+                                                <div className={`w-full bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl p-3 flex items-center justify-between transition-all group/card ${isUntrackedKing ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`p-2 rounded-lg ${MODE_COLORS[viewMode].bg} text-white`}>
+                                                            {viewMode === 'STORAGE' ? <Database size={14} /> : viewMode === 'CREDITS' ? <Zap size={14} /> : <Activity size={14} />}
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Region's Top Performer</div>
+                                                                {topData.network === 'MAINNET' && <span className="text-[8px] bg-green-500 text-black px-1 rounded font-bold uppercase">Mainnet</span>}
+                                                                {topData.network === 'DEVNET' && <span className="text-[8px] bg-blue-500 text-white px-1 rounded font-bold uppercase">Devnet</span>}
+                                                            </div>
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="text-xs font-mono text-white truncate w-32 md:w-24 lg:w-32">{topData.pk.slice(0, 16)}...</div>
+                                                                <div className="hidden md:block text-xs">
+                                                                    {getPerformerStats(topData)}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 text-[10px] font-bold text-blue-400 group-hover/card:translate-x-1 transition-transform whitespace-nowrap">
+                                                        VIEW DETAILS <ArrowRight size={12} />
+                                                    </div>
+                                                </div>
+                                            );
+
+                                            if (isUntrackedKing) {
+                                                return (
+                                                    <div onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setToast({
+                                                            msg: "This node is currently not receiving storage credits from the protocol due to various reasons including: performance thresholds not yet met, the node is in a 'proving' phase, or the associated stake is below the required minimum for rewards.",
+                                                            type: 'info'
+                                                        });
+                                                        setTimeout(() => setToast(null), 8000);
+                                                    }}>
+                                                        {CardContent}
+                                                    </div>
+                                                )
+                                            }
+
+                                            return (
+                                                <Link href={viewMode === 'CREDITS' 
+                                                    ? getDeepLink(topData, 'LEADERBOARD') 
+                                                    : getDeepLink(topData, 'DASHBOARD')
+                                                }>
+                                                    {CardContent}
+                                                </Link>
+                                            )
+                                        })()}
+
+                                        <div className="w-full h-1 bg-zinc-800 rounded-full mt-4 overflow-hidden"><div className="h-full bg-white/20" style={{ width: `${(loc.count / stats.totalNodes) * 100}%` }}></div></div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
             {!isSplitView && (
                 <div className="shrink-0 p-3 md:px-6 md:py-4 bg-[#09090b] border-t border-zinc-800/30 z-50">
-                    <button onClick={() => setIsSplitView(true)} className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 px-6 py-3 bg-zinc-900 border border-blue-500/30 rounded-xl hover:bg-zinc-800 transition-all group shadow-[0_0_20px_rgba(59,130,246,0.15)]"><Activity size={16} className="text-blue-400" /><span className="text-xs md:text-sm font-bold uppercase tracking-widest text-blue-100">Open Live Stats</span><ChevronUp size={16} className="text-blue-500/50" /></button>
-                </div>
-            )}
-
-            {isSplitView && (
-                <div className="flex flex-col h-full overflow-hidden">
-                    <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-zinc-800/30 bg-[#09090b]">
-                        <div className="flex items-center gap-3"><h2 className="text-sm font-bold text-white flex items-center gap-2"><Activity size={14} className="text-green-500" /> Live Data</h2><ViewToggles className="hidden md:flex scale-90 origin-left" /></div>
-                        <button onClick={handleCloseDrawer} className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 transition-all shadow-lg"><X size={20} /></button>
-                    </div>
-
-                    <div 
-                        ref={listRef} 
-                        onScroll={onListScroll}
-                        className="flex-grow overflow-y-auto p-4 space-y-2 pb-safe custom-scrollbar bg-[#09090b]"
-                    >
-                        {sortedLocations.map((loc, i) => {
-                            const tier = getTierIndex(loc); const isExp = expandedLocation === loc.name; 
-                            const tColor = viewMode === 'CREDITS' && loc.totalCredits === null ? '#71717a' : TIER_COLORS[tier];
-                            const xray = getXRayStats(loc, i, tColor); const topData = loc.topPerformers?.[viewMode];
-                            return (
-                                <div id={`list-item-${loc.name}`} key={`${loc.countryCode}-${loc.name}`} onClick={() => toggleExpansion(loc.name, loc.lat, loc.lon)} className={`group rounded-2xl border transition-all cursor-pointer overflow-hidden ${activeLocation === loc.name ? 'bg-zinc-800 border-green-500/50' : 'bg-zinc-900/50 border-zinc-800/50 hover:bg-zinc-800'}`}>
-                                    <div className="p-3 flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`flex items-center justify-center w-8 h-8 rounded-full font-mono text-xs font-bold ${activeLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'}`}>{i + 1}</div>
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-bold text-zinc-200 flex items-center gap-2">{loc.countryCode && <img src={`https://flagcdn.com/w20/${loc.countryCode.toLowerCase()}.png`} className="w-4" />}{loc.name}, {loc.country}</span>
-                                                <span onClick={(e)=>{e.stopPropagation(); handleCopyCoords(loc.lat, loc.lon, loc.name);}} className="text-[10px] text-zinc-500 flex items-center gap-1 hover:text-blue-400"><MapPin size={10} /> {copiedCoords === loc.name ? 'Copied!' : `${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}`}</span>
-                                            </div>
-                                        </div>
-                                        <div className="text-right"><div className="text-sm font-mono font-bold" style={{ color: tColor }}>{getMetricText(loc)}</div><div className="text-[10px] text-zinc-500">{loc.count} Nodes</div></div>
-                                    </div>
-                                    {isExp && (
-                                        <div className="bg-black/30 border-t border-white/5 p-4 animate-in slide-in-from-top-2 duration-300">
-                                            <div className="grid grid-cols-3 gap-2 text-center mb-4">
-                                                <div className="flex flex-col items-center"><div className="text-zinc-500 text-[9px] uppercase mb-1">{xray.labelA}</div><div className="font-mono font-bold">{xray.valA}</div></div>
-                                                <div className="flex flex-col items-center border-l border-zinc-800/50"><div className="text-zinc-500 text-[9px] uppercase mb-1">{xray.labelB}</div><div className="font-mono font-bold">{xray.valB}</div></div>
-                                                <div className="flex flex-col items-center border-l border-zinc-800/50"><div className="text-zinc-500 text-[9px] uppercase mb-1">{xray.labelC}</div><div className="font-mono font-bold">{xray.valC}</div></div>
-                                            </div>
-                                            {topData && (
-                                                <Link href={viewMode === 'CREDITS' ? getDeepLink(topData, 'LEADERBOARD') : getDeepLink(topData, 'DASHBOARD')}>
-                                                    <div className="w-full bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl p-3 flex items-center justify-between transition-all">
-                                                        <div className="flex items-center gap-3"><div className={`p-2 rounded-lg ${MODE_COLORS[viewMode].bg} text-white`}><Activity size={14} /></div><div className="flex flex-col"><span className="text-[10px] font-bold text-zinc-400 uppercase">Top Performer</span><div className="flex items-center gap-2"><span className="text-xs font-mono text-white truncate w-32">{topData.pk.slice(0, 16)}...</span>{getPerformerStats(topData)}</div></div></div>
-                                                        <ArrowRight size={14} className="text-blue-400" />
-                                                    </div>
-                                                </Link>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
+                    <button onClick={() => setIsSplitView(true)} className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 px-6 py-3 bg-zinc-900/80 hover:bg-zinc-800 border border-blue-500/30 hover:border-blue-500/60 rounded-xl transition-all group shadow-[0_0_20px_rgba(59,130,246,0.15)] hover:shadow-[0_0_30px_rgba(59,130,246,0.3)] animate-[pulse_3s_infinite]"><Activity size={16} className="text-blue-400 group-hover:scale-110 transition-transform animate-pulse" /><span className="text-xs md:text-sm font-bold uppercase tracking-widest text-blue-100 group-hover:text-white">Open Live Stats</span><ChevronUp size={16} className="text-blue-500/50 group-hover:-translate-y-1 transition-transform" /></button>
                 </div>
             )}
       </div>
