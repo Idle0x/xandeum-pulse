@@ -21,6 +21,7 @@ const geoCache = new Map<string, { lat: number; lon: number; country: string; co
 // --- INTERFACES ---
 
 export interface EnrichedNode {
+  uid: string; // <--- NEW: Unique ID to prevent collisions
   address: string;
   pubkey: string;
   version: string;
@@ -287,12 +288,13 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const pubkey = pod.pubkey || pod.public_key;
       const ip = pod.address.split(':')[0];
       const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
-      
+
       // FIX: Don't default to 0. Allow null to flow through.
       const rawCreds = mainnetCreditMap.get(pubkey);
       const credits = rawCreds !== undefined ? rawCreds : null;
 
       const node: EnrichedNode = {
+          uid: `${pubkey}-MAINNET`, // <--- NEW: Unique ID for Frontend
           ...pod,
           pubkey: pubkey,
           network: 'MAINNET',
@@ -343,6 +345,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       }
 
       const node: EnrichedNode = {
+          uid: `${pubkey}-${network}`, // <--- NEW: Unique ID for Frontend
           ...pod,
           pubkey: pubkey,
           network: network,
@@ -380,6 +383,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
               const clonedNode: EnrichedNode = {
                   ...mainnetNode,
                   network: 'DEVNET',
+                  uid: `${pubkey}-DEVNET`, // <--- NEW: Unique ID for the Ghost Clone
                   // FIX: Use null coalescing so undefined becomes null, not 0
                   credits: devnetCreditMap.get(pubkey) ?? null,
               };
