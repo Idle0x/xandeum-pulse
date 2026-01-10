@@ -148,6 +148,7 @@ export default function Leaderboard() {
     fetchData();
   }, []);
 
+  // --- 2. RANKING & SEARCH LOGIC ---
   const filteredAndRanked = useMemo(() => {
       const networkList = allNodes.filter(n => (networkFilter === 'COMBINED' || n.network === networkFilter));
       networkList.sort((a, b) => b.credits - a.credits || b.health - a.health || a.pubkey.localeCompare(b.pubkey));
@@ -157,11 +158,24 @@ export default function Leaderboard() {
       return rankedList.filter(n => n.pubkey.toLowerCase().includes(searchLower) || (n.address && n.address.toLowerCase().includes(searchLower)));
   }, [allNodes, networkFilter, searchQuery]);
 
-  // --- AUTOPILOT TIMER LOGIC ---
+  // --- 3. STRATEGY: RESET LOGIC ON STEP CHANGE ---
+  useEffect(() => {
+    // If user navigates back to Step 1 (index 0), reset success/countdown 
+    // so they can trigger the autopilot again.
+    if (simStep === 0) {
+      setImportSuccess(false);
+      setAutoPilotCountdown(null);
+    }
+    // Dismiss tooltips on step change
+    setShowFeeHelp(false);
+    setShowNetworkHelp(false);
+  }, [simStep]);
+
+  // --- 4. AUTOPILOT TIMER (3-SEC REDUCED) ---
   useEffect(() => {
     if (autoPilotCountdown === null) return;
     if (autoPilotCountdown <= 0) {
-      setSimStep(1);
+      setSimStep(1); // Proceed to Step 2
       setAutoPilotCountdown(null);
       return;
     }
@@ -169,7 +183,7 @@ export default function Leaderboard() {
     return () => clearTimeout(timer);
   }, [autoPilotCountdown]);
 
-  // --- DEEP LINK LOGIC ---
+  // --- 5. DEEP LINK LOGIC ---
   useEffect(() => {
       if (loading || !router.isReady || !router.query.highlight || allNodes.length === 0) return;
       const targetKey = router.query.highlight as string;
@@ -198,7 +212,7 @@ export default function Leaderboard() {
       }
   }, [loading, router.isReady, router.query, allNodes, networkFilter]);
 
-  // --- SIMULATOR FUNCTIONS ---
+  // --- 6. SIMULATOR FUNCTIONS ---
   const clearImport = () => {
     setImportKey('');
     setImportSuccess(false);
@@ -220,7 +234,7 @@ export default function Leaderboard() {
         setImportSuccess(true);
         setSimMode('IMPORT');
         setImportedBaseCredits(node.credits);
-        setAutoPilotCountdown(5); 
+        setAutoPilotCountdown(3); // Updated to 3 seconds
     } else {
         setImportError("Key not found in active leaderboard.");
     }
@@ -291,14 +305,12 @@ export default function Leaderboard() {
     return `/?${params.toString()}`;
   };
 
-  // --- VALIDATION HELPER ---
   const isStep1Valid = simMode === 'IMPORT' ? importedBaseCredits > 0 : simNodes >= 1;
 
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-2 md:p-8 selection:bg-yellow-500/30">
       <Head><title>Xandeum Pulse - Credits & Reputation</title></Head>
 
-      {/* HEADER */}
       <div className="max-w-5xl mx-2 md:mx-auto mb-6 md:mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
         <Link href="/" className="flex items-center gap-2 text-zinc-500 hover:text-white transition text-xs md:text-sm font-bold uppercase tracking-wider group">
           <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back to Monitor
@@ -312,7 +324,6 @@ export default function Leaderboard() {
 
       {/* --- STOINC SIMULATOR WIZARD --- */}
       <div className="max-w-5xl mx-auto mb-6 md:mb-10 bg-gradient-to-b from-zinc-900 to-black border border-yellow-500/30 rounded-xl md:rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.1)] transition-all duration-300">
-
           <div className="p-3 md:p-4 bg-yellow-500/10 border-b border-yellow-500/20 flex justify-between items-center cursor-pointer hover:bg-yellow-500/20 transition" onClick={() => setShowSim(!showSim)}>
               <div className="flex items-center gap-3">
                   <div className="p-1.5 md:p-2 bg-yellow-500 text-black rounded-lg"><Calculator size={18} /></div>
@@ -337,7 +348,7 @@ export default function Leaderboard() {
               <div className="relative transition-all duration-300 ease-in-out">
                   {simStep === 0 && (
                       <div className="p-4 md:p-8 animate-in slide-in-from-right-4 fade-in duration-300 relative">
-                          {/* AUTO-PILOT OVERLAY */}
+                          {/* AUTO-PILOT OVERLAY (3-SEC) */}
                           {autoPilotCountdown !== null && (
                               <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-6 animate-in fade-in duration-500">
                                   <div className="w-16 h-16 mb-4 relative">
@@ -505,14 +516,16 @@ export default function Leaderboard() {
                           </div>
                           <div className="max-w-xl mx-auto space-y-6 md:space-y-8">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  <div>
+                                  <div className="relative">
+                                      {/* CLICK-AWAY SHIELD FOR FEE HELP */}
+                                      {showFeeHelp && <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowFeeHelp(false)}></div>}
                                       <div className="flex justify-between items-end mb-2 relative z-50">
                                           <div className="flex items-center gap-2">
                                             <label className={`text-[10px] uppercase font-bold ${simNetworkFees <= 0 ? 'text-red-500' : 'text-zinc-400'}`}>Total Network Fees</label>
                                             <div className="relative">
                                                 <button onClick={() => setShowFeeHelp(!showFeeHelp)} className="text-zinc-500 hover:text-white transition"><Info size={14} /></button>
                                                 {showFeeHelp && (
-                                                    <div className="absolute left-0 bottom-full mb-2 w-64 bg-zinc-800 border border-zinc-700 p-4 rounded-xl shadow-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-200">
+                                                    <div className="absolute left-0 bottom-full mb-2 w-64 bg-zinc-800 border border-zinc-700 p-4 rounded-xl shadow-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
                                                         <p className="text-[10px] md:text-xs text-zinc-300 leading-relaxed"><strong className="text-white block mb-1">About Network Fees:</strong>Revenue collected from sedApps. <span className="text-yellow-500 block mt-1">94% is distributed to pNode owners.</span></p>
                                                         <div className="absolute bottom-[-6px] left-1 w-3 h-3 bg-zinc-800 border-b border-r border-zinc-700 rotate-45"></div>
                                                     </div>
@@ -525,14 +538,16 @@ export default function Leaderboard() {
                                          <span className="absolute right-4 top-3.5 text-[10px] font-bold text-zinc-600">SOL</span>
                                       </div>
                                   </div>
-                                  <div>
+                                  <div className="relative">
+                                      {/* CLICK-AWAY SHIELD FOR NETWORK HELP */}
+                                      {showNetworkHelp && <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowNetworkHelp(false)}></div>}
                                       <div className="flex justify-between items-end mb-2 relative z-50">
                                           <div className="flex items-center gap-2">
                                             <label className={`text-[10px] uppercase font-bold ${networkAvgMult < 1 ? 'text-red-500' : 'text-zinc-400'}`}>Est. Total Boosted Credits</label>
                                             <div className="relative">
                                                 <button onClick={() => setShowNetworkHelp(!showNetworkHelp)} className="text-zinc-500 hover:text-white transition"><Settings2 size={14} /></button>
                                                 {showNetworkHelp && (
-                                                    <div className="absolute left-0 bottom-full mb-2 w-64 bg-zinc-800 border border-zinc-700 p-4 rounded-xl shadow-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-200">
+                                                    <div className="absolute left-0 bottom-full mb-2 w-64 bg-zinc-800 border border-zinc-700 p-4 rounded-xl shadow-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
                                                         <p className="text-[10px] md:text-xs text-zinc-300 leading-relaxed"><strong className="text-white block mb-1">Estimation Multiplier</strong>Factor to estimate Total Network Boosted Credits. <span className="text-yellow-500 block mt-1">14x accounts for high-impact nodes.</span></p>
                                                         <div className="absolute bottom-[-6px] left-1 w-3 h-3 bg-zinc-800 border-b border-r border-zinc-700 rotate-45"></div>
                                                     </div>
