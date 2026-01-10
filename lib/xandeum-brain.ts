@@ -4,7 +4,7 @@ import geoip from 'geoip-lite';
 // --- CONFIGURATION ---
 
 // 1. PRIVATE TUNNEL (Source of Truth for Mainnet)
-const PRIVATE_RPC = 'https://arkansas-collect-loving-rather.trycloudflare.com/rpc';
+const PRIVATE_RPC = 'https://persian-starts-sounds-colon.trycloudflare.com/rpc';
 
 // 2. PUBLIC SWARM (Source of Truth for Devnet)
 const PUBLIC_SWARM = [
