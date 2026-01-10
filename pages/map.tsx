@@ -8,7 +8,7 @@ import { scaleSqrt } from 'd3-scale';
 import { 
   ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, 
   MapPin, RotateCcw, Info, X, HelpCircle, Share2, Check, ArrowRight, 
-  AlertOctagon, AlertCircle, EyeOff 
+  AlertOctagon, AlertCircle, EyeOff, BarChart3
 } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
@@ -88,6 +88,7 @@ export default function MapPage() {
   const [isSplitView, setIsSplitView] = useState(false);
   const [activeLocation, setActiveLocation] = useState<string | null>(null);
   const [expandedLocation, setExpandedLocation] = useState<string | null>(null);
+  const [isCountryModalOpen, setIsCountryModalOpen] = useState(false);
 
   // UI State
   const [toast, setToast] = useState<{ msg: string; type: 'error' | 'info' | 'private' } | null>(null);
@@ -102,6 +103,57 @@ export default function MapPage() {
 
   const visibleNodes = useMemo(() => locations.reduce((sum, loc) => sum + loc.count, 0), [locations]);
   const privateNodes = Math.max(0, stats.totalNodes - visibleNodes);
+
+  // --- AGGREGATION LOGIC (Country Breakdown) ---
+  const countryBreakdown = useMemo(() => {
+    const map = new Map<string, {
+      code: string;
+      name: string;
+      count: number;
+      storage: number;
+      credits: number;
+      healthSum: number;
+    }>();
+
+    // Aggregation Loop
+    locations.forEach(loc => {
+      const code = loc.countryCode || 'XX';
+      const current = map.get(code) || { 
+        code, 
+        name: loc.country, 
+        count: 0, 
+        storage: 0, 
+        credits: 0, 
+        healthSum: 0 
+      };
+
+      current.count += loc.count;
+      current.storage += loc.totalStorage;
+      current.credits += (loc.totalCredits || 0);
+      current.healthSum += (loc.avgHealth * loc.count); // Weighted sum
+      
+      map.set(code, current);
+    });
+
+    // Convert to Array & Sort
+    return Array.from(map.values()).map(c => ({
+      ...c,
+      avgHealth: c.healthSum / (c.count || 1)
+    })).sort((a, b) => {
+      if (viewMode === 'STORAGE') return b.storage - a.storage;
+      if (viewMode === 'CREDITS') return b.credits - a.credits;
+      return b.avgHealth - a.avgHealth;
+    });
+  }, [locations, viewMode]);
+
+  // Global Totals for Percentage Calculation
+  const globalTotals = useMemo(() => {
+    return {
+      storage: countryBreakdown.reduce((sum, c) => sum + c.storage, 0),
+      credits: countryBreakdown.reduce((sum, c) => sum + c.credits, 0),
+      nodes: countryBreakdown.reduce((sum, c) => sum + c.count, 0)
+    };
+  }, [countryBreakdown]);
 
   // --- GLOBAL API HEALTH CHECK ---
   const isGlobalCreditsOffline = useMemo(() => {
@@ -225,14 +277,12 @@ export default function MapPage() {
       return `${h}h`;
   };
 
-  // UPDATED: Performer Stats with "No Storage Credits"
   const getPerformerStats = (pkData: TopPerformerData) => {
       if (viewMode === 'STORAGE') {
           return <span className="text-indigo-400 font-bold">{formatStorage(pkData.val)} Committed</span>;
       }
       if (viewMode === 'CREDITS') {
           if (pkData.isUntracked) {
-              // CHANGE 1: Explicit Label for King Node
               return <span className="text-orange-400/80 font-bold italic">No Storage Credits</span>;
           }
           return <span className="text-yellow-500 font-bold">{pkData.val.toLocaleString()} Cr Earned</span>;
@@ -318,7 +368,6 @@ export default function MapPage() {
     }
   };
 
-  // UPDATED: Educational X-Ray Stats for Untracked Tiers
   const getXRayStats = (loc: LocationData, index: number, tierColor: string) => {
       const globalShare = ((loc.count / stats.totalNodes) * 100).toFixed(1);
       const rawPercentile = ((locations.length - index) / locations.length) * 100;
@@ -346,16 +395,15 @@ export default function MapPage() {
               const statusColor = isGlobalCreditsOffline ? "text-red-400" : "text-zinc-500";
               const statusIcon = isGlobalCreditsOffline ? <AlertOctagon size={12}/> : <EyeOff size={12}/>;
 
-              // CHANGE 2: Educational Context
               return {
                   labelA: 'Avg Earnings',
                   valA: <span className={`${statusColor} flex items-center justify-center gap-1 font-bold`}>{statusIcon} No Rewards Active</span>,
                   descA: "Node is visible via Gossip protocol but has not completed a Storage Proof cycle required for rewards.",
-                  
+
                   labelB: 'Contribution',
                   valB: <span className="text-zinc-400 font-bold">Gossip Active</span>,
                   descB: "Node contributes to network topology but may be in a proving phase or below stake thresholds.",
-                  
+
                   labelC: 'Tier Rank',
                   valC: <span className="text-zinc-500 italic">Unknown</span>,
                   descC: "Cannot calculate rank without confirmed credits."
@@ -436,6 +484,8 @@ export default function MapPage() {
     return active ? [...others, active] : others;
   }, [locations, activeLocation]);
 
+  // --- SUB-COMPONENTS ---
+
   const ViewToggles = ({ className = "" }: { className?: string }) => (
     <div className={`flex items-center gap-1 p-1 bg-zinc-900 border border-zinc-700/50 rounded-xl ${className}`}>
         {(['STORAGE', 'HEALTH', 'CREDITS'] as ViewMode[]).map((mode) => {
@@ -454,6 +504,117 @@ export default function MapPage() {
     </div>
   );
 
+  const RegionTrigger = ({ className = "" }: { className?: string }) => {
+    // Get top 3 flags safely
+    const topFlags = countryBreakdown.slice(0, 3).map(c => c.code.toLowerCase());
+    const count = Math.max(0, countryBreakdown.length - 3);
+
+    return (
+      <button 
+        onClick={() => setIsCountryModalOpen(true)}
+        className={`bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-600 rounded-xl px-3 py-2 transition-all cursor-pointer group items-center gap-3 backdrop-blur-sm ${className}`}
+      >
+        <div className="flex -space-x-2">
+          {topFlags.map(code => (
+            <div key={code} className="w-5 h-5 rounded-full border border-zinc-900 overflow-hidden relative z-0 group-hover:z-10 transition-all shadow-sm">
+              <img src={`https://flagcdn.com/w40/${code}.png`} className="w-full h-full object-cover" alt="flag" />
+            </div>
+          ))}
+        </div>
+        <div className="text-xs font-bold text-zinc-300 group-hover:text-white flex items-center gap-1">
+          <span>+{count} Regions Active</span>
+          <BarChart3 size={12} className="text-zinc-600 group-hover:text-white transition-colors" />
+        </div>
+      </button>
+    );
+  };
+
+  const CountryBreakdownModal = () => {
+    if (!isCountryModalOpen) return null;
+
+    return (
+      <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setIsCountryModalOpen(false)}>
+        <div className="bg-[#09090b] border border-zinc-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+          
+          {/* Header */}
+          <div className="p-5 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
+            <div>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Globe size={18} className="text-blue-500" /> Global Breakdown
+              </h3>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                Ranking {countryBreakdown.length} active regions by {viewMode.toLowerCase()}.
+              </p>
+            </div>
+            <button onClick={() => setIsCountryModalOpen(false)} className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-full text-zinc-400 hover:text-white transition">
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* List */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+            {countryBreakdown.map((c, i) => {
+              // Calculate Dynamic Percentages
+              let primaryShare = 0;
+              let metricLabel = '';
+              let metricValue = '';
+
+              if (viewMode === 'STORAGE') {
+                primaryShare = (c.storage / (globalTotals.storage || 1)) * 100;
+                metricLabel = 'Capacity';
+                metricValue = formatStorage(c.storage);
+              } else if (viewMode === 'CREDITS') {
+                primaryShare = (c.credits / (globalTotals.credits || 1)) * 100;
+                metricLabel = 'Earnings';
+                metricValue = formatCredits(c.credits);
+              } else {
+                primaryShare = c.avgHealth; // For health, bar is absolute score
+                metricLabel = 'Health';
+                metricValue = c.avgHealth.toFixed(1) + '%';
+              }
+
+              const nodeShare = (c.count / (globalTotals.nodes || 1)) * 100;
+              const barColor = MODE_COLORS[viewMode].bg;
+              const textColor = MODE_COLORS[viewMode].tailwind;
+
+              return (
+                <div key={c.code} className="p-3 rounded-xl bg-zinc-900/30 border border-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-700 transition flex flex-col gap-2">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-mono text-zinc-600 w-4">#{i + 1}</span>
+                      <img src={`https://flagcdn.com/w40/${c.code.toLowerCase()}.png`} alt={c.code} className="w-5 rounded-[2px]" />
+                      <span className="text-sm font-bold text-zinc-200">{c.name}</span>
+                    </div>
+                    <div className={`text-sm font-mono font-bold ${textColor}`}>
+                      {metricValue}
+                    </div>
+                  </div>
+
+                  {/* Dual Data Bar */}
+                  <div className="space-y-1.5">
+                    <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden flex">
+                      {/* Primary Metric Bar */}
+                      <div className={`h-full ${barColor} shadow-[0_0_10px_currentColor]`} style={{ width: `${Math.max(2, primaryShare)}%` }}></div>
+                    </div>
+                    
+                    <div className="flex justify-between items-center text-[9px] font-mono uppercase tracking-wide text-zinc-500">
+                      <span>
+                        <span className={textColor}>{primaryShare.toFixed(1)}%</span> of {metricLabel}
+                      </span>
+                      <span>
+                        Makes up <span className="text-zinc-300">{nodeShare.toFixed(1)}%</span> of Nodes
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 bg-black text-white font-sans overflow-hidden flex flex-col">
       <Head>
@@ -469,6 +630,9 @@ export default function MapPage() {
               </div>
           </div>
       )}
+
+      {/* RENDER THE MODAL */}
+      <CountryBreakdownModal />
 
       {/* HEADER COMPONENT */}
       <div className="shrink-0 w-full z-50 flex flex-col gap-3 px-4 md:px-6 py-3 bg-[#09090b] border-b border-zinc-800/30">
@@ -490,7 +654,20 @@ export default function MapPage() {
                 )}
             </div>
         </div>
-        <div><h1 className="text-lg md:text-2xl font-bold tracking-tight text-white leading-tight">{getDynamicTitle()}</h1><p className="text-xs text-zinc-400 leading-relaxed mt-1 max-w-2xl">{getDynamicSubtitle()}</p></div>
+
+        {/* TITLE ROW WITH INTEGRATED DESKTOP TRIGGER */}
+        <div className="flex justify-between items-end">
+            <div>
+                <h1 className="text-lg md:text-2xl font-bold tracking-tight text-white leading-tight">{getDynamicTitle()}</h1>
+                <p className="text-xs text-zinc-400 leading-relaxed mt-1 max-w-2xl">{getDynamicSubtitle()}</p>
+            </div>
+            
+            {/* DESKTOP TRIGGER (Fills the empty space on the right) */}
+            {!loading && <RegionTrigger className="hidden md:flex" />}
+        </div>
+
+        {/* MOBILE TRIGGER (Sits below title) */}
+        {!loading && <RegionTrigger className="flex md:hidden w-full justify-center bg-zinc-900/50" />}
       </div>
 
       <div className={`relative w-full bg-[#080808] ${isSplitView ? 'h-[40vh] shrink-0' : 'flex-1 basis-0 min-h-0'}`}>
@@ -589,8 +766,7 @@ export default function MapPage() {
                                         </div>
                                         {topData && (() => {
                                             const isUntrackedKing = viewMode === 'CREDITS' && topData.isUntracked;
-                                            
-                                            // CHANGE 3: Conditional Wrapper for King Node Card
+
                                             const CardContent = (
                                                 <div className={`w-full bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl p-3 flex items-center justify-between transition-all group/card ${isUntrackedKing ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}>
                                                     <div className="flex items-center gap-3">
