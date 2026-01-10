@@ -1732,46 +1732,53 @@ export default function Home() {
           </div>
 
           {/* Protocol Context Block */}
-          <div className="mb-8 shrink-0 relative z-20">
+          <div className="mb-8 shrink-0 relative z-10">
             <div className="bg-zinc-900/80 border border-white/5 p-4 rounded-2xl relative overflow-hidden group">
-              {/* Background Glow - pointer-events-none is critical here */}
-              <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition-all duration-700 pointer-events-none"></div>
-              
+              {/* Background Glow - pointer-events-none is critical here to allow clicks to pass through */}
+              <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition-all duration-700 pointer-events-none z-0"></div>
+
               <div className="flex items-center gap-2 mb-3 relative z-10">
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
                 <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">Protocol Context</span>
               </div>
 
-              <div className="relative z-30">
-                <NetworkSwitcher current={networkFilter} onChange={setNetworkFilter} />
+              {/* Network Switcher - Elevated to Z-20 to be on top of the glow */}
+              <div className="relative z-20">
+                <NetworkSwitcher 
+                  current={networkFilter} 
+                  onChange={(val) => {
+                    setNetworkFilter(val);
+                    showToast(`Switched to ${val} View`);
+                  }} 
+                />
               </div>
 
               <div className="mt-4 flex items-center justify-between relative z-10">
                 <span className="text-[9px] text-zinc-600 font-mono font-bold uppercase tracking-tight">Active Stream</span>
                 <span className={`text-[9px] font-mono font-bold ${networkFilter === 'MAINNET' ? 'text-green-500' : networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-zinc-400'}`}>
-                  LIVE_SYNC_READY
+                  {networkFilter === 'ALL' ? 'GLOBAL_SYNC' : `${networkFilter}_READY`}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Navigation Links - Explicit z-index and relative position */}
-          <nav className="flex-grow space-y-2 relative z-30 overflow-y-auto scrollbar-hide">
-            <Link href="/">
+          {/* Navigation Links */}
+          <nav className="flex-grow space-y-2 relative z-10 overflow-y-auto scrollbar-hide">
+            <Link href="/" onClick={() => setIsMenuOpen(false)}>
               <div className="flex items-center gap-3 p-3 bg-zinc-900/50 text-white rounded-lg border border-zinc-700 cursor-pointer hover:bg-zinc-800 transition-colors">
                 <LayoutDashboard size={18} />
                 <span className="text-sm font-bold">Dashboard</span>
               </div>
             </Link>
 
-            <Link href="/map">
+            <Link href="/map" onClick={() => setIsMenuOpen(false)}>
               <div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800">
                 <MapIcon size={18} />
                 <span className="text-sm font-bold">Global Map</span>
               </div>
             </Link>
 
-            <Link href={selectedNode?.pubkey ? `/leaderboard?highlight=${selectedNode.pubkey}` : '/leaderboard'}>
+            <Link href="/leaderboard" onClick={() => setIsMenuOpen(false)}>
               <div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800">
                 <Trophy size={18} />
                 <span className="text-sm font-bold">Leaderboard</span>
@@ -1786,7 +1793,7 @@ export default function Home() {
               <span className="text-sm font-bold">Compare Nodes</span>
             </button>
 
-            <Link href="/docs">
+            <Link href="/docs" onClick={() => setIsMenuOpen(false)}>
               <div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800">
                 <BookOpen size={18} />
                 <span className="text-sm font-bold">Documentation</span>
@@ -1801,7 +1808,10 @@ export default function Home() {
                 Quick Actions
               </div>
               <button
-                onClick={exportCSV}
+                onClick={() => {
+                  exportCSV();
+                  setIsMenuOpen(false);
+                }}
                 className="w-full py-2 bg-black border border-zinc-700 rounded-lg text-xs font-bold text-zinc-300 hover:text-white hover:border-zinc-500 transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Download size={14} />
