@@ -304,14 +304,14 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
 
   // A. PROCESS PRIVATE RPC (Strictly Mainnet)
   // Logic: Anything coming from here is Mainnet. No debate.
-  rawPrivateNodes.forEach(pod => {
+  rawPrivateNodes.forEach((pod: any) => {
       const key = getUniqueKey(pod);
       // Even if public swarm finds this later, this is the 'authoritative' version of this specific node instance
       finalNodesMap.set(key, createNode(pod, 'MAINNET'));
   });
 
   // B. PROCESS PUBLIC SWARM (Fill in the gaps)
-  rawPublicNodes.forEach(pod => {
+  rawPublicNodes.forEach((pod: any) => {
       const key = getUniqueKey(pod);
       const pubkey = pod.pubkey || pod.public_key;
 
