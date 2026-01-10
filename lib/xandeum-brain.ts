@@ -3,7 +3,7 @@ import geoip from 'geoip-lite';
 
 // --- CONFIGURATION ---
 
-// 1. MAINNET SOURCE (Your Private Node)
+// 1. MAINNET SOURCE (Your Private Node - Source of Truth)
 const PRIVATE_MAINNET_RPC = 'https://persian-starts-sounds-colon.trycloudflare.com/rpc';
 
 // 2. DEVNET SOURCE (Public Swarm)
@@ -51,7 +51,7 @@ export interface EnrichedNode {
   health_rank?: number; 
 }
 
-// --- HELPERS (Standard) ---
+// --- HELPERS ---
 export const cleanSemver = (v: string) => {
   if (!v) return '0.0.0';
   const mainVer = v.split('-')[0]; 
@@ -90,14 +90,12 @@ export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: str
     if (nodeIndex === -1) return 0;
 
     const distance = nodeIndex - consensusIndex;
-
     if (distance <= 0) return 100; 
     if (distance === 1) return 90;
     if (distance === 2) return 70;
     if (distance === 3) return 50;
     if (distance === 4) return 30;
     if (distance === 5) return 10;
-
     return Math.max(0, 10 - (distance - 5));
 };
 
@@ -163,8 +161,6 @@ async function fetchPrivateMainnetNodes() {
 
 async function fetchPublicSwarmNodes() {
     const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
-    
-    // Attempt all IPs, resolve with the first successful one
     const promises = PUBLIC_RPC_NODES.map(ip => 
         axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC })
              .then(r => r.data?.result?.pods || [])
@@ -236,15 +232,25 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   }
 
   // ---------------------------------------------------------
-  // 2. THE LOGICAL FILTER (Address-Based Deduplication)
+  // 2. THE STRICT 6-POINT FILTER (Identity-Aware Deduplication)
   // ---------------------------------------------------------
+  
+  // Helper to generate the Strict Fingerprint
+  // Includes PUBLIC KEY to ensure different users with similar data are NOT deleted.
+  const getStrictFingerprint = (p: any) => {
+    const key = p.pubkey || p.public_key;
+    // 1. Pubkey (Identity) | 2. Address (Location) | 3. Storage Com | 4. Storage Used | 5. Version | 6. Public
+    return `${key}|${p.address}|${p.storage_committed}|${p.storage_used}|${p.version}|${p.is_public}`;
+  };
 
-  // A. Create a Set of addresses (IP:PORT) that are CONFIRMED Mainnet
-  const mainnetAddresses = new Set(rawMainnet.map((p: any) => p.address));
+  // A. Create a Set of fingerprints from the Private Mainnet (Source of Truth)
+  const mainnetFingerprints = new Set(rawMainnet.map(getStrictFingerprint));
 
-  // B. Filter Devnet: Only keep nodes whose ADDRESS is NOT in Mainnet
-  // This removes the "Ghost Duplicates" while keeping valid multi-node setups
-  const uniqueDevnetPods = rawDevnet.filter((p: any) => !mainnetAddresses.has(p.address));
+  // B. Filter Devnet: Remove ONLY exact 6-point matches.
+  const uniqueDevnetPods = rawDevnet.filter((p: any) => {
+      const fp = getStrictFingerprint(p);
+      return !mainnetFingerprints.has(fp);
+  });
 
   // ---------------------------------------------------------
 
@@ -334,12 +340,12 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       };
   };
 
-  // 3. Add ALL Mainnet Nodes (No Filtering, they are the truth)
+  // 3. Add ALL Mainnet Nodes
   rawMainnet.forEach((pod: any) => {
       expandedNodes.push(scoreNode(pod, 'MAINNET'));
   });
 
-  // 4. Add FILTERED Devnet Nodes
+  // 4. Add STRICTLY FILTERED Devnet Nodes
   uniqueDevnetPods.forEach((pod: any) => {
       expandedNodes.push(scoreNode(pod, 'DEVNET'));
   });
