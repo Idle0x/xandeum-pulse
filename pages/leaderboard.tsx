@@ -148,7 +148,6 @@ export default function Leaderboard() {
     fetchData();
   }, []);
 
-  // --- 2. DETERMINISTIC FILTER & RANKING LOGIC ---
   const filteredAndRanked = useMemo(() => {
       const networkList = allNodes.filter(n => (networkFilter === 'COMBINED' || n.network === networkFilter));
       networkList.sort((a, b) => b.credits - a.credits || b.health - a.health || a.pubkey.localeCompare(b.pubkey));
@@ -158,7 +157,7 @@ export default function Leaderboard() {
       return rankedList.filter(n => n.pubkey.toLowerCase().includes(searchLower) || (n.address && n.address.toLowerCase().includes(searchLower)));
   }, [allNodes, networkFilter, searchQuery]);
 
-  // --- 3. AUTOPILOT TIMER LOGIC ---
+  // --- AUTOPILOT TIMER LOGIC ---
   useEffect(() => {
     if (autoPilotCountdown === null) return;
     if (autoPilotCountdown <= 0) {
@@ -170,7 +169,7 @@ export default function Leaderboard() {
     return () => clearTimeout(timer);
   }, [autoPilotCountdown]);
 
-  // --- 4. DEEP LINK LOGIC ---
+  // --- DEEP LINK LOGIC ---
   useEffect(() => {
       if (loading || !router.isReady || !router.query.highlight || allNodes.length === 0) return;
       const targetKey = router.query.highlight as string;
@@ -199,7 +198,7 @@ export default function Leaderboard() {
       }
   }, [loading, router.isReady, router.query, allNodes, networkFilter]);
 
-  // --- 5. SIMULATOR LOGIC ---
+  // --- SIMULATOR FUNCTIONS ---
   const clearImport = () => {
     setImportKey('');
     setImportSuccess(false);
@@ -240,13 +239,11 @@ export default function Leaderboard() {
           networkAvgMult: networkAvgMult,
           networkFees: simNetworkFees
       });
-      
       const rawCredits = simMode === 'IMPORT' ? importedBaseCredits : result.userBaseCredits;
       const boostedCredits = simMode === 'IMPORT' ? (importedBaseCredits * result.geoMean) : result.boostedCredits;
       const estimatedNetworkBoostedTotal = (currentNetworkTotal * networkAvgMult) + (simMode === 'NEW' ? boostedCredits : 0);
       const share = estimatedNetworkBoostedTotal > 0 ? boostedCredits / estimatedNetworkBoostedTotal : 0;
       const stoinc = simNetworkFees * 0.94 * share;
-      
       return { rawCredits, geoMean: result.geoMean, boostedCredits, share, stoinc };
   }, [simStorageVal, simStorageUnit, simNodes, simPerf, simStake, boostCounts, allNodes, networkAvgMult, simNetworkFees, simMode, importedBaseCredits]);
 
@@ -294,10 +291,14 @@ export default function Leaderboard() {
     return `/?${params.toString()}`;
   };
 
+  // --- VALIDATION HELPER ---
+  const isStep1Valid = simMode === 'IMPORT' ? importedBaseCredits > 0 : simNodes >= 1;
+
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-2 md:p-8 selection:bg-yellow-500/30">
       <Head><title>Xandeum Pulse - Credits & Reputation</title></Head>
 
+      {/* HEADER */}
       <div className="max-w-5xl mx-2 md:mx-auto mb-6 md:mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
         <Link href="/" className="flex items-center gap-2 text-zinc-500 hover:text-white transition text-xs md:text-sm font-bold uppercase tracking-wider group">
           <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back to Monitor
@@ -309,7 +310,9 @@ export default function Leaderboard() {
         <div className="w-32 hidden md:block"></div>
       </div>
 
+      {/* --- STOINC SIMULATOR WIZARD --- */}
       <div className="max-w-5xl mx-auto mb-6 md:mb-10 bg-gradient-to-b from-zinc-900 to-black border border-yellow-500/30 rounded-xl md:rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.1)] transition-all duration-300">
+
           <div className="p-3 md:p-4 bg-yellow-500/10 border-b border-yellow-500/20 flex justify-between items-center cursor-pointer hover:bg-yellow-500/20 transition" onClick={() => setShowSim(!showSim)}>
               <div className="flex items-center gap-3">
                   <div className="p-1.5 md:p-2 bg-yellow-500 text-black rounded-lg"><Calculator size={18} /></div>
@@ -334,6 +337,7 @@ export default function Leaderboard() {
               <div className="relative transition-all duration-300 ease-in-out">
                   {simStep === 0 && (
                       <div className="p-4 md:p-8 animate-in slide-in-from-right-4 fade-in duration-300 relative">
+                          {/* AUTO-PILOT OVERLAY */}
                           {autoPilotCountdown !== null && (
                               <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-6 animate-in fade-in duration-500">
                                   <div className="w-16 h-16 mb-4 relative">
