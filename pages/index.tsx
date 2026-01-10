@@ -251,20 +251,6 @@ const formatLastSeen = (timestamp: number | undefined) => {
   return `${days}d ago`;
 };
 
-const formatDetailedTimestamp = (timestamp: number | undefined) => {
-  if (!timestamp || isNaN(timestamp)) return 'Never Seen';
-  const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
-  return new Date(time).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
-};
-
 const compareVersions = (v1: string = '0.0.0', v2: string = '0.0.0') => {
   const p1 = v1.replace(/[^0-9.]/g, '').split('.').map(Number);
   const p2 = v2.replace(/[^0-9.]/g, '').split('.').map(Number);
@@ -406,47 +392,48 @@ export default function Home() {
     };
   }, []);
 
+  // --- IDENTITY-FIRST URL DEEP LINKING (THE FIX) ---
   useEffect(() => {
     if (!loading && nodes.length > 0 && router.query.open) {
       const pubkeyToOpen = router.query.open as string;
       const networkParam = router.query.network as string;
       const addrParam = router.query.focusAddr as string;
 
-      // SOPHISTICATED 3-SYSTEM MATCHING
-      const targetNode = nodes.find((n) => {
-        // 1. Must match Pubkey
-        const keyMatch = n.pubkey === pubkeyToOpen;
-        
-        // 2. If network param exists, it MUST match
-        const netMatch = networkParam 
-            ? n.network === networkParam 
-            : true;
+      // STRATEGY: 
+      // 1. Find ALL instances matching Pubkey + Network (Identity)
+      // 2. Tie-Break with IP Address (Physical)
+      // 3. Fallback to any instance if strict IP match fails
 
-        // 3. If address param exists, it MUST match (exact or strict IP match)
-        // We decodeURIComponent because IPs might pass as URL encoded
-        const addrMatch = addrParam 
-            ? n.address === decodeURIComponent(addrParam)
-            : true;
-
-        return keyMatch && netMatch && addrMatch;
+      // Step 1: Filter by Identity
+      const identityMatches = nodes.filter(n => {
+          const keyMatch = n.pubkey === pubkeyToOpen;
+          const netMatch = networkParam ? n.network === networkParam : true;
+          return keyMatch && netMatch;
       });
 
-      if (targetNode) {
-        // Exact match found
-        setSelectedNode(targetNode);
-        setModalView('overview');
-        
-        // Clean URL without reload
-        router.replace('/', undefined, { shallow: true });
+      if (identityMatches.length > 0) {
+          // Step 2: Try to find exact IP match
+          let bestMatch = identityMatches.find(n => 
+              addrParam && n.address === decodeURIComponent(addrParam)
+          );
+
+          // Step 3: Fallback if IP mismatch (e.g. node rotated/ghosted)
+          if (!bestMatch) {
+              bestMatch = identityMatches[0];
+              // Optional: console.log("Deep Link: Exact IP not found, falling back to identity match");
+          }
+
+          setSelectedNode(bestMatch);
+          setModalView('overview');
+          router.replace('/', undefined, { shallow: true });
       } else {
-        // Fallback: If we have a Pubkey match but missed Network/Addr specifics, 
-        // try to find the "best" sibling (e.g. Mainnet preferred)
-        const fallbackNode = nodes.find(n => n.pubkey === pubkeyToOpen);
-        if (fallbackNode) {
-           console.warn("Precise match failed, falling back to Pubkey match");
-           setSelectedNode(fallbackNode);
-           setModalView('overview');
-        }
+          // Absolute Fallback (Just Pubkey)
+          const desperateMatch = nodes.find(n => n.pubkey === pubkeyToOpen);
+          if(desperateMatch) {
+              setSelectedNode(desperateMatch);
+              setModalView('overview');
+              router.replace('/', undefined, { shallow: true });
+          }
       }
     }
   }, [loading, nodes, router.query]);
@@ -535,7 +522,7 @@ export default function Home() {
         // Stats Logic
         const stableNodes = podList.filter(n => (n.uptime || 0) > 86400).length;
         setNetworkHealth((podList.length > 0 ? (stableNodes / podList.length) * 100 : 0).toFixed(2));
-        
+
         const consensusCount = podList.filter(n => (n.version || 'Unknown') === stats.consensusVersion).length;
         setNetworkConsensus((consensusCount / podList.length) * 100);
 
@@ -606,7 +593,7 @@ export default function Home() {
 
   const handleLeaderboardNav = (e: React.MouseEvent, node: Node) => {
     e.stopPropagation();
-    
+
     if ((node as any).isUntracked) {
        showToast("This node is currently not receiving storage credits from the protocol due to various reasons including: performance thresholds not yet met, the node is in a 'proving' phase, or the associated stake is below the required minimum for rewards.");
        return;
@@ -615,7 +602,7 @@ export default function Home() {
     if (node.pubkey) {
         // Pass Pubkey (Primary), Network (Secondary), AND Address (Tie-Breaker)
         const netParam = node.network ? `&network=${node.network}` : '';
-        
+
         // Sanitize address to ensure it's safe for URL
         const safeAddr = node.address ? encodeURIComponent(node.address) : '';
         const addrParam = safeAddr ? `&focusAddr=${safeAddr}` : '';
@@ -2852,7 +2839,7 @@ export default function Home() {
     onClick={() => handleCardToggle('health')}
   >
     <div className={`absolute inset-0 bg-gradient-to-b from-transparent pointer-events-none ${zenMode ? 'to-green-900/10' : 'to-blue-900/10'}`}></div>
-    
+
     {/* DESKTOP VIEW */}
     <div className="hidden md:flex flex-col h-full justify-between z-10">
        <div className="w-full flex justify-between items-start mb-4">
@@ -2890,7 +2877,7 @@ export default function Home() {
              <div className="bg-green-500/10 p-1.5 rounded-lg border border-green-500/20">
                 <Maximize2 size={12} className="text-green-400 animate-pulse" />
              </div>
-             
+
              <div className={`text-[9px] font-bold px-2 py-1 rounded border ${(selectedNode.health || 0) >= avgNetworkHealth ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
                 {(selectedNode.health || 0) >= avgNetworkHealth ? 'ABOVE AVG' : 'BELOW AVG'}
              </div>
@@ -2972,13 +2959,13 @@ export default function Home() {
               <Database size={14} className="text-blue-500" />
               <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Storage</span>
            </div>
-           
+
            {/* ANIMATED PULSE ICON */}
            <div className="bg-purple-500/10 p-1.5 rounded-lg border border-purple-500/20">
              <Maximize2 size={12} className="text-purple-400 animate-pulse" />
            </div>
         </div>
-        
+
         <div className="grid grid-cols-2 gap-4 items-end">
            <div>
               <div className="text-xl font-mono font-bold text-blue-400 leading-none">
@@ -3071,7 +3058,7 @@ export default function Home() {
              <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${selectedNode.network === 'MAINNET' ? 'bg-green-500/10 border-green-500/30 text-green-500' : 'bg-blue-500/10 border-blue-500/30 text-blue-500'}`}>
                {selectedNode.network}
              </div>
-             
+
              {/* ANIMATED PULSE ICON */}
              <div className="bg-blue-500/10 p-1.5 rounded-lg border border-blue-500/20">
                <Maximize2 size={12} className="text-blue-400 animate-pulse" />
