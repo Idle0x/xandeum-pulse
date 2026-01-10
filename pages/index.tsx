@@ -1811,18 +1811,28 @@ export default function Home() {
               )}
 
               <input
-                type="text"
-                placeholder=""
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full rounded-lg py-2 pl-10 pr-4 text-sm outline-none shadow-inner transition-all relative z-10 bg-transparent ${
-                  zenMode
-                    ? 'border border-zinc-800 text-zinc-300 focus:border-zinc-600'
-                    : 'border border-zinc-800 text-white focus:border-blue-500'
-                }`}
-                onFocus={() => setIsSearchFocused(true)}
-                onBlur={() => setIsSearchFocused(false)}
-              />
+  type="text"
+  placeholder=""
+  value={searchQuery}
+  onChange={(e) => setSearchQuery(e.target.value)}
+  className={`w-full rounded-lg py-2 pl-10 pr-8 md:pr-4 text-sm outline-none shadow-inner transition-all relative z-10 bg-transparent ${
+    zenMode
+      ? 'border border-zinc-800 text-zinc-300 focus:border-zinc-600'
+      : 'border border-zinc-800 text-white focus:border-blue-500'
+  }`}
+  onFocus={() => setIsSearchFocused(true)}
+  onBlur={() => setIsSearchFocused(false)}
+/>
+
+{searchQuery && (
+  <button
+    onClick={() => setSearchQuery('')}
+    className="absolute right-2 top-2.5 text-zinc-500 hover:text-white transition z-20 p-0.5 bg-black/20 rounded-full hover:bg-zinc-700"
+  >
+    <X size={14} />
+  </button>
+)}
+
             </div>
 
             {!zenMode && (
@@ -2829,248 +2839,251 @@ export default function Home() {
                     </div>
                   ) : (
                     <div className="flex flex-col gap-4 h-full">
-                      {/* --- TOP ROW: 3 CARDS (Health, Storage, Identity) --- */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* --- TOP ROW: 3 CARDS (Mobile Optimized) --- */}
+<div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
 
-                        {/* 1. SYSTEM DIAGNOSTICS (Health) */}
-                        <div
-                          className={`rounded-3xl p-6 border flex flex-col items-center justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group h-64 ${
-                            zenMode
-                              ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
-                              : 'bg-zinc-900/30 border-zinc-800 hover:border-blue-500/30'
-                          }`}
-                          onClick={() => handleCardToggle('health')}
-                        >
-                          <div
-                            className={`absolute inset-0 bg-gradient-to-b from-transparent pointer-events-none ${
-                              zenMode ? 'to-green-900/10' : 'to-blue-900/10'
-                            }`}
-                          ></div>
-                          <div className="w-full flex justify-between items-start z-10 mb-4">
-                            <div className="flex flex-col">
-                              <h3
-                                className={`text-[10px] font-bold tracking-widest uppercase ${
-                                  zenMode ? 'text-zinc-400' : 'text-zinc-500'
-                                }`}
-                              >
-                                SYSTEM DIAGNOSTICS
-                              </h3>
-                              <div
-                                className={`text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit ${
-                                  (selectedNode.health || 0) >= avgNetworkHealth
-                                    ? 'bg-green-500/20 text-green-400'
-                                    : 'bg-red-500/20 text-red-400'
-                                }`}
-                              >
-                                {(selectedNode.health || 0) >= avgNetworkHealth
-                                  ? '▲ Above Avg'
-                                  : '▼ Below Avg'}
-                              </div>
-                            </div>
-                            <HelpCircle
-                              size={14}
-                              className={`z-20 hover:text-white transition ${
-                                zenMode ? 'text-zinc-600' : 'text-zinc-500'
-                              }`}
-                            />
-                          </div>
-                          <div className="relative z-10 scale-100 group-hover:scale-110 transition-transform duration-500 ease-in-out">
-                            <RadialProgress score={selectedNode.health || 0} size={140} />
-                          </div>
-                          <div className="mt-6 text-center w-full z-10 flex justify-center">
-                            <div className="text-[9px] font-bold uppercase tracking-widest text-green-400/80 animate-pulse group-hover:text-green-300 transition-colors flex items-center gap-1">
-                              <Maximize2 size={8} /> CLICK TO EXPAND
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* 2. STORAGE CAPACITY */}
-                        <div
-                          className={`p-5 rounded-2xl border flex flex-col justify-between cursor-pointer transition group relative h-64 ${
-                            zenMode
-                              ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
-                              : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'
-                          }`}
-                          onClick={() => handleCardToggle('storage')}
-                        >
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="flex items-center gap-2">
-                              <div
-                                className={`p-2 rounded-lg ${
-                                  zenMode ? 'bg-green-900/20 text-green-500' : 'bg-blue-500/10 text-blue-500'
-                                }`}
-                              >
-                                <Database size={18} />
-                              </div>
-                              <div
-                                className={`text-xs font-bold uppercase ${
-                                  zenMode ? 'text-zinc-400' : 'text-zinc-500'
-                                }`}
-                              >
-                                STORAGE CAPACITY
-                              </div>
-                            </div>
-                            <HelpCircle size={12} className="text-zinc-600 hover:text-white z-20" />
-                          </div>
-
-                          <div className="mt-auto space-y-4 relative z-10">
-                            <div className="flex items-end justify-between">
-                              <div>
-                                <div className="text-[9px] font-mono text-zinc-500 mb-1 bg-zinc-900/50 border border-zinc-800 px-2 py-0.5 rounded-full inline-block">
-                                  {(selectedNode?.storage_used || 0).toLocaleString()} raw
-                                </div>
-                                <div className="flex items-baseline gap-1">
-                                  <span
-                                    className={`text-2xl font-bold font-mono ${
-                                      zenMode ? 'text-green-400' : 'text-blue-400'
-                                    }`}
-                                  >
-                                    {formatBytes(selectedNode?.storage_used).split(' ')[0]}
-                                    <span className="text-sm ml-1">
-                                      {formatBytes(selectedNode?.storage_used).split(' ')[1]}
-                                    </span>
-                                  </span>
-                                </div>
-                                <div className="text-[9px] text-zinc-600 uppercase font-bold tracking-wider mt-0.5">
-                                  USED
-                                </div>
-                              </div>
-
-                              <div className="text-right">
-                                <div className="flex items-baseline gap-1 justify-end">
-                                  <span
-                                    className={`text-2xl font-bold font-mono ${
-                                      zenMode ? 'text-green-600' : 'text-purple-400'
-                                    }`}
-                                  >
-                                    {formatBytes(selectedNode?.storage_committed).split(' ')[0]}
-                                    <span className="text-sm ml-1">
-                                      {formatBytes(selectedNode?.storage_committed).split(' ')[1]}
-                                    </span>
-                                  </span>
-                                </div>
-                                <div className="text-[9px] text-zinc-600 uppercase font-bold tracking-wider mt-0.5">
-                                  COMMITTED
-                                </div>
-                              </div>
-                            </div>
-
-                            <div>
-                              <div className="h-2 bg-zinc-800 rounded-full overflow-hidden mb-2">
-                                <div
-                                  className={`h-full transition-all duration-1000 group-hover:brightness-125 ${
-                                    zenMode
-                                      ? 'bg-green-500'
-                                      : 'bg-gradient-to-r from-blue-500 to-purple-500'
-                                  }`}
-                                  style={{
-                                    width: `${Math.min(
-                                      100,
-                                      ((selectedNode?.storage_used || 0) /
-                                        (selectedNode?.storage_committed || 1)) *
-                                        100
-                                    )}%`,
-                                  }}
-                                ></div>
-                              </div>
-                            </div>
-
-                            <div className="mt-4 flex justify-center">
-                              <div className="text-[9px] font-bold uppercase tracking-widest text-purple-400/80 animate-pulse group-hover:text-purple-300 transition-colors flex items-center gap-1">
-                                <Maximize2 size={8} /> CLICK TO EXPAND
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* 3. IDENTITY & STATUS */}
-<div
-  className={`p-5 rounded-2xl border flex flex-col justify-between relative overflow-hidden cursor-pointer group h-64 ${
-    zenMode
-      ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
-      : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'
-  }`}
-  onClick={() => handleCardToggle('identity')}
->
-  <div className="flex justify-between items-start mb-2 relative z-10">
-    <div className="flex items-center gap-2">
-      <div className="p-2 rounded-lg bg-zinc-800 text-zinc-400">
-        <Server size={18} />
+  {/* 1. SYSTEM DIAGNOSTICS (Health) */}
+  <div
+    className={`rounded-2xl md:rounded-3xl p-4 md:p-6 border flex flex-col justify-between relative overflow-hidden shadow-inner cursor-pointer transition-all group min-h-[110px] md:h-64 ${
+      zenMode
+        ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
+        : 'bg-zinc-900/30 border-zinc-800 hover:border-blue-500/30'
+    }`}
+    onClick={() => handleCardToggle('health')}
+  >
+    <div className={`absolute inset-0 bg-gradient-to-b from-transparent pointer-events-none ${zenMode ? 'to-green-900/10' : 'to-blue-900/10'}`}></div>
+    
+    {/* DESKTOP VIEW (Original Tall Layout) */}
+    <div className="hidden md:flex flex-col h-full justify-between z-10">
+       <div className="w-full flex justify-between items-start mb-4">
+        <div className="flex flex-col">
+          <h3 className={`text-[10px] font-bold tracking-widest uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>
+            SYSTEM DIAGNOSTICS
+          </h3>
+          <div className={`text-[9px] font-mono mt-1 px-2 py-0.5 rounded-full inline-block w-fit ${(selectedNode.health || 0) >= avgNetworkHealth ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+            {(selectedNode.health || 0) >= avgNetworkHealth ? '▲ Above Avg' : '▼ Below Avg'}
+          </div>
+        </div>
+        <HelpCircle size={14} className={`hover:text-white transition ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
       </div>
-      <div className={`text-xs font-bold uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>
-        IDENTITY & STATUS
+      <div className="relative scale-100 group-hover:scale-110 transition-transform duration-500 ease-in-out self-center">
+        <RadialProgress score={selectedNode.health || 0} size={140} />
+      </div>
+      <div className="mt-6 text-center w-full flex justify-center">
+        <div className="text-[9px] font-bold uppercase tracking-widest text-green-400/80 animate-pulse group-hover:text-green-300 transition-colors flex items-center gap-1">
+          <Maximize2 size={8} /> CLICK TO EXPAND
+        </div>
       </div>
     </div>
 
-    {/* --- NEW: LEVEL 2 BADGE AREA --- */}
-    <div className="flex flex-col items-end gap-1">
-      {/* Network Badge */}
-      <div
-        className={`px-2 py-1 rounded text-[9px] font-black uppercase border ${
-          selectedNode.network === 'MAINNET'
-            ? 'bg-green-500/10 border-green-500/30 text-green-500'
-            : selectedNode.network === 'DEVNET'
-            ? 'bg-blue-500/10 border-blue-500/30 text-blue-500'
-            : 'bg-zinc-800 border-zinc-700 text-zinc-500'
-        }`}
-      >
-        {selectedNode.network || 'UNKNOWN'}
-      </div>
-
-      {/* Conditional Sibling Badge */}
-      {(() => {
-        const stats = selectedNode.clusterStats || {
-          mainnetCount: 0,
-          devnetCount: 0,
-        };
-
-        const siblings =
-          selectedNode.network === 'MAINNET'
-            ? stats.mainnetCount - 1
-            : stats.devnetCount - 1;
-
-        if (siblings > 0) {
-          return (
-            <span className="text-[9px] font-mono font-bold text-zinc-500 flex items-center gap-1 bg-black/40 px-1.5 py-0.5 rounded border border-zinc-800/50">
-              <Server size={8} /> +{siblings} Instances
-            </span>
-          );
-        }
-        return null;
-      })()}
-    </div>
-    {/* -------------------------------- */}
-  </div>
-
-  <div className="mt-auto relative z-10">
-    <div className="text-xl font-mono text-white group-hover:text-blue-400 group-hover:animate-pulse">
-      {getSafeVersion(selectedNode)}
-    </div>
-
-    <div className="text-xs text-zinc-500 mt-1 font-mono flex items-center gap-1">
-      <Clock size={12} className="text-zinc-600" />
-      Up: <span className="text-zinc-400">{formatUptime(selectedNode.uptime)}</span>
-    </div>
-
-    {isSelectedNodeLatest ? (
-      <div className="text-[10px] text-green-500 mt-2 font-bold bg-green-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
-        <CheckCircle size={10} />
-        UP TO DATE
-      </div>
-    ) : (
-      <div className="text-[10px] text-orange-500 mt-2 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
-        <AlertTriangle size={10} />
-        UPDATE NEEDED
-      </div>
-    )}
-
-    <div className="mt-4 flex justify-center">
-      <div className="text-[9px] font-bold uppercase tracking-widest text-blue-400/80 animate-pulse group-hover:text-blue-300 transition-colors flex items-center gap-1">
-        <Maximize2 size={8} /> CLICK TO EXPAND
-      </div>
+    {/* MOBILE COMPACT VIEW (New Horizontal Layout) */}
+    <div className="flex md:hidden flex-col justify-between h-full z-10 w-full gap-2">
+       <div className="flex justify-between items-start">
+          <div className="flex flex-col">
+             <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-0.5">Health Score</div>
+             <div className={`text-4xl font-black ${(selectedNode.health || 0) >= 80 ? 'text-green-400' : 'text-yellow-400'}`}>
+                {selectedNode.health || 0}
+             </div>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+             <Maximize2 size={12} className="text-zinc-600" />
+             <div className={`text-[9px] font-bold px-2 py-1 rounded border ${(selectedNode.health || 0) >= avgNetworkHealth ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                {(selectedNode.health || 0) >= avgNetworkHealth ? 'ABOVE AVG' : 'BELOW AVG'}
+             </div>
+          </div>
+       </div>
+       {/* Linear Progress Bar for Mobile */}
+       <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+          <div 
+            className={`h-full ${(selectedNode.health || 0) >= 80 ? 'bg-green-500' : 'bg-yellow-500'}`} 
+            style={{ width: `${selectedNode.health || 0}%` }}
+          ></div>
+       </div>
     </div>
   </div>
-</div>
+
+  {/* 2. STORAGE CAPACITY */}
+  <div
+    className={`rounded-2xl md:rounded-3xl p-4 md:p-5 border flex flex-col justify-between cursor-pointer transition group relative min-h-[110px] md:h-64 ${
+      zenMode
+        ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
+        : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'
+    }`}
+    onClick={() => handleCardToggle('storage')}
+  >
+    {/* DESKTOP VIEW */}
+    <div className="hidden md:flex flex-col h-full justify-between z-10">
+       <div className="flex justify-between items-start mb-4">
+        <div className="flex items-center gap-2">
+          <div className={`p-2 rounded-lg ${zenMode ? 'bg-green-900/20 text-green-500' : 'bg-blue-500/10 text-blue-500'}`}>
+            <Database size={18} />
+          </div>
+          <div className={`text-xs font-bold uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>
+            STORAGE CAPACITY
+          </div>
+        </div>
+        <HelpCircle size={12} className="text-zinc-600 hover:text-white" />
+      </div>
+      <div className="mt-auto space-y-4">
+        <div className="flex items-end justify-between">
+          <div>
+            <div className="text-[9px] font-mono text-zinc-500 mb-1 bg-zinc-900/50 border border-zinc-800 px-2 py-0.5 rounded-full inline-block">
+              {(selectedNode?.storage_used || 0).toLocaleString()} raw
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className={`text-2xl font-bold font-mono ${zenMode ? 'text-green-400' : 'text-blue-400'}`}>
+                {formatBytes(selectedNode?.storage_used).split(' ')[0]}
+                <span className="text-sm ml-1">{formatBytes(selectedNode?.storage_used).split(' ')[1]}</span>
+              </span>
+            </div>
+            <div className="text-[9px] text-zinc-600 uppercase font-bold tracking-wider mt-0.5">USED</div>
+          </div>
+          <div className="text-right">
+            <div className="flex items-baseline gap-1 justify-end">
+              <span className={`text-2xl font-bold font-mono ${zenMode ? 'text-green-600' : 'text-purple-400'}`}>
+                {formatBytes(selectedNode?.storage_committed).split(' ')[0]}
+                <span className="text-sm ml-1">{formatBytes(selectedNode?.storage_committed).split(' ')[1]}</span>
+              </span>
+            </div>
+            <div className="text-[9px] text-zinc-600 uppercase font-bold tracking-wider mt-0.5">COMMITTED</div>
+          </div>
+        </div>
+        <div>
+          <div className="h-2 bg-zinc-800 rounded-full overflow-hidden mb-2">
+            <div className={`h-full transition-all duration-1000 group-hover:brightness-125 ${zenMode ? 'bg-green-500' : 'bg-gradient-to-r from-blue-500 to-purple-500'}`} style={{ width: `${Math.min(100, ((selectedNode?.storage_used || 0) / (selectedNode?.storage_committed || 1)) * 100)}%` }}></div>
+          </div>
+        </div>
+        <div className="mt-4 flex justify-center">
+          <div className="text-[9px] font-bold uppercase tracking-widest text-purple-400/80 animate-pulse group-hover:text-purple-300 transition-colors flex items-center gap-1">
+            <Maximize2 size={8} /> CLICK TO EXPAND
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* MOBILE COMPACT VIEW */}
+    <div className="flex md:hidden flex-col justify-between h-full z-10 w-full gap-3">
+        <div className="flex justify-between items-center border-b border-white/5 pb-2">
+           <div className="flex items-center gap-2">
+              <Database size={14} className="text-blue-500" />
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Storage</span>
+           </div>
+           <Maximize2 size={12} className="text-zinc-600" />
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4 items-end">
+           <div>
+              <div className="text-xl font-mono font-bold text-blue-400 leading-none">
+                 {formatBytes(selectedNode?.storage_used).split(' ')[0]}
+                 <span className="text-xs ml-0.5 text-blue-500/70">{formatBytes(selectedNode?.storage_used).split(' ')[1]}</span>
+              </div>
+              <div className="text-[8px] text-zinc-600 uppercase font-bold mt-1">Used Space</div>
+           </div>
+           <div className="text-right">
+              <div className="text-xl font-mono font-bold text-purple-400 leading-none">
+                 {formatBytes(selectedNode?.storage_committed).split(' ')[0]}
+                 <span className="text-xs ml-0.5 text-purple-500/70">{formatBytes(selectedNode?.storage_committed).split(' ')[1]}</span>
+              </div>
+              <div className="text-[8px] text-zinc-600 uppercase font-bold mt-1">Total Capacity</div>
+           </div>
+        </div>
+
+        {/* Slim Bar */}
+        <div className="h-1 bg-zinc-800 rounded-full w-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500" style={{ width: `${Math.min(100, ((selectedNode?.storage_used || 0) / (selectedNode?.storage_committed || 1)) * 100)}%` }}></div>
+        </div>
+    </div>
+  </div>
+
+  {/* 3. IDENTITY & STATUS */}
+  <div
+    className={`rounded-2xl md:rounded-3xl p-4 md:p-5 border flex flex-col justify-between relative overflow-hidden cursor-pointer group min-h-[110px] md:h-64 ${
+      zenMode
+        ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
+        : 'bg-zinc-900/50 border-zinc-800 hover:border-blue-500/30'
+    }`}
+    onClick={() => handleCardToggle('identity')}
+  >
+    {/* DESKTOP VIEW */}
+    <div className="hidden md:flex flex-col h-full justify-between z-10">
+       <div className="flex justify-between items-start mb-2 relative z-10">
+        <div className="flex items-center gap-2">
+          <div className="p-2 rounded-lg bg-zinc-800 text-zinc-400">
+            <Server size={18} />
+          </div>
+          <div className={`text-xs font-bold uppercase ${zenMode ? 'text-zinc-400' : 'text-zinc-500'}`}>
+            IDENTITY & STATUS
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <div className={`px-2 py-1 rounded text-[9px] font-black uppercase border ${selectedNode.network === 'MAINNET' ? 'bg-green-500/10 border-green-500/30 text-green-500' : selectedNode.network === 'DEVNET' ? 'bg-blue-500/10 border-blue-500/30 text-blue-500' : 'bg-zinc-800 border-zinc-700 text-zinc-500'}`}>
+            {selectedNode.network || 'UNKNOWN'}
+          </div>
+           {(() => {
+            const stats = selectedNode.clusterStats || { mainnetCount: 0, devnetCount: 0 };
+            const siblings = selectedNode.network === 'MAINNET' ? stats.mainnetCount - 1 : stats.devnetCount - 1;
+            if (siblings > 0) return (
+                <span className="text-[9px] font-mono font-bold text-zinc-500 flex items-center gap-1 bg-black/40 px-1.5 py-0.5 rounded border border-zinc-800/50">
+                  <Server size={8} /> +{siblings} Instances
+                </span>
+            );
+            return null;
+          })()}
+        </div>
+      </div>
+      <div className="mt-auto relative z-10">
+        <div className="text-xl font-mono text-white group-hover:text-blue-400 group-hover:animate-pulse">
+          {getSafeVersion(selectedNode)}
+        </div>
+        <div className="text-xs text-zinc-500 mt-1 font-mono flex items-center gap-1">
+          <Clock size={12} className="text-zinc-600" />
+          Up: <span className="text-zinc-400">{formatUptime(selectedNode.uptime)}</span>
+        </div>
+        {isSelectedNodeLatest ? (
+          <div className="text-[10px] text-green-500 mt-2 font-bold bg-green-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
+            <CheckCircle size={10} /> UP TO DATE
+          </div>
+        ) : (
+          <div className="text-[10px] text-orange-500 mt-2 font-bold bg-orange-500/10 inline-flex items-center gap-1 px-2 py-0.5 rounded">
+            <AlertTriangle size={10} /> UPDATE NEEDED
+          </div>
+        )}
+        <div className="mt-4 flex justify-center">
+          <div className="text-[9px] font-bold uppercase tracking-widest text-blue-400/80 animate-pulse group-hover:text-blue-300 transition-colors flex items-center gap-1">
+            <Maximize2 size={8} /> CLICK TO EXPAND
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* MOBILE COMPACT VIEW */}
+    <div className="flex md:hidden flex-col justify-between h-full z-10 w-full gap-1">
+       <div className="flex justify-between items-start">
+          <div className="flex items-center gap-2">
+             <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${selectedNode.network === 'MAINNET' ? 'bg-green-500/10 border-green-500/30 text-green-500' : 'bg-blue-500/10 border-blue-500/30 text-blue-500'}`}>
+               {selectedNode.network}
+             </div>
+             <Maximize2 size={12} className="text-zinc-600" />
+          </div>
+          {isSelectedNodeLatest ? (
+             <div className="flex items-center gap-1 text-[9px] font-bold text-green-500"><CheckCircle size={10}/> OK</div>
+          ) : (
+             <div className="flex items-center gap-1 text-[9px] font-bold text-orange-500"><AlertTriangle size={10}/> OLD</div>
+          )}
+       </div>
+
+       <div className="flex items-baseline justify-between mt-1">
+          <div>
+             <div className="text-[9px] text-zinc-500 uppercase font-bold">Version</div>
+             <div className="text-lg font-mono text-white leading-none">{getSafeVersion(selectedNode)}</div>
+          </div>
+          <div className="text-right">
+             <div className="text-[9px] text-zinc-500 uppercase font-bold">Uptime</div>
+             <div className="text-sm font-mono text-zinc-300 leading-none">{formatUptime(selectedNode.uptime)}</div>
+          </div>
+       </div>
+    </div>
+  </div>
 </div>
 
 {/* --- BOTTOM ROW: 2 CARDS (Reputation, Map) --- */}
