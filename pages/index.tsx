@@ -286,6 +286,7 @@ export default function Home() {
   // State
   const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isBackgroundSyncing, setIsBackgroundSyncing] = useState(false);
   const [error, setError] = useState('');
 
   // Sorting: Default to STORAGE
@@ -382,12 +383,17 @@ export default function Home() {
   }, [isSearchFocused]);
 
   // Data Loop
-  useEffect(() => {
-    fetchData();
+    useEffect(() => {
+    // 1. Initial Load: FAST mode (Instant paint) -> Automatically chains SWARM inside fetchData
+    fetchData('fast');
+
     const saved = localStorage.getItem('xandeum_favorites');
     if (saved) setFavorites(JSON.parse(saved));
 
-    const dataInterval = setInterval(fetchData, 30000);
+    // 2. Periodic Refresh: SWARM mode only (Keep data deep and updated)
+    const dataInterval = setInterval(() => {
+        fetchData('swarm');
+    }, 30000);
 
     const handleScroll = () => {
       setScrolled(window.scrollY > 50);
@@ -445,135 +451,115 @@ export default function Home() {
     }
   }, [loading, nodes, router.query]);
 
-  const fetchData = async () => {
-  setLoading(true);
-  try {
-    const res = await axios.get(`/api/stats?t=${Date.now()}`);
+    // --- DATA FETCHING LOGIC (THE 2-TIER STRATEGY) ---
+  const fetchData = async (mode: 'fast' | 'swarm' = 'fast') => {
+    // 1. Set Loading States based on Mode
+    if (mode === 'fast') {
+      setLoading(true); // Hero Mode: Block UI for < 1s
+    } else {
+      setIsBackgroundSyncing(true); // Swarm Mode: Silent background update
+    }
 
-    if (res.data.result && res.data.result.pods) {
-      let podList = res.data.result.pods as Node[];
-      const stats = res.data.stats;
+    try {
+      // 2. Fetch from API with mode parameter
+      const res = await axios.get(`/api/stats?mode=${mode}&t=${Date.now()}`);
 
-      if (stats) {
-        setNetworkStats(stats);
-        setMostCommonVersion(stats.consensusVersion || 'N/A');
-        setAvgNetworkHealth(stats.avgBreakdown?.total || 0);
-        setMedianCommitted(stats.medianStorage || 0);
-      }
+      if (res.data.result && res.data.result.pods) {
+        let podList = res.data.result.pods as Node[];
+        const stats = res.data.stats;
 
-      // --------------------------------------------------
-      // 1. SORT FUNCTION (Existing)
-      // --------------------------------------------------
-      const sortFn = (a: Node, b: Node) => {
-        if ((b.credits || 0) !== (a.credits || 0)) return (b.credits || 0) - (a.credits || 0);
-        if ((b.health || 0) !== (a.health || 0)) return (b.health || 0) - (a.health || 0);
-        return (a.pubkey || '').localeCompare(b.pubkey || '');
-      };
-
-      // --------------------------------------------------
-      // 2. NEW: CLUSTER CALCULATION (Sibling Counting)
-      // --------------------------------------------------
-      const clusterMap = new Map<string, { mainnet: number; devnet: number }>();
-
-      podList.forEach(node => {
-        if (!node.pubkey) return;
-        const current = clusterMap.get(node.pubkey) || { mainnet: 0, devnet: 0 };
-        if (node.network === 'MAINNET') current.mainnet++;
-        if (node.network === 'DEVNET') current.devnet++;
-        clusterMap.set(node.pubkey, current);
-      });
-      // --------------------------------------------------
-
-      // --------------------------------------------------
-      // 3. SPLIT + SORT BY NETWORK (Existing)
-      // --------------------------------------------------
-      const mainnetNodes = podList.filter(n => n.network === 'MAINNET').sort(sortFn);
-      const devnetNodes = podList.filter(n => n.network === 'DEVNET').sort(sortFn);
-
-      // --------------------------------------------------
-      // 4. RANK MAP (Composite Key)
-      // --------------------------------------------------
-      const rankMap = new Map<string, number>();
-
-      mainnetNodes.forEach((node, idx) => {
-        if (node.pubkey) rankMap.set(`${node.pubkey}-MAINNET`, idx + 1);
-      });
-
-      devnetNodes.forEach((node, idx) => {
-        if (node.pubkey) rankMap.set(`${node.pubkey}-DEVNET`, idx + 1);
-      });
-
-      // --------------------------------------------------
-      // 5. MAP BACK → Inject Rank + Storage + ClusterStats
-      // --------------------------------------------------
-      podList = podList.map(node => {
-        const used = node.storage_used || 0;
-        const cap = node.storage_committed || 0;
-
-        let percentStr = '0%';
-        let rawPercent = 0;
-
-        if (cap > 0 && used > 0) {
-          rawPercent = (used / cap) * 100;
-          percentStr = rawPercent < 0.01 ? '< 0.01%' : `${rawPercent.toFixed(2)}%`;
+        // --- (Existing Processing Logic: Sort, Cluster, Rank) ---
+        if (stats) {
+          setNetworkStats(stats);
+          setMostCommonVersion(stats.consensusVersion || 'N/A');
+          setAvgNetworkHealth(stats.avgBreakdown?.total || 0);
+          setMedianCommitted(stats.medianStorage || 0);
         }
 
-        const compositeKey = `${node.pubkey}-${node.network}`;
-        const cluster = clusterMap.get(node.pubkey || '') || { mainnet: 0, devnet: 0 };
-
-        return {
-          ...node,
-          rank: node.pubkey ? rankMap.get(compositeKey) || 0 : 0,
-          storage_usage_percentage: percentStr,
-          storage_usage_raw: rawPercent,
-
-          // NEW: CLUSTER STATS (Used by badges + fleet matrix)
-          clusterStats: {
-            totalGlobal: cluster.mainnet + cluster.devnet,
-            mainnetCount: cluster.mainnet,
-            devnetCount: cluster.devnet,
-          },
+        const sortFn = (a: Node, b: Node) => {
+          if ((b.credits || 0) !== (a.credits || 0)) return (b.credits || 0) - (a.credits || 0);
+          if ((b.health || 0) !== (a.health || 0)) return (b.health || 0) - (a.health || 0);
+          return (a.pubkey || '').localeCompare(b.pubkey || '');
         };
-      });
 
-      setNodes(podList);
+        const clusterMap = new Map<string, { mainnet: number; devnet: number }>();
+        podList.forEach(node => {
+          if (!node.pubkey) return;
+          const current = clusterMap.get(node.pubkey) || { mainnet: 0, devnet: 0 };
+          if (node.network === 'MAINNET') current.mainnet++;
+          if (node.network === 'DEVNET') current.devnet++;
+          clusterMap.set(node.pubkey, current);
+        });
 
-      // --------------------------------------------------
-      // 6. REST OF EXISTING STATS LOGIC
-      // --------------------------------------------------
-      const stableNodes = podList.filter(n => (n.uptime || 0) > 86400).length;
-      setNetworkHealth(
-        (podList.length > 0 ? (stableNodes / podList.length) * 100 : 0).toFixed(2)
-      );
+        const mainnetNodes = podList.filter(n => n.network === 'MAINNET').sort(sortFn);
+        const devnetNodes = podList.filter(n => n.network === 'DEVNET').sort(sortFn);
 
-      const consensusCount = podList.filter(
-        n => (n.version || 'Unknown') === stats.consensusVersion
-      ).length;
-      setNetworkConsensus((consensusCount / podList.length) * 100);
+        const rankMap = new Map<string, number>();
+        mainnetNodes.forEach((node, idx) => { if (node.pubkey) rankMap.set(`${node.pubkey}-MAINNET`, idx + 1); });
+        devnetNodes.forEach((node, idx) => { if (node.pubkey) rankMap.set(`${node.pubkey}-DEVNET`, idx + 1); });
 
-      const committed = podList.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
-      const usedTotal = podList.reduce((sum, n) => sum + (n.storage_used || 0), 0);
+        podList = podList.map(node => {
+          const used = node.storage_used || 0;
+          const cap = node.storage_committed || 0;
+          let percentStr = '0%';
+          let rawPercent = 0;
+          if (cap > 0 && used > 0) {
+            rawPercent = (used / cap) * 100;
+            percentStr = rawPercent < 0.01 ? '< 0.01%' : `${rawPercent.toFixed(2)}%`;
+          }
+          const compositeKey = `${node.pubkey}-${node.network}`;
+          const cluster = clusterMap.get(node.pubkey || '') || { mainnet: 0, devnet: 0 };
+          return {
+            ...node,
+            rank: node.pubkey ? rankMap.get(compositeKey) || 0 : 0,
+            storage_usage_percentage: percentStr,
+            storage_usage_raw: rawPercent,
+            clusterStats: {
+              totalGlobal: cluster.mainnet + cluster.devnet,
+              mainnetCount: cluster.mainnet,
+              devnetCount: cluster.devnet,
+            },
+          };
+        });
 
-      setTotalStorageCommitted(committed);
-      setTotalStorageUsed(usedTotal);
+        // --- PROCESSING COMPLETE ---
 
-      setLastSync(
-        new Date().toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-        })
-      );
+        // 3. Update State & Notify
+        // Only show toast if in Swarm mode AND we actually found new nodes
+        if (mode === 'swarm' && podList.length > nodes.length && nodes.length > 0) {
+           showToast(`New nodes detected. Refreshing... (+${podList.length - nodes.length} nodes)`);
+        }
 
-      setError('');
+        setNodes(podList);
+
+        // Stats Logic
+        const stableNodes = podList.filter(n => (n.uptime || 0) > 86400).length;
+        setNetworkHealth((podList.length > 0 ? (stableNodes / podList.length) * 100 : 0).toFixed(2));
+        
+        const consensusCount = podList.filter(n => (n.version || 'Unknown') === stats.consensusVersion).length;
+        setNetworkConsensus((consensusCount / podList.length) * 100);
+
+        setTotalStorageCommitted(podList.reduce((sum, n) => sum + (n.storage_committed || 0), 0));
+        setTotalStorageUsed(podList.reduce((sum, n) => sum + (n.storage_used || 0), 0));
+
+        setLastSync(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        setError('');
+
+        // 4. CHAIN REACTION: If we just finished 'fast', immediately trigger 'swarm'
+        if (mode === 'fast') {
+           fetchData('swarm');
+        }
+      }
+    } catch (err: any) {
+      console.error('Fetch error:', err);
+      // Only show error on screen if it's the initial load
+      if (mode === 'fast') setError('Syncing latest network data...');
+    } finally {
+      // Clear specific loading state
+      if (mode === 'fast') setLoading(false);
+      else setIsBackgroundSyncing(false);
     }
-  } catch (err: any) {
-    console.error('Fetch error:', err);
-    setError('Syncing latest network data...');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const checkIsLatest = (nodeVersion: string | null | undefined) => {
     const cleanVer = (nodeVersion || '').replace(/[^0-9.]/g, '');
@@ -1887,9 +1873,9 @@ export default function Home() {
         </div>
 
         <div className="flex items-center justify-between gap-4 overflow-x-auto pb-2 scrollbar-hide w-full mt-1 md:mt-6 border-t border-zinc-800/50 pt-2">
-          <button
-            onClick={fetchData}
-            disabled={loading}
+                  <button
+            onClick={() => fetchData('fast')} // Manual click triggers FAST load -> chains SWARM
+            disabled={loading} // Only disable if it's the blocking initial load
             className={`flex items-center gap-2 px-6 h-9 md:h-12 rounded-xl transition font-bold text-[10px] md:text-xs ${
               loading
                 ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait'
@@ -1898,7 +1884,14 @@ export default function Home() {
                 : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'
             }`}
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            {/* VISUAL LOGIC:
+                - If loading (Fast Mode) OR isBackgroundSyncing (Swarm Mode): SPIN THE ICON
+                - Text remains 'REFRESH' unless it is the initial blocking load
+            */}
+            <RefreshCw 
+                size={14} 
+                className={loading || isBackgroundSyncing ? 'animate-spin' : ''} 
+            />
             {loading ? 'SYNCING...' : 'REFRESH'}
           </button>
 
