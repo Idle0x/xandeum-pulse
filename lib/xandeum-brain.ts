@@ -3,30 +3,25 @@ import geoip from 'geoip-lite';
 
 // --- CONFIGURATION ---
 
-// 1. YOUR PRIVATE TUNNEL (Source of Truth for Mainnet)
-const PRIVATE_RPC = 'https://persian-starts-sounds-colon.trycloudflare.com/rpc';
+// 1. SOURCE OF TRUTH (Your Private Mainnet Node)
+const PRIVATE_MAINNET_RPC = 'https://persian-starts-sounds-colon.trycloudflare.com/rpc';
 
-// 2. PUBLIC SWARM (Source of Truth for Devnet)
-const PUBLIC_SWARM = [
-  'http://173.212.203.145:6000',
-  'http://161.97.97.41:6000',
-  'http://192.190.136.36:6000',
-  'http://192.190.136.38:6000',
-  'http://207.244.255.1:6000',
-  'http://192.190.136.28:6000',
-  'http://192.190.136.29:6000'
+// 2. DISCOVERY SWARM (Public Nodes)
+const PUBLIC_RPC_NODES = [
+  '173.212.203.145', '161.97.97.41', '192.190.136.36', '192.190.136.38',
+  '207.244.255.1', '192.190.136.28', '192.190.136.29', '159.195.4.138', '152.53.155.30'
 ];
 
-const TIMEOUT_RPC = 6000;
+const TIMEOUT_RPC = 5000;
 const TIMEOUT_CREDITS = 8000;
 
-// API Endpoints
+// API ENDPOINTS
 const API_CREDITS_MAINNET = 'https://podcredits.xandeum.network/api/mainnet-pod-credits';
 const API_CREDITS_DEVNET  = 'https://podcredits.xandeum.network/api/pods-credits';
 
 const geoCache = new Map<string, { lat: number; lon: number; country: string; countryCode: string; city: string }>();
 
-// --- INTERFACES & HELPERS ---
+// --- INTERFACES ---
 export interface EnrichedNode {
   address: string;
   pubkey: string;
@@ -35,19 +30,35 @@ export interface EnrichedNode {
   last_seen_timestamp: number;
   is_public: boolean;
   isUntracked?: boolean;
-  network: 'MAINNET' | 'DEVNET' | 'UNKNOWN';
+  network: 'MAINNET' | 'DEVNET'; // Strict typing, no UNKNOWN
   storage_used: number;      
   storage_committed: number; 
   credits: number | null; 
   health: number;
-  healthBreakdown: { uptime: number; version: number; reputation: number | null; storage: number; };
-  location: { lat: number; lon: number; countryName: string; countryCode: string; city: string; };
+  healthBreakdown: {
+      uptime: number;
+      version: number;
+      reputation: number | null;
+      storage: number;
+  };
+  location: {
+    lat: number;
+    lon: number;
+    countryName: string;
+    countryCode: string;
+    city: string;
+  };
   rank?: number;        
-  health_rank?: number;
-  rpc_source?: string;
+  health_rank?: number; 
 }
 
-export const cleanSemver = (v: string) => v ? v.split('-')[0].replace(/[^0-9.]/g, '') : '0.0.0';
+// --- HELPERS ---
+
+export const cleanSemver = (v: string) => {
+  if (!v) return '0.0.0';
+  const mainVer = v.split('-')[0]; 
+  return mainVer.replace(/[^0-9.]/g, '');
+};
 
 export const compareVersions = (v1: string, v2: string) => {
   const p1 = cleanSemver(v1).split('.').map(Number);
@@ -72,27 +83,40 @@ export const calculateLogScore = (value: number, median: number, maxScore: numbe
 export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedCleanVersions: string[]) => {
     const cleanNode = cleanSemver(nodeVersion);
     const cleanConsensus = cleanSemver(consensusVersion);
+
     if (compareVersions(cleanNode, cleanConsensus) >= 0) return 100;
+
     const consensusIndex = sortedCleanVersions.indexOf(cleanConsensus);
     const nodeIndex = sortedCleanVersions.indexOf(cleanNode);
+
     if (nodeIndex === -1) return 0;
+
     const distance = nodeIndex - consensusIndex;
+
     if (distance <= 0) return 100; 
     if (distance === 1) return 90;
     if (distance === 2) return 70;
     if (distance === 3) return 50;
     if (distance === 4) return 30;
     if (distance === 5) return 10;
+
     return Math.max(0, 10 - (distance - 5));
 };
 
+// --- SCORING FACTORY ---
 export const calculateVitalityScore = (
-    storageCommitted: number, storageUsed: number, uptimeSeconds: number, version: string, 
-    consensusVersion: string, sortedCleanVersions: string[], medianCredits: number, 
-    credits: number | null, medianStorage: number
+    storageCommitted: number, 
+    storageUsed: number,
+    uptimeSeconds: number, 
+    version: string, 
+    consensusVersion: string, 
+    sortedCleanVersions: string[], 
+    medianCredits: number, 
+    credits: number | null, 
+    medianStorage: number
 ) => {
   if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
-  
+
   const uptimeDays = uptimeSeconds / 86400;
   let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
   if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20); 
@@ -116,84 +140,56 @@ export const calculateVitalityScore = (
 
   return {
       total: Math.max(0, Math.min(100, total)),
-      breakdown: { uptime: Math.round(uptimeScore), version: Math.round(versionScore), reputation: reputationScore, storage: Math.round(totalStorageScore) }
+      breakdown: {
+          uptime: Math.round(uptimeScore),
+          version: Math.round(versionScore),
+          reputation: reputationScore,
+          storage: Math.round(totalStorageScore)
+      }
   };
 };
 
-const AXIOS_CONFIG_CREDITS = {
+// --- FETCHING ---
+const AXIOS_CONFIG = {
     timeout: TIMEOUT_CREDITS,
-    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json, text/plain, */*' }
+    headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'Accept': 'application/json, text/plain, */*'
+    }
 };
 
-// --- FETCHING WITH STABLE FINGERPRINT DEDUPLICATION ---
-async function fetchRawData() {
-  const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
-
-  // 1. Fetch Private Tunnel (Priority)
-  const privateReq = axios.post(PRIVATE_RPC, payload, { timeout: TIMEOUT_RPC })
-    .then(r => r.data?.result?.pods || [])
-    .catch(e => {
-        console.error('[PULSE] Tunnel Error:', e.message);
-        return [];
-    });
-
-  // 2. Fetch Public Swarm
-  const publicReqs = PUBLIC_SWARM.map(url => 
-    axios.post(`${url}/rpc`, payload, { timeout: TIMEOUT_RPC })
-      .then(r => r.data?.result?.pods || [])
-      .catch(() => [])
-  );
-
-  const [privatePods, ...publicResults] = await Promise.all([privateReq, ...publicReqs]);
-
-  // 3. Flatten Public Results
-  let publicPods: any[] = [];
-  publicResults.forEach(pods => publicPods.push(...pods));
-
-  // --- 4. THE 5-POINT STABLE FILTER ---
-  
-  // Helper to generate the unique ID for a node state
-  const getFingerprint = (p: any) => {
-    return `${p.pubkey}-${p.address}-${p.version}-${p.storage_committed}-${p.storage_used}`;
-  };
-
-  // Create a Set of fingerprints from the Private RPC (Our Source of Truth)
-  const privateFingerprints = new Set(privatePods.map(getFingerprint));
-
-  const finalPublicPods: any[] = [];
-  
-  publicPods.forEach((pod: any) => {
-    const fingerprint = getFingerprint(pod);
-    
-    // If this Exact 5-Point signature is NOT in the private list, we keep it.
-    // If it IS in the private list, we drop it (because it's a duplicate).
-    if (!privateFingerprints.has(fingerprint)) {
-      finalPublicPods.push(pod);
-      // Optional: Add to set to self-deduplicate the public list too
-      privateFingerprints.add(fingerprint); 
+// Fetch Mainnet nodes from the Private RPC (Source of Truth)
+async function fetchPrivateMainnetNodes() {
+    const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
+    try {
+        const res = await axios.post(PRIVATE_MAINNET_RPC, payload, { timeout: TIMEOUT_RPC });
+        if (res.data?.result?.pods && Array.isArray(res.data.result.pods)) {
+            return res.data.result.pods;
+        }
+    } catch (e) {
+        console.warn("Private Mainnet RPC Unreachable:", e);
     }
-  });
+    return [];
+}
 
-  // 5. Label and Merge
-  const labeledPrivate = privatePods.map((p: any) => ({ ...p, rpc_source: 'Private RPC' }));
-  const labeledPublic = finalPublicPods.map((p: any) => ({ ...p, rpc_source: 'Public Swarm' }));
-
-  const mergedList = [...labeledPrivate, ...labeledPublic];
-  
-  console.log(`[PULSE] Private: ${privatePods.length} | Public (Unique): ${finalPublicPods.length} | Total: ${mergedList.length}`);
-
-  let sourceLabel = 'No Connection';
-  if (mergedList.length > 0) {
-      sourceLabel = `Global View (${mergedList.length} Nodes)`;
-  }
-
-  return { pods: mergedList, source: sourceLabel };
+// Fetch All nodes from the Public Swarm (Discovery)
+async function fetchPublicSwarmNodes() {
+    const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
+    const shuffled = PUBLIC_RPC_NODES.sort(() => 0.5 - Math.random()).slice(0, 3);
+    
+    try {
+        const winner = await Promise.any(shuffled.map(ip => 
+            axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC })
+                 .then(r => r.data?.result?.pods || [])
+        ));
+        return winner;
+    } catch (e) { return []; }
 }
 
 async function fetchCredits() {
     const [mainnetRes, devnetRes] = await Promise.allSettled([
-        axios.get(API_CREDITS_MAINNET, AXIOS_CONFIG_CREDITS),
-        axios.get(API_CREDITS_DEVNET, AXIOS_CONFIG_CREDITS)
+        axios.get(API_CREDITS_MAINNET, AXIOS_CONFIG),
+        axios.get(API_CREDITS_DEVNET, AXIOS_CONFIG)
     ]);
     const parseData = (res: PromiseSettledResult<any>) => {
         if (res.status !== 'fulfilled') return [];
@@ -202,7 +198,10 @@ async function fetchCredits() {
         if (Array.isArray(d)) return d;
         return [];
     };
-    return { mainnet: parseData(mainnetRes), devnet: parseData(devnetRes) };
+    return {
+        mainnet: parseData(mainnetRes),
+        devnet: parseData(devnetRes)
+    };
 }
 
 async function resolveLocations(ips: string[]) {
@@ -228,121 +227,164 @@ async function resolveLocations(ips: string[]) {
 }
 
 // --- MAIN EXPORT ---
-export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  const [{ pods: rawPods, source }, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
-  
-  if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable (0 Nodes Found)");
 
-  const mainnetMap = new Map<string, number>();
-  const devnetMap = new Map<string, number>();
+export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
+  // 1. Parallel Fetching: Private RPC (Mainnet) + Public Swarm (Discovery) + Credits
+  const [privateMainnetNodes, publicSwarmNodes, creditsData] = await Promise.all([ 
+      fetchPrivateMainnetNodes(), 
+      fetchPublicSwarmNodes(), 
+      fetchCredits() 
+  ]);
+
+  if (privateMainnetNodes.length === 0 && publicSwarmNodes.length === 0) {
+      throw new Error("Network Unreachable");
+  }
+
+  // 2. Prepare Credit Maps
+  const mainnetCreditMap = new Map<string, number>();
+  const devnetCreditMap = new Map<string, number>();
   const mainnetValues: number[] = [];
   const devnetValues: number[] = [];
 
-  // Populate Credits Maps
-  if (Array.isArray(creditsData.mainnet)) {
-      creditsData.mainnet.forEach((c: any) => {
-          const val = parseFloat(c.credits || c.amount || '0');
-          const key = c.pod_id || c.pubkey || c.node;
-          if (key && !isNaN(val)) { mainnetMap.set(key, val); mainnetValues.push(val); }
-      });
-  }
-  if (Array.isArray(creditsData.devnet)) {
-      creditsData.devnet.forEach((c: any) => {
-          const val = parseFloat(c.credits || c.amount || '0');
-          const key = c.pod_id || c.pubkey || c.node;
-          if (key && !isNaN(val)) { devnetMap.set(key, val); devnetValues.push(val); }
-      });
-  }
+  creditsData.mainnet.forEach((c: any) => {
+      const val = parseFloat(c.credits || c.amount || '0');
+      const key = c.pod_id || c.pubkey || c.node;
+      if (key && !isNaN(val)) { mainnetCreditMap.set(key, val); mainnetValues.push(val); }
+  });
+
+  creditsData.devnet.forEach((c: any) => {
+      const val = parseFloat(c.credits || c.amount || '0');
+      const key = c.pod_id || c.pubkey || c.node;
+      if (key && !isNaN(val)) { devnetCreditMap.set(key, val); devnetValues.push(val); }
+  });
 
   mainnetValues.sort((a, b) => a - b);
   devnetValues.sort((a, b) => a - b);
   const medianMainnet = mainnetValues.length ? mainnetValues[Math.floor(mainnetValues.length / 2)] : 0;
-  const medianStorage = rawPods.length ? rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b)[Math.floor(rawPods.length / 2)] : 1;
+  const medianDevnet = devnetValues.length ? devnetValues[Math.floor(devnetValues.length / 2)] : 0;
 
-  // Consensus
+  // 3. Topology Filtering (The Source of Truth)
+  const finalNodeMap = new Map<string, { pod: any, network: 'MAINNET' | 'DEVNET' }>();
+  
+  // A. Process Private Mainnet RPC (Highest Priority)
+  // Everything here is GUARANTEED Mainnet
+  privateMainnetNodes.forEach((pod: any) => {
+      const key = pod.pubkey || pod.public_key;
+      if (key) {
+          finalNodeMap.set(key, { pod, network: 'MAINNET' });
+      }
+  });
+
+  // B. Process Public Swarm (Discovery)
+  // If it's NOT in the map yet, it must be DEVNET
+  publicSwarmNodes.forEach((pod: any) => {
+      const key = pod.pubkey || pod.public_key;
+      if (key && !finalNodeMap.has(key)) {
+          finalNodeMap.set(key, { pod, network: 'DEVNET' });
+      }
+  });
+
+  const allRawPods = Array.from(finalNodeMap.values()).map(x => x.pod);
+
+  // 4. Consensus & Stats
+  const storageArray: number[] = allRawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
+  const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
+
   const rawVersionCounts: Record<string, number> = {}; 
   const uniqueCleanVersionsSet = new Set<string>();
-  rawPods.forEach((p: any) => { 
+
+  allRawPods.forEach((p: any) => { 
       const rawV = (p.version || '0.0.0'); 
       const cleanV = cleanSemver(rawV);
       rawVersionCounts[rawV] = (rawVersionCounts[rawV] || 0) + 1;
       uniqueCleanVersionsSet.add(cleanV);
   });
+
   const consensusVersion = Object.keys(rawVersionCounts).sort((a, b) => rawVersionCounts[b] - rawVersionCounts[a])[0] || '0.0.0';
   const sortedCleanVersions = Array.from(uniqueCleanVersionsSet).sort((a, b) => compareVersions(b, a));
 
-  await resolveLocations([...new Set(rawPods.map((p: any) => p.address.split(':')[0]))] as string[]);
+  await resolveLocations([...new Set(allRawPods.map((p: any) => p.address.split(':')[0]))] as string[]);
 
   const expandedNodes: EnrichedNode[] = [];
 
-  const scoreNode = (pod: any, network: 'MAINNET' | 'DEVNET' | 'UNKNOWN', credits: number | null, medianCredits: number, isUntracked: boolean) => {
+  // 5. Scoring & Enrichment
+  finalNodeMap.forEach(({ pod, network }) => {
+      const key = pod.pubkey || pod.public_key;
       const ip = pod.address.split(':')[0];
       const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
       const storageCommitted = Number(pod.storage_committed) || 0;
       const storageUsed = Number(pod.storage_used) || 0;
       const uptime = Number(pod.uptime) || 0;
 
+      // Assign Credits based on Network Tag
+      let credits = 0;
+      let medianForScore = 1;
+      
+      if (network === 'MAINNET') {
+          credits = mainnetCreditMap.get(key) || 0;
+          medianForScore = medianMainnet;
+      } else {
+          credits = devnetCreditMap.get(key) || 0;
+          medianForScore = medianDevnet;
+      }
+
       const vitality = calculateVitalityScore(
           storageCommitted, storageUsed, uptime, 
           pod.version || '0.0.0', consensusVersion, sortedCleanVersions, 
-          medianCredits, credits, medianStorage
+          medianForScore, credits, medianStorage
       );
 
-      return {
+      expandedNodes.push({
           ...pod,
-          pubkey: pod.pubkey || pod.public_key,
-          network, 
+          pubkey: key,
+          network, // Strict assignment from Topology Filter
           storage_committed: storageCommitted, 
           storage_used: storageUsed,           
-          credits, 
-          isUntracked,
+          credits: credits, 
+          isUntracked: false, // Concept deprecated in this logic
           health: vitality.total,
           healthBreakdown: vitality.breakdown, 
-          location: { lat: loc.lat, lon: loc.lon, countryName: loc.country, countryCode: loc.countryCode, city: loc.city },
-          rpc_source: pod.rpc_source 
-      };
-  };
-
-  rawPods.forEach((pod: any) => {
-      const key = pod.pubkey || pod.public_key;
-      const inMainnet = mainnetMap.has(key);
-      const inDevnet = devnetMap.has(key);
-
-      if (inMainnet) {
-          const credits = mainnetMap.get(key) || 0;
-          expandedNodes.push(scoreNode(pod, 'MAINNET', credits, medianMainnet, false));
-      }
-      if (inDevnet) {
-          const credits = devnetMap.get(key) || 0;
-          expandedNodes.push(scoreNode(pod, 'DEVNET', credits, medianMainnet, false)); 
-      }
-      if (!inMainnet && !inDevnet) {
-          const isUntracked = creditsData.mainnet.length > 0;
-          expandedNodes.push(scoreNode(pod, 'UNKNOWN', null, medianMainnet, isUntracked));
-      }
+          location: { 
+              lat: loc.lat, lon: loc.lon, countryName: loc.country, countryCode: loc.countryCode, city: loc.city 
+          }
+      });
   });
 
+  // 6. Ranking
   const mainnetNodes = expandedNodes.filter(n => n.network === 'MAINNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const devnetNodes = expandedNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
-  const unknownNodes = expandedNodes.filter(n => n.network === 'UNKNOWN');
 
-  // Ranking Logic
-  let r = 1; mainnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (mainnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
-  r = 1; devnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (devnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
+  let r = 1;
+  mainnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (mainnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
 
-  const finalNodes = [...mainnetNodes, ...devnetNodes, ...unknownNodes];
+  r = 1;
+  devnetNodes.forEach((n, i) => { if (i > 0 && (n.credits || 0) < (devnetNodes[i-1].credits || 0)) r = i + 1; n.rank = r; });
 
+  const finalNodes = [...mainnetNodes, ...devnetNodes];
+
+  // Health Ranking (Global)
   const healthSorted = [...finalNodes].sort((a, b) => b.health - a.health);
   let hr = 1;
-  healthSorted.forEach((n, i) => { if (i > 0 && n.health < healthSorted[i-1].health) hr = i + 1; n.health_rank = hr; });
+  healthSorted.forEach((n, i) => {
+      if (i > 0 && n.health < healthSorted[i-1].health) hr = i + 1;
+      n.health_rank = hr;
+  });
 
   // Averages
-  let totalUptime = 0, totalVersion = 0, totalReputation = 0, reputationCount = 0, totalStorage = 0;
+  let totalUptime = 0;
+  let totalVersion = 0;
+  let totalReputation = 0;
+  let reputationCount = 0;
+  let totalStorage = 0;
+
   finalNodes.forEach(node => {
     totalUptime += node.healthBreakdown.uptime;
     totalVersion += node.healthBreakdown.version;
     totalStorage += node.healthBreakdown.storage;
-    if (node.healthBreakdown.reputation !== null) { totalReputation += node.healthBreakdown.reputation; reputationCount++; }
+    if (node.healthBreakdown.reputation !== null) {
+      totalReputation += node.healthBreakdown.reputation;
+      reputationCount++;
+    }
   });
 
   const nodeCount = finalNodes.length || 1;
@@ -351,9 +393,21 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   return { 
     nodes: finalNodes, 
     stats: { 
-        consensusVersion, medianCredits: medianMainnet, medianStorage, totalNodes: finalNodes.length, connectedNode: source,
-        systemStatus: { credits: creditsData.mainnet.length > 0 || creditsData.devnet.length > 0, rpc: true },
-        avgBreakdown: { total: avgHealth, uptime: Math.round(totalUptime / nodeCount), version: Math.round(totalVersion / nodeCount), reputation: reputationCount > 0 ? Math.round(totalReputation / reputationCount) : null, storage: Math.round(totalStorage / nodeCount) }
+        consensusVersion, 
+        medianCredits: medianMainnet, 
+        medianStorage,
+        totalNodes: finalNodes.length,
+        systemStatus: {
+            credits: creditsData.mainnet.length > 0 || creditsData.devnet.length > 0, 
+            rpc: true 
+        },
+        avgBreakdown: {
+            total: avgHealth,
+            uptime: Math.round(totalUptime / nodeCount),
+            version: Math.round(totalVersion / nodeCount),
+            reputation: reputationCount > 0 ? Math.round(totalReputation / reputationCount) : null,
+            storage: Math.round(totalStorage / nodeCount)
+        }
     } 
   };
 }
