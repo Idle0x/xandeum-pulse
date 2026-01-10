@@ -3,9 +3,8 @@ import geoip from 'geoip-lite';
 
 // --- CONFIGURATION ---
 
-// 1. YOUR PRIVATE TUNNEL (Source of Truth for Mainnet)
-// Note: We include /rpc here because the tunnel root points to port 6000
-const PRIVATE_RPC = 'https://persian-starts-sounds-colon.trycloudflare.com/rpc';
+// 1. PRIVATE TUNNEL (Source of Truth for Mainnet)
+const PRIVATE_RPC = 'https://arkansas-collect-loving-rather.trycloudflare.com/rpc';
 
 // 2. PUBLIC SWARM (Source of Truth for Devnet)
 const PUBLIC_SWARM = [
@@ -27,7 +26,7 @@ const API_CREDITS_DEVNET  = 'https://podcredits.xandeum.network/api/pods-credits
 
 const geoCache = new Map<string, { lat: number; lon: number; country: string; countryCode: string; city: string }>();
 
-// --- INTERFACES & HELPERS (Kept exactly as you had them) ---
+// --- INTERFACES & HELPERS ---
 export interface EnrichedNode {
   address: string;
   pubkey: string;
@@ -126,63 +125,62 @@ const AXIOS_CONFIG_CREDITS = {
     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json, text/plain, */*' }
 };
 
-// --- AGGRESSIVE FETCHING ---
+// --- FETCHING LOGIC ---
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
 
-  // 1. Build Request List
-  const requests = [];
+  // 1. Fetch Private Tunnel (The "God Mode" Source)
+  const privateReq = axios.post(PRIVATE_RPC, payload, { timeout: TIMEOUT_RPC })
+    .then(r => ({ pods: r.data?.result?.pods || [], source: 'Private RPC' }))
+    .catch(() => ({ pods: [], source: 'Private RPC' }));
 
-  // A. Private Tunnel Request
-  console.log(`[PULSE] Connecting to Tunnel: ${PRIVATE_RPC}`);
-  requests.push(
-    axios.post(PRIVATE_RPC, payload, { timeout: TIMEOUT_RPC })
-    .then(res => ({ status: 'fulfilled' as const, url: PRIVATE_RPC, pods: res.data?.result?.pods || [] }))
-    .catch(err => ({ status: 'rejected' as const, url: PRIVATE_RPC, error: err.message, code: err.response?.status }))
+  // 2. Fetch Public Swarm (The "Gossip" Source)
+  // We grab ALL public nodes we can find, not just one winner
+  const publicReqs = PUBLIC_SWARM.map(url => 
+    axios.post(`${url}/rpc`, payload, { timeout: TIMEOUT_RPC })
+      .then(r => r.data?.result?.pods || [])
+      .catch(() => [])
   );
 
-  // B. Public Swarm Requests
-  PUBLIC_SWARM.forEach(node => {
-      const url = `${node}/rpc`; 
-      requests.push(
-        axios.post(url, payload, { timeout: TIMEOUT_RPC })
-          .then(res => ({ status: 'fulfilled' as const, url, pods: res.data?.result?.pods || [] }))
-          .catch(err => ({ status: 'rejected' as const, url, error: err.message, code: err.response?.status }))
-      );
-  });
+  const [privateResult, ...publicResults] = await Promise.all([privateReq, ...publicReqs]);
 
-  // 2. Wait for all
-  const results = await Promise.all(requests);
+  // 3. Build the Master Lists
+  const privatePods = privateResult.pods;
+  let publicPods: any[] = [];
+  publicResults.forEach(pods => publicPods.push(...pods));
 
-  // 3. Process (Concatenate ALL found pods, NO Deduplication)
-  const allPods: any[] = [];
-  const successfulRPCs: string[] = [];
+  // 4. THE STRICT DEDUPLICATOR
+  // We trust the Private list first. We create a "Fingerprint Set" of exactly what we already have.
+  const privateFingerprints = new Set(privatePods.map((p: any) => JSON.stringify(p)));
 
-  results.forEach(r => {
-    if (r.status === 'fulfilled' && Array.isArray(r.pods)) {
-      if (r.pods.length > 0) {
-        successfulRPCs.push(r.url);
-        const labeledPods = r.pods.map((p: any) => ({ ...p, rpc_source: r.url }));
-        allPods.push(...labeledPods);
-      }
-    } else {
-      const errCode = (r as any).code || 'Unknown';
-      // console.warn(`[PULSE] Failed ${r.url} -> Status: ${errCode}`);
+  const finalPublicPods: any[] = [];
+  
+  publicPods.forEach((pod: any) => {
+    const fingerprint = JSON.stringify(pod);
+    // If we DO NOT have this exact JSON string in our private list, we keep it.
+    // If it matches exactly, we skip it (because the Private list already has it).
+    if (!privateFingerprints.has(fingerprint)) {
+      finalPublicPods.push(pod);
+      // Add to set to prevent duplicates strictly within the public list too
+      privateFingerprints.add(fingerprint); 
     }
   });
 
-  console.log(`[PULSE] Connected to: ${successfulRPCs.length} RPCs. Total Nodes: ${allPods.length}`);
+  // 5. Label and Merge
+  // We apply the source label AFTER the comparison so it doesn't break the JSON match
+  const labeledPrivate = privatePods.map((p: any) => ({ ...p, rpc_source: 'Private RPC' }));
+  const labeledPublic = finalPublicPods.map((p: any) => ({ ...p, rpc_source: 'Public Swarm' }));
+
+  const mergedList = [...labeledPrivate, ...labeledPublic];
+  
+  console.log(`[PULSE] Private: ${privatePods.length} | Public (Filtered): ${finalPublicPods.length} | Total: ${mergedList.length}`);
 
   let sourceLabel = 'No Connection';
-  if (successfulRPCs.length > 0) {
-    if (successfulRPCs.some(u => u.includes('trycloudflare'))) {
-      sourceLabel = `Tunnel + ${successfulRPCs.length - 1} Public RPCs`;
-    } else {
-      sourceLabel = `Public Swarm Only (${successfulRPCs.length})`;
-    }
+  if (mergedList.length > 0) {
+      sourceLabel = `Global View (${mergedList.length} Nodes)`;
   }
 
-  return { pods: allPods, source: sourceLabel };
+  return { pods: mergedList, source: sourceLabel };
 }
 
 async function fetchCredits() {
@@ -224,7 +222,6 @@ async function resolveLocations(ips: string[]) {
 
 // --- MAIN EXPORT ---
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  // Correctly destructure the return object
   const [{ pods: rawPods, source }, creditsData] = await Promise.all([ fetchRawData(), fetchCredits() ]);
   
   if (!rawPods || rawPods.length === 0) throw new Error("Network Unreachable (0 Nodes Found)");
@@ -253,7 +250,6 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   mainnetValues.sort((a, b) => a - b);
   devnetValues.sort((a, b) => a - b);
   const medianMainnet = mainnetValues.length ? mainnetValues[Math.floor(mainnetValues.length / 2)] : 0;
-  // Use rawPods for median calculation even with duplicates to be safe
   const medianStorage = rawPods.length ? rawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b)[Math.floor(rawPods.length / 2)] : 1;
 
   // Consensus
