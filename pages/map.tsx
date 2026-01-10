@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react'; // Added useLayoutEffect
+import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -99,6 +99,11 @@ export default function MapPage() {
   const listRef = useRef<HTMLDivElement>(null);
   const hasDeepLinked = useRef(false);
 
+  // --- SCROLL FIX REFS (Hoisted to Parent) ---
+  // We hoist these so they persist even when the modal content re-renders
+  const modalListRef = useRef<HTMLDivElement>(null);
+  const scrollPosRef = useRef(0);
+
   const [dynamicThresholds, setDynamicThresholds] = useState<number[]>([0, 0, 0, 0]);
 
   const visibleNodes = useMemo(() => locations.reduce((sum, loc) => sum + loc.count, 0), [locations]);
@@ -160,6 +165,17 @@ export default function MapPage() {
       if (locations.length === 0) return false; 
       return !locations.some(l => l.totalCredits !== null);
   }, [locations]);
+
+  // Snapshot & Restore Scroll Position for Modal
+  useLayoutEffect(() => {
+    if (modalListRef.current) {
+      modalListRef.current.scrollTop = scrollPosRef.current;
+    }
+  }, [countryBreakdown]); // Runs when data updates
+
+  const handleModalScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    scrollPosRef.current = e.currentTarget.scrollTop;
+  };
 
   // Scroll to Active Effect
   useEffect(() => {
@@ -533,34 +549,15 @@ export default function MapPage() {
     );
   };
 
-  const CountryBreakdownModal = () => {
-    // 1. Create a ref to access the DOM element for the scrollable list
-    const modalListRef = useRef<HTMLDivElement>(null);
-
-    // 2. Create a ref to store the current scroll position.
-    // We use a ref instead of state because we don't want to trigger re-renders on scroll.
-    const scrollPosRef = useRef(0);
-
-    // 3. The "Fix": useLayoutEffect fires synchronously after the DOM updates but before painting.
-    // If 'countryBreakdown' changes (new live data), this hook immediately restores the scroll position.
-    useLayoutEffect(() => {
-        if (modalListRef.current) {
-            modalListRef.current.scrollTop = scrollPosRef.current;
-        }
-    }, [countryBreakdown]);
-
-    // 4. Update the stored scroll position whenever the user scrolls
-    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-        scrollPosRef.current = e.currentTarget.scrollTop;
-    };
-
+  // Changed from Component to a Helper Function to prevent unmounting
+  const renderCountryBreakdownModal = () => {
     if (!isCountryModalOpen) return null;
 
     return (
       <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setIsCountryModalOpen(false)}>
         <div className="bg-[#09090b] border border-zinc-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
 
-          {/* Header with Integrated Toggles */}
+          {/* Header */}
           <div className="p-5 border-b border-zinc-800 flex flex-col gap-4 bg-zinc-900/50">
             <div className="flex justify-between items-start">
               <div>
@@ -575,17 +572,15 @@ export default function MapPage() {
                 <X size={18} />
               </button>
             </div>
-
-            {/* Filter Toggles Inside Modal */}
             <div className="w-full">
                <ViewToggles className="w-full justify-between bg-black/40 border-zinc-800" />
             </div>
           </div>
 
-          {/* List with Ref and Scroll Handler */}
+          {/* List with HOISTED Ref and Scroll Handler */}
           <div 
             ref={modalListRef}
-            onScroll={handleScroll}
+            onScroll={handleModalScroll}
             className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar"
           >
             {countryBreakdown.map((c, i) => {
@@ -634,11 +629,9 @@ export default function MapPage() {
 
                     <div className="flex justify-between items-center text-[9px] font-mono uppercase tracking-wide text-zinc-500">
                       <span>
-                        {/* 2 Decimal Places in Modal */}
                         <span className={textColor}>{primaryShare.toFixed(2)}%</span> of {metricLabel}
                       </span>
                       <span>
-                        {/* 2 Decimal Places in Modal */}
                         Hosts <span className="text-zinc-300">{nodeShare.toFixed(2)}%</span> of Total Nodes
                       </span>
                     </div>
@@ -679,8 +672,8 @@ export default function MapPage() {
           </div>
       )}
 
-      {/* RENDER THE MODAL */}
-      <CountryBreakdownModal />
+      {/* RENDER THE MODAL FUNCTION */}
+      {renderCountryBreakdownModal()}
 
       {/* HEADER COMPONENT */}
       <div className="shrink-0 w-full z-50 flex flex-col gap-3 px-4 md:px-6 py-3 bg-[#09090b] border-b border-zinc-800/30">
