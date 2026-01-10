@@ -512,16 +512,19 @@ export default function MapPage() {
     return (
       <button 
         onClick={() => setIsCountryModalOpen(true)}
-        className={`bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-600 rounded-xl px-3 py-2 transition-all cursor-pointer group items-center gap-3 backdrop-blur-sm ${className}`}
+        className={`relative overflow-hidden bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-500/50 rounded-xl px-3 py-2 transition-all cursor-pointer group items-center gap-3 backdrop-blur-md shadow-lg ${className}`}
       >
-        <div className="flex -space-x-2">
+        {/* SCANNER LIGHT EFFECT */}
+        <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/10 to-transparent animate-scanner pointer-events-none" />
+
+        <div className="flex -space-x-2 relative z-10">
           {topFlags.map(code => (
             <div key={code} className="w-5 h-5 rounded-full border border-zinc-900 overflow-hidden relative z-0 group-hover:z-10 transition-all shadow-sm">
               <img src={`https://flagcdn.com/w40/${code}.png`} className="w-full h-full object-cover" alt="flag" />
             </div>
           ))}
         </div>
-        <div className="text-xs font-bold text-zinc-300 group-hover:text-white flex items-center gap-1">
+        <div className="text-xs font-bold text-zinc-300 group-hover:text-white flex items-center gap-1 relative z-10">
           <span>+{count} Regions Active</span>
           <BarChart3 size={12} className="text-zinc-600 group-hover:text-white transition-colors" />
         </div>
@@ -534,21 +537,28 @@ export default function MapPage() {
 
     return (
       <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setIsCountryModalOpen(false)}>
-        <div className="bg-[#09090b] border border-zinc-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+        <div className="bg-[#09090b] border border-zinc-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
           
-          {/* Header */}
-          <div className="p-5 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
-            <div>
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Globe size={18} className="text-blue-500" /> Global Breakdown
-              </h3>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                Ranking {countryBreakdown.length} active regions by {viewMode.toLowerCase()}.
-              </p>
+          {/* Header with Integrated Toggles */}
+          <div className="p-5 border-b border-zinc-800 flex flex-col gap-4 bg-zinc-900/50">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Globe size={18} className="text-blue-500" /> Global Breakdown
+                </h3>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Ranking {countryBreakdown.length} active regions.
+                </p>
+              </div>
+              <button onClick={() => setIsCountryModalOpen(false)} className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-full text-zinc-400 hover:text-white transition">
+                <X size={18} />
+              </button>
             </div>
-            <button onClick={() => setIsCountryModalOpen(false)} className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-full text-zinc-400 hover:text-white transition">
-              <X size={18} />
-            </button>
+
+            {/* Filter Toggles Inside Modal */}
+            <div className="w-full">
+               <ViewToggles className="w-full justify-between bg-black/40 border-zinc-800" />
+            </div>
           </div>
 
           {/* List */}
@@ -568,7 +578,7 @@ export default function MapPage() {
                 metricLabel = 'Earnings';
                 metricValue = formatCredits(c.credits);
               } else {
-                primaryShare = c.avgHealth; // For health, bar is absolute score
+                primaryShare = c.avgHealth; 
                 metricLabel = 'Health';
                 metricValue = c.avgHealth.toFixed(1) + '%';
               }
@@ -602,7 +612,7 @@ export default function MapPage() {
                         <span className={textColor}>{primaryShare.toFixed(1)}%</span> of {metricLabel}
                       </span>
                       <span>
-                        Makes up <span className="text-zinc-300">{nodeShare.toFixed(1)}%</span> of Nodes
+                        Hosts <span className="text-zinc-300">{nodeShare.toFixed(1)}%</span> of Total Nodes
                       </span>
                     </div>
                   </div>
@@ -619,7 +629,18 @@ export default function MapPage() {
     <div className="fixed inset-0 bg-black text-white font-sans overflow-hidden flex flex-col">
       <Head>
         <title>Xandeum Command Center</title>
-        <style>{`@supports (padding: max(0px)) { .pb-safe { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); } }`}</style>
+        <style>{`
+          @keyframes scanner {
+            0% { transform: translateX(-100%) skewX(-15deg); }
+            50%, 100% { transform: translateX(200%) skewX(-15deg); }
+          }
+          .animate-scanner {
+            animation: scanner 3s ease-in-out infinite;
+          }
+          @supports (padding: max(0px)) { 
+            .pb-safe { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); } 
+          }
+        `}</style>
       </Head>
 
       {toast && (
