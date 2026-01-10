@@ -99,8 +99,7 @@ export default function MapPage() {
   const listRef = useRef<HTMLDivElement>(null);
   const hasDeepLinked = useRef(false);
 
-  // --- SCROLL FIX REFS (Hoisted to Parent) ---
-  // We hoist these so they persist even when the modal content re-renders
+  // --- SCROLL FIX REFS ---
   const modalListRef = useRef<HTMLDivElement>(null);
   const scrollPosRef = useRef(0);
 
@@ -171,7 +170,7 @@ export default function MapPage() {
     if (modalListRef.current) {
       modalListRef.current.scrollTop = scrollPosRef.current;
     }
-  }, [countryBreakdown]); // Runs when data updates
+  }, [countryBreakdown]); 
 
   const handleModalScroll = (e: React.UIEvent<HTMLDivElement>) => {
     scrollPosRef.current = e.currentTarget.scrollTop;
@@ -385,7 +384,6 @@ export default function MapPage() {
   };
 
   const getXRayStats = (loc: LocationData, index: number, tierColor: string) => {
-      // DRAWER: 1 Decimal Place (Original)
       const globalShare = ((loc.count / stats.totalNodes) * 100).toFixed(1);
       const rawPercentile = ((locations.length - index) / locations.length) * 100;
       const topPercent = 100 - rawPercentile;
@@ -522,7 +520,6 @@ export default function MapPage() {
   );
 
   const RegionTrigger = ({ className = "" }: { className?: string }) => {
-    // Get top 3 flags safely
     const topFlags = countryBreakdown.slice(0, 3).map(c => c.code.toLowerCase());
     const count = Math.max(0, countryBreakdown.length - 3);
 
@@ -531,7 +528,6 @@ export default function MapPage() {
         onClick={() => setIsCountryModalOpen(true)}
         className={`relative overflow-hidden bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-500/50 rounded-xl px-3 py-2 transition-all cursor-pointer group items-center gap-3 backdrop-blur-md shadow-lg ${className}`}
       >
-        {/* SCANNER LIGHT EFFECT */}
         <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/10 to-transparent animate-scanner pointer-events-none" />
 
         <div className="flex -space-x-2 relative z-10">
@@ -549,7 +545,6 @@ export default function MapPage() {
     );
   };
 
-  // Changed from Component to a Helper Function to prevent unmounting
   const renderCountryBreakdownModal = () => {
     if (!isCountryModalOpen) return null;
 
@@ -557,7 +552,6 @@ export default function MapPage() {
       <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setIsCountryModalOpen(false)}>
         <div className="bg-[#09090b] border border-zinc-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
 
-          {/* Header */}
           <div className="p-5 border-b border-zinc-800 flex flex-col gap-4 bg-zinc-900/50">
             <div className="flex justify-between items-start">
               <div>
@@ -577,14 +571,12 @@ export default function MapPage() {
             </div>
           </div>
 
-          {/* List with HOISTED Ref and Scroll Handler */}
           <div 
             ref={modalListRef}
             onScroll={handleModalScroll}
             className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar"
           >
             {countryBreakdown.map((c, i) => {
-              // Calculate Dynamic Percentages
               let primaryShare = 0;
               let metricLabel = '';
               let metricValue = '';
@@ -620,10 +612,8 @@ export default function MapPage() {
                     </div>
                   </div>
 
-                  {/* Dual Data Bar */}
                   <div className="space-y-1.5">
                     <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden flex">
-                      {/* Primary Metric Bar */}
                       <div className={`h-full ${barColor} shadow-[0_0_10px_currentColor]`} style={{ width: `${Math.max(2, primaryShare)}%` }}></div>
                     </div>
 
@@ -672,7 +662,6 @@ export default function MapPage() {
           </div>
       )}
 
-      {/* RENDER THE MODAL FUNCTION */}
       {renderCountryBreakdownModal()}
 
       {/* HEADER COMPONENT */}
@@ -698,7 +687,6 @@ export default function MapPage() {
                         }} 
                         className="flex md:items-center gap-1.5 text-zinc-400 hover:text-white transition-colors cursor-help group text-right"
                     >
-                        {/* DESKTOP VIEW (Single Line) */}
                         <div className="hidden md:flex items-center gap-1.5">
                             <HelpCircle size={12} className="text-zinc-500" />
                             <span className="text-xs md:text-sm font-bold tracking-tight">
@@ -706,7 +694,6 @@ export default function MapPage() {
                             </span>
                         </div>
 
-                        {/* MOBILE VIEW (Stacked 2 Rows) */}
                         <div className="md:hidden flex flex-col items-end leading-none mt-0.5">
                             <span className="text-[7px] font-bold uppercase tracking-widest text-zinc-600 mb-0.5">
                                 Tracking
@@ -720,18 +707,15 @@ export default function MapPage() {
             </div>
         </div>
 
-        {/* TITLE ROW WITH INTEGRATED DESKTOP TRIGGER */}
         <div className="flex justify-between items-end">
             <div>
                 <h1 className="text-lg md:text-2xl font-bold tracking-tight text-white leading-tight">{getDynamicTitle()}</h1>
                 <p className="text-xs text-zinc-400 leading-relaxed mt-1 max-w-2xl">{getDynamicSubtitle()}</p>
             </div>
 
-            {/* DESKTOP TRIGGER (Fills the empty space on the right) */}
             {!loading && <RegionTrigger className="hidden md:flex" />}
         </div>
 
-        {/* MOBILE TRIGGER (Sits below title) */}
         {!loading && <RegionTrigger className="flex md:hidden w-full justify-center bg-zinc-900/50" />}
       </div>
 
@@ -766,7 +750,6 @@ export default function MapPage() {
                 </ZoomableGroup>
                 </ComposableMap>
             )}
-            {/* ZOOM CONTROLS */}
             <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-30">
                 <button onClick={handleZoomIn} className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Plus size={16} /></button>
                 <button onClick={handleZoomOut} className="p-2 md:p-3 bg-zinc-900/90 border border-zinc-700 text-zinc-300 rounded-xl hover:text-white"><Minus size={16} /></button>
@@ -831,9 +814,15 @@ export default function MapPage() {
                                         </div>
                                         {topData && (() => {
                                             const isUntrackedKing = viewMode === 'CREDITS' && topData.isUntracked;
+                                            
+                                            const getCardStyle = () => {
+                                                if (viewMode === 'CREDITS' && isGlobalCreditsOffline) return 'cursor-not-allowed border-red-500/30 bg-red-900/10 opacity-100';
+                                                if (isUntrackedKing) return 'cursor-not-allowed opacity-70';
+                                                return 'cursor-pointer hover:bg-zinc-800';
+                                            };
 
                                             const CardContent = (
-                                                <div className={`w-full bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl p-3 flex items-center justify-between transition-all group/card ${isUntrackedKing ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}>
+                                                <div className={`w-full border border-zinc-700/50 rounded-xl p-3 flex items-center justify-between transition-all group/card ${getCardStyle()} ${isGlobalCreditsOffline ? '' : 'bg-zinc-800/50'}`}>
                                                     <div className="flex items-center gap-3">
                                                         <div className={`p-2 rounded-lg ${MODE_COLORS[viewMode].bg} text-white`}>
                                                             {viewMode === 'STORAGE' ? <Database size={14} /> : viewMode === 'CREDITS' ? <Zap size={14} /> : <Activity size={14} />}
@@ -857,6 +846,21 @@ export default function MapPage() {
                                                     </div>
                                                 </div>
                                             );
+
+                                            if (viewMode === 'CREDITS' && isGlobalCreditsOffline) {
+                                                return (
+                                                    <div onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setToast({
+                                                            msg: "Credits API is currently offline. Leaderboard data is unavailable.",
+                                                            type: 'error'
+                                                        });
+                                                        setTimeout(() => setToast(null), 5000);
+                                                    }}>
+                                                        {CardContent}
+                                                    </div>
+                                                );
+                                            }
 
                                             if (isUntrackedKing) {
                                                 return (
