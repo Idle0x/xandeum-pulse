@@ -7,8 +7,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
 
+  // 1. Capture the mode from query string (default to 'fast')
+  const mode = req.query.mode === 'swarm' ? 'swarm' : 'fast';
+
   try {
-    const { nodes, stats } = await getNetworkPulse();
+    // 2. Pass mode to the brain
+    const { nodes, stats } = await getNetworkPulse(mode);
 
     res.status(200).json({
       result: {
@@ -18,13 +22,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
   } catch (error) {
-    console.error("Stats API Fatal Error:", error);
-    
-    // Return 503 (Service Unavailable) so frontend knows to keep retrying or show 'Offline'
+    console.error(`Stats API Fatal Error (${mode} mode):`, error);
+
     res.status(503).json({ 
         error: 'Pulse System Offline', 
         details: String(error),
-        // Fallback stats so UI doesn't completely break if it tries to read stats
         stats: {
             totalNodes: 0,
             systemStatus: { rpc: false, credits: false }
