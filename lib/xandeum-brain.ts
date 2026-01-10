@@ -125,7 +125,7 @@ const AXIOS_CONFIG_CREDITS = {
     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json, text/plain, */*' }
 };
 
-// --- FETCHING WITH STRICT DEDUPLICATION ---
+// --- FETCHING WITH STABLE FINGERPRINT DEDUPLICATION ---
 async function fetchRawData() {
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
 
@@ -150,23 +150,27 @@ async function fetchRawData() {
   let publicPods: any[] = [];
   publicResults.forEach(pods => publicPods.push(...pods));
 
-  // 4. THE EXACT MATCH FILTER
-  // We trust the Private list first. We create a "Fingerprint Set" of exactly what we already have.
-  // Note: JSON.stringify is order-dependent, but RPC responses are usually consistent.
-  // Ideally, we'd sort keys, but for this specific API, exact string matching is usually sufficient.
-  const privateFingerprints = new Set(privatePods.map((p: any) => JSON.stringify(p)));
+  // --- 4. THE 5-POINT STABLE FILTER ---
+  
+  // Helper to generate the unique ID for a node state
+  const getFingerprint = (p: any) => {
+    return `${p.pubkey}-${p.address}-${p.version}-${p.storage_committed}-${p.storage_used}`;
+  };
+
+  // Create a Set of fingerprints from the Private RPC (Our Source of Truth)
+  const privateFingerprints = new Set(privatePods.map(getFingerprint));
 
   const finalPublicPods: any[] = [];
   
   publicPods.forEach((pod: any) => {
-    const fingerprint = JSON.stringify(pod);
-    // If we DO NOT have this exact JSON string in our private list, we keep it.
-    // If it matches exactly, we skip it (because the Private list already has it).
+    const fingerprint = getFingerprint(pod);
+    
+    // If this Exact 5-Point signature is NOT in the private list, we keep it.
+    // If it IS in the private list, we drop it (because it's a duplicate).
     if (!privateFingerprints.has(fingerprint)) {
       finalPublicPods.push(pod);
-      // Optional: Add to set to prevent duplicates strictly within the public list too?
-      // For now, we only dedupe against Private to be safe.
-      // privateFingerprints.add(fingerprint); 
+      // Optional: Add to set to self-deduplicate the public list too
+      privateFingerprints.add(fingerprint); 
     }
   });
 
@@ -176,7 +180,7 @@ async function fetchRawData() {
 
   const mergedList = [...labeledPrivate, ...labeledPublic];
   
-  console.log(`[PULSE] Private: ${privatePods.length} | Public (Filtered): ${finalPublicPods.length} | Total: ${mergedList.length}`);
+  console.log(`[PULSE] Private: ${privatePods.length} | Public (Unique): ${finalPublicPods.length} | Total: ${mergedList.length}`);
 
   let sourceLabel = 'No Connection';
   if (mergedList.length > 0) {
