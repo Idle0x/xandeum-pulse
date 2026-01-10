@@ -161,19 +161,15 @@ async function fetchPrivateMainnetNodes() {
 
 // ----------------------------------------------------
 // DUAL MODE FETCHING STRATEGY
-// 'fast' = Hero Mode (Promise.any) - Instant
-// 'swarm' = Aggregation Mode (Promise.all) - Comprehensive
 // ----------------------------------------------------
 async function fetchPublicSwarmNodes(mode: 'fast' | 'swarm') {
     const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
-    
+
     // Prepare all requests
     const requests = PUBLIC_RPC_NODES.map(ip => 
         axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC })
              .then(r => r.data?.result?.pods || [])
              .catch(() => {
-                 // In swarm mode, we just return empty array on fail.
-                 // In fast mode, Promise.any handles the errors until one succeeds.
                  if (mode === 'swarm') return []; 
                  throw new Error(ip); 
              })
@@ -181,13 +177,9 @@ async function fetchPublicSwarmNodes(mode: 'fast' | 'swarm') {
 
     try {
         if (mode === 'fast') {
-            // HERO MODE: Return the first one that replies.
-            // Fast, but incomplete (only sees what that specific node sees)
             const winner = await Promise.any(requests);
             return winner;
         } else {
-            // SWARM MODE: Wait for everyone.
-            // Slow, but complete.
             const results = await Promise.all(requests);
             const aggregatedPods: any[] = [];
             results.forEach(pods => aggregatedPods.push(...pods));
@@ -252,7 +244,7 @@ async function resolveLocations(ips: string[]) {
 // --- MAIN EXPORT ---
 
 export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  // 1. Fetch RAW data (Pass mode to public fetcher)
+  // 1. Fetch RAW data
   const [rawMainnet, rawDevnet, creditsData] = await Promise.all([ 
       fetchPrivateMainnetNodes(), 
       fetchPublicSwarmNodes(mode), 
@@ -264,23 +256,9 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   }
 
   // ---------------------------------------------------------
-  // 2. THE STRICT 6-POINT FILTER (Identity-Aware Deduplication)
+  // 2. CREDIT MAPPING (Source of Truth for Classification)
   // ---------------------------------------------------------
   
-  const getStrictFingerprint = (p: any) => {
-    const key = p.pubkey || p.public_key;
-    return `${key}|${p.address}|${p.storage_committed}|${p.storage_used}|${p.version}|${p.is_public}`;
-  };
-
-  const mainnetFingerprints = new Set(rawMainnet.map(getStrictFingerprint));
-
-  const uniqueDevnetPods = rawDevnet.filter((p: any) => {
-      const fp = getStrictFingerprint(p);
-      return !mainnetFingerprints.has(fp);
-  });
-
-  // ---------------------------------------------------------
-
   const mainnetCreditMap = new Map<string, number>();
   const devnetCreditMap = new Map<string, number>();
   const mainnetValues: number[] = [];
@@ -297,6 +275,25 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const key = c.pod_id || c.pubkey || c.node;
       if (key && !isNaN(val)) { devnetCreditMap.set(key, val); devnetValues.push(val); }
   });
+
+  // ---------------------------------------------------------
+  // 3. THE STRICT FILTER (Identity-Aware Deduplication)
+  // ---------------------------------------------------------
+
+  const getStrictFingerprint = (p: any) => {
+    const key = p.pubkey || p.public_key;
+    return `${key}|${p.address}|${p.storage_committed}|${p.storage_used}|${p.version}|${p.is_public}`;
+  };
+
+  const mainnetFingerprints = new Set(rawMainnet.map(getStrictFingerprint));
+
+  // Filter Devnet (Swarm) nodes that are exact duplicates of Private RPC nodes
+  const uniqueDevnetPods = rawDevnet.filter((p: any) => {
+      const fp = getStrictFingerprint(p);
+      return !mainnetFingerprints.has(fp);
+  });
+
+  // ---------------------------------------------------------
 
   const medianMainnet = mainnetValues.sort((a, b) => a - b)[Math.floor(mainnetValues.length / 2)] || 0;
   const medianDevnet = devnetValues.sort((a, b) => a - b)[Math.floor(devnetValues.length / 2)] || 0;
@@ -364,8 +361,27 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       };
   };
 
+  // ---------------------------------------------------------
+  // 4. CLASSIFICATION & RECOVERY LOGIC
+  // ---------------------------------------------------------
+
+  // Process Private RPC Nodes (Always Mainnet)
   rawMainnet.forEach((pod: any) => expandedNodes.push(scoreNode(pod, 'MAINNET')));
-  uniqueDevnetPods.forEach((pod: any) => expandedNodes.push(scoreNode(pod, 'DEVNET')));
+
+  // Process Public Swarm Nodes (Check Credentials)
+  uniqueDevnetPods.forEach((pod: any) => {
+      const key = pod.pubkey || pod.public_key;
+      // KEY FIX: If this "Devnet" node has Mainnet Credits, it's actually a Mainnet Node!
+      const isActuallyMainnet = mainnetCreditMap.has(key);
+      
+      if (isActuallyMainnet) {
+          expandedNodes.push(scoreNode(pod, 'MAINNET'));
+      } else {
+          expandedNodes.push(scoreNode(pod, 'DEVNET'));
+      }
+  });
+
+  // ---------------------------------------------------------
 
   const mainnetNodes = expandedNodes.filter(n => n.network === 'MAINNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const devnetNodes = expandedNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
