@@ -179,9 +179,10 @@ export default function Leaderboard() {
       }));
   }, [allNodes, networkFilter, searchQuery]);
 
-    // --- 3. DEEP LINK LOGIC (Composite ID Support) ---
+    // --- 3. DEEP LINK LOGIC (Composite ID Support + Loading Wait) ---
   useEffect(() => {
-      if (!router.isReady || !router.query.highlight || allNodes.length === 0) return;
+      // WAITING FOR LOADING IS CRITICAL HERE
+      if (loading || !router.isReady || !router.query.highlight || allNodes.length === 0) return;
 
       const targetKey = router.query.highlight as string;
       const targetNetwork = router.query.network as string;
@@ -237,10 +238,10 @@ export default function Leaderboard() {
               setTimeout(() => {
                   const el = document.getElementById(`node-${compositeId}`);
                   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }, 100);
+              }, 300); // Increased delay slightly to allow DOM render
           }, 150);
       }
-  }, [router.isReady, router.query, allNodes, networkFilter]); 
+  }, [loading, router.isReady, router.query, allNodes, networkFilter]); // Added 'loading' dependency
 
   // --- 4. SIMULATOR LOGIC ---
 
