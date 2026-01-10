@@ -4,18 +4,18 @@ import geoip from 'geoip-lite';
 // --- CONFIGURATION ---
 
 // 1. SOURCE OF TRUTH (Your Private Mainnet Node)
+// Note: Ensure this URL is stable. If the tunnel drops, Mainnet nodes will disappear.
 const PRIVATE_MAINNET_RPC = 'https://persian-starts-sounds-colon.trycloudflare.com/rpc';
 
-// 2. DISCOVERY SWARM (Public Nodes)
+// 2. DISCOVERY SWARM (Public Nodes - HTTP)
 const PUBLIC_RPC_NODES = [
   '173.212.203.145', '161.97.97.41', '192.190.136.36', '192.190.136.38',
   '207.244.255.1', '192.190.136.28', '192.190.136.29', '159.195.4.138', '152.53.155.30'
 ];
 
-const TIMEOUT_RPC = 5000;
+const TIMEOUT_RPC = 10000; // Increased to 10s for reliability
 const TIMEOUT_CREDITS = 8000;
 
-// API ENDPOINTS
 const API_CREDITS_MAINNET = 'https://podcredits.xandeum.network/api/mainnet-pod-credits';
 const API_CREDITS_DEVNET  = 'https://podcredits.xandeum.network/api/pods-credits';
 
@@ -30,7 +30,7 @@ export interface EnrichedNode {
   last_seen_timestamp: number;
   is_public: boolean;
   isUntracked?: boolean;
-  network: 'MAINNET' | 'DEVNET'; // Strict typing, no UNKNOWN
+  network: 'MAINNET' | 'DEVNET';
   storage_used: number;      
   storage_committed: number; 
   credits: number | null; 
@@ -52,8 +52,7 @@ export interface EnrichedNode {
   health_rank?: number; 
 }
 
-// --- HELPERS ---
-
+// --- HELPERS (Same as before) ---
 export const cleanSemver = (v: string) => {
   if (!v) return '0.0.0';
   const mainVer = v.split('-')[0]; 
@@ -103,7 +102,6 @@ export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: str
     return Math.max(0, 10 - (distance - 5));
 };
 
-// --- SCORING FACTORY ---
 export const calculateVitalityScore = (
     storageCommitted: number, 
     storageUsed: number,
@@ -149,44 +147,49 @@ export const calculateVitalityScore = (
   };
 };
 
-// --- FETCHING ---
-const AXIOS_CONFIG = {
-    timeout: TIMEOUT_CREDITS,
-    headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        'Accept': 'application/json, text/plain, */*'
-    }
-};
+// --- FETCHING LOGIC ---
 
 // Fetch Mainnet nodes from the Private RPC (Source of Truth)
 async function fetchPrivateMainnetNodes() {
     const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
     try {
+        console.log("Fetching Private RPC...");
         const res = await axios.post(PRIVATE_MAINNET_RPC, payload, { timeout: TIMEOUT_RPC });
         if (res.data?.result?.pods && Array.isArray(res.data.result.pods)) {
+            console.log(`Private RPC Success: Found ${res.data.result.pods.length} nodes`);
             return res.data.result.pods;
         }
     } catch (e) {
-        console.warn("Private Mainnet RPC Unreachable:", e);
+        console.warn("Private Mainnet RPC Failed:", (e as any).message);
     }
     return [];
 }
 
-// Fetch All nodes from the Public Swarm (Discovery)
+// Aggressive Fetch for Public Swarm
 async function fetchPublicSwarmNodes() {
     const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
-    const shuffled = PUBLIC_RPC_NODES.sort(() => 0.5 - Math.random()).slice(0, 3);
     
+    // We try Promise.any on ALL nodes instead of just 3. 
+    // This increases the chance of finding a working node significantly.
+    const promises = PUBLIC_RPC_NODES.map(ip => 
+        axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC })
+             .then(r => r.data?.result?.pods || [])
+             .catch(() => { throw new Error(ip); }) // Throw so Promise.any ignores it
+    );
+
     try {
-        const winner = await Promise.any(shuffled.map(ip => 
-            axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC })
-                 .then(r => r.data?.result?.pods || [])
-        ));
+        console.log("Fetching Public Swarm...");
+        const winner = await Promise.any(promises);
+        console.log(`Public Swarm Success: Found ${winner.length} nodes`);
         return winner;
-    } catch (e) { return []; }
+    } catch (e) {
+        console.error("All Public RPC nodes failed to respond.");
+        return [];
+    }
 }
 
 async function fetchCredits() {
+    const AXIOS_CONFIG = { timeout: TIMEOUT_CREDITS };
     const [mainnetRes, devnetRes] = await Promise.allSettled([
         axios.get(API_CREDITS_MAINNET, AXIOS_CONFIG),
         axios.get(API_CREDITS_DEVNET, AXIOS_CONFIG)
@@ -229,7 +232,7 @@ async function resolveLocations(ips: string[]) {
 // --- MAIN EXPORT ---
 
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  // 1. Parallel Fetching: Private RPC (Mainnet) + Public Swarm (Discovery) + Credits
+  // 1. Parallel Fetching with Error Handling
   const [privateMainnetNodes, publicSwarmNodes, creditsData] = await Promise.all([ 
       fetchPrivateMainnetNodes(), 
       fetchPublicSwarmNodes(), 
@@ -237,7 +240,8 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   ]);
 
   if (privateMainnetNodes.length === 0 && publicSwarmNodes.length === 0) {
-      throw new Error("Network Unreachable");
+      // Return empty instead of throwing to prevent crashing the UI completely
+      return { nodes: [], stats: { consensusVersion: '0.0.0', totalNodes: 0, systemStatus: { rpc: false, credits: false }, avgBreakdown: { total: 0, uptime: 0, version: 0, reputation: 0, storage: 0 } } };
   }
 
   // 2. Prepare Credit Maps
@@ -264,10 +268,10 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const medianDevnet = devnetValues.length ? devnetValues[Math.floor(devnetValues.length / 2)] : 0;
 
   // 3. Topology Filtering (The Source of Truth)
+  // Logic: Private RPC = MAINNET. Everything else = DEVNET.
   const finalNodeMap = new Map<string, { pod: any, network: 'MAINNET' | 'DEVNET' }>();
   
   // A. Process Private Mainnet RPC (Highest Priority)
-  // Everything here is GUARANTEED Mainnet
   privateMainnetNodes.forEach((pod: any) => {
       const key = pod.pubkey || pod.public_key;
       if (key) {
@@ -276,9 +280,9 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   });
 
   // B. Process Public Swarm (Discovery)
-  // If it's NOT in the map yet, it must be DEVNET
   publicSwarmNodes.forEach((pod: any) => {
       const key = pod.pubkey || pod.public_key;
+      // If it's NOT in the map yet (meaning not in private rpc), it must be DEVNET
       if (key && !finalNodeMap.has(key)) {
           finalNodeMap.set(key, { pod, network: 'DEVNET' });
       }
@@ -337,11 +341,11 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       expandedNodes.push({
           ...pod,
           pubkey: key,
-          network, // Strict assignment from Topology Filter
+          network, 
           storage_committed: storageCommitted, 
           storage_used: storageUsed,           
           credits: credits, 
-          isUntracked: false, // Concept deprecated in this logic
+          isUntracked: false,
           health: vitality.total,
           healthBreakdown: vitality.breakdown, 
           location: { 
