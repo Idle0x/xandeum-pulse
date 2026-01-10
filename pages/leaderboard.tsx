@@ -77,7 +77,7 @@ export default function Leaderboard() {
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const lastProcessedHighlight = useRef<string | null>(null);
 
-  // --- DATA FETCHING ---
+  // --- 1. DATA FETCHING ---
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -148,6 +148,7 @@ export default function Leaderboard() {
     fetchData();
   }, []);
 
+  // --- 2. DETERMINISTIC FILTER & RANKING LOGIC ---
   const filteredAndRanked = useMemo(() => {
       const networkList = allNodes.filter(n => (networkFilter === 'COMBINED' || n.network === networkFilter));
       networkList.sort((a, b) => b.credits - a.credits || b.health - a.health || a.pubkey.localeCompare(b.pubkey));
@@ -157,7 +158,7 @@ export default function Leaderboard() {
       return rankedList.filter(n => n.pubkey.toLowerCase().includes(searchLower) || (n.address && n.address.toLowerCase().includes(searchLower)));
   }, [allNodes, networkFilter, searchQuery]);
 
-  // --- AUTOPILOT TIMER LOGIC ---
+  // --- 3. AUTOPILOT TIMER LOGIC ---
   useEffect(() => {
     if (autoPilotCountdown === null) return;
     if (autoPilotCountdown <= 0) {
@@ -169,7 +170,7 @@ export default function Leaderboard() {
     return () => clearTimeout(timer);
   }, [autoPilotCountdown]);
 
-  // --- DEEP LINK LOGIC ---
+  // --- 4. DEEP LINK LOGIC ---
   useEffect(() => {
       if (loading || !router.isReady || !router.query.highlight || allNodes.length === 0) return;
       const targetKey = router.query.highlight as string;
@@ -198,7 +199,7 @@ export default function Leaderboard() {
       }
   }, [loading, router.isReady, router.query, allNodes, networkFilter]);
 
-  // --- SIMULATOR FUNCTIONS ---
+  // --- 5. SIMULATOR LOGIC ---
   const clearImport = () => {
     setImportKey('');
     setImportSuccess(false);
@@ -220,7 +221,7 @@ export default function Leaderboard() {
         setImportSuccess(true);
         setSimMode('IMPORT');
         setImportedBaseCredits(node.credits);
-        setAutoPilotCountdown(5); // Start the 5s auto-pilot
+        setAutoPilotCountdown(5); 
     } else {
         setImportError("Key not found in active leaderboard.");
     }
@@ -239,11 +240,13 @@ export default function Leaderboard() {
           networkAvgMult: networkAvgMult,
           networkFees: simNetworkFees
       });
-      constRawCredits = simMode === 'IMPORT' ? importedBaseCredits : result.userBaseCredits;
+      
+      const rawCredits = simMode === 'IMPORT' ? importedBaseCredits : result.userBaseCredits;
       const boostedCredits = simMode === 'IMPORT' ? (importedBaseCredits * result.geoMean) : result.boostedCredits;
       const estimatedNetworkBoostedTotal = (currentNetworkTotal * networkAvgMult) + (simMode === 'NEW' ? boostedCredits : 0);
       const share = estimatedNetworkBoostedTotal > 0 ? boostedCredits / estimatedNetworkBoostedTotal : 0;
       const stoinc = simNetworkFees * 0.94 * share;
+      
       return { rawCredits, geoMean: result.geoMean, boostedCredits, share, stoinc };
   }, [simStorageVal, simStorageUnit, simNodes, simPerf, simStake, boostCounts, allNodes, networkAvgMult, simNetworkFees, simMode, importedBaseCredits]);
 
@@ -257,7 +260,7 @@ export default function Leaderboard() {
       e.stopPropagation();
       setShowSim(true);
       setSimStep(0);
-      handleImportNode(nodeKey); // Auto-paste and trigger logic
+      handleImportNode(nodeKey);
       window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -295,7 +298,6 @@ export default function Leaderboard() {
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans p-2 md:p-8 selection:bg-yellow-500/30">
       <Head><title>Xandeum Pulse - Credits & Reputation</title></Head>
 
-      {/* HEADER */}
       <div className="max-w-5xl mx-2 md:mx-auto mb-6 md:mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
         <Link href="/" className="flex items-center gap-2 text-zinc-500 hover:text-white transition text-xs md:text-sm font-bold uppercase tracking-wider group">
           <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back to Monitor
@@ -307,9 +309,7 @@ export default function Leaderboard() {
         <div className="w-32 hidden md:block"></div>
       </div>
 
-      {/* --- STOINC SIMULATOR WIZARD --- */}
       <div className="max-w-5xl mx-auto mb-6 md:mb-10 bg-gradient-to-b from-zinc-900 to-black border border-yellow-500/30 rounded-xl md:rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.1)] transition-all duration-300">
-
           <div className="p-3 md:p-4 bg-yellow-500/10 border-b border-yellow-500/20 flex justify-between items-center cursor-pointer hover:bg-yellow-500/20 transition" onClick={() => setShowSim(!showSim)}>
               <div className="flex items-center gap-3">
                   <div className="p-1.5 md:p-2 bg-yellow-500 text-black rounded-lg"><Calculator size={18} /></div>
@@ -334,7 +334,6 @@ export default function Leaderboard() {
               <div className="relative transition-all duration-300 ease-in-out">
                   {simStep === 0 && (
                       <div className="p-4 md:p-8 animate-in slide-in-from-right-4 fade-in duration-300 relative">
-                          {/* AUTO-PILOT OVERLAY */}
                           {autoPilotCountdown !== null && (
                               <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-6 animate-in fade-in duration-500">
                                   <div className="w-16 h-16 mb-4 relative">
@@ -716,12 +715,20 @@ export default function Leaderboard() {
         )}
       </div>
 
-      {/* FOOTER */}
+      {!loading && !creditsOffline && (
+        <div className="max-w-5xl mx-auto mt-6 text-center text-sm md:text-base text-zinc-500 flex flex-col md:flex-row items-center justify-center gap-2 font-medium">
+            <div className="flex items-center gap-2">
+                <Eye size={16} />
+                <span>Showing <span className="text-zinc-300 font-bold">{Math.min(visibleCount, filteredAndRanked.length)}</span> of <span className="text-zinc-300 font-bold">{filteredAndRanked.length}</span> nodes.</span>
+            </div>
+        </div>
+      )}
+
       {!loading && !creditsOffline && (
         <footer className="max-w-5xl mx-auto mt-8 mb-12 pt-8 border-t border-zinc-900 px-4 text-center animate-in fade-in duration-700">
           <div className="max-w-2xl mx-auto space-y-4">
             <p className="text-[10px] md:text-xs text-zinc-600 italic font-serif leading-relaxed">
-              * Participants listed have successfully submitted Storage Proofs and met network stability thresholds. This leaderboard tracks Incentivized Nodes.
+              * Participants listed have successfully submitted Storage Proofs and met network stability thresholds.
             </p>
             <div className="pt-6 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-3 text-xs font-mono text-zinc-600">
               <span className="uppercase tracking-widest opacity-70">Data fetched directly from the Pod Credits API:</span>
