@@ -179,6 +179,49 @@ const PulseGraphLoader = () => {
   );
 };
 
+const NetworkSwitcher = ({ current, onChange, size = 'md' }) => {
+  const options = [
+    { id: 'ALL', label: 'ALL' },
+    { id: 'MAINNET', label: 'MAINNET' },
+    { id: 'DEVNET', label: 'DEVNET' },
+  ];
+
+  const activeIdx = options.findIndex(o => o.id === current);
+  
+  const activeStyles = {
+    ALL: 'bg-zinc-100 shadow-[0_0_15px_rgba(255,255,255,0.2)]',
+    MAINNET: 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.4)]',
+    DEVNET: 'bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.4)]'
+  };
+
+  return (
+    <div className={`relative bg-black/60 border border-white/5 rounded-full p-1 flex items-center transition-all ${size === 'sm' ? 'w-32' : 'w-full'}`}>
+      <div 
+        className={`absolute top-1 bottom-1 left-1 rounded-full transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${activeStyles[current as keyof typeof activeStyles]}`}
+        style={{ 
+          width: `calc(33.33% - 2.5px)`, 
+          transform: `translateX(${activeIdx * 100}%)` 
+        }}
+      />
+      {options.map((opt) => (
+        <button
+          key={opt.id}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange(opt.id as 'ALL' | 'MAINNET' | 'DEVNET');
+          }}
+          className={`relative z-10 flex-1 text-[8px] md:text-[9px] font-black tracking-tighter py-1 transition-colors duration-300 ${
+            current === opt.id ? 'text-black' : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+};
+
 // --- HELPER FUNCTIONS ---
 
 const useTimeAgo = (timestamp: number | undefined) => {
@@ -1685,6 +1728,28 @@ export default function Home() {
             </button>
           </div>
 
+<div className="px-2 mb-8">
+  <div className="bg-zinc-900/80 border border-white/5 p-4 rounded-2xl relative overflow-hidden group">
+    <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition-all duration-700"></div>
+    
+    <div className="flex items-center gap-2 mb-3 relative z-10">
+      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">Protocol Context</span>
+    </div>
+
+    <div className="relative z-10">
+      <NetworkSwitcher current={networkFilter} onChange={setNetworkFilter} />
+    </div>
+
+    <div className="mt-4 flex items-center justify-between relative z-10">
+      <span className="text-[9px] text-zinc-600 font-mono font-bold uppercase tracking-tight">Active Stream</span>
+      <span className={`text-[9px] font-mono font-bold ${networkFilter === 'MAINNET' ? 'text-green-500' : networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-zinc-400'}`}>
+        LIVE_SYNC_READY
+      </span>
+    </div>
+  </div>
+</div>
+
           <nav className="flex-grow space-y-2">
             <Link href="/">
               <div className="flex items-center gap-3 p-3 bg-zinc-900/50 text-white rounded-lg border border-zinc-700 cursor-pointer">
@@ -2065,24 +2130,41 @@ export default function Home() {
             </div>
 
             {/* Total Nodes Card - Click to Cycle Filter */}
-            <div 
-              onClick={() => {
-                setNetworkFilter(prev => 
-                  prev === 'ALL' ? 'MAINNET' : prev === 'MAINNET' ? 'DEVNET' : 'ALL'
-                );
-              }}
-              className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm flex flex-col justify-between cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm flex flex-col justify-between group relative overflow-hidden transition-all duration-500 hover:border-zinc-700">
+  <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
-              <div className="flex justify-between items-start relative z-10">
-                <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Total Nodes</div>
-                <div className="flex gap-1">
-                  <div className={`w-2 h-2 rounded-full transition-all duration-300 ${networkFilter === 'ALL' ? 'bg-white scale-125' : 'bg-zinc-700 scale-100'}`} title="All Networks"/>
-                  <div className={`w-2 h-2 rounded-full transition-all duration-300 ${networkFilter === 'MAINNET' ? 'bg-green-500 scale-125' : 'bg-green-900/30 scale-100'}`} title="Mainnet Only"/>
-                  <div className={`w-2 h-2 rounded-full transition-all duration-300 ${networkFilter === 'DEVNET' ? 'bg-blue-500 scale-125' : 'bg-blue-900/30 scale-100'}`} title="Devnet Only"/>
-                </div>
-              </div>
+  <div className="flex justify-between items-center relative z-10 mb-4">
+    <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1.5">
+      <Activity size={12} className={networkFilter === 'MAINNET' ? 'text-green-500' : networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-white'} />
+      Network Filter
+    </div>
+    <NetworkSwitcher current={networkFilter} onChange={setNetworkFilter} size="sm" />
+  </div>
+
+  <div className="relative z-10">
+    <div className="flex items-baseline gap-2">
+      <div className="text-3xl md:text-5xl font-black text-white tracking-tighter" key={filteredNodes.length}>
+        {filteredNodes.length}
+      </div>
+      <div className="text-[10px] md:text-xs font-mono text-zinc-500 font-bold uppercase tracking-widest">Nodes Found</div>
+    </div>
+
+    <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+      <div className="flex flex-col">
+        <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter mb-0.5">Stream Status</span>
+        <div className={`text-[10px] font-bold uppercase flex items-center gap-1.5 ${
+          networkFilter === 'MAINNET' ? 'text-green-400' : 
+          networkFilter === 'DEVNET' ? 'text-blue-400' : 'text-zinc-300'
+        }`}>
+          {networkFilter === 'ALL' ? 'Global View' : `${networkFilter} Live`}
+        </div>
+      </div>
+      <div className="p-2 rounded-lg bg-black/40 border border-white/5">
+         <RefreshCw size={12} className={`text-zinc-600 ${loading ? 'animate-spin' : ''}`} />
+      </div>
+    </div>
+  </div>
+</div>
 
               <div className="mt-2 relative z-10">
                 <div className="text-2xl md:text-4xl font-black text-white tracking-tight group-hover:scale-105 transition-transform">{filteredNodes.length}</div>
