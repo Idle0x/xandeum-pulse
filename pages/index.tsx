@@ -213,6 +213,7 @@ const NetworkSwitcher = ({
       {options.map((opt) => (
         <div
           key={opt.id}
+          onClick={() => onChange(opt.id as 'ALL' | 'MAINNET' | 'DEVNET')}
           className={`relative z-10 flex-1 text-[7px] md:text-[8px] font-black tracking-tighter py-0.5 text-center transition-colors duration-300 ${
             current === opt.id ? 'text-black' : 'text-zinc-600'
           }`}
