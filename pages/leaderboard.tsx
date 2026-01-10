@@ -94,8 +94,6 @@ export default function Leaderboard() {
         const metaMap = new Map<string, { address: string, location?: any, health: number }>();
         if (statsRes.data?.result?.pods) {
             statsRes.data.result.pods.forEach((node: any) => {
-                // CAPTURE HEALTH AS TIE-BREAKER
-                // Note: If duplicates exist, this overwrites, which is why we use relaxed deep linking
                 metaMap.set(node.pubkey, { 
                     address: node.address, 
                     location: node.location,
@@ -124,7 +122,7 @@ export default function Leaderboard() {
                 return {
                     pubkey: pKey,
                     credits: Number(item.credits || 0),
-                    health: meta?.health || 0, // Assigned from metaMap
+                    health: meta?.health || 0,
                     network: item.network || 'MAINNET',
                     rank: 0,
                     address: meta?.address,
@@ -133,7 +131,6 @@ export default function Leaderboard() {
                 };
             });
 
-            // Initial sort for trend calculation
             parsedList.sort((a, b) => {
                 if (b.credits !== a.credits) return b.credits - a.credits;
                 return b.health - a.health;
@@ -159,49 +156,49 @@ export default function Leaderboard() {
     fetchData();
   }, []);
 
-  // --- 2. DETERMINISTIC FILTER & RANKING LOGIC ---
+  // --- 2. DETERMINISTIC FILTER & RANKING LOGIC (Preserving global rank during search) ---
   const filteredAndRanked = useMemo(() => {
-      const filtered = allNodes.filter(n => 
-          (networkFilter === 'COMBINED' || n.network === networkFilter) && 
-          n.pubkey.toLowerCase().includes(searchQuery.toLowerCase())
+      // Step A: First, filter ONLY by network to establish the correct rank pool
+      const networkList = allNodes.filter(n => 
+          (networkFilter === 'COMBINED' || n.network === networkFilter)
       );
 
-      // MULTI-LEVEL SORT (Credits > Health > Pubkey)
-      filtered.sort((a, b) => {
+      // Step B: Sort strictly by Credits > Health > Pubkey (Deterministic)
+      networkList.sort((a, b) => {
           if (b.credits !== a.credits) return b.credits - a.credits;
           if (b.health !== a.health) return b.health - a.health;
           return a.pubkey.localeCompare(b.pubkey);
       });
 
-      // STRICT SEQUENTIAL NUMBERING (1, 2, 3...)
-      return filtered.map((n, i) => ({
+      // Step C: Assign sequential Ranks based on the Global Network View
+      const rankedList = networkList.map((n, i) => ({
           ...n,
           rank: i + 1
       }));
+
+      // Step D: Apply Search Filter to the already-ranked list
+      if (!searchQuery) return rankedList;
+      
+      const searchLower = searchQuery.toLowerCase();
+      return rankedList.filter(n => 
+          n.pubkey.toLowerCase().includes(searchLower) ||
+          (n.address && n.address.toLowerCase().includes(searchLower))
+      );
   }, [allNodes, networkFilter, searchQuery]);
 
-  // --- 3. DEEP LINK LOGIC (Identity-First Fallback Strategy) ---
+  // --- 3. DEEP LINK LOGIC ---
   useEffect(() => {
-      // WAITING FOR LOADING IS CRITICAL HERE
       if (loading || !router.isReady || !router.query.highlight || allNodes.length === 0) return;
 
       const targetKey = router.query.highlight as string;
       const targetNetwork = router.query.network as string;
       const targetAddr = router.query.focusAddr as string; 
 
-      // Create a unique signature for this specific deep link request
       const requestSignature = `${targetKey}-${targetNetwork}-${targetAddr}`;
       if (lastProcessedHighlight.current === requestSignature) return;
 
-      // STRATEGY: Identity First.
-      // We look for the Pubkey + Network. 
-      // The IP address in the URL is treated as "preferred context" but not a hard filter.
-      // This solves the issue where the Leaderboard might display Instance A's IP 
-      // while you are linking from Instance B (same Pubkey).
-      
       const targetNode = allNodes.find(n => {
           const keyMatch = n.pubkey === targetKey;
-          // If network is specified, it must match. If not, ignore network.
           const netMatch = !targetNetwork || n.network === targetNetwork;
           return keyMatch && netMatch;
       });
@@ -209,31 +206,19 @@ export default function Leaderboard() {
       if (targetNode) {
           lastProcessedHighlight.current = requestSignature;
 
-          // Force filter to ensure the node is visible
-          // If the found node is DEVNET but filter is MAINNET, switch it.
           if (targetNode.network !== networkFilter && networkFilter !== 'COMBINED') {
               setNetworkFilter(targetNode.network as any);
           }
 
           setTimeout(() => {
-              // Expand using the ID present in the Leaderboard Data (which might differ from URL IP)
-              // This ensures the DOM ID matches exactly what is rendered
               const compositeId = `${targetNode.pubkey}-${targetNode.network}-${targetNode.address || 'no-ip'}`;
               setExpandedNode(compositeId);
 
-              // Calculate index for "Load More" logic
-              // We reconstruct the current view's sorting to find where this node sits
+              // Correct sorting for visibleCount logic
               const currentList = networkFilter === 'COMBINED' 
-                ? [...allNodes].sort((a,b) => {
-                    if (b.credits !== a.credits) return b.credits - a.credits;
-                    return b.health - a.health;
-                })
-                : allNodes.filter(n => n.network === targetNode.network).sort((a,b) => {
-                    if (b.credits !== a.credits) return b.credits - a.credits;
-                    return b.health - a.health;
-                });
+                ? [...allNodes].sort((a,b) => b.credits - a.credits || b.health - a.health)
+                : allNodes.filter(n => n.network === targetNode.network).sort((a,b) => b.credits - a.credits || b.health - a.health);
 
-              // Find exact index of the displayed node
               const idx = currentList.findIndex(n => n.pubkey === targetNode.pubkey);
 
               if (idx >= visibleCount) setVisibleCount(idx + 50);
@@ -247,7 +232,6 @@ export default function Leaderboard() {
   }, [loading, router.isReady, router.query, allNodes, networkFilter]);
 
   // --- 4. SIMULATOR LOGIC ---
-
   const clearImport = () => {
     setImportKey('');
     setImportSuccess(false);
@@ -319,8 +303,7 @@ export default function Leaderboard() {
       setBoostCounts({...boostCounts, [name]: next});
   };
 
-    const handleRowClick = (node: RankedNode) => {
-      // 3-Part Unique ID: Pubkey + Network + Address
+  const handleRowClick = (node: RankedNode) => {
       const compositeId = `${node.pubkey}-${node.network}-${node.address || 'no-ip'}`;
       setExpandedNode(expandedNode === compositeId ? null : compositeId);
   };
@@ -353,7 +336,6 @@ export default function Leaderboard() {
 
   const isStep1Valid = simNodes >= 1;
 
-  // --- NEW: Helper to generate precise Dashboard links ---
   const getDashboardLink = (n: RankedNode) => {
     const params = new URLSearchParams();
     params.set('open', n.pubkey);
@@ -403,7 +385,6 @@ export default function Leaderboard() {
 
           {showSim && (
               <div className="relative transition-all duration-300 ease-in-out">
-
                   {simStep === 0 && (
                       <div className="p-4 md:p-8 animate-in slide-in-from-right-4 fade-in duration-300">
                           <div className="mb-6 text-center">
@@ -705,21 +686,17 @@ export default function Leaderboard() {
           <div className="divide-y-0 px-2 pb-2">
             {filteredAndRanked.slice(0, visibleCount).map((node) => {
     const isMyNode = node.address && favorites.includes(node.address);
-
-    // NEW: 3-Part Composite ID Logic
     const compositeId = `${node.pubkey}-${node.network}-${node.address || 'no-ip'}`;
     const isExpanded = expandedNode === compositeId; 
-
     const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
 
     return (
     <div 
         key={compositeId} 
-        id={`node-${compositeId}`} // Important for Deep Link scrolling
+        id={`node-${compositeId}`} 
         className={`relative transition-all duration-300 ease-out mb-2 rounded-xl border ${isExpanded ? 'scale-[1.02] z-10 bg-black border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.15)]' : 'scale-100 bg-zinc-900/30 border-transparent hover:scale-[1.01] hover:bg-zinc-800 hover:border-zinc-600'} ${isMyNode && !isExpanded ? 'border-yellow-500/30 bg-yellow-500/5' : ''}`}
     >
         <div className="grid grid-cols-12 gap-2 md:gap-4 p-3 md:p-4 items-center cursor-pointer" onClick={() => handleRowClick(node)}>
-
                         <div className="col-span-2 md:col-span-1 flex flex-col justify-center items-center gap-1 relative">
                             <div className="flex items-center gap-1">
                                 {node.rank === 1 && <Trophy size={14} className="text-yellow-400" />}
@@ -741,10 +718,7 @@ export default function Leaderboard() {
                     {isExpanded && (
                         <div className="border-t border-zinc-800/50 p-3 md:p-4 animate-in slide-in-from-top-2 duration-200">
                             <div className="flex flex-col gap-4">
-
-                                {/* --- MOBILE ONLY VIEW (Grid 2x3) --- */}
                                 <div className="grid grid-cols-6 gap-2 md:hidden">
-                                    {/* Row 1 */}
                                     {node.address && (
                                         <Link href={`/map?focus=${node.address.split(':')[0]}`} className="col-span-3">
                                             <button className="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-blue-900/20 border border-blue-500/30 text-[10px] font-bold text-blue-400">
@@ -757,8 +731,6 @@ export default function Leaderboard() {
                                             <Activity size={12} className="text-green-400" /> DIAGNOSTICS
                                         </button>
                                     </Link>
-
-                                    {/* Row 2 */}
                                     <button onClick={(e) => handleUseInSim(e)} className="col-span-2 flex items-center justify-center gap-2 px-1 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-[10px] font-bold text-yellow-500">
                                         <Calculator size={12} /> CALC
                                     </button>
@@ -770,7 +742,6 @@ export default function Leaderboard() {
                                     </button>
                                 </div>
 
-                                {/* --- DESKTOP ONLY VIEW --- */}
                                 <div className="hidden md:flex flex-row gap-4 items-center justify-between">
                                     <div className="flex gap-2 w-full md:w-auto">
                                         {node.address && (
@@ -800,7 +771,6 @@ export default function Leaderboard() {
                                         </button>
                                     </div>
                                 </div>
-
                             </div>
                         </div>
                     )}
@@ -812,7 +782,7 @@ export default function Leaderboard() {
         )}
       </div>
 
-      {/* EXISTING COUNTER: Legible size (text-sm/base) */}
+      {/* EXISTING COUNTER */}
       {!loading && !creditsOffline && (
         <div className="max-w-5xl mx-auto mt-6 text-center text-sm md:text-base text-zinc-500 flex flex-col md:flex-row items-center justify-center gap-2 font-medium">
             <div className="flex items-center gap-2">
@@ -825,42 +795,21 @@ export default function Leaderboard() {
       {/* FOOTER */}
       {!loading && !creditsOffline && (
         <footer className="max-w-5xl mx-auto mt-8 mb-12 pt-8 border-t border-zinc-900 px-4 text-center animate-in fade-in duration-700">
-
           <div className="max-w-2xl mx-auto space-y-4">
-
-            {/* MERGED DISCLAIMER: Tiny, Italic, Serif style */}
             <p className="text-[10px] md:text-xs text-zinc-600 italic font-serif leading-relaxed">
               * Participants listed have successfully submitted Storage Proofs and met network stability thresholds. This leaderboard tracks Incentivized Nodes. To be eligible for credits, a node must not only participate in the Gossip protocol but also validate its committed storage via successful Proof cycles.
             </p>
-
-            {/* Links */}
             <div className="pt-6 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-3 text-xs font-mono text-zinc-600">
               <span className="uppercase tracking-widest opacity-70">Data fetched directly from the Pod Credits API:</span>
               <div className="flex items-center gap-3">
-                <a 
-                  href="https://podcredits.xandeum.network/api/mainnet-pod-credits" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-green-600 hover:text-green-400 font-bold transition-colors hover:underline underline-offset-4"
-                >
-                  Mainnet
-                </a>
+                <a href="https://podcredits.xandeum.network/api/mainnet-pod-credits" target="_blank" rel="noopener noreferrer" className="text-green-600 hover:text-green-400 font-bold transition-colors hover:underline underline-offset-4">Mainnet</a>
                 <span className="text-zinc-800">|</span>
-                <a 
-                  href="https://podcredits.xandeum.network/api/pods-credits" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-400 font-bold transition-colors hover:underline underline-offset-4"
-                >
-                  Devnet
-                </a>
+                <a href="https://podcredits.xandeum.network/api/pods-credits" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-400 font-bold transition-colors hover:underline underline-offset-4">Devnet</a>
               </div>
             </div>
-
           </div>
         </footer>
       )}
-
     </div>
   );
 }
