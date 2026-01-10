@@ -1076,7 +1076,7 @@ export default function Home() {
 
     return (
       <div
-        key={node.uid}
+        key={`${node.pubkey}-${node.network}`}
         onClick={() => { setSelectedNode(node); setModalView('overview'); }}
         className={`group relative border rounded-xl p-3 md:p-5 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${
           zenMode ? 'bg-black border-zinc-800 hover:border-zinc-600' : isFav ? 'bg-gradient-to-b from-zinc-900 to-black border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.1)]' : 'bg-gradient-to-b from-zinc-900 to-black border-zinc-800 hover:border-blue-500/50'
@@ -1170,7 +1170,7 @@ export default function Home() {
 
     return (
       <div
-        key={node.uid}
+        key={`${node.pubkey}-${node.network}`}
         onClick={() => { setSelectedNode(node); setModalView('overview'); }}
         className="group relative border border-zinc-800 bg-black/50 hover:border-zinc-600 p-3 md:p-4 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-lg flex flex-col justify-between"
       >
