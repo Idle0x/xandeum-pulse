@@ -179,7 +179,15 @@ const PulseGraphLoader = () => {
   );
 };
 
-const NetworkSwitcher = ({ current, onChange, size = 'md' }) => {
+const NetworkSwitcher = ({ 
+  current, 
+  onChange, 
+  size = 'md' 
+}: { 
+  current: string; 
+  onChange: (val: 'ALL' | 'MAINNET' | 'DEVNET') => void; 
+  size?: 'sm' | 'md' 
+}) => {
   const options = [
     { id: 'ALL', label: 'ALL' },
     { id: 'MAINNET', label: 'MAINNET' },
@@ -188,7 +196,7 @@ const NetworkSwitcher = ({ current, onChange, size = 'md' }) => {
 
   const activeIdx = options.findIndex(o => o.id === current);
   
-  const activeStyles = {
+  const activeStyles: Record<string, string> = {
     ALL: 'bg-zinc-100 shadow-[0_0_15px_rgba(255,255,255,0.2)]',
     MAINNET: 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.4)]',
     DEVNET: 'bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.4)]'
@@ -197,7 +205,7 @@ const NetworkSwitcher = ({ current, onChange, size = 'md' }) => {
   return (
     <div className={`relative bg-black/60 border border-white/5 rounded-full p-1 flex items-center transition-all ${size === 'sm' ? 'w-32' : 'w-full'}`}>
       <div 
-        className={`absolute top-1 bottom-1 left-1 rounded-full transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${activeStyles[current as keyof typeof activeStyles]}`}
+        className={`absolute top-1 bottom-1 left-1 rounded-full transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${activeStyles[current] || activeStyles.ALL}`}
         style={{ 
           width: `calc(33.33% - 2.5px)`, 
           transform: `translateX(${activeIdx * 100}%)` 
