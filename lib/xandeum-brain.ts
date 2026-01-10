@@ -27,7 +27,7 @@ export interface EnrichedNode {
   uptime: number;
   last_seen_timestamp: number;
   is_public: boolean;
-  isUntracked?: boolean;
+  isUntracked?: boolean; // <--- The Fix: New Optional Flag
   network: 'MAINNET' | 'DEVNET';
   storage_used: number;      
   storage_committed: number; 
@@ -125,11 +125,14 @@ export const calculateVitalityScore = (
   let total = 0;
   let reputationScore: number | null = null;
 
+  // SCORING LOGIC UPDATE:
+  // If credits !== null, we calculate reputation.
+  // If credits === null, we SKIP reputation and re-weight the other metrics.
   if (credits !== null && medianCredits > 0) {
       reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
       total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15));
   } else {
-      // Re-weight if reputation is missing
+      // Re-weight if reputation is missing (API Down)
       total = Math.round((uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20));
       reputationScore = null; 
   }
@@ -241,6 +244,9 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       return { nodes: [], stats: { consensusVersion: '0.0.0', totalNodes: 0, systemStatus: { rpc: false, credits: false }, avgBreakdown: { total: 0, uptime: 0, version: 0, reputation: 0, storage: 0 } } };
   }
 
+  // Check if Credits API is actually Online
+  const isCreditsApiOnline = creditsData.mainnet.length > 0 || creditsData.devnet.length > 0;
+
   // Build the Bank (Credits Maps)
   const mainnetCreditMap = new Map<string, number>();
   const devnetCreditMap = new Map<string, number>();
@@ -271,12 +277,8 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   // Fingerprint Generator
   const getFingerprint = (p: any, assumedNetwork: 'MAINNET' | 'DEVNET') => {
       const key = p.pubkey || p.public_key;
-      // Note: We use strict checks here so undefined is different from 0
-      const credVal = assumedNetwork === 'MAINNET' 
-          ? mainnetCreditMap.get(key)
-          : devnetCreditMap.get(key);
-      const credits = credVal !== undefined ? credVal : 'NULL'; 
-
+      const rawCredVal = assumedNetwork === 'MAINNET' ? mainnetCreditMap.get(key) : devnetCreditMap.get(key);
+      const credits = rawCredVal !== undefined ? rawCredVal : 'NULL'; 
       return `${key}|${p.address}|${p.storage_committed}|${p.storage_used}|${p.version}|${p.is_public}|${credits}`;
   };
 
@@ -288,15 +290,27 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const ip = pod.address.split(':')[0];
       const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
 
-      // FIX: Don't default to 0. Allow null to flow through.
       const rawCreds = mainnetCreditMap.get(pubkey);
-      const credits = rawCreds !== undefined ? rawCreds : null;
+      
+      // LOGIC FIX: 
+      // If found in map -> credits = value, isUntracked = false
+      // If NOT found AND API Online -> credits = null, isUntracked = true
+      // If NOT found AND API Offline -> credits = null, isUntracked = false
+      let credits: number | null = null;
+      let isUntracked = false;
+
+      if (rawCreds !== undefined) {
+          credits = rawCreds;
+      } else if (isCreditsApiOnline) {
+          isUntracked = true;
+      }
 
       const node: EnrichedNode = {
           ...pod,
           pubkey: pubkey,
           network: 'MAINNET',
           credits: credits,
+          isUntracked: isUntracked,
           storage_committed: Number(pod.storage_committed) || 0,
           storage_used: Number(pod.storage_used) || 0,
           uptime: Number(pod.uptime) || 0,
@@ -328,18 +342,26 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
 
       let network: 'MAINNET' | 'DEVNET' = 'DEVNET';
-      let credits: number | null = null; // Default to null (untracked)
+      let credits: number | null = null; 
+      let isUntracked = false;
 
       const mainnetVal = mainnetCreditMap.get(pubkey);
       const devnetVal = devnetCreditMap.get(pubkey);
 
-      // FIX: Strict undefined checks to distinguish 0 from missing
+      // Network detection and Credit Assignment
       if (mainnetVal !== undefined && devnetVal === undefined) {
           network = 'MAINNET';
           credits = mainnetVal;
-      } else {
+      } else if (devnetVal !== undefined) {
           network = 'DEVNET';
-          credits = devnetVal !== undefined ? devnetVal : null;
+          credits = devnetVal;
+      } else {
+          // No credits found in either map
+          // Default to DEVNET unless stronger evidence exists
+          network = 'DEVNET';
+          if (isCreditsApiOnline) {
+              isUntracked = true;
+          }
       }
 
       const node: EnrichedNode = {
@@ -347,6 +369,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
           pubkey: pubkey,
           network: network,
           credits: credits,
+          isUntracked: isUntracked,
           storage_committed: Number(pod.storage_committed) || 0,
           storage_used: Number(pod.storage_used) || 0,
           uptime: Number(pod.uptime) || 0,
@@ -377,11 +400,13 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
           const mainnetNode = processedNodes.find(n => n.pubkey === pubkey && n.network === 'MAINNET');
 
           if (mainnetNode) {
+              // We found a node on Mainnet that also has credits on Devnet. 
+              // Clone it as a Devnet node.
               const clonedNode: EnrichedNode = {
                   ...mainnetNode,
                   network: 'DEVNET',
-                  // FIX: Use null coalescing so undefined becomes null, not 0
                   credits: devnetCreditMap.get(pubkey) ?? null,
+                  isUntracked: false // It has credits, so it is tracked
               };
               processedNodes.push(clonedNode);
           }
@@ -415,10 +440,17 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const loc = geoCache.get(ip) || node.location;
       const medianCreditsForScore = node.network === 'MAINNET' ? medianMainnet : medianDevnet;
 
+      // FIX: Determining what to pass to scoring algo
+      // If Untracked: Pass 0 (Penalize reputation score)
+      // If API Offline: Pass null (Trigger re-weighting protection)
+      const creditsForScore = node.isUntracked ? 0 : node.credits;
+
       const vitality = calculateVitalityScore(
           node.storage_committed, node.storage_used, node.uptime, 
           node.version, consensusVersion, sortedCleanVersions, 
-          medianCreditsForScore, node.credits, medianStorage
+          medianCreditsForScore, 
+          creditsForScore, 
+          medianStorage
       );
 
       return {
@@ -479,7 +511,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
         medianStorage,
         totalNodes: allSorted.length,
         systemStatus: {
-            credits: creditsData.mainnet.length > 0 || creditsData.devnet.length > 0, 
+            credits: isCreditsApiOnline, 
             rpc: true 
         },
         avgBreakdown: {
