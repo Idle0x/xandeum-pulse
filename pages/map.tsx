@@ -580,7 +580,8 @@ export default function MapPage() {
               } else {
                 primaryShare = c.avgHealth; 
                 metricLabel = 'Health';
-                metricValue = c.avgHealth.toFixed(1) + '%';
+                // CHANGED: 2 decimal places as requested
+                metricValue = c.avgHealth.toFixed(2) + '%';
               }
 
               const nodeShare = (c.count / (globalTotals.nodes || 1)) * 100;
@@ -609,10 +610,12 @@ export default function MapPage() {
                     
                     <div className="flex justify-between items-center text-[9px] font-mono uppercase tracking-wide text-zinc-500">
                       <span>
-                        <span className={textColor}>{primaryShare.toFixed(1)}%</span> of {metricLabel}
+                        {/* CHANGED: 2 decimal places as requested */}
+                        <span className={textColor}>{primaryShare.toFixed(2)}%</span> of {metricLabel}
                       </span>
                       <span>
-                        Hosts <span className="text-zinc-300">{nodeShare.toFixed(1)}%</span> of Total Nodes
+                        {/* CHANGED: 2 decimal places as requested */}
+                        Hosts <span className="text-zinc-300">{nodeShare.toFixed(2)}%</span> of Total Nodes
                       </span>
                     </div>
                   </div>
