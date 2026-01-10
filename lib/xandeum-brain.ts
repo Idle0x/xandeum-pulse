@@ -7,7 +7,6 @@ import geoip from 'geoip-lite';
 const PRIVATE_MAINNET_RPC = 'https://persian-starts-sounds-colon.trycloudflare.com/rpc';
 
 // 2. DEVNET SOURCE (Public Swarm)
-// We will try ALL of these until one responds with the full list
 const PUBLIC_RPC_NODES = [
   '173.212.203.145', '161.97.97.41', '192.190.136.36', '192.190.136.38',
   '207.244.255.1', '192.190.136.28', '192.190.136.29', '159.195.4.138', '152.53.155.30'
@@ -147,9 +146,8 @@ export const calculateVitalityScore = (
   };
 };
 
-// --- ROBUST FETCHING ---
+// --- FETCHING ---
 
-// 1. Fetch MAINNET from your Private RPC
 async function fetchPrivateMainnetNodes() {
     const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
     try {
@@ -163,20 +161,17 @@ async function fetchPrivateMainnetNodes() {
     return [];
 }
 
-// 2. Fetch DEVNET from Public Swarm (Aggressive Strategy)
 async function fetchPublicSwarmNodes() {
     const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
     
-    // Create a promise for every single IP in the list
+    // Attempt all IPs, resolve with the first successful one
     const promises = PUBLIC_RPC_NODES.map(ip => 
         axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC })
              .then(r => r.data?.result?.pods || [])
-             .catch(() => { throw new Error(ip); }) // Throw on error so Promise.any keeps going
+             .catch(() => { throw new Error(ip); }) 
     );
 
     try {
-        // Promise.any will return the FIRST successful response from ANY node
-        // This fixes the "28 nodes" issue by ensuring we actually find a working public node
         const winner = await Promise.any(promises);
         return winner;
     } catch (e) {
@@ -229,7 +224,7 @@ async function resolveLocations(ips: string[]) {
 // --- MAIN EXPORT ---
 
 export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats: any }> {
-  // Fetch everything in parallel
+  // 1. Fetch RAW data
   const [rawMainnet, rawDevnet, creditsData] = await Promise.all([ 
       fetchPrivateMainnetNodes(), 
       fetchPublicSwarmNodes(), 
@@ -237,12 +232,23 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   ]);
 
   if (rawMainnet.length === 0 && rawDevnet.length === 0) {
-      // Return empty safely if everything fails
       return { nodes: [], stats: { consensusVersion: '0.0.0', totalNodes: 0, systemStatus: { rpc: false, credits: false }, avgBreakdown: { total: 0, uptime: 0, version: 0, reputation: 0, storage: 0 } } };
   }
 
-  // --- PREPARE DATA ---
+  // ---------------------------------------------------------
+  // 2. THE LOGICAL FILTER (Address-Based Deduplication)
+  // ---------------------------------------------------------
 
+  // A. Create a Set of addresses (IP:PORT) that are CONFIRMED Mainnet
+  const mainnetAddresses = new Set(rawMainnet.map((p: any) => p.address));
+
+  // B. Filter Devnet: Only keep nodes whose ADDRESS is NOT in Mainnet
+  // This removes the "Ghost Duplicates" while keeping valid multi-node setups
+  const uniqueDevnetPods = rawDevnet.filter((p: any) => !mainnetAddresses.has(p.address));
+
+  // ---------------------------------------------------------
+
+  // Prepare Credits
   const mainnetCreditMap = new Map<string, number>();
   const devnetCreditMap = new Map<string, number>();
   const mainnetValues: number[] = [];
@@ -263,16 +269,16 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const medianMainnet = mainnetValues.sort((a, b) => a - b)[Math.floor(mainnetValues.length / 2)] || 0;
   const medianDevnet = devnetValues.sort((a, b) => a - b)[Math.floor(devnetValues.length / 2)] || 0;
 
-  // Combine raw lists just for stats (consensus/storage/geo)
-  const allRawPods = [...rawMainnet, ...rawDevnet];
+  // Stats use the combined UNIQUE list
+  const allUniquePods = [...rawMainnet, ...uniqueDevnetPods];
 
-  const storageArray: number[] = allRawPods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
+  const storageArray: number[] = allUniquePods.map((p: any) => Number(p.storage_committed) || 0).sort((a: number, b: number) => a - b);
   const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
 
   const rawVersionCounts: Record<string, number> = {}; 
   const uniqueCleanVersionsSet = new Set<string>();
 
-  allRawPods.forEach((p: any) => { 
+  allUniquePods.forEach((p: any) => { 
       const rawV = (p.version || '0.0.0'); 
       const cleanV = cleanSemver(rawV);
       rawVersionCounts[rawV] = (rawVersionCounts[rawV] || 0) + 1;
@@ -282,12 +288,11 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   const consensusVersion = Object.keys(rawVersionCounts).sort((a, b) => rawVersionCounts[b] - rawVersionCounts[a])[0] || '0.0.0';
   const sortedCleanVersions = Array.from(uniqueCleanVersionsSet).sort((a, b) => compareVersions(b, a));
 
-  await resolveLocations([...new Set(allRawPods.map((p: any) => p.address.split(':')[0]))] as string[]);
+  await resolveLocations([...new Set(allUniquePods.map((p: any) => p.address.split(':')[0]))] as string[]);
 
   const expandedNodes: EnrichedNode[] = [];
 
-  // --- NODE SCORING FUNCTION ---
-  
+  // --- SCORING FACTORY ---
   const scoreNode = (pod: any, network: 'MAINNET' | 'DEVNET') => {
       const key = pod.pubkey || pod.public_key;
       const ip = pod.address.split(':')[0];
@@ -329,22 +334,17 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
       };
   };
 
-  // --- ADDITIVE LOGIC (No Filtering) ---
-
-  // 1. Add ALL Mainnet Nodes (from Private RPC)
+  // 3. Add ALL Mainnet Nodes (No Filtering, they are the truth)
   rawMainnet.forEach((pod: any) => {
       expandedNodes.push(scoreNode(pod, 'MAINNET'));
   });
 
-  // 2. Add ALL Devnet Nodes (from Public RPC)
-  // If a node is here, it gets added as DEVNET, even if it was already added above as MAINNET.
-  // This ensures both entries appear.
-  rawDevnet.forEach((pod: any) => {
+  // 4. Add FILTERED Devnet Nodes
+  uniqueDevnetPods.forEach((pod: any) => {
       expandedNodes.push(scoreNode(pod, 'DEVNET'));
   });
 
   // --- RANKING ---
-
   const mainnetNodes = expandedNodes.filter(n => n.network === 'MAINNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const devnetNodes = expandedNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
 
@@ -365,20 +365,12 @@ export async function getNetworkPulse(): Promise<{ nodes: EnrichedNode[], stats:
   });
 
   // Averages
-  let totalUptime = 0;
-  let totalVersion = 0;
-  let totalReputation = 0;
-  let reputationCount = 0;
-  let totalStorage = 0;
-
+  let totalUptime = 0, totalVersion = 0, totalReputation = 0, reputationCount = 0, totalStorage = 0;
   finalNodes.forEach(node => {
     totalUptime += node.healthBreakdown.uptime;
     totalVersion += node.healthBreakdown.version;
     totalStorage += node.healthBreakdown.storage;
-    if (node.healthBreakdown.reputation !== null) {
-      totalReputation += node.healthBreakdown.reputation;
-      reputationCount++;
-    }
+    if (node.healthBreakdown.reputation !== null) { totalReputation += node.healthBreakdown.reputation; reputationCount++; }
   });
 
   const nodeCount = finalNodes.length || 1;
