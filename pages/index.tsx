@@ -1328,8 +1328,11 @@ export default function Home() {
   };
 
   const renderHealthBreakdown = () => {
-    const health = selectedNode?.health || 0;
-    const bd = selectedNode?.healthBreakdown || {
+    // FIX: Guard Clause to satisfy TypeScript
+    if (!selectedNode) return null;
+
+    const health = selectedNode.health || 0;
+    const bd = selectedNode.healthBreakdown || {
       uptime: health,
       version: health,
       reputation: health,
@@ -1339,7 +1342,7 @@ export default function Home() {
     const totalNodes = networkStats.totalNodes || 1;
 
     // UPDATED: Use health_rank if available, otherwise fallback (Dual Ranking Logic)
-    const rank = selectedNode?.health_rank || selectedNode?.rank || totalNodes;
+    const rank = selectedNode.health_rank || selectedNode.rank || totalNodes;
 
     // Recalculate percentile based on the correct rank type
     const rankPercentile = (rank / totalNodes) * 100;
@@ -1349,7 +1352,7 @@ export default function Home() {
     const diff = health - netAvgHealth;
 
     // We check specifically for API Offline to determine weighting
-    const isCreditsOffline = selectedNode?.credits === null && !(selectedNode as any).isUntracked;
+    const isCreditsOffline = selectedNode.credits === null && !(selectedNode as any).isUntracked;
 
     const weights = isCreditsOffline 
         ? { uptime: 0.45, storage: 0.35, reputation: 0, version: 0.20 }
