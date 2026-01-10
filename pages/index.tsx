@@ -2137,73 +2137,43 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Total Nodes Card - Click to Cycle Filter */}
+                        {/* Total Nodes Card - Corrected Nesting */}
             <div className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm flex flex-col justify-between group relative overflow-hidden transition-all duration-500 hover:border-zinc-700">
-  <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
-  <div className="flex justify-between items-center relative z-10 mb-4">
-    <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1.5">
-      <Activity size={12} className={networkFilter === 'MAINNET' ? 'text-green-500' : networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-white'} />
-      Network Filter
-    </div>
-    <NetworkSwitcher current={networkFilter} onChange={setNetworkFilter} size="sm" />
-  </div>
+              <div className="flex justify-between items-center relative z-10 mb-4">
+                <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                  <Activity size={12} className={networkFilter === 'MAINNET' ? 'text-green-500' : networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-white'} />
+                  Network Filter
+                </div>
+                <NetworkSwitcher current={networkFilter} onChange={setNetworkFilter} size="sm" />
+              </div>
 
-  <div className="relative z-10">
-    <div className="flex items-baseline gap-2">
-      <div className="text-3xl md:text-5xl font-black text-white tracking-tighter" key={filteredNodes.length}>
-        {filteredNodes.length}
-      </div>
-      <div className="text-[10px] md:text-xs font-mono text-zinc-500 font-bold uppercase tracking-widest">Nodes Found</div>
-    </div>
-
-    <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
-      <div className="flex flex-col">
-        <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter mb-0.5">Stream Status</span>
-        <div className={`text-[10px] font-bold uppercase flex items-center gap-1.5 ${
-          networkFilter === 'MAINNET' ? 'text-green-400' : 
-          networkFilter === 'DEVNET' ? 'text-blue-400' : 'text-zinc-300'
-        }`}>
-          {networkFilter === 'ALL' ? 'Global View' : `${networkFilter} Live`}
-        </div>
-      </div>
-      <div className="p-2 rounded-lg bg-black/40 border border-white/5">
-         <RefreshCw size={12} className={`text-zinc-600 ${loading ? 'animate-spin' : ''}`} />
-      </div>
-    </div>
-  </div>
-</div>
-
-              <div className="mt-2 relative z-10">
-                <div className="text-2xl md:text-4xl font-black text-white tracking-tight group-hover:scale-105 transition-transform">{filteredNodes.length}</div>
-
-                <div className="mt-2 text-[10px] font-mono border-t border-white/5 pt-2">
-                  {networkFilter === 'ALL' && (
-                    <div className="text-zinc-400 flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
-                      <span>All Networks</span>
-                    </div>
-                  )}
-                  {networkFilter === 'MAINNET' && (
-                    <div className="text-green-400 flex items-center gap-1.5 animate-in fade-in slide-in-from-right-2 duration-200">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                      <span className="font-bold">{nodes.filter(n => n.network === 'MAINNET').length} Mainnet Nodes</span>
-                    </div>
-                  )}
-                  {networkFilter === 'DEVNET' && (
-                    <div className="text-blue-400 flex items-center gap-1.5 animate-in fade-in slide-in-from-right-2 duration-200">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
-                      <span className="font-bold">{nodes.filter(n => n.network === 'DEVNET').length} Devnet Nodes</span>
-                    </div>
-                  )}
+              <div className="relative z-10">
+                <div className="flex items-baseline gap-2">
+                  <div className="text-3xl md:text-5xl font-black text-white tracking-tighter" key={filteredNodes.length}>
+                    {filteredNodes.length}
+                  </div>
+                  <div className="text-[10px] md:text-xs font-mono text-zinc-500 font-bold uppercase tracking-widest">Nodes Found</div>
                 </div>
 
-                <div className="mt-2 text-[8px] text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                  <RefreshCw size={8} /> Click to cycle filter
+                <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-[8px] text-zinc-600 uppercase font-black tracking-tighter mb-0.5">Stream Status</span>
+                    <div className={`text-[10px] font-bold uppercase flex items-center gap-1.5 ${
+                      networkFilter === 'MAINNET' ? 'text-green-400' : 
+                      networkFilter === 'DEVNET' ? 'text-blue-400' : 'text-zinc-300'
+                    }`}>
+                      {networkFilter === 'ALL' ? 'Global View' : `${networkFilter} Live`}
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-lg bg-black/40 border border-white/5">
+                     <RefreshCw size={12} className={`text-zinc-600 ${loading ? 'animate-spin' : ''}`} />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </div> // This closes the grid-cols-4 container
         )}
 
         {error && (
