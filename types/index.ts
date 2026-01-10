@@ -1,7 +1,8 @@
-// types/index.ts
+import * as React from 'react';
 
+// --- MAIN INTERFACE ---
 export interface Node {
-  uid?: string; // <--- NEW: Unique ID (Composite of Pubkey + Network)
+  uid?: string; // <--- NEW: Unique ID
   address?: string;
   pubkey?: string;
   version?: string;
@@ -40,8 +41,8 @@ export interface Node {
 // --- MODULE DECLARATIONS ---
 
 declare module 'react-simple-maps' {
-  import * as React from 'react';
-
+  // NOTE: React is now imported at the top of the file, so we don't need to import it here.
+  
   export interface ComposableMapProps {
     width?: number;
     height?: number;
