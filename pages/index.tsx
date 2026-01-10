@@ -373,7 +373,7 @@ export default function Home() {
   const showToast = (msg: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ visible: true, msg });
-    toastTimer.current = setTimeout(() => setToast(null), 7000); // Updated to 7 seconds
+    toastTimer.current = setTimeout(() => setToast(null), 1000); 
   };
 
   const proofRef = useRef<HTMLDivElement>(null);
