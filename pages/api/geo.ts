@@ -11,14 +11,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     nodes.forEach(node => {
       const { city, countryName, countryCode, lat, lon } = node.location;
-      
+
       // Skip nodes without valid coordinates
       if (lat === 0 && lon === 0) return; 
 
       const key = `${city}-${countryName}`;
       const storageGB = (node.storage_committed || 0) / (1024 ** 3);
       const network = node.network || 'UNKNOWN';
-      const hasCredits = node.credits !== null; // Check if this specific node has data
+      
+      // FIX 1: Use the explicit flag from getNetworkPulse
+      const isUntracked = node.isUntracked || false;
+      const hasCredits = node.credits !== null; 
 
       if (cityMap.has(key)) {
         const existing = cityMap.get(key);
@@ -36,24 +39,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         existing.ips.push(node.address.split(':')[0]);
 
-        // --- TRACKING KINGS (UPDATED WITH ADDRESS PRECISION) ---
-        
+        // --- TRACKING KINGS ---
+
         // 1. Storage King
         if (storageGB > existing.bestNodes.storageVal) {
             existing.bestNodes.storageVal = storageGB;
             existing.bestNodes.storagePk = node.pubkey;
             existing.bestNodes.storageNet = network;
-            existing.bestNodes.storageAddr = node.address; // <--- PRECISION FIX
+            existing.bestNodes.storageAddr = node.address;
         }
 
         // 2. Credits King
-        // Only update Credit King if this node actually has credits
-        if (hasCredits && (node.credits || 0) >= existing.bestNodes.creditsVal) {
-            existing.bestNodes.creditsVal = node.credits;
+        // Logic: If current king is untracked, but this node HAS credits, take over.
+        // Or if both have credits (or both untracked), compare values.
+        const currentKingUntracked = existing.bestNodes.creditsUntracked;
+        
+        // If the new node is "better" (has credits while king doesn't, or has more credits)
+        const isBetter = (!isUntracked && currentKingUntracked) || 
+                         ((node.credits || 0) >= existing.bestNodes.creditsVal);
+
+        if (isBetter) {
+            existing.bestNodes.creditsVal = node.credits || 0;
             existing.bestNodes.creditsPk = node.pubkey;
             existing.bestNodes.creditsNet = network;
-            existing.bestNodes.creditsAddr = node.address; // <--- PRECISION FIX
-            existing.bestNodes.creditsUntracked = false; // Mark as tracked
+            existing.bestNodes.creditsAddr = node.address;
+            existing.bestNodes.creditsUntracked = isUntracked; // Explicit assignment
         }
 
         // 3. Health King
@@ -62,7 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             existing.bestNodes.healthPk = node.pubkey;
             existing.bestNodes.healthUptime = node.uptime || 0;
             existing.bestNodes.healthNet = network;
-            existing.bestNodes.healthAddr = node.address; // <--- PRECISION FIX
+            existing.bestNodes.healthAddr = node.address;
         }
 
       } else {
@@ -81,33 +91,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           publicCount: node.is_public ? 1 : 0,
           ips: [node.address.split(':')[0]],
 
-          // Initial Best Nodes
           bestNodes: {
               // Storage
               storageVal: storageGB, 
               storagePk: node.pubkey, 
               storageNet: network,
-              storageAddr: node.address, // <--- INIT
+              storageAddr: node.address,
 
               // Credits
               creditsVal: node.credits || 0, 
               creditsPk: node.pubkey, 
               creditsNet: network,
-              creditsAddr: node.address, // <--- INIT
-              creditsUntracked: !hasCredits, // Mark untracked if initial node is null
+              creditsAddr: node.address,
+              creditsUntracked: isUntracked, // Explicit assignment
 
               // Health
               healthVal: node.health, 
               healthPk: node.pubkey, 
               healthUptime: node.uptime || 0, 
               healthNet: network,
-              healthAddr: node.address // <--- INIT
+              healthAddr: node.address
           }
         });
       }
     });
 
     const locations = Array.from(cityMap.values()).map(l => {
+        // If NO node in this city had valid credits, set total to null
         const finalCredits = l.hasValidCreditData ? l.totalCredits : null;
 
         return {
@@ -129,13 +139,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   pk: l.bestNodes.storagePk, 
                   val: l.bestNodes.storageVal, 
                   network: l.bestNodes.storageNet,
-                  address: l.bestNodes.storageAddr // <--- PASS TO FRONTEND
+                  address: l.bestNodes.storageAddr
               },
               CREDITS: { 
                   pk: l.bestNodes.creditsPk, 
                   val: l.bestNodes.creditsVal, 
                   network: l.bestNodes.creditsNet,
-                  address: l.bestNodes.creditsAddr, // <--- PASS TO FRONTEND
+                  address: l.bestNodes.creditsAddr,
                   isUntracked: l.bestNodes.creditsUntracked 
               },
               HEALTH: { 
@@ -143,7 +153,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   val: l.bestNodes.healthVal, 
                   subVal: l.bestNodes.healthUptime, 
                   network: l.bestNodes.healthNet,
-                  address: l.bestNodes.healthAddr // <--- PASS TO FRONTEND
+                  address: l.bestNodes.healthAddr
               }
           }
         };
