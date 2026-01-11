@@ -3,7 +3,6 @@ import geoip from 'geoip-lite';
 
 // --- CONFIGURATION ---
 
-// Public Swarm IPs
 const PUBLIC_RPC_NODES = [
   '173.212.203.145', '161.97.97.41', '192.190.136.36', '192.190.136.38',
   '207.244.255.1', '192.190.136.28', '192.190.136.29', '159.195.4.138', '152.53.155.30'
@@ -107,7 +106,8 @@ export const calculateVitalityScore = (
     sortedCleanVersions: string[], 
     medianCredits: number, 
     credits: number | null, 
-    medianStorage: number
+    medianStorage: number,
+    isCreditsApiOnline: boolean 
 ) => {
   if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
 
@@ -124,12 +124,32 @@ export const calculateVitalityScore = (
   let total = 0;
   let reputationScore: number | null = null;
 
-  if (credits !== null && medianCredits > 0) {
-      reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
-      total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15));
+  // LOGIC UPDATE: Fair Penalty System
+  if (isCreditsApiOnline) {
+      // API IS ONLINE: Everyone is judged on the same 4 criteria.
+      // If credits are missing/zero, reputationScore is simply 0.
+      if (credits !== null && medianCredits > 0) {
+          reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
+      } else {
+          reputationScore = 0; 
+      }
+      
+      // Standard Weighting (Total 100%)
+      total = Math.round(
+          (uptimeScore * 0.35) + 
+          (totalStorageScore * 0.30) + 
+          (reputationScore * 0.20) + 
+          (versionScore * 0.15)
+      );
   } else {
-      total = Math.round((uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20));
-      reputationScore = null; 
+      // API IS OFFLINE: We cannot judge reputation. Remove it from the equation.
+      // Dynamic Re-weighting (Total 100%)
+      reputationScore = null;
+      total = Math.round(
+          (uptimeScore * 0.45) + 
+          (totalStorageScore * 0.35) + 
+          (versionScore * 0.20)
+      );
   }
 
   return {
@@ -160,7 +180,6 @@ async function fetchPrivateMainnetNodes() {
             return res.data.result.pods;
         }
     } catch (e) {
-        // Safe logging
         const errMsg = (e as any).message;
         console.warn("Private Mainnet RPC Failed:", errMsg);
     }
@@ -269,7 +288,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   const medianDevnet = devnetValues.sort((a, b) => a - b)[Math.floor(devnetValues.length / 2)] || 0;
 
   // ---------------------------------------------------------
-  // PHASE 2 & 3: THE STRICT 7-FILTER SYSTEM + HYBRID UPTIME CHECK
+  // PHASE 2 & 3: THE STRICT 7-FILTER SYSTEM + TIME DELTA CHECK
   // ---------------------------------------------------------
 
   const processedNodes: EnrichedNode[] = [];
@@ -281,7 +300,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       return `${key}|${p.address}|${p.storage_committed}|${p.storage_used}|${p.version}|${p.is_public}|${credits}`;
   };
 
-  // CHANGED: Map now stores uptime for the Tie-Breaker check
   const mainnetFingerprints = new Map<string, number>();
 
   // A. PROCESS PRIVATE RPC (ANCHOR) -> ALWAYS MAINNET
@@ -295,6 +313,8 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       let credits: number | null = null;
       let isUntracked = false;
 
+      // Logic: If in Private RPC, it is MAINNET.
+      // We still check for credits to assign score, but network is fixed.
       if (rawCreds !== undefined) {
           credits = rawCreds;
       } else if (isCreditsApiOnline) {
@@ -325,42 +345,30 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
 
       processedNodes.push(node);
       
-      // STORE UPTIME FOR THE HYBRID CHECK
       const fingerprint = getFingerprint(pod, 'MAINNET');
       mainnetFingerprints.set(fingerprint, uptimeVal);
   });
 
-  // B. PROCESS PUBLIC SWARM (SUBTRACTION WITH HYBRID TIE-BREAKER)
+  // B. PROCESS PUBLIC SWARM (SUBTRACTION WITH TIME DELTA)
   rawPublicNodes.forEach((pod: any) => {
+      // Step 1: Check against Mainnet Fingerprints (Prevent Duplicate)
       const potentialMainnetFingerprint = getFingerprint(pod, 'MAINNET');
       const publicUptime = Number(pod.uptime) || 0;
 
       if (mainnetFingerprints.has(potentialMainnetFingerprint)) {
           const privateUptime = mainnetFingerprints.get(potentialMainnetFingerprint) || 0;
-          
-          // --- HYBRID TIE-BREAKER LOGIC ---
-          
-          // 1. Prefix Match (First 4 Digits)
-          const pStr = privateUptime.toString().substring(0, 4);
-          const cStr = publicUptime.toString().substring(0, 4);
-          const isPrefixMatch = pStr === cStr;
-
-          // 2. Delta Match (100 Second Tolerance)
           const diff = Math.abs(privateUptime - publicUptime);
-          const isDeltaMatch = diff <= 100;
-
-          // If EITHER condition matches, it is the same node -> SKIP
-          if (isPrefixMatch || isDeltaMatch) {
-              return; 
-          }
           
-          // If neither matches, it implies a restart or massive drift -> Treat as new entry
+          if (diff <= 100) {
+              return; // DUPLICATE DETECTED -> SKIP
+          }
       }
 
       const pubkey = pod.pubkey || pod.public_key;
       const ip = pod.address.split(':')[0];
       const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
 
+      // Step 2: Strict Network Assignment (Binary)
       let network: 'MAINNET' | 'DEVNET' = 'DEVNET';
       let credits: number | null = null; 
       let isUntracked = false;
@@ -368,15 +376,18 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const mainnetVal = mainnetCreditMap.get(pubkey);
       const devnetVal = devnetCreditMap.get(pubkey);
 
-      if (mainnetVal !== undefined && devnetVal === undefined) {
+      // Rule: If it has Mainnet credits, it is MAINNET. 
+      // Otherwise, it defaults to DEVNET.
+      if (mainnetVal !== undefined) {
           network = 'MAINNET';
           credits = mainnetVal;
-      } else if (devnetVal !== undefined) {
-          network = 'DEVNET';
-          credits = devnetVal;
       } else {
+          // Strictly Devnet if not Mainnet
           network = 'DEVNET';
-          if (isCreditsApiOnline) {
+          if (devnetVal !== undefined) {
+              credits = devnetVal;
+          } else if (isCreditsApiOnline) {
+              // No credits on either net, but API is online -> Untracked
               isUntracked = true;
           }
       }
@@ -405,7 +416,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   });
 
   // ---------------------------------------------------------
-  // PHASE 6: SCORING & STATS (GHOST PROTOCOL REMOVED)
+  // PHASE 6: SCORING & STATS
   // ---------------------------------------------------------
 
   const rawVersionCounts: Record<string, number> = {}; 
@@ -430,6 +441,8 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const ip = node.address.split(':')[0];
       const loc = geoCache.get(ip) || node.location;
       const medianCreditsForScore = node.network === 'MAINNET' ? medianMainnet : medianDevnet;
+      
+      // Note: creditsForScore is 0 if untracked, maintaining logic for calculation
       const creditsForScore = node.isUntracked ? 0 : node.credits;
 
       const vitality = calculateVitalityScore(
@@ -437,7 +450,8 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
           node.version, consensusVersion, sortedCleanVersions, 
           medianCreditsForScore, 
           creditsForScore, 
-          medianStorage
+          medianStorage,
+          isCreditsApiOnline // Pass global API status to determine weighting logic
       );
 
       return {
