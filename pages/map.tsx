@@ -242,7 +242,7 @@ export default function MapPage() {
       setDynamicThresholds([getQuantile(0.90), getQuantile(0.75), getQuantile(0.50), getQuantile(0.25)]);
   }, [locations, viewMode]);
 
-  // --- HELPERS ---
+  // --- HELPER FUNCTIONS ---
 
   const getDeepLink = (data: TopPerformerData, destination: 'DASHBOARD' | 'LEADERBOARD') => {
     const params = new URLSearchParams();
@@ -814,7 +814,7 @@ export default function MapPage() {
                                         </div>
                                         {topData && (() => {
                                             const isUntrackedKing = viewMode === 'CREDITS' && topData.isUntracked;
-                                            
+
                                             const getCardStyle = () => {
                                                 if (viewMode === 'CREDITS' && isGlobalCreditsOffline) return 'cursor-not-allowed border-red-500/30 bg-red-900/10 opacity-100';
                                                 if (isUntrackedKing) return 'cursor-not-allowed opacity-70';
