@@ -3,7 +3,7 @@ import geoip from 'geoip-lite';
 
 // --- CONFIGURATION ---
 
-const PRIVATE_MAINNET_RPC = 'https://persian-starts-sounds-colon.trycloudflare.com/rpc';
+const PRIVATE_MAINNET_RPC = 'process.env.PRIVATE_RPC_URL';
 // Public Swarm IPs
 const PUBLIC_RPC_NODES = [
   '173.212.203.145', '161.97.97.41', '192.190.136.36', '192.190.136.38',
