@@ -97,6 +97,7 @@ export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: str
     return Math.max(0, 10 - (distance - 5));
 };
 
+// UPDATED: Now accepts isCreditsApiOnline to enforce fair penalization
 export const calculateVitalityScore = (
     storageCommitted: number, 
     storageUsed: number,
@@ -107,7 +108,7 @@ export const calculateVitalityScore = (
     medianCredits: number, 
     credits: number | null, 
     medianStorage: number,
-    isCreditsApiOnline: boolean 
+    isCreditsApiOnline: boolean
 ) => {
   if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
 
@@ -124,32 +125,19 @@ export const calculateVitalityScore = (
   let total = 0;
   let reputationScore: number | null = null;
 
-  // LOGIC UPDATE: Fair Penalty System
-  if (isCreditsApiOnline) {
-      // API IS ONLINE: Everyone is judged on the same 4 criteria.
-      // If credits are missing/zero, reputationScore is simply 0.
-      if (credits !== null && medianCredits > 0) {
-          reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
-      } else {
-          reputationScore = 0; 
-      }
-      
-      // Standard Weighting (Total 100%)
-      total = Math.round(
-          (uptimeScore * 0.35) + 
-          (totalStorageScore * 0.30) + 
-          (reputationScore * 0.20) + 
-          (versionScore * 0.15)
-      );
+  // LOGIC CHANGE: Strict penalty when API is online but credits are missing
+  if (credits !== null && medianCredits > 0) {
+      // 1. Has Credits -> Standard calculation
+      reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
+      total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15));
+  } else if (isCreditsApiOnline) {
+      // 2. No Credits, but API is ONLINE -> Penalize (0 Score, Standard Weights)
+      reputationScore = 0;
+      total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (0 * 0.20) + (versionScore * 0.15));
   } else {
-      // API IS OFFLINE: We cannot judge reputation. Remove it from the equation.
-      // Dynamic Re-weighting (Total 100%)
-      reputationScore = null;
-      total = Math.round(
-          (uptimeScore * 0.45) + 
-          (totalStorageScore * 0.35) + 
-          (versionScore * 0.20)
-      );
+      // 3. No Credits, API OFFLINE -> Reweight (Dynamic Reweighting protected for outages)
+      total = Math.round((uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20));
+      reputationScore = null; 
   }
 
   return {
@@ -180,6 +168,7 @@ async function fetchPrivateMainnetNodes() {
             return res.data.result.pods;
         }
     } catch (e) {
+        // Safe logging
         const errMsg = (e as any).message;
         console.warn("Private Mainnet RPC Failed:", errMsg);
     }
@@ -313,8 +302,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       let credits: number | null = null;
       let isUntracked = false;
 
-      // Logic: If in Private RPC, it is MAINNET.
-      // We still check for credits to assign score, but network is fixed.
       if (rawCreds !== undefined) {
           credits = rawCreds;
       } else if (isCreditsApiOnline) {
@@ -351,16 +338,16 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
 
   // B. PROCESS PUBLIC SWARM (SUBTRACTION WITH TIME DELTA)
   rawPublicNodes.forEach((pod: any) => {
-      // Step 1: Check against Mainnet Fingerprints (Prevent Duplicate)
       const potentialMainnetFingerprint = getFingerprint(pod, 'MAINNET');
       const publicUptime = Number(pod.uptime) || 0;
 
       if (mainnetFingerprints.has(potentialMainnetFingerprint)) {
           const privateUptime = mainnetFingerprints.get(potentialMainnetFingerprint) || 0;
+          
           const diff = Math.abs(privateUptime - publicUptime);
           
           if (diff <= 100) {
-              return; // DUPLICATE DETECTED -> SKIP
+              return; // DUPLICATE DETECTED -> Skip
           }
       }
 
@@ -368,7 +355,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const ip = pod.address.split(':')[0];
       const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
 
-      // Step 2: Strict Network Assignment (Binary)
       let network: 'MAINNET' | 'DEVNET' = 'DEVNET';
       let credits: number | null = null; 
       let isUntracked = false;
@@ -376,18 +362,15 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const mainnetVal = mainnetCreditMap.get(pubkey);
       const devnetVal = devnetCreditMap.get(pubkey);
 
-      // Rule: If it has Mainnet credits, it is MAINNET. 
-      // Otherwise, it defaults to DEVNET.
-      if (mainnetVal !== undefined) {
+      if (mainnetVal !== undefined && devnetVal === undefined) {
           network = 'MAINNET';
           credits = mainnetVal;
-      } else {
-          // Strictly Devnet if not Mainnet
+      } else if (devnetVal !== undefined) {
           network = 'DEVNET';
-          if (devnetVal !== undefined) {
-              credits = devnetVal;
-          } else if (isCreditsApiOnline) {
-              // No credits on either net, but API is online -> Untracked
+          credits = devnetVal;
+      } else {
+          network = 'DEVNET';
+          if (isCreditsApiOnline) {
               isUntracked = true;
           }
       }
@@ -441,17 +424,14 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const ip = node.address.split(':')[0];
       const loc = geoCache.get(ip) || node.location;
       const medianCreditsForScore = node.network === 'MAINNET' ? medianMainnet : medianDevnet;
-      
-      // Note: creditsForScore is 0 if untracked, maintaining logic for calculation
-      const creditsForScore = node.isUntracked ? 0 : node.credits;
 
       const vitality = calculateVitalityScore(
           node.storage_committed, node.storage_used, node.uptime, 
           node.version, consensusVersion, sortedCleanVersions, 
           medianCreditsForScore, 
-          creditsForScore, 
+          node.credits, // Passed as null if no credits
           medianStorage,
-          isCreditsApiOnline // Pass global API status to determine weighting logic
+          isCreditsApiOnline // Passed to enforce score penalty vs reweighting
       );
 
       return {
