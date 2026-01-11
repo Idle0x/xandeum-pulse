@@ -117,7 +117,8 @@ export default function MapPage() {
       storage: number;
       credits: number;
       healthSum: number;
-      uptimeSum: number; // Added to track uptime aggregation
+      uptimeSum: number;
+      stableCount: number; // New field for stability count
     }>();
 
     // Aggregation Loop
@@ -130,14 +131,20 @@ export default function MapPage() {
         storage: 0, 
         credits: 0, 
         healthSum: 0,
-        uptimeSum: 0 
+        uptimeSum: 0,
+        stableCount: 0 
       };
 
       current.count += loc.count;
       current.storage += loc.totalStorage;
       current.credits += (loc.totalCredits || 0);
-      current.healthSum += (loc.avgHealth * loc.count); // Weighted sum
-      current.uptimeSum += (loc.avgUptime * loc.count); // Weighted sum for uptime
+      current.healthSum += (loc.avgHealth * loc.count); 
+      current.uptimeSum += (loc.avgUptime * loc.count);
+      
+      // Stability Check: If location avg uptime > 24h (86400s), count these nodes as stable
+      if (loc.avgUptime > 86400) {
+          current.stableCount += loc.count;
+      }
 
       map.set(code, current);
     });
@@ -146,7 +153,7 @@ export default function MapPage() {
     return Array.from(map.values()).map(c => ({
       ...c,
       avgHealth: c.healthSum / (c.count || 1),
-      avgUptime: c.uptimeSum / (c.count || 1) // Calculate average uptime per country
+      avgUptime: c.uptimeSum / (c.count || 1)
     })).sort((a, b) => {
       if (viewMode === 'STORAGE') return b.storage - a.storage;
       if (viewMode === 'CREDITS') return b.credits - a.credits;
@@ -292,8 +299,11 @@ export default function MapPage() {
   const formatUptime = (seconds: number) => {
       const d = Math.floor(seconds / 86400);
       const h = Math.floor((seconds % 86400) / 3600);
-      if(d > 0) return `${d}d ${h}h`;
-      return `${h}h`;
+      const m = Math.floor((seconds % 3600) / 60);
+      
+      // Detailed format for the Hybrid View
+      if (d > 0) return `${d}d ${h}h`;
+      return `${h}h ${m}m`;
   };
 
   const getPerformerStats = (pkData: TopPerformerData) => {
@@ -621,18 +631,25 @@ export default function MapPage() {
                       <div className={`h-full ${barColor} shadow-[0_0_10px_currentColor]`} style={{ width: `${Math.max(2, primaryShare)}%` }}></div>
                     </div>
 
-                    <div className="flex justify-between items-center text-[9px] font-mono uppercase tracking-wide text-zinc-500">
-                      <span>
-                        {viewMode === 'HEALTH' ? (
-                          <>Avg Uptime: <span className={textColor}>{formatUptime(c.avgUptime)}</span></>
-                        ) : (
-                          <><span className={textColor}>{primaryShare.toFixed(2)}%</span> of {metricLabel}</>
-                        )}
-                      </span>
-                      <span>
-                        Hosts <span className="text-zinc-300">{nodeShare.toFixed(2)}%</span> of Total Nodes
-                      </span>
-                    </div>
+                    {/* --- UPDATED LOGIC HERE: HYBRID STABILITY VIEW --- */}
+                    {viewMode === 'HEALTH' ? (
+                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[9px] font-mono uppercase tracking-wide text-zinc-500 leading-none mt-1">
+                          <span className="text-green-500 font-bold">{c.stableCount} nodes stable</span>
+                          <span className="text-zinc-700">|</span>
+                          <span>avg uptime: <span className="text-zinc-300">{formatUptime(c.avgUptime)}</span></span>
+                          <span className="text-zinc-700">|</span>
+                          <span>hosts <span className="text-zinc-300">{nodeShare.toFixed(1)}%</span> of total nodes</span>
+                       </div>
+                    ) : (
+                       <div className="flex justify-between items-center text-[9px] font-mono uppercase tracking-wide text-zinc-500">
+                          <span>
+                            <span className={textColor}>{primaryShare.toFixed(2)}%</span> of {metricLabel}
+                          </span>
+                          <span>
+                            Hosts <span className="text-zinc-300">{nodeShare.toFixed(2)}%</span> of Total Nodes
+                          </span>
+                       </div>
+                    )}
                   </div>
                 </div>
               );
