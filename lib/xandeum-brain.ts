@@ -269,7 +269,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   const medianDevnet = devnetValues.sort((a, b) => a - b)[Math.floor(devnetValues.length / 2)] || 0;
 
   // ---------------------------------------------------------
-  // PHASE 2 & 3: THE STRICT 7-FILTER SYSTEM
+  // PHASE 2 & 3: THE STRICT 7-FILTER SYSTEM + HYBRID UPTIME CHECK
   // ---------------------------------------------------------
 
   const processedNodes: EnrichedNode[] = [];
@@ -278,16 +278,11 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const key = p.pubkey || p.public_key;
       const rawCredVal = assumedNetwork === 'MAINNET' ? mainnetCreditMap.get(key) : devnetCreditMap.get(key);
       const credits = rawCredVal !== undefined ? rawCredVal : 'NULL'; 
-      
-      // --- UPDATE: UPTIME TIE-BREAKER (8th Variable) ---
-      // We extract the first 4 digits of the uptime as a "State Signature"
-      // If a node reboots or is a different process, this signature changes.
-      const uptimeSig = String(Math.floor(p.uptime || 0)).substring(0, 4);
-
-      return `${key}|${p.address}|${p.storage_committed}|${p.storage_used}|${p.version}|${p.is_public}|${credits}|${uptimeSig}`;
+      return `${key}|${p.address}|${p.storage_committed}|${p.storage_used}|${p.version}|${p.is_public}|${credits}`;
   };
 
-  const mainnetFingerprints = new Set<string>();
+  // CHANGED: Map now stores uptime for the Tie-Breaker check
+  const mainnetFingerprints = new Map<string, number>();
 
   // A. PROCESS PRIVATE RPC (ANCHOR) -> ALWAYS MAINNET
   rawPrivateNodes.forEach((pod: any) => {
@@ -306,6 +301,8 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
           isUntracked = true;
       }
 
+      const uptimeVal = Number(pod.uptime) || 0;
+
       const node: EnrichedNode = {
           ...pod,
           pubkey: pubkey,
@@ -314,7 +311,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
           isUntracked: isUntracked,
           storage_committed: Number(pod.storage_committed) || 0,
           storage_used: Number(pod.storage_used) || 0,
-          uptime: Number(pod.uptime) || 0,
+          uptime: uptimeVal,
           health: 0, 
           healthBreakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 },
           location: { 
@@ -327,100 +324,88 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       };
 
       processedNodes.push(node);
-      mainnetFingerprints.add(getFingerprint(pod, 'MAINNET'));
+      
+      // STORE UPTIME FOR THE HYBRID CHECK
+      const fingerprint = getFingerprint(pod, 'MAINNET');
+      mainnetFingerprints.set(fingerprint, uptimeVal);
   });
 
-  // B. PROCESS PUBLIC SWARM (SUBTRACTION) -> MODIFIED FOR DUAL-STACK
+  // B. PROCESS PUBLIC SWARM (SUBTRACTION WITH HYBRID TIE-BREAKER)
   rawPublicNodes.forEach((pod: any) => {
       const potentialMainnetFingerprint = getFingerprint(pod, 'MAINNET');
+      const publicUptime = Number(pod.uptime) || 0;
 
       if (mainnetFingerprints.has(potentialMainnetFingerprint)) {
-          return;
+          const privateUptime = mainnetFingerprints.get(potentialMainnetFingerprint) || 0;
+          
+          // --- HYBRID TIE-BREAKER LOGIC ---
+          
+          // 1. Prefix Match (First 4 Digits)
+          const pStr = privateUptime.toString().substring(0, 4);
+          const cStr = publicUptime.toString().substring(0, 4);
+          const isPrefixMatch = pStr === cStr;
+
+          // 2. Delta Match (100 Second Tolerance)
+          const diff = Math.abs(privateUptime - publicUptime);
+          const isDeltaMatch = diff <= 100;
+
+          // If EITHER condition matches, it is the same node -> SKIP
+          if (isPrefixMatch || isDeltaMatch) {
+              return; 
+          }
+          
+          // If neither matches, it implies a restart or massive drift -> Treat as new entry
       }
 
       const pubkey = pod.pubkey || pod.public_key;
       const ip = pod.address.split(':')[0];
       const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
 
+      let network: 'MAINNET' | 'DEVNET' = 'DEVNET';
+      let credits: number | null = null; 
+      let isUntracked = false;
+
       const mainnetVal = mainnetCreditMap.get(pubkey);
       const devnetVal = devnetCreditMap.get(pubkey);
 
-      // --- UPDATE: DUAL-STACK INJECTION ---
-      // We create a helper to push nodes easily since we might push TWO nodes now.
-      const pushNode = (net: 'MAINNET' | 'DEVNET', creds: number | null, untracked: boolean) => {
-          processedNodes.push({
-              ...pod,
-              pubkey: pubkey,
-              network: net,
-              credits: creds,
-              isUntracked: untracked,
-              storage_committed: Number(pod.storage_committed) || 0,
-              storage_used: Number(pod.storage_used) || 0,
-              uptime: Number(pod.uptime) || 0,
-              health: 0, 
-              healthBreakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 },
-              location: { 
-                  lat: loc.lat, 
-                  lon: loc.lon, 
-                  countryName: (loc as any).country || (loc as any).countryName || 'Unknown', 
-                  countryCode: loc.countryCode, 
-                  city: loc.city 
-              }
-          });
-      };
-
-      if (mainnetVal !== undefined && devnetVal !== undefined) {
-          // SCENARIO C: DUAL CITIZENSHIP
-          // Force injection of BOTH identities so neither is lost
-          pushNode('MAINNET', mainnetVal, false);
-          pushNode('DEVNET', devnetVal, false);
-      } 
-      else if (mainnetVal !== undefined) {
-          // SCENARIO A: ONLY MAINNET
-          pushNode('MAINNET', mainnetVal, false);
-      } 
-      else if (devnetVal !== undefined) {
-          // SCENARIO B: ONLY DEVNET
-          pushNode('DEVNET', devnetVal, false);
-      } 
-      else {
-          // SCENARIO D: UNTRACKED (Default to Devnet for now)
-          const untracked = isCreditsApiOnline;
-          pushNode('DEVNET', null, untracked);
-      }
-  });
-
-  // ---------------------------------------------------------
-  // PHASE 5: THE IMPROVED "GHOST PROTOCOL"
-  // ---------------------------------------------------------
-
-  const devnetPubkeys = new Set(devnetCreditMap.keys());
-
-  devnetPubkeys.forEach(pubkey => {
-      const hasDevnetNode = processedNodes.some(n => n.pubkey === pubkey && n.network === 'DEVNET');
-
-      if (!hasDevnetNode) {
-          const mainnetNode = processedNodes.find(n => n.pubkey === pubkey && n.network === 'MAINNET');
-
-          if (mainnetNode) {
-              // --- PROOF OF LIFE FIX ---
-              if (mainnetNode.isUntracked) {
-                  mainnetNode.isUntracked = false;
-              }
-
-              const clonedNode: EnrichedNode = {
-                  ...mainnetNode,
-                  network: 'DEVNET',
-                  credits: devnetCreditMap.get(pubkey) ?? null,
-                  isUntracked: false 
-              };
-              processedNodes.push(clonedNode);
+      if (mainnetVal !== undefined && devnetVal === undefined) {
+          network = 'MAINNET';
+          credits = mainnetVal;
+      } else if (devnetVal !== undefined) {
+          network = 'DEVNET';
+          credits = devnetVal;
+      } else {
+          network = 'DEVNET';
+          if (isCreditsApiOnline) {
+              isUntracked = true;
           }
       }
+
+      const node: EnrichedNode = {
+          ...pod,
+          pubkey: pubkey,
+          network: network,
+          credits: credits,
+          isUntracked: isUntracked,
+          storage_committed: Number(pod.storage_committed) || 0,
+          storage_used: Number(pod.storage_used) || 0,
+          uptime: publicUptime,
+          health: 0, 
+          healthBreakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 },
+          location: { 
+              lat: loc.lat, 
+              lon: loc.lon, 
+              countryName: (loc as any).country || (loc as any).countryName || 'Unknown', 
+              countryCode: loc.countryCode, 
+              city: loc.city 
+          }
+      };
+
+      processedNodes.push(node);
   });
 
   // ---------------------------------------------------------
-  // PHASE 6: SCORING & STATS
+  // PHASE 6: SCORING & STATS (GHOST PROTOCOL REMOVED)
   // ---------------------------------------------------------
 
   const rawVersionCounts: Record<string, number> = {}; 
