@@ -3,8 +3,6 @@ import geoip from 'geoip-lite';
 
 // --- CONFIGURATION ---
 
-const PRIVATE_MAINNET_RPC = '/api/proxy';
-
 // Public Swarm IPs
 const PUBLIC_RPC_NODES = [
   '173.212.203.145', '161.97.97.41', '192.190.136.36', '192.190.136.38',
@@ -148,15 +146,23 @@ export const calculateVitalityScore = (
 // --- FETCHING ---
 
 async function fetchPrivateMainnetNodes() {
+    const privateUrl = process.env.XANDEUM_PRIVATE_RPC_URL;
+
+    if (!privateUrl) {
+        console.warn("XANDEUM_PRIVATE_RPC_URL is not set.");
+        return [];
+    }
+
     const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
     try {
-        // Updated to hit our local proxy instead of the remote URL
-        const res = await axios.post(PRIVATE_MAINNET_RPC, payload, { timeout: TIMEOUT_RPC });
+        const res = await axios.post(privateUrl, payload, { timeout: TIMEOUT_RPC });
         if (res.data?.result?.pods && Array.isArray(res.data.result.pods)) {
             return res.data.result.pods;
         }
     } catch (e) {
-        console.warn("Private Mainnet RPC Failed:", (e as any).message);
+        // Safe logging
+        const errMsg = (e as any).message;
+        console.warn("Private Mainnet RPC Failed:", errMsg);
     }
     return [];
 }
