@@ -3,7 +3,6 @@ import geoip from 'geoip-lite';
 
 // --- CONFIGURATION ---
 
-// SECURITY UPGRADE: Points to our local API route, not the real URL.
 const PRIVATE_MAINNET_RPC = '/api/proxy';
 
 // Public Swarm IPs
