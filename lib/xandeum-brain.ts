@@ -278,7 +278,13 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const key = p.pubkey || p.public_key;
       const rawCredVal = assumedNetwork === 'MAINNET' ? mainnetCreditMap.get(key) : devnetCreditMap.get(key);
       const credits = rawCredVal !== undefined ? rawCredVal : 'NULL'; 
-      return `${key}|${p.address}|${p.storage_committed}|${p.storage_used}|${p.version}|${p.is_public}|${credits}`;
+      
+      // --- UPDATE: UPTIME TIE-BREAKER (8th Variable) ---
+      // We extract the first 4 digits of the uptime as a "State Signature"
+      // If a node reboots or is a different process, this signature changes.
+      const uptimeSig = String(Math.floor(p.uptime || 0)).substring(0, 4);
+
+      return `${key}|${p.address}|${p.storage_committed}|${p.storage_used}|${p.version}|${p.is_public}|${credits}|${uptimeSig}`;
   };
 
   const mainnetFingerprints = new Set<string>();
@@ -324,7 +330,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       mainnetFingerprints.add(getFingerprint(pod, 'MAINNET'));
   });
 
-  // B. PROCESS PUBLIC SWARM (SUBTRACTION)
+  // B. PROCESS PUBLIC SWARM (SUBTRACTION) -> MODIFIED FOR DUAL-STACK
   rawPublicNodes.forEach((pod: any) => {
       const potentialMainnetFingerprint = getFingerprint(pod, 'MAINNET');
 
@@ -336,51 +342,56 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const ip = pod.address.split(':')[0];
       const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
 
-      let network: 'MAINNET' | 'DEVNET' = 'DEVNET';
-      let credits: number | null = null; 
-      let isUntracked = false;
-
       const mainnetVal = mainnetCreditMap.get(pubkey);
       const devnetVal = devnetCreditMap.get(pubkey);
 
-      if (mainnetVal !== undefined && devnetVal === undefined) {
-          network = 'MAINNET';
-          credits = mainnetVal;
-      } else if (devnetVal !== undefined) {
-          network = 'DEVNET';
-          credits = devnetVal;
-      } else {
-          network = 'DEVNET';
-          if (isCreditsApiOnline) {
-              isUntracked = true;
-          }
-      }
-
-      const node: EnrichedNode = {
-          ...pod,
-          pubkey: pubkey,
-          network: network,
-          credits: credits,
-          isUntracked: isUntracked,
-          storage_committed: Number(pod.storage_committed) || 0,
-          storage_used: Number(pod.storage_used) || 0,
-          uptime: Number(pod.uptime) || 0,
-          health: 0, 
-          healthBreakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 },
-          location: { 
-              lat: loc.lat, 
-              lon: loc.lon, 
-              countryName: (loc as any).country || (loc as any).countryName || 'Unknown', 
-              countryCode: loc.countryCode, 
-              city: loc.city 
-          }
+      // --- UPDATE: DUAL-STACK INJECTION ---
+      // We create a helper to push nodes easily since we might push TWO nodes now.
+      const pushNode = (net: 'MAINNET' | 'DEVNET', creds: number | null, untracked: boolean) => {
+          processedNodes.push({
+              ...pod,
+              pubkey: pubkey,
+              network: net,
+              credits: creds,
+              isUntracked: untracked,
+              storage_committed: Number(pod.storage_committed) || 0,
+              storage_used: Number(pod.storage_used) || 0,
+              uptime: Number(pod.uptime) || 0,
+              health: 0, 
+              healthBreakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 },
+              location: { 
+                  lat: loc.lat, 
+                  lon: loc.lon, 
+                  countryName: (loc as any).country || (loc as any).countryName || 'Unknown', 
+                  countryCode: loc.countryCode, 
+                  city: loc.city 
+              }
+          });
       };
 
-      processedNodes.push(node);
+      if (mainnetVal !== undefined && devnetVal !== undefined) {
+          // SCENARIO C: DUAL CITIZENSHIP
+          // Force injection of BOTH identities so neither is lost
+          pushNode('MAINNET', mainnetVal, false);
+          pushNode('DEVNET', devnetVal, false);
+      } 
+      else if (mainnetVal !== undefined) {
+          // SCENARIO A: ONLY MAINNET
+          pushNode('MAINNET', mainnetVal, false);
+      } 
+      else if (devnetVal !== undefined) {
+          // SCENARIO B: ONLY DEVNET
+          pushNode('DEVNET', devnetVal, false);
+      } 
+      else {
+          // SCENARIO D: UNTRACKED (Default to Devnet for now)
+          const untracked = isCreditsApiOnline;
+          pushNode('DEVNET', null, untracked);
+      }
   });
 
   // ---------------------------------------------------------
-  // PHASE 5: THE "GHOST PROTOCOL"
+  // PHASE 5: THE IMPROVED "GHOST PROTOCOL"
   // ---------------------------------------------------------
 
   const devnetPubkeys = new Set(devnetCreditMap.keys());
@@ -392,6 +403,11 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
           const mainnetNode = processedNodes.find(n => n.pubkey === pubkey && n.network === 'MAINNET');
 
           if (mainnetNode) {
+              // --- PROOF OF LIFE FIX ---
+              if (mainnetNode.isUntracked) {
+                  mainnetNode.isUntracked = false;
+              }
+
               const clonedNode: EnrichedNode = {
                   ...mainnetNode,
                   network: 'DEVNET',
