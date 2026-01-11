@@ -3,7 +3,9 @@ import geoip from 'geoip-lite';
 
 // --- CONFIGURATION ---
 
-const PRIVATE_MAINNET_RPC = 'process.env.PRIVATE_RPC_URL';
+// SECURITY UPGRADE: Points to our local API route, not the real URL.
+const PRIVATE_MAINNET_RPC = '/api/proxy';
+
 // Public Swarm IPs
 const PUBLIC_RPC_NODES = [
   '173.212.203.145', '161.97.97.41', '192.190.136.36', '192.190.136.38',
@@ -27,7 +29,7 @@ export interface EnrichedNode {
   uptime: number;
   last_seen_timestamp: number;
   is_public: boolean;
-  isUntracked?: boolean; // <--- The Fix: New Optional Flag
+  isUntracked?: boolean; 
   network: 'MAINNET' | 'DEVNET';
   storage_used: number;      
   storage_committed: number; 
@@ -125,14 +127,10 @@ export const calculateVitalityScore = (
   let total = 0;
   let reputationScore: number | null = null;
 
-  // SCORING LOGIC UPDATE:
-  // If credits !== null, we calculate reputation.
-  // If credits === null, we SKIP reputation and re-weight the other metrics.
   if (credits !== null && medianCredits > 0) {
       reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
       total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15));
   } else {
-      // Re-weight if reputation is missing (API Down)
       total = Math.round((uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20));
       reputationScore = null; 
   }
@@ -153,6 +151,7 @@ export const calculateVitalityScore = (
 async function fetchPrivateMainnetNodes() {
     const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
     try {
+        // Updated to hit our local proxy instead of the remote URL
         const res = await axios.post(PRIVATE_MAINNET_RPC, payload, { timeout: TIMEOUT_RPC });
         if (res.data?.result?.pods && Array.isArray(res.data.result.pods)) {
             return res.data.result.pods;
@@ -166,7 +165,6 @@ async function fetchPrivateMainnetNodes() {
 async function fetchPublicSwarmNodes(mode: 'fast' | 'swarm') {
     const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
 
-    // We strictly use Promise.any for speed and uniqueness
     const requests = PUBLIC_RPC_NODES.map(ip => 
         axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC })
              .then(r => r.data?.result?.pods || [])
@@ -176,7 +174,6 @@ async function fetchPublicSwarmNodes(mode: 'fast' | 'swarm') {
     );
 
     try {
-        // Hero Mode: Return the first valid list we get.
         const winner = await Promise.any(requests);
         return winner;
     } catch (e) {
@@ -244,10 +241,8 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       return { nodes: [], stats: { consensusVersion: '0.0.0', totalNodes: 0, systemStatus: { rpc: false, credits: false }, avgBreakdown: { total: 0, uptime: 0, version: 0, reputation: 0, storage: 0 } } };
   }
 
-  // Check if Credits API is actually Online
   const isCreditsApiOnline = creditsData.mainnet.length > 0 || creditsData.devnet.length > 0;
 
-  // Build the Bank (Credits Maps)
   const mainnetCreditMap = new Map<string, number>();
   const devnetCreditMap = new Map<string, number>();
   const mainnetValues: number[] = [];
@@ -274,7 +269,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
 
   const processedNodes: EnrichedNode[] = [];
 
-  // Fingerprint Generator
   const getFingerprint = (p: any, assumedNetwork: 'MAINNET' | 'DEVNET') => {
       const key = p.pubkey || p.public_key;
       const rawCredVal = assumedNetwork === 'MAINNET' ? mainnetCreditMap.get(key) : devnetCreditMap.get(key);
@@ -291,11 +285,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
 
       const rawCreds = mainnetCreditMap.get(pubkey);
-      
-      // LOGIC FIX: 
-      // If found in map -> credits = value, isUntracked = false
-      // If NOT found AND API Online -> credits = null, isUntracked = true
-      // If NOT found AND API Offline -> credits = null, isUntracked = false
+
       let credits: number | null = null;
       let isUntracked = false;
 
@@ -348,7 +338,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const mainnetVal = mainnetCreditMap.get(pubkey);
       const devnetVal = devnetCreditMap.get(pubkey);
 
-      // Network detection and Credit Assignment
       if (mainnetVal !== undefined && devnetVal === undefined) {
           network = 'MAINNET';
           credits = mainnetVal;
@@ -356,8 +345,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
           network = 'DEVNET';
           credits = devnetVal;
       } else {
-          // No credits found in either map
-          // Default to DEVNET unless stronger evidence exists
           network = 'DEVNET';
           if (isCreditsApiOnline) {
               isUntracked = true;
@@ -388,7 +375,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   });
 
   // ---------------------------------------------------------
-  // PHASE 5: THE "GHOST PROTOCOL" (REWRITE / CLONE)
+  // PHASE 5: THE "GHOST PROTOCOL"
   // ---------------------------------------------------------
 
   const devnetPubkeys = new Set(devnetCreditMap.keys());
@@ -400,13 +387,11 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
           const mainnetNode = processedNodes.find(n => n.pubkey === pubkey && n.network === 'MAINNET');
 
           if (mainnetNode) {
-              // We found a node on Mainnet that also has credits on Devnet. 
-              // Clone it as a Devnet node.
               const clonedNode: EnrichedNode = {
                   ...mainnetNode,
                   network: 'DEVNET',
                   credits: devnetCreditMap.get(pubkey) ?? null,
-                  isUntracked: false // It has credits, so it is tracked
+                  isUntracked: false 
               };
               processedNodes.push(clonedNode);
           }
@@ -439,10 +424,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       const ip = node.address.split(':')[0];
       const loc = geoCache.get(ip) || node.location;
       const medianCreditsForScore = node.network === 'MAINNET' ? medianMainnet : medianDevnet;
-
-      // FIX: Determining what to pass to scoring algo
-      // If Untracked: Pass 0 (Penalize reputation score)
-      // If API Offline: Pass null (Trigger re-weighting protection)
       const creditsForScore = node.isUntracked ? 0 : node.credits;
 
       const vitality = calculateVitalityScore(
@@ -467,7 +448,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       };
   });
 
-  // Ranking & Sorting
   const mainnetList = finalNodes.filter(n => n.network === 'MAINNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const devnetList = finalNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
 
@@ -483,7 +463,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
 
   const allSorted = [...mainnetList, ...devnetList];
 
-  // Health Rank
   allSorted.sort((a, b) => b.health - a.health);
   let hr = 1;
   allSorted.forEach((n, i) => {
@@ -491,7 +470,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       n.health_rank = hr;
   });
 
-  // Global Stats
   let totalUptime = 0, totalVersion = 0, totalReputation = 0, reputationCount = 0, totalStorage = 0;
   allSorted.forEach(node => {
     totalUptime += node.healthBreakdown.uptime;
@@ -508,7 +486,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     stats: { 
         consensusVersion, 
         medianCredits: medianMainnet, 
-        medianStorage,
+        medianStorage, 
         totalNodes: allSorted.length,
         systemStatus: {
             credits: isCreditsApiOnline, 
