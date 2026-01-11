@@ -8,7 +8,7 @@ import { scaleSqrt } from 'd3-scale';
 import { 
   ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, 
   MapPin, RotateCcw, Info, X, HelpCircle, Share2, Check, ArrowRight, 
-  AlertOctagon, AlertCircle, EyeOff, BarChart3
+  AlertOctagon, AlertCircle, EyeOff, BarChart3, Clock
 } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
@@ -117,6 +117,7 @@ export default function MapPage() {
       storage: number;
       credits: number;
       healthSum: number;
+      uptimeSum: number; // Added to track uptime aggregation
     }>();
 
     // Aggregation Loop
@@ -128,13 +129,15 @@ export default function MapPage() {
         count: 0, 
         storage: 0, 
         credits: 0, 
-        healthSum: 0 
+        healthSum: 0,
+        uptimeSum: 0 
       };
 
       current.count += loc.count;
       current.storage += loc.totalStorage;
       current.credits += (loc.totalCredits || 0);
       current.healthSum += (loc.avgHealth * loc.count); // Weighted sum
+      current.uptimeSum += (loc.avgUptime * loc.count); // Weighted sum for uptime
 
       map.set(code, current);
     });
@@ -142,7 +145,8 @@ export default function MapPage() {
     // Convert to Array & Sort
     return Array.from(map.values()).map(c => ({
       ...c,
-      avgHealth: c.healthSum / (c.count || 1)
+      avgHealth: c.healthSum / (c.count || 1),
+      avgUptime: c.uptimeSum / (c.count || 1) // Calculate average uptime per country
     })).sort((a, b) => {
       if (viewMode === 'STORAGE') return b.storage - a.storage;
       if (viewMode === 'CREDITS') return b.credits - a.credits;
@@ -619,7 +623,11 @@ export default function MapPage() {
 
                     <div className="flex justify-between items-center text-[9px] font-mono uppercase tracking-wide text-zinc-500">
                       <span>
-                        <span className={textColor}>{primaryShare.toFixed(2)}%</span> of {metricLabel}
+                        {viewMode === 'HEALTH' ? (
+                          <>Avg Uptime: <span className={textColor}>{formatUptime(c.avgUptime)}</span></>
+                        ) : (
+                          <><span className={textColor}>{primaryShare.toFixed(2)}%</span> of {metricLabel}</>
+                        )}
                       </span>
                       <span>
                         Hosts <span className="text-zinc-300">{nodeShare.toFixed(2)}%</span> of Total Nodes
