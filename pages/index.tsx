@@ -3318,7 +3318,7 @@ export default function Home() {
                 </div>
               )}
 
-            {!compareMode && !shareMode && (
+                        {!compareMode && !shareMode && (
               <div className="mt-6 pt-6 border-t border-zinc-800 flex flex-col gap-4">
                 <div className="flex flex-col items-center justify-center gap-3">
                   <div className="text-[10px] text-zinc-500 flex items-center gap-1.5 bg-black/40 px-3 py-1 rounded-full border border-zinc-800/50">
@@ -3336,7 +3336,7 @@ export default function Home() {
 
                 <div className="flex gap-4">
                   <button
-                    onClick={() => router.push('/compare')} 
+                    onClick={() => router.push('/compare')}
                     className="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 transition hover:scale-[1.02] border border-zinc-700"
                   >
                     <Swords size={16} className="text-red-400" /> COMPARE NODES
@@ -3350,10 +3350,12 @@ export default function Home() {
                 </div>
               </div>
             )}
-          </div>
-        </div>
-      </div>
-    )}
+          </div> {/* Closes the main Details View wrapper */}
+        )} {/* Closes the ternary operator (compareMode ? : shareMode ? : else) */}
+        </div> {/* Closes the scrollable body (flex-1 overflow-y-auto) */}
+      </div> {/* Closes the Modal Content Card */}
+    </div> {/* Closes the Fixed Overlay (inset-0) */}
+  )} {/* Closes selectedNode && (...) */}
 
     {!zenMode && (
       <footer className="border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto text-center">
