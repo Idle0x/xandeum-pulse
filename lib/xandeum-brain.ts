@@ -26,6 +26,7 @@ export interface EnrichedNode {
   last_seen_timestamp: number;
   is_public: boolean;
   isUntracked?: boolean; 
+  is_operator?: boolean; // New flag to identify the dashboard host node
   network: 'MAINNET' | 'DEVNET';
   storage_used: number;      
   storage_committed: number; 
@@ -97,7 +98,6 @@ export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: str
     return Math.max(0, 10 - (distance - 5));
 };
 
-// UPDATED: Now accepts isCreditsApiOnline to enforce fair penalization
 export const calculateVitalityScore = (
     storageCommitted: number, 
     storageUsed: number,
@@ -125,17 +125,13 @@ export const calculateVitalityScore = (
   let total = 0;
   let reputationScore: number | null = null;
 
-  // LOGIC CHANGE: Strict penalty when API is online but credits are missing
   if (credits !== null && medianCredits > 0) {
-      // 1. Has Credits -> Standard calculation
       reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
       total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15));
   } else if (isCreditsApiOnline) {
-      // 2. No Credits, but API is ONLINE -> Penalize (0 Score, Standard Weights)
       reputationScore = 0;
       total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (0 * 0.20) + (versionScore * 0.15));
   } else {
-      // 3. No Credits, API OFFLINE -> Reweight (Dynamic Reweighting protected for outages)
       total = Math.round((uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20));
       reputationScore = null; 
   }
@@ -168,11 +164,45 @@ async function fetchPrivateMainnetNodes() {
             return res.data.result.pods;
         }
     } catch (e) {
-        // Safe logging
         const errMsg = (e as any).message;
         console.warn("Private Mainnet RPC Failed:", errMsg);
     }
     return [];
+}
+
+// *** NEW FUNCTION: Fetch Operator Node ***
+async function fetchOperatorNode() {
+    const privateUrl = process.env.XANDEUM_PRIVATE_RPC_URL;
+    const operatorPubkey = process.env.XANDEUM_OPERATOR_PUBKEY;
+    const operatorIp = process.env.XANDEUM_OPERATOR_IP;
+
+    // Only run if the environment is fully configured
+    if (!privateUrl || !operatorPubkey || !operatorIp) return null;
+
+    const payload = { jsonrpc: '2.0', method: 'get-stats', params: [], id: 1 };
+    try {
+        const res = await axios.post(privateUrl, payload, { timeout: TIMEOUT_RPC });
+        const stats = res.data?.result;
+
+        if (stats) {
+            return {
+                address: `${operatorIp}:9001`,
+                rpc_port: 6000,
+                pubkey: operatorPubkey,
+                is_public: false,
+                // Manually mapping "1" -> "1.2.0" because get-stats returns int version
+                version: "1.2.0", 
+                uptime: stats.uptime,
+                storage_committed: stats.file_size,
+                storage_used: 0,
+                last_seen_timestamp: Math.floor(Date.now() / 1000),
+                is_operator: true // Flag to mark this node
+            };
+        }
+    } catch (e) {
+        console.warn("Operator Node Fetch Failed:", (e as any).message);
+    }
+    return null;
 }
 
 async function fetchPublicSwarmNodes(mode: 'fast' | 'swarm') {
@@ -244,11 +274,23 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   // PHASE 1: COLLECTION
   // ---------------------------------------------------------
 
-  const [rawPrivateNodes, rawPublicNodes, creditsData] = await Promise.all([ 
+  // *** UPDATED: Added fetchOperatorNode() to the collection phase ***
+  const [rawPrivateNodes, operatorNode, rawPublicNodes, creditsData] = await Promise.all([ 
       fetchPrivateMainnetNodes(), 
+      fetchOperatorNode(),
       fetchPublicSwarmNodes(mode), 
       fetchCredits() 
   ]);
+
+  // *** UPDATED: Inject Operator Node into Private List ***
+  // We unshift it to the top so it is processed first and considered "Mainnet Anchor"
+  if (operatorNode) {
+      // Avoid duplicates if the RPC logic changes later
+      const exists = rawPrivateNodes.find((p: any) => p.pubkey === operatorNode.pubkey);
+      if (!exists) {
+          rawPrivateNodes.unshift(operatorNode);
+      }
+  }
 
   if (rawPrivateNodes.length === 0 && rawPublicNodes.length === 0) {
       return { nodes: [], stats: { consensusVersion: '0.0.0', totalNodes: 0, systemStatus: { rpc: false, credits: false }, avgBreakdown: { total: 0, uptime: 0, version: 0, reputation: 0, storage: 0 } } };
@@ -316,6 +358,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
           network: 'MAINNET',
           credits: credits,
           isUntracked: isUntracked,
+          is_operator: pod.is_operator || false, // Pass through the operator flag
           storage_committed: Number(pod.storage_committed) || 0,
           storage_used: Number(pod.storage_used) || 0,
           uptime: uptimeVal,
@@ -331,7 +374,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       };
 
       processedNodes.push(node);
-      
+
       const fingerprint = getFingerprint(pod, 'MAINNET');
       mainnetFingerprints.set(fingerprint, uptimeVal);
   });
@@ -343,9 +386,9 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
 
       if (mainnetFingerprints.has(potentialMainnetFingerprint)) {
           const privateUptime = mainnetFingerprints.get(potentialMainnetFingerprint) || 0;
-          
+
           const diff = Math.abs(privateUptime - publicUptime);
-          
+
           if (diff <= 100) {
               return; // DUPLICATE DETECTED -> Skip
           }
