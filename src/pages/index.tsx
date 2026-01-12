@@ -30,7 +30,7 @@ import {
   Clock, Trophy, Star, ArrowUp, ArrowDown,
   Info, ExternalLink, Maximize2, Map as MapIcon,
   BookOpen, Menu, LayoutDashboard, HeartPulse,
-  Swords, Monitor, AlertTriangle, RefreshCw
+  Swords, Monitor, AlertTriangle, RefreshCw, Twitter
 } from 'lucide-react';
 
 export default function Home() {
