@@ -1812,7 +1812,7 @@ export default function Home() {
             </Link>
 
             <button
-              onClick={handleCompareNav} 
+              onClick={handleCompareLink} 
               className="w-full text-left flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800"
             >
               <Swords size={18} />
