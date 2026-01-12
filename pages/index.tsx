@@ -629,8 +629,7 @@ export default function Home() {
     if (activeTooltip) setActiveTooltip(null);
   };
 
-  const handleCompareLink = () => {
-    // NEW LOGIC: Navigate to the dedicated comparison page
+  const handleCompareNav = () => {
     router.push('/compare');
     setIsMenuOpen(false);
   };
@@ -1812,7 +1811,7 @@ export default function Home() {
             </Link>
 
             <button
-              onClick={handleCompareLink} 
+              onClick={handleCompareNav} 
               className="w-full text-left flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800"
             >
               <Swords size={18} />
@@ -3349,12 +3348,10 @@ export default function Home() {
                   </div>
                 </div>
               )}
-          </div> {/* Closes the main Details View wrapper */}
-        )} {/* Closes the ternary operator (compareMode ? : shareMode ? : else) */}
-        </div> {/* Closes the scrollable body (flex-1 overflow-y-auto) */}
-      </div> {/* Closes the Modal Content Card */}
-    </div> {/* Closes the Fixed Overlay (inset-0) */}
-  )} {/* Closes selectedNode && (...) */}
+            </div>
+          </div>
+        </div>
+      )}
 
     {!zenMode && (
       <footer className="border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto text-center">
