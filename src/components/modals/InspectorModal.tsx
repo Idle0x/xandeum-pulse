@@ -7,10 +7,11 @@ import {
 } from 'lucide-react';
 import { Node } from '../../types';
 import { ModalAvatar } from '../common/ModalAvatar';
-import { RadialProgress } from '../RadialProgress'; // Ensure this path is correct
-import { PhysicalLocationBadge } from '../PhysicalLocationBadge'; // Ensure this path is correct
-import { formatBytes, formatUptime, useTimeAgo } from '../../utils/formatters';
-import { getSafeIp, getSafeVersion, checkIsLatest } from '../../utils/nodeHelpers';
+import { RadialProgress } from '../RadialProgress'; 
+import { PhysicalLocationBadge } from '../PhysicalLocationBadge'; 
+import { formatBytes, formatUptime } from '../../utils/formatters';
+import { useTimeAgo } from '../../hooks/useTimeAgo'; // ✅ Corrected import path
+import { getSafeIp, getSafeVersion, checkIsLatest } from '../../utils/nodeHelpers'; // ✅ Added checkIsLatest
 import { IdentityView } from './views/IdentityView';
 import { HealthView } from './views/HealthView';
 import { StorageView } from './views/StorageView';
@@ -47,7 +48,7 @@ export const InspectorModal = ({
   const [modalView, setModalView] = useState<'overview' | 'health' | 'storage' | 'identity'>('overview');
   const [mode, setMode] = useState<'VIEW' | 'COMPARE' | 'SHARE'>('VIEW');
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+  // removed unused activeTooltip state
 
   // When node changes, reset view
   useEffect(() => {
