@@ -1,5 +1,4 @@
-// src/utils/nodeHelpers.ts
-import { Node } from '../types'; 
+import { Node } from '../types';
 
 export const getSafeIp = (node: Node | null) => {
   return node?.address ? node.address.split(':')[0] : 'Unknown IP';
@@ -20,4 +19,11 @@ export const compareVersions = (v1: string = '0.0.0', v2: string = '0.0.0') => {
     if (n1 < n2) return -1;
   }
   return 0;
+};
+
+// Added specifically for InspectorModal
+export const checkIsLatest = (nodeVersion: string | null | undefined, consensusVersion: string) => {
+  const cleanVer = (nodeVersion || '').replace(/[^0-9.]/g, '');
+  const cleanConsensus = consensusVersion.replace(/[^0-9.]/g, '');
+  return cleanVer === cleanConsensus || compareVersions(cleanVer, cleanConsensus) > 0;
 };
