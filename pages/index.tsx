@@ -1711,6 +1711,8 @@ export default function Home() {
     );
   };
 
+  const isSelectedNodeLatest = checklsLatest(selectedNode?.version);
+
   return (
     <div
       className={`min-h-screen font-sans transition-colors duration-500 ${
