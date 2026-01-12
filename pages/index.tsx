@@ -1,5 +1,3 @@
-This is my complete current code. just update the code, right from the return all the way down to the end of the file
-
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
