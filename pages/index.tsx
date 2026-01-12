@@ -1079,67 +1079,69 @@ export default function Home() {
     const isLatest = checkIsLatest(node.version);
     const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
     
-    // Dynamic Density Classes
+    // Dynamic Density Classes for Mobile
     const cardPadding = "p-2 md:p-5";
     const titleSize = "text-[9px] md:text-[10px]";
     const valueSize = "text-xs md:text-lg";
     
-    return (
+    // --------------------------------------------------------
+    // STRICT SEPARATION: MOBILE COMPONENT
+    // --------------------------------------------------------
+    const MobileCard = (
       <div
-        key={`${node.pubkey}-${node.network}-${i}`}
         onClick={() => { setSelectedNode(node); setModalView('overview'); }}
-        className={`group relative border rounded-xl ${cardPadding} cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${
+        className={`md:hidden group relative border rounded-xl p-2 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${
           zenMode ? 'bg-black border-zinc-800 hover:border-zinc-600' : isFav ? 'bg-gradient-to-b from-zinc-900 to-black border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.1)]' : 'bg-gradient-to-b from-zinc-900 to-black border-zinc-800 hover:border-blue-500/50'
         }`}
       >
         {/* HOVER REVEAL: View Details Arrow */}
-        <div className="absolute top-1 right-1 md:top-2 md:right-2 opacity-0 group-hover:opacity-100 transition duration-300 text-[8px] md:text-[9px] text-blue-400 font-bold uppercase tracking-widest flex items-center gap-1 bg-black/80 px-1.5 py-0.5 rounded-full border border-blue-500/20 z-10">
+        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition duration-300 text-[8px] text-blue-400 font-bold uppercase tracking-widest flex items-center gap-1 bg-black/80 px-1.5 py-0.5 rounded-full border border-blue-500/20 z-10">
           <Maximize2 size={8} />
         </div>
 
-        <div className="mb-2 md:mb-4 flex justify-between items-start">
+        <div className="mb-2 flex justify-between items-start">
           <div className="overflow-hidden pr-2 w-full">
             <div className="flex items-center gap-1.5 mb-1">
                {/* NETWORK BADGES (Compact) */}
-              {node.network === 'MAINNET' && <span className="text-[7px] md:text-[8px] bg-green-500 text-black px-1 rounded font-bold uppercase">MN</span>}
-              {node.network === 'DEVNET' && <span className="text-[7px] md:text-[8px] bg-blue-500 text-white px-1 rounded font-bold uppercase">DN</span>}
-              {node.network === 'UNKNOWN' && <span className="text-[7px] md:text-[8px] bg-zinc-700 text-zinc-300 px-1 rounded font-bold uppercase">UNK</span>}
+              {node.network === 'MAINNET' && <span className="text-[7px] bg-green-500 text-black px-1 rounded font-bold uppercase">MN</span>}
+              {node.network === 'DEVNET' && <span className="text-[7px] bg-blue-500 text-white px-1 rounded font-bold uppercase">DN</span>}
+              {node.network === 'UNKNOWN' && <span className="text-[7px] bg-zinc-700 text-zinc-300 px-1 rounded font-bold uppercase">UNK</span>}
               
               {!node.is_public && <Shield size={8} className="text-zinc-600" />}
             </div>
 
-            <div className="relative h-4 md:h-6 w-full">
+            <div className="relative h-4 w-full">
                {/* DEFAULT STATE: PUBKEY */}
                <div className="absolute inset-0 transition-opacity duration-300 group-hover:opacity-0 flex items-center">
-                  <span className="font-mono text-[10px] md:text-sm text-zinc-300 truncate w-full">{node.pubkey?.slice(0,12)}...</span>
+                  <span className="font-mono text-[10px] text-zinc-300 truncate w-full">{node.pubkey?.slice(0,12)}...</span>
                </div>
                
                {/* HOVER STATE: IP + FLAG */}
                <div className="absolute inset-0 transition-opacity duration-300 opacity-0 group-hover:opacity-100 flex items-center gap-1.5">
-                   {flagUrl && <img src={flagUrl} className="w-3 md:w-4 h-auto rounded-sm shrink-0" />}
-                   <span className="font-mono text-[10px] md:text-sm text-blue-400 truncate">{getSafeIp(node)}</span>
+                   {flagUrl && <img src={flagUrl} className="w-3 h-auto rounded-sm shrink-0" />}
+                   <span className="font-mono text-[10px] text-blue-400 truncate">{getSafeIp(node)}</span>
                </div>
             </div>
           </div>
 
-          <button onClick={(e) => toggleFavorite(e, node.address || '')} className={`p-1.5 md:p-3 rounded-full transition-all duration-200 shrink-0 active:scale-90 ${isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-600 hover:text-yellow-500 hover:bg-zinc-800'}`}>
-            <Star size={14} className="md:w-6 md:h-6" strokeWidth={isFav ? 2.5 : 2} fill={isFav ? "currentColor" : "none"} />
+          <button onClick={(e) => toggleFavorite(e, node.address || '')} className={`p-1.5 rounded-full transition-all duration-200 shrink-0 active:scale-90 ${isFav ? 'text-yellow-500 bg-yellow-500/10' : 'text-zinc-600 hover:text-yellow-500 hover:bg-zinc-800'}`}>
+            <Star size={14} strokeWidth={isFav ? 2.5 : 2} fill={isFav ? "currentColor" : "none"} />
           </button>
         </div>
 
-        <div className="space-y-1.5 md:space-y-3">
-          <div className="flex justify-between items-center text-[9px] md:text-xs">
+        <div className="space-y-1.5">
+          <div className="flex justify-between items-center text-[9px]">
             <span className="text-zinc-500">Ver</span>
             <span className={`px-1.5 py-0.5 rounded transition-all duration-500 ${
               isVersionSort ? 'text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.4)] border-cyan-500/50 bg-zinc-900 border' : 'text-zinc-300 bg-zinc-800'
             }`}>
-              {node.version || 'Unknown'} {isLatest && <CheckCircle size={8} className="inline text-green-500 ml-0.5 md:ml-1"/>}
+              {node.version || 'Unknown'} {isLatest && <CheckCircle size={8} className="inline text-green-500 ml-0.5"/>}
             </span>
           </div>
 
-          <div className="pt-1 md:pt-2">
+          <div className="pt-1">
             {/* REWARDS PILL (Compact Mode) */}
-            <div className={`flex justify-between items-center text-[9px] md:text-xs p-1 md:p-2 rounded-lg border transition-colors ${
+            <div className={`flex justify-between items-center text-[9px] p-1 rounded-lg border transition-colors ${
               (node as any).isUntracked 
                 ? 'bg-zinc-900/50 border-zinc-800' 
                 : node.credits !== null 
@@ -1169,17 +1171,120 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="pt-1 md:pt-3 mt-1 md:mt-3 border-t border-white/5 flex justify-between items-end">
+          <div className="pt-1 mt-1 border-t border-white/5 flex justify-between items-end">
             <div>
-              <span className="text-[8px] md:text-[10px] text-zinc-500 uppercase font-bold block mb-0.5 flex items-center gap-1">
-                <cycleData.icon size={8} className="md:w-3 md:h-3" /> {cycleData.label}
+              <span className="text-[8px] text-zinc-500 uppercase font-bold block mb-0.5 flex items-center gap-1">
+                <cycleData.icon size={8} /> {cycleData.label}
               </span>
-              <span className={`${valueSize} font-bold ${cycleData.color} font-mono tracking-tight`}>
+              <span className={`text-xs font-bold ${cycleData.color} font-mono tracking-tight`}>
                 {cycleData.value}
               </span>
             </div>
           </div>
         </div>
+      </div>
+    );
+
+    // --------------------------------------------------------
+    // STRICT SEPARATION: DESKTOP COMPONENT (Original Code Restored)
+    // --------------------------------------------------------
+    const DesktopCard = (
+      <div
+        onClick={() => { setSelectedNode(node); setModalView('overview'); }}
+        className={`hidden md:block group relative border rounded-xl p-3 md:p-5 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${
+          zenMode ? 'bg-black border-zinc-800 hover:border-zinc-600' : isFav ? 'bg-gradient-to-b from-zinc-900 to-black border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.1)]' : 'bg-gradient-to-b from-zinc-900 to-black border-zinc-800 hover:border-blue-500/50'
+        }`}
+      >
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition duration-300 text-[9px] text-blue-400 font-bold uppercase tracking-widest flex items-center gap-1 bg-black/50 px-2 py-1 rounded-full border border-blue-500/20">
+          View Details <Maximize2 size={8} />
+        </div>
+
+        <div className="mb-2 md:mb-4 flex justify-between items-start">
+          <div className="overflow-hidden pr-2 w-full">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold">NODE IDENTITY</div>
+              {!node.is_public && <Shield size={10} className="text-zinc-600" />}
+              {node.network === 'MAINNET' && <span className="text-[8px] bg-green-500 text-black px-1 rounded font-bold uppercase">MAINNET</span>}
+              {node.network === 'DEVNET' && <span className="text-[8px] bg-blue-500 text-white px-1 rounded font-bold uppercase">DEVNET</span>}
+              {node.network === 'UNKNOWN' && <span className="text-[8px] bg-zinc-700 text-zinc-300 px-1 rounded font-bold uppercase">UNKNOWN</span>}
+            </div>
+
+            <div className="relative h-6 w-full">
+               <div className="absolute inset-0 transition-opacity duration-300 group-hover:opacity-0 flex items-center">
+                  <span className="font-mono text-xs md:text-sm text-zinc-300 truncate w-full">{node.pubkey?.slice(0,16)}...</span>
+               </div>
+               <div className="absolute inset-0 transition-opacity duration-300 opacity-0 group-hover:opacity-100 flex items-center gap-2">
+                   {flagUrl && <img src={flagUrl} className="w-4 h-auto rounded-sm shrink-0" />}
+                   <span className="font-mono text-xs md:text-sm text-blue-400 truncate">{getSafeIp(node)}</span>
+               </div>
+            </div>
+          </div>
+
+          <button onClick={(e) => toggleFavorite(e, node.address || '')} className={`p-3 rounded-full transition-all duration-200 shrink-0 active:scale-90 ${isFav ? 'text-yellow-500 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.2)]' : 'text-zinc-600 hover:text-yellow-500 hover:bg-zinc-800'}`} style={{ minWidth: '44px', minHeight: '44px' }}>
+            <Star size={24} strokeWidth={isFav ? 2.5 : 2} fill={isFav ? "currentColor" : "none"} />
+          </button>
+        </div>
+
+        <div className="space-y-1.5 md:space-y-3">
+          <div className="flex justify-between items-center text-[10px] md:text-xs">
+            <span className="text-zinc-500">Version</span>
+            <span className={`px-2 py-0.5 rounded transition-all duration-500 ${
+              isVersionSort ? 'text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.4)] border-cyan-500/50 bg-zinc-900 border' : 'text-zinc-300 bg-zinc-800'
+            }`}>
+              {node.version || 'Unknown'} {isLatest && <CheckCircle size={10} className="inline text-green-500 ml-1"/>}
+            </span>
+          </div>
+
+          <div className="pt-1 md:pt-2">
+            <div className="text-[9px] md:text-[10px] text-zinc-600 uppercase font-bold mb-1">Network Rewards</div>
+            <div className={`flex justify-between items-center text-[10px] md:text-xs p-1.5 md:p-2 rounded-lg border transition-colors ${
+              (node as any).isUntracked 
+                ? 'bg-zinc-900/50 border-zinc-800' 
+                : node.credits !== null 
+                  ? 'bg-black/40 border-zinc-800/50' 
+                  : 'bg-red-900/10 border-red-500/20'
+            }`}>
+              {(node as any).isUntracked ? (
+                <div className="flex items-center gap-2 text-zinc-500 w-full justify-center font-bold text-[9px] md:text-[10px] tracking-wide">
+                  <AlertTriangle size={10} className="text-zinc-600"/> NO STORAGE CREDITS
+                </div>
+              ) : node.credits !== null ? (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <Medal size={10} className={node.rank===1?'text-yellow-400':'text-zinc-500'} />
+                    <span className="text-zinc-400 font-bold">#{node.rank}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-zinc-300 font-mono">{node.credits.toLocaleString()}</span>
+                    <Wallet size={10} className="text-yellow-600"/>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 text-red-400 w-full justify-center font-bold italic text-[9px] md:text-[10px]">
+                  <AlertOctagon size={10}/> CREDITS API OFFLINE
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="pt-2 md:pt-3 mt-2 md:mt-3 border-t border-white/5 flex justify-between items-end">
+            <div>
+              <span className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold block mb-0.5 flex items-center gap-1">
+                <cycleData.icon size={10} /> {cycleData.label}
+              </span>
+              <span className={`text-sm md:text-lg font-bold ${cycleData.color} font-mono tracking-tight`}>
+                {cycleData.value}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+
+    return (
+      <div key={`${node.pubkey}-${node.network}-${i}`} className="contents">
+        {MobileCard}
+        {DesktopCard}
       </div>
     );
   };
@@ -1280,9 +1385,8 @@ export default function Home() {
                 >
                   {d.val}
                 </code>
-                {/* DYNAMIC COPY BUTTON */}
                 <button
-                  onClick={() => copyToClipboard(d.val, d.label)} // Pass Label as ID
+                  onClick={() => copyToClipboard(d.val, d.label)}
                   className={`p-1.5 rounded transition ${
                     copiedField === d.label 
                       ? 'bg-green-500/20 text-green-500' 
@@ -1335,7 +1439,6 @@ export default function Home() {
   };
 
   const renderHealthBreakdown = () => {
-    // FIX: Guard Clause to satisfy TypeScript
     if (!selectedNode) return null;
 
     const health = selectedNode.health || 0;
@@ -1348,17 +1451,13 @@ export default function Home() {
     const avgs = networkStats.avgBreakdown;
     const totalNodes = networkStats.totalNodes || 1;
 
-    // UPDATED: Use health_rank if available, otherwise fallback (Dual Ranking Logic)
     const rank = selectedNode.health_rank || selectedNode.rank || totalNodes;
-
-    // Recalculate percentile based on the correct rank type
     const rankPercentile = (rank / totalNodes) * 100;
     const betterThanPercent = 100 - rankPercentile;
 
     const netAvgHealth = avgs.total || 50;
     const diff = health - netAvgHealth;
 
-    // We check specifically for API Offline to determine weighting
     const isCreditsOffline = selectedNode.credits === null && !(selectedNode as any).isUntracked;
 
     const weights = isCreditsOffline 
@@ -1854,7 +1953,7 @@ export default function Home() {
         ></div>
       )}
 
-      {/* --- HEADER (UPDATED PADDING) --- */}
+      {/* --- HEADER (Desktop Padding Restored: px-6 py-2 md:py-4) --- */}
       <header
         className={`sticky top-0 z-[100] backdrop-blur-md border-b px-4 py-2 md:px-6 md:py-4 flex flex-col gap-2 md:gap-6 transition-all duration-500 ${
           zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'
@@ -2051,13 +2150,13 @@ export default function Home() {
       )}
 
       <main
-        className={`p-2 md:p-8 ${
+        className={`p-4 md:p-8 ${
           zenMode ? 'max-w-full' : 'max-w-7xl 2xl:max-w-[1800px] mx-auto'
         } transition-all duration-500`}
       >
         {!zenMode && !loading && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
-            {/* Network Capacity Card */}
+            [span_0](start_span){/* Network Capacity Card[span_0](end_span) */}
             <div 
               onClick={() => setActiveStatsModal('capacity')}
               className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm flex flex-col justify-between cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden"
@@ -2081,7 +2180,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Network Vitals Card */}
+            [span_1](start_span){/* Network Vitals Card[span_1](end_span) */}
             <div 
               onClick={() => setActiveStatsModal('vitals')}
               className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform"
@@ -2147,7 +2246,7 @@ export default function Home() {
               `}</style>
             </div>
 
-            {/* Consensus Version Card */}
+            [span_2](start_span){/* Consensus Version Card[span_2](end_span) */}
             <div 
               onClick={() => setActiveStatsModal('consensus')}
               className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden"
@@ -2166,7 +2265,7 @@ export default function Home() {
               </div>
             </div>
 
-           {/* Total Nodes Card */}
+           [span_3](start_span){/* Total Nodes Card[span_3](end_span) */}
             <div 
               onClick={() => {
                 const nextFilter = networkFilter === 'ALL' ? 'MAINNET' : networkFilter === 'MAINNET' ? 'DEVNET' : 'ALL';
@@ -2250,9 +2349,10 @@ export default function Home() {
         {loading && nodes.length === 0 ? (
           <PulseGraphLoader />
         ) : (
+          [span_4](start_span)// NODE GRID CONTAINER[span_4](end_span)
           <div
             className={`grid gap-2 md:gap-4 ${
-              zenMode ? 'grid-cols-2 md:grid-cols-2' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:gap-8'
+              zenMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-2 md:grid-cols-2 lg:grid-cols-3 2xl:gap-8'
             } pb-20`}
           >
             {filteredNodes.map((node, i) => {
@@ -2264,6 +2364,7 @@ export default function Home() {
       </main>
 
             {/* --- THE ULTRA MODAL --- */}
+      {/* --- THE ULTRA MODAL --- */}
       {selectedNode && (
         <div
           className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-4"
@@ -2281,7 +2382,8 @@ export default function Home() {
                 zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'
               }`}
             >
-              <div className="flex items-center gap-3 md:gap-4">
+              {/* HYBRID LAYOUT: Flex-Col on Mobile, Flex-Row on Desktop */}
+              <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 w-full md:w-auto">
                 <ModalAvatar node={selectedNode} />
                 <div className="min-w-0">
                   <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
@@ -2342,7 +2444,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="flex flex-col items-end gap-2">
+              <div className="flex flex-col items-end gap-2 absolute top-4 right-4 md:static">
                 <button
                   onClick={closeModal}
                   className="p-2 md:p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition group"
