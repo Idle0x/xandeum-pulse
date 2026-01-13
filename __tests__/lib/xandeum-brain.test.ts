@@ -3,7 +3,7 @@ import {
   compareVersions, 
   calculateVitalityScore,
   getVersionScoreByRank
-} from '../../lib/xandeum-brain';
+} from '../../src/lib/xandeum-brain';
 
 describe('Xandeum Brain (Unit Logic)', () => {
 
