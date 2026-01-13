@@ -1,5 +1,5 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import MapPage from '../../pages/map';
+import MapPage from '../../src/pages/map';
 import '@testing-library/jest-dom';
 import axios from 'axios';
 
@@ -69,10 +69,10 @@ describe('Map Page - UI & Deep Linking', () => {
 
   test('RENDERING: Should display region list and stats', async () => {
     render(<MapPage />);
-    
+
     // Wait for data load
     await waitFor(() => expect(screen.getByText('Berlin, Germany')).toBeInTheDocument());
-    
+
     // Check dynamic title (Germany appears in title AND list, so we check for length)
     const germanyTexts = screen.getAllByText(/Germany/);
     expect(germanyTexts.length).toBeGreaterThan(0);
@@ -82,7 +82,7 @@ describe('Map Page - UI & Deep Linking', () => {
   test('DEEP LINKING: Should lock onto target IP from URL', async () => {
     // Simulate user arriving with ?focus=1.2.3.4
     mockQuery = { focus: '1.2.3.4' };
-    
+
     render(<MapPage />);
 
     await waitFor(() => {
