@@ -1,3 +1,5 @@
+import React from 'react';
+
 export const NetworkSwitcher = ({ 
   current, 
   onChange, 
@@ -20,6 +22,11 @@ export const NetworkSwitcher = ({
     DEVNET: 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.4)]'
   };
 
+  const handleSwitch = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation(); // STOP PROPAGATION HERE
+    onChange(id as 'ALL' | 'MAINNET' | 'DEVNET');
+  };
+
   return (
     <div className={`relative bg-black/60 border border-white/5 rounded-full p-0.5 flex items-center transition-all ${size === 'sm' ? 'w-24' : 'w-full'}`}>
       <div 
@@ -32,9 +39,9 @@ export const NetworkSwitcher = ({
       {options.map((opt) => (
         <div
           key={opt.id}
-          onClick={() => onChange(opt.id as 'ALL' | 'MAINNET' | 'DEVNET')}
-          className={`relative z-10 flex-1 text-[7px] md:text-[8px] font-black tracking-tighter py-0.5 text-center transition-colors duration-300 ${
-            current === opt.id ? 'text-black' : 'text-zinc-600'
+          onClick={(e) => handleSwitch(e, opt.id)}
+          className={`relative z-10 flex-1 text-[7px] md:text-[8px] font-black tracking-tighter py-0.5 text-center transition-colors duration-300 cursor-pointer ${
+            current === opt.id ? 'text-black' : 'text-zinc-600 hover:text-zinc-400'
           }`}
         >
           {opt.label}
