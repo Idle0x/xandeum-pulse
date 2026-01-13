@@ -1,4 +1,4 @@
-import { calculateStoinc, ERA_BOOSTS, NFT_BOOSTS } from '../../lib/xandeum-economics';
+import { calculateStoinc, ERA_BOOSTS, NFT_BOOSTS } from '../../src/lib/xandeum-economics';
 
 describe('Xandeum Economics (Stoinc Simulator)', () => {
 
