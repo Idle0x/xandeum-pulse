@@ -529,6 +529,7 @@ export default function Home() {
       <main className={`p-4 md:p-8 ${zenMode ? 'max-w-full' : 'max-w-7xl 2xl:max-w-[1800px] mx-auto'} transition-all duration-500`}>
         {!zenMode && !loading && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
+            {/* 1. CAPACITY CARD */}
             <div onClick={() => setActiveStatsModal('capacity')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm flex flex-col justify-between cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
@@ -541,6 +542,7 @@ export default function Home() {
               <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-purple-400 font-bold flex items-center gap-1 z-10"><Maximize2 size={8} /> DETAILS</div>
             </div>
 
+            {/* 2. VITALS CARD */}
             <div onClick={() => setActiveStatsModal('vitals')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-green-500/0 to-green-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="absolute inset-0 opacity-20 pointer-events-none"><div className="ekg-line"></div></div>
@@ -556,6 +558,7 @@ export default function Home() {
               <style jsx>{` @keyframes ekg { 0% { left: -100%; opacity: 0; } 50% { opacity: 1; } 100% { left: 100%; opacity: 0; } } .ekg-line { position: absolute; top: 0; bottom: 0; width: 50%; background: linear-gradient( 90deg, transparent 0%, rgba(34, 197, 94, 0.5) 50%, transparent 100% ); animation: ekg 2s linear infinite; } `}</style>
             </div>
 
+            {/* 3. CONSENSUS CARD */}
             <div onClick={() => setActiveStatsModal('consensus')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
@@ -565,6 +568,7 @@ export default function Home() {
               <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-blue-400 font-bold flex items-center gap-1 z-10"><Maximize2 size={8} /> DETAILS</div>
             </div>
 
+            {/* 4. FILTER CARD */}
             <div onClick={() => { const nextFilter = networkFilter === 'ALL' ? 'MAINNET' : networkFilter === 'MAINNET' ? 'DEVNET' : 'ALL'; setNetworkFilter(nextFilter); }} className="bg-zinc-900/50 border border-zinc-800 p-3 rounded-xl backdrop-blur-sm flex flex-col justify-between group relative overflow-hidden transition-all duration-300 hover:border-zinc-700 cursor-pointer select-none active:scale-[0.98] h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="flex justify-between items-center relative z-10 mb-2">
@@ -588,9 +592,10 @@ export default function Home() {
           <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="flex items-center gap-2 mb-4"><Star className="text-yellow-500" fill="currentColor" size={20} /><h3 className="text-lg font-bold text-white tracking-widest uppercase">Your Watchlist</h3></div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 border-b border-zinc-800 pb-10">
-              {watchListNodes.map((node) => (
-                <NodeCard key={`${node.pubkey}-${node.network}`} node={node} onClick={(n) => setSelectedNode(n)} onToggleFavorite={toggleFavorite} isFav={true} cycleStep={cycleStep} zenMode={zenMode} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />
-              ))}
+              {watchListNodes.map((node) => {
+                const compositeKey = `${node.pubkey}-${node.network}`;
+                return <NodeCard key={compositeKey} node={node} onClick={(n) => setSelectedNode(n)} onToggleFavorite={toggleFavorite} isFav={true} cycleStep={cycleStep} zenMode={zenMode} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />
+              })}
             </div>
           </div>
         )}
@@ -608,9 +613,8 @@ export default function Home() {
         ) : (
           <div className={`grid gap-2 md:gap-4 ${zenMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-2 md:grid-cols-2 lg:grid-cols-3 2xl:gap-8'} pb-20`}>
             {filteredNodes.map((node) => {
-              // Create a truly unique key for React using Pubkey + Network
               const compositeKey = `${node.pubkey}-${node.network}`;
-
+              
               if (zenMode) return <ZenCard key={compositeKey} node={node} onClick={(n) => setSelectedNode(n)} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />;
               
               return <NodeCard key={compositeKey} node={node} onClick={(n) => setSelectedNode(n)} onToggleFavorite={toggleFavorite} isFav={favorites.includes(node.address || '')} cycleStep={cycleStep} zenMode={zenMode} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />;
