@@ -203,10 +203,7 @@ export const InspectorModal = ({
                                     {/* Breathing Glow */}
                                     <div className={`absolute inset-0 rounded-full blur-xl animate-pulse ${healthGlow}`}></div>
                                     <RadialProgress score={healthScore} size={100} />
-                                    {/* Score Text Overlay (Replaces Internal Label) */}
-                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                        <span className="text-2xl font-black text-white">{healthScore}</span>
-                                    </div>
+                                    {/* Score Text Removed to prevent duplication */}
                                 </div>
                             </div>
                         </div>
@@ -218,14 +215,14 @@ export const InspectorModal = ({
                           onClick={() => handleCardToggle('storage')} 
                           className="aspect-square rounded-2xl bg-zinc-900 border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300"
                         >
-                            {/* TANK LIQUID LAYER */}
+                            {/* TANK LIQUID LAYER (30-40% Opacity) */}
                             <div 
                               className="absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out" 
                               style={{ height: `${tankFillPercent}%` }}
                             >
-                                <div className={`absolute inset-0 ${isAboveMedian ? 'bg-gradient-to-t from-purple-900 to-purple-500' : 'bg-gradient-to-t from-purple-950 to-purple-800'}`}></div>
+                                <div className={`absolute inset-0 ${isAboveMedian ? 'bg-gradient-to-t from-purple-900/40 to-purple-500/40' : 'bg-gradient-to-t from-purple-950/40 to-purple-800/40'}`}></div>
                                 {!isAboveMedian && (
-                                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-purple-400 shadow-[0_0_15px_rgba(192,132,252,0.8)] animate-pulse"></div>
+                                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-purple-400/60 shadow-[0_0_15px_rgba(192,132,252,0.8)] animate-pulse"></div>
                                 )}
                             </div>
 
@@ -261,8 +258,8 @@ export const InspectorModal = ({
                           onClick={() => handleCardToggle('identity')} 
                           className="aspect-square rounded-2xl border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 bg-zinc-900"
                         >
-                            {/* Animated Background */}
-                            <div className={`absolute inset-0 bg-gradient-to-br opacity-20 ${isSelectedNodeLatest ? 'from-green-900/40 via-transparent to-blue-900/40' : 'from-orange-900/40 via-transparent to-red-900/40'}`}></div>
+                            {/* Animated Background (Increased Brightness to 30%) */}
+                            <div className={`absolute inset-0 bg-gradient-to-br opacity-30 ${isSelectedNodeLatest ? 'from-green-900/40 via-transparent to-blue-900/40' : 'from-orange-900/40 via-transparent to-red-900/40'}`}></div>
                             
                             {/* Content */}
                             <div className="relative z-10 p-3 flex flex-col h-full">
