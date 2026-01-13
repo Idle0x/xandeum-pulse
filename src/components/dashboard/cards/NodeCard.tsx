@@ -23,31 +23,22 @@ export const NodeCard = ({
   zenMode, mostCommonVersion, sortBy 
 }: NodeCardProps) => {
 
-  // Helpers needed for logic inside getCycleContent
+  // Helpers
   const cleanVer = (node.version || '').replace(/[^0-9.]/g, '');
   const cleanConsensus = mostCommonVersion.replace(/[^0-9.]/g, '');
   const isLatest = cleanVer === cleanConsensus || compareVersions(cleanVer, cleanConsensus) > 0;
+  const isVersionSort = sortBy === 'version';
+  const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
 
-  // --- 1. LOCAL CYCLE LOGIC (FIXED) ---
+  // --- 1. LOCAL CYCLE LOGIC ---
   const getCycleContent = () => {
     // A. EXPLICIT SORT OVERRIDES
     if (sortBy === 'storage') {
-      // User Request: "filtering by storage should be storage committed only"
       return { 
         label: 'Committed Storage', 
         value: formatBytes(node.storage_committed || 0), 
         color: zenMode ? 'text-zinc-300' : 'text-purple-400', 
         icon: HardDrive 
-      };
-    }
-
-    if (sortBy === 'version') {
-      // User Request: "filtering by version should be version only"
-      return { 
-        label: 'Node Version', 
-        value: node.version || 'Unknown', 
-        color: isLatest ? 'text-green-400' : 'text-zinc-400', 
-        icon: Server 
       };
     }
 
@@ -70,7 +61,10 @@ export const NodeCard = ({
       };
     }
 
-    // B. DEFAULT CYCLE LOOP (If no specific sort is active)
+    // Note: Version sort is intentionally omitted here. 
+    // It will fall through to the default cycle below.
+
+    // B. DEFAULT CYCLE LOOP
     const step = cycleStep % 5;
     if (step === 0) return { label: 'Storage Used', value: formatBytes(node.storage_used), color: zenMode ? 'text-zinc-300' : 'text-blue-400', icon: Database };
     if (step === 1) return { label: 'Committed', value: formatBytes(node.storage_committed || 0), color: zenMode ? 'text-zinc-300' : 'text-purple-400', icon: HardDrive };
@@ -80,10 +74,8 @@ export const NodeCard = ({
   };
 
   const cycleData = getCycleContent();
-  const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
-  const isVersionSort = sortBy === 'version';
 
-  // --- 2. SINGLE ROOT DIV ---
+  // --- 2. RENDER ---
   return (
     <div
       onClick={() => onClick(node)}
@@ -129,7 +121,7 @@ export const NodeCard = ({
         </button>
       </div>
 
-      {/* Body */}
+      {/* Body: Version (Highlighted if Sorting by Version) */}
       <div className="space-y-1.5 md:space-y-3">
         <div className="flex justify-between items-center text-[9px] md:text-xs">
           <span className="text-zinc-500">Version</span>
@@ -156,7 +148,7 @@ export const NodeCard = ({
           </div>
         </div>
 
-        {/* Footer (Cycling Metric) */}
+        {/* Footer: Cycling Metric */}
         <div className="pt-1 md:pt-3 mt-1 md:mt-3 border-t border-white/5 flex justify-between items-end">
           <div>
             <span className="text-[8px] md:text-[10px] text-zinc-500 uppercase font-bold block mb-0.5 flex items-center gap-1">
