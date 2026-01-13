@@ -1,7 +1,7 @@
 import { 
   Shield, Star, Maximize2, CheckCircle, 
   AlertTriangle, Medal, Wallet, AlertOctagon, 
-  Database, HardDrive, Activity, Zap, Clock 
+  Database, HardDrive, Activity, Zap, Clock, Server 
 } from 'lucide-react';
 import { Node } from '../../../types';
 import { getSafeIp, compareVersions } from '../../../utils/nodeHelpers';
@@ -23,15 +23,54 @@ export const NodeCard = ({
   zenMode, mostCommonVersion, sortBy 
 }: NodeCardProps) => {
 
-  // --- 1. LOCAL CYCLE LOGIC ---
-  // This ensures the card updates its view immediately when you sort
-  const getCycleContent = () => {
-    // If we are sorting by specific metrics, force that view
-    if (sortBy === 'storage') return { label: 'Storage Used', value: formatBytes(node.storage_used), color: zenMode ? 'text-zinc-300' : 'text-blue-400', icon: Database };
-    if (sortBy === 'health') { const score = node.health || 0; return { label: 'Health Score', value: `${score}/100`, color: score > 80 ? 'text-green-400' : 'text-yellow-400', icon: Activity }; }
-    if (sortBy === 'uptime') return { label: 'Continuous Uptime', value: formatUptime(node.uptime), color: 'text-orange-400', icon: Zap };
+  // Helpers needed for logic inside getCycleContent
+  const cleanVer = (node.version || '').replace(/[^0-9.]/g, '');
+  const cleanConsensus = mostCommonVersion.replace(/[^0-9.]/g, '');
+  const isLatest = cleanVer === cleanConsensus || compareVersions(cleanVer, cleanConsensus) > 0;
 
-    // Otherwise, cycle through normally based on the timer
+  // --- 1. LOCAL CYCLE LOGIC (FIXED) ---
+  const getCycleContent = () => {
+    // A. EXPLICIT SORT OVERRIDES
+    if (sortBy === 'storage') {
+      // User Request: "filtering by storage should be storage committed only"
+      return { 
+        label: 'Committed Storage', 
+        value: formatBytes(node.storage_committed || 0), 
+        color: zenMode ? 'text-zinc-300' : 'text-purple-400', 
+        icon: HardDrive 
+      };
+    }
+
+    if (sortBy === 'version') {
+      // User Request: "filtering by version should be version only"
+      return { 
+        label: 'Node Version', 
+        value: node.version || 'Unknown', 
+        color: isLatest ? 'text-green-400' : 'text-zinc-400', 
+        icon: Server 
+      };
+    }
+
+    if (sortBy === 'health') { 
+      const score = node.health || 0; 
+      return { 
+        label: 'Health Score', 
+        value: `${score}/100`, 
+        color: score > 80 ? 'text-green-400' : 'text-yellow-400', 
+        icon: Activity 
+      }; 
+    }
+
+    if (sortBy === 'uptime') {
+      return { 
+        label: 'Continuous Uptime', 
+        value: formatUptime(node.uptime), 
+        color: 'text-orange-400', 
+        icon: Zap 
+      };
+    }
+
+    // B. DEFAULT CYCLE LOOP (If no specific sort is active)
     const step = cycleStep % 5;
     if (step === 0) return { label: 'Storage Used', value: formatBytes(node.storage_used), color: zenMode ? 'text-zinc-300' : 'text-blue-400', icon: Database };
     if (step === 1) return { label: 'Committed', value: formatBytes(node.storage_committed || 0), color: zenMode ? 'text-zinc-300' : 'text-purple-400', icon: HardDrive };
@@ -41,16 +80,10 @@ export const NodeCard = ({
   };
 
   const cycleData = getCycleContent();
-  
-  // Helpers
   const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
-  const cleanVer = (node.version || '').replace(/[^0-9.]/g, '');
-  const cleanConsensus = mostCommonVersion.replace(/[^0-9.]/g, '');
-  const isLatest = cleanVer === cleanConsensus || compareVersions(cleanVer, cleanConsensus) > 0;
   const isVersionSort = sortBy === 'version';
 
   // --- 2. SINGLE ROOT DIV ---
-  // This is the critical fix. One Div = One Card. No duplication possible.
   return (
     <div
       onClick={() => onClick(node)}
@@ -73,8 +106,8 @@ export const NodeCard = ({
           <div className="flex items-center gap-1.5 md:gap-2 mb-1">
              <div className="hidden md:block text-[10px] text-zinc-500 uppercase font-bold">NODE IDENTITY</div>
              <div className="flex gap-1">
-                {node.network === 'MAINNET' && <span className="text-[7px] md:text-[8px] bg-green-500 text-black px-1 rounded font-bold uppercase">MN</span>}
-                {node.network === 'DEVNET' && <span className="text-[7px] md:text-[8px] bg-blue-500 text-white px-1 rounded font-bold uppercase">DN</span>}
+                {node.network === 'MAINNET' && <span className="text-[7px] md:text-[8px] bg-green-500 text-black px-1 rounded font-bold uppercase">{window.innerWidth < 768 ? 'MN' : 'MAINNET'}</span>}
+                {node.network === 'DEVNET' && <span className="text-[7px] md:text-[8px] bg-blue-500 text-white px-1 rounded font-bold uppercase">{window.innerWidth < 768 ? 'DN' : 'DEVNET'}</span>}
                 {node.network === 'UNKNOWN' && <span className="text-[7px] md:text-[8px] bg-zinc-700 text-zinc-300 px-1 rounded font-bold uppercase">UNK</span>}
              </div>
              {!node.is_public && <Shield size={10} className="text-zinc-600" />}
