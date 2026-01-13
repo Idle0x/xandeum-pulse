@@ -58,6 +58,14 @@ export const InspectorModal = ({
   const isSelectedNodeLatest = checkIsLatest(selectedNode.version, mostCommonVersion);
   const avgNetworkHealth = networkStats?.avgBreakdown?.total || 0;
 
+  // --- STORAGE TANK CALCULATIONS ---
+  const nodeCap = selectedNode.storage_committed || 0;
+  // Tank fill is percentage of the Median. Cap at 100% for visual sanity if over median.
+  const tankFillPercent = Math.min(100, (nodeCap / (medianCommitted || 1)) * 100);
+  const isAboveMedian = nodeCap >= medianCommitted;
+  // Internal Usage Progress (Used vs Committed)
+  const internalUsagePercent = Math.min(100, ((selectedNode.storage_used || 0) / (nodeCap || 1)) * 100);
+
   const copyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldId);
@@ -168,20 +176,54 @@ export const InspectorModal = ({
                         </div>
 
                         {/* ROW 2: STORAGE (Left) & IDENTITY (Right) */}
-                        {/* STORAGE CARD */}
-                        <div onClick={() => handleCardToggle('storage')} className="aspect-square p-3 rounded-2xl bg-zinc-900/50 border border-zinc-800 flex flex-col justify-between relative overflow-hidden">
-                            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-transparent pointer-events-none"></div>
-                            <div className="flex justify-between items-start relative z-10">
-                                <Database size={16} className="text-purple-500"/>
-                                <div className="bg-purple-500/10 px-1.5 py-0.5 rounded text-[8px] font-mono text-purple-300 border border-purple-500/20">{selectedNode.storage_used?.toLocaleString()} B</div>
+                        
+                        {/* --- NEW STORAGE CARD (LIQUID TANK) --- */}
+                        <div 
+                          onClick={() => handleCardToggle('storage')} 
+                          className="aspect-square rounded-2xl bg-zinc-900 border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300"
+                        >
+                            {/* TANK LIQUID LAYER */}
+                            <div 
+                              className="absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out" 
+                              style={{ height: `${tankFillPercent}%` }}
+                            >
+                                {/* The Liquid Gradient */}
+                                <div className={`absolute inset-0 ${isAboveMedian ? 'bg-gradient-to-t from-purple-900 to-purple-500' : 'bg-gradient-to-t from-purple-950 to-purple-800'}`}></div>
+                                
+                                {/* The Water Surface Animation (Only if NOT full/above median) */}
+                                {!isAboveMedian && (
+                                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-purple-400 shadow-[0_0_15px_rgba(192,132,252,0.8)] animate-pulse"></div>
+                                )}
                             </div>
-                            <div className="relative z-10 mt-auto">
-                                <div className="flex justify-between items-end mb-1">
-                                    <div className="text-xl font-bold text-white leading-none">{formatBytes(selectedNode.storage_used).split(' ')[0]}</div>
+
+                            {/* CONTENT LAYER (Z-10 to sit above liquid) */}
+                            <div className="relative z-10 p-3 flex flex-col h-full">
+                                <div className="flex justify-between items-start">
+                                    <Database size={16} className="text-white drop-shadow-md"/>
+                                    {/* Raw Bytes Pill */}
+                                    <div className="bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded-full text-[7px] font-mono text-white border border-white/10 shadow-sm">
+                                      {(selectedNode.storage_used || 0).toLocaleString()} B
+                                    </div>
                                 </div>
-                                <div className="flex justify-between items-center text-[8px] font-bold uppercase">
-                                    <span className="text-zinc-500">USED</span>
-                                    <span className="text-purple-400">{formatBytes(selectedNode.storage_committed)}</span>
+
+                                <div className="mt-auto flex flex-col gap-2">
+                                    {/* Data Row */}
+                                    <div className="flex justify-between items-end">
+                                        <div className="flex flex-col items-center">
+                                            <div className="text-[8px] font-bold text-zinc-300/80 uppercase shadow-black drop-shadow-sm">Used</div>
+                                            <div className="text-sm font-bold text-white drop-shadow-md">{formatBytes(selectedNode.storage_used).split(' ')[0]} <span className="text-[9px]">{formatBytes(selectedNode.storage_used).split(' ')[1]}</span></div>
+                                        </div>
+                                        <div className="w-px h-6 bg-white/20 mx-1"></div>
+                                        <div className="flex flex-col items-center">
+                                            <div className="text-[8px] font-bold text-zinc-300/80 uppercase shadow-black drop-shadow-sm">Committed</div>
+                                            <div className="text-sm font-bold text-white drop-shadow-md">{formatBytes(selectedNode.storage_committed).split(' ')[0]} <span className="text-[9px]">{formatBytes(selectedNode.storage_committed).split(' ')[1]}</span></div>
+                                        </div>
+                                    </div>
+
+                                    {/* Usage Progress Bar */}
+                                    <div className="w-full h-1 bg-black/50 rounded-full overflow-hidden border border-white/10">
+                                        <div className="h-full bg-blue-400 shadow-[0_0_5px_rgba(96,165,250,0.8)]" style={{ width: `${internalUsagePercent}%` }}></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
