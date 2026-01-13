@@ -5,9 +5,9 @@ import axios from 'axios';
 import Link from 'next/link';
 
 // --- COMPONENTS ---
-import { RadialProgress } from '../components/RadialProgress'; // Assuming this exists
-import { WelcomeCurtain } from '../components/WelcomeCurtain'; // Assuming this exists
-import { PhysicalLocationBadge } from '../components/PhysicalLocationBadge'; // Assuming this exists
+import { RadialProgress } from '../components/RadialProgress'; 
+import { WelcomeCurtain } from '../components/WelcomeCurtain'; 
+import { PhysicalLocationBadge } from '../components/PhysicalLocationBadge'; 
 
 // --- REFACTORED COMPONENTS ---
 import { NetworkSwitcher } from '../components/common/NetworkSwitcher';
@@ -55,7 +55,7 @@ export default function Home() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
-  
+
   // Network Data
   const [networkStats, setNetworkStats] = useState({
     avgBreakdown: { uptime: 0, version: 0, reputation: 0, storage: 0, total: 0 },
@@ -79,7 +79,7 @@ export default function Home() {
 
   // User Prefs
   const [favorites, setFavorites] = useState<string[]>([]);
-  
+
   // Toasts
   const [toast, setToast] = useState<{visible: boolean, msg: string} | null>(null);
   const toastTimer = useRef<NodeJS.Timeout | null>(null);
@@ -156,14 +156,12 @@ export default function Home() {
           setMedianCommitted(stats.medianStorage || 0);
         }
 
-        // Sorting Helper
         const sortFn = (a: Node, b: Node) => {
           if ((b.credits || 0) !== (a.credits || 0)) return (b.credits || 0) - (a.credits || 0);
           if ((b.health || 0) !== (a.health || 0)) return (b.health || 0) - (a.health || 0);
           return (a.pubkey || '').localeCompare(b.pubkey || '');
         };
 
-        // Clustering Logic
         const clusterMap = new Map<string, { mainnet: number; devnet: number }>();
         podList.forEach(node => {
           if (!node.pubkey) return;
@@ -173,14 +171,12 @@ export default function Home() {
           clusterMap.set(node.pubkey, current);
         });
 
-        // Ranking
         const mainnetNodes = podList.filter(n => n.network === 'MAINNET').sort(sortFn);
         const devnetNodes = podList.filter(n => n.network === 'DEVNET').sort(sortFn);
         const rankMap = new Map<string, number>();
         mainnetNodes.forEach((node, idx) => { if (node.pubkey) rankMap.set(`${node.pubkey}-MAINNET`, idx + 1); });
         devnetNodes.forEach((node, idx) => { if (node.pubkey) rankMap.set(`${node.pubkey}-DEVNET`, idx + 1); });
 
-        // Enrichment
         podList = podList.map(node => {
           const used = node.storage_used || 0;
           const cap = node.storage_committed || 0;
@@ -211,7 +207,6 @@ export default function Home() {
 
         setNodes(podList);
 
-        // Calculate Network Metrics
         const stableNodes = podList.filter(n => (n.uptime || 0) > 86400).length;
         setNetworkHealth((podList.length > 0 ? (stableNodes / podList.length) * 100 : 0).toFixed(2));
         const consensusCount = podList.filter(n => (n.version || 'Unknown') === stats.consensusVersion).length;
@@ -259,7 +254,6 @@ export default function Home() {
     };
   }, []);
 
-  // Deep Linking Logic
   useEffect(() => {
     if (!loading && nodes.length > 0 && router.query.open) {
       const pubkeyToOpen = router.query.open as string;
@@ -452,7 +446,7 @@ export default function Home() {
       {isMenuOpen && <div className="fixed inset-0 bg-black/50 z-[190] backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* --- HEADER --- */}
-      <header className={`sticky top-0 z-[100] backdrop-blur-md border-b px-4 py-2 md:px-6 md:py-4 flex flex-col gap-2 md:gap-6 transition-all duration-500 ${zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'}`}>
+      <header className={`sticky top-0 z-[50] backdrop-blur-md border-b px-4 py-2 md:px-6 md:py-4 flex flex-col gap-2 md:gap-6 transition-all duration-500 ${zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'}`}>
         <div className="flex justify-between items-center w-full">
           <div className="flex items-center gap-4">
             <button onClick={() => setIsMenuOpen(true)} className={`p-2.5 md:p-3.5 rounded-xl transition ${zenMode ? 'text-zinc-400 border border-zinc-800' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white hover:bg-zinc-800'}`}>
@@ -462,7 +456,7 @@ export default function Home() {
               <h1 className={`text-lg md:text-xl font-extrabold tracking-tight flex items-center gap-2 ${zenMode ? 'text-white' : 'text-white'}`}>
                 <Activity className={zenMode ? 'text-zinc-500' : 'text-blue-500'} size={20} /> PULSE
               </h1>
-              <span className="text-[9px] text-zinc-600 font-mono tracking-wider ml-1">Last Sync: {lastSync}</span>
+              <span className="text-[9px] text-zinc-600 font-mono tracking-wider ml-1">Sync: {lastSync}</span>
             </div>
           </div>
 
@@ -502,7 +496,7 @@ export default function Home() {
           </button>
           <div className="flex gap-2 relative">
             {['uptime', 'storage', 'version', 'health'].map((opt) => (
-              <button key={opt} onClick={() => handleSortChange(opt as any)} className={`flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg text-[10px] md:text-xs font-bold transition border whitespace-nowrap h-8 md:h-auto ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-zinc-200' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
+              <button key={opt} onClick={() => handleSortChange(opt as any)} className={`flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg text-[10px] md:text-xs font-bold transition border whitespace-nowrap h-9 md:h-auto ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-zinc-200' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
                 {opt === 'uptime' && <Clock size={12} />}{opt === 'storage' && <Database size={12} />}{opt === 'version' && <Server size={12} />}{opt === 'health' && <HeartPulse size={12} />}
                 {opt.toUpperCase()}
                 {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={10} className="ml-1" /> : <ArrowDown size={10} className="ml-1" />)}
@@ -535,7 +529,7 @@ export default function Home() {
       <main className={`p-4 md:p-8 ${zenMode ? 'max-w-full' : 'max-w-7xl 2xl:max-w-[1800px] mx-auto'} transition-all duration-500`}>
         {!zenMode && !loading && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
-            <div onClick={() => setActiveStatsModal('capacity')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm flex flex-col justify-between cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden">
+            <div onClick={() => setActiveStatsModal('capacity')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm flex flex-col justify-between cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
                 <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Network Capacity</div>
@@ -547,7 +541,7 @@ export default function Home() {
               <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-purple-400 font-bold flex items-center gap-1 z-10"><Maximize2 size={8} /> DETAILS</div>
             </div>
 
-            <div onClick={() => setActiveStatsModal('vitals')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform">
+            <div onClick={() => setActiveStatsModal('vitals')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-green-500/0 to-green-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="absolute inset-0 opacity-20 pointer-events-none"><div className="ekg-line"></div></div>
               <div className="relative z-10">
@@ -562,7 +556,7 @@ export default function Home() {
               <style jsx>{` @keyframes ekg { 0% { left: -100%; opacity: 0; } 50% { opacity: 1; } 100% { left: 100%; opacity: 0; } } .ekg-line { position: absolute; top: 0; bottom: 0; width: 50%; background: linear-gradient( 90deg, transparent 0%, rgba(34, 197, 94, 0.5) 50%, transparent 100% ); animation: ekg 2s linear infinite; } `}</style>
             </div>
 
-            <div onClick={() => setActiveStatsModal('consensus')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden">
+            <div onClick={() => setActiveStatsModal('consensus')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
                 <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Consensus Ver</div>
@@ -571,7 +565,7 @@ export default function Home() {
               <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-blue-400 font-bold flex items-center gap-1 z-10"><Maximize2 size={8} /> DETAILS</div>
             </div>
 
-            <div onClick={() => { const nextFilter = networkFilter === 'ALL' ? 'MAINNET' : networkFilter === 'MAINNET' ? 'DEVNET' : 'ALL'; setNetworkFilter(nextFilter); }} className="bg-zinc-900/50 border border-zinc-800 p-3 rounded-xl backdrop-blur-sm flex flex-col justify-between group relative overflow-hidden transition-all duration-300 hover:border-zinc-700 cursor-pointer select-none active:scale-[0.98]">
+            <div onClick={() => { const nextFilter = networkFilter === 'ALL' ? 'MAINNET' : networkFilter === 'MAINNET' ? 'DEVNET' : 'ALL'; setNetworkFilter(nextFilter); }} className="bg-zinc-900/50 border border-zinc-800 p-3 rounded-xl backdrop-blur-sm flex flex-col justify-between group relative overflow-hidden transition-all duration-300 hover:border-zinc-700 cursor-pointer select-none active:scale-[0.98] h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="flex justify-between items-center relative z-10 mb-2">
                 <div className="text-[8px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1"><Activity size={10} className={networkFilter === 'MAINNET' ? 'text-green-500' : networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-white'} /> Filter</div>
@@ -589,7 +583,7 @@ export default function Home() {
         )}
 
         {error && <div className="mb-8 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center gap-2 text-blue-400 animate-pulse"><RefreshCw size={14} className="animate-spin" /><span className="text-xs font-bold">{error}</span></div>}
-        
+
         {!zenMode && favorites.length > 0 && (
           <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="flex items-center gap-2 mb-4"><Star className="text-yellow-500" fill="currentColor" size={20} /><h3 className="text-lg font-bold text-white tracking-widest uppercase">Your Watchlist</h3></div>
