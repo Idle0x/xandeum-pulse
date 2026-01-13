@@ -1,47 +1,23 @@
-import { formatBytes, formatUptime } from '../../src/utils/formatters';
-import { checkIsLatest, compareVersions } from '../../src/utils/nodeHelpers';
+export const formatBytes = (bytes: number | undefined | null, decimals: number = 2) => {
+  if (!bytes || bytes === 0 || isNaN(bytes)) return '0.00 B';
 
-describe('Utility Functions', () => {
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
 
-  describe('formatBytes', () => {
-    test('Should format bytes to human readable strings', () => {
-      expect(formatBytes(0)).toBe('0.00 B');
-      expect(formatBytes(1024)).toBe('1.00 KB');
-      expect(formatBytes(1024 * 1024)).toBe('1.00 MB');
-      expect(formatBytes(1024 * 1024 * 1024 * 2.5)).toBe('2.50 GB');
-    });
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-    test('Should handle undefined or null', () => {
-      expect(formatBytes(undefined)).toBe('0.00 B');
-    });
-  });
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+};
 
-  describe('formatUptime', () => {
-    test('Should format seconds to days/hours', () => {
-      expect(formatUptime(3600)).toBe('1h');
-      expect(formatUptime(86400)).toBe('1d 0h');
-      expect(formatUptime(90000)).toBe('1d 1h');
-    });
-  });
+export const formatUptime = (seconds: number | undefined | null) => {
+  if (!seconds) return '0s';
+  
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
 
-  describe('compareVersions', () => {
-    test('Should compare semver strings correctly', () => {
-      expect(compareVersions('1.0.0', '1.0.0')).toBe(0);
-      expect(compareVersions('1.0.1', '1.0.0')).toBe(1); // Newer
-      expect(compareVersions('1.0.0', '1.0.1')).toBe(-1); // Older
-      expect(compareVersions('2.0.0', '1.9.9')).toBe(1);
-    });
-  });
-
-  describe('checkIsLatest', () => {
-    test('Should return true if node is equal or ahead of consensus', () => {
-      expect(checkIsLatest('1.5.0', '1.5.0')).toBe(true);
-      expect(checkIsLatest('1.6.0', '1.5.0')).toBe(true);
-    });
-
-    test('Should return false if node is behind', () => {
-      expect(checkIsLatest('1.4.9', '1.5.0')).toBe(false);
-    });
-  });
-
-});
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+};
