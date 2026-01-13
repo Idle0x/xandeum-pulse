@@ -63,7 +63,8 @@ export const InspectorModal = ({
   const healthScore = selectedNode.health || 0;
   const healthColor = healthScore >= 80 ? 'text-green-500' : healthScore >= 50 ? 'text-yellow-500' : 'text-red-500';
   const healthRingColor = healthScore >= 80 ? 'ring-green-500/20 hover:ring-green-500/60' : healthScore >= 50 ? 'ring-yellow-500/20 hover:ring-yellow-500/60' : 'ring-red-500/20 hover:ring-red-500/60';
-  const healthGlow = healthScore >= 80 ? 'bg-green-500' : healthScore >= 50 ? 'bg-yellow-500' : 'bg-red-500';
+  // Note: Background glow color is dynamic, opacity handled in CSS
+  const healthGlowColor = healthScore >= 80 ? 'bg-green-500' : healthScore >= 50 ? 'bg-yellow-500' : 'bg-red-500';
 
   // --- STORAGE LOGIC ---
   const nodeCap = selectedNode.storage_committed || 0;
@@ -78,6 +79,15 @@ export const InspectorModal = ({
   
   const identityRingColor = isSelectedNodeLatest ? 'ring-green-500/20 hover:ring-green-500/60' : 'ring-orange-500/20 hover:ring-orange-500/60';
 
+  // --- REPUTATION TIER LOGIC ---
+  const rank = selectedNode.rank || 999999;
+  let hoverShimmerGradient = "via-blue-400/20"; // Default / Cosmic Blue
+  if (rank <= 100) {
+      hoverShimmerGradient = "via-yellow-300/40"; // Gold Tier
+  } else if (rank <= 1000) {
+      hoverShimmerGradient = "via-slate-300/40"; // Platinum Tier
+  }
+
   const copyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldId);
@@ -88,19 +98,24 @@ export const InspectorModal = ({
      setModalView(modalView === view ? 'overview' : view);
   };
 
-  const shimmerAnimation = "animate-[shimmer_5s_infinite_ease-in-out]";
+  const shimmerAnimation = "animate-[shimmer_12s_infinite_linear]"; // Passive Slow Shimmer
+  const hoverShimmerAnimation = "group-hover:animate-[shimmer_2s_infinite_linear]"; // Active Fast Shimmer
+  const breatheAnimation = "animate-[slow-breathe_5s_infinite_ease-in-out]";
 
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[200] flex items-center justify-center p-4" onClick={onClose}>
         <style jsx global>{`
         @keyframes shimmer {
             0% { transform: translateX(-150%) skewX(-12deg); }
-            30% { transform: translateX(150%) skewX(-12deg); }
             100% { transform: translateX(150%) skewX(-12deg); }
         }
-        @keyframes breathe {
-            0%, 100% { opacity: 0.1; transform: scale(0.95); }
-            50% { opacity: 0.3; transform: scale(1.05); }
+        @keyframes slow-pulse {
+            0%, 100% { opacity: 0.05; transform: scale(0.98); }
+            50% { opacity: 0.15; transform: scale(1.02); }
+        }
+        @keyframes slow-breathe {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(0.92); opacity: 0.7; }
         }
         `}</style>
       <div 
@@ -114,7 +129,6 @@ export const InspectorModal = ({
           <div className="md:hidden p-3 flex flex-col gap-2">
              {/* Row 1: Flag - Title - Close */}
              <div className="flex items-center justify-between">
-                {/* FIX: Scaled via CSS wrapper instead of passing invalid 'size' prop */}
                 <div className="scale-75 origin-left">
                     <ModalAvatar node={selectedNode} /> 
                 </div>
@@ -245,7 +259,7 @@ export const InspectorModal = ({
                                     Status: <span className={healthScore >= 80 ? 'text-green-400' : 'text-yellow-400'}>{healthScore >= 80 ? 'OPTIMAL' : 'ATTENTION'}</span>
                                   </div>
                                 </div>
-                                <div className="text-[9px] text-green-400 font-bold uppercase flex items-center gap-1 animate-pulse group-active:scale-95 transition-transform origin-left mt-2">
+                                <div className={`text-[9px] text-green-400 font-bold uppercase flex items-center gap-1 transition-transform origin-left mt-2 ${breatheAnimation}`}>
                                   <Maximize2 size={8}/> TAP TO EXPAND
                                 </div>
                             </div>
@@ -253,7 +267,8 @@ export const InspectorModal = ({
                             {/* The Reactor Core - COMPACT SIZE */}
                             <div className="relative z-10 flex flex-col items-center justify-center mr-2">
                                 <div className="relative scale-100 group-active:scale-110 transition-transform duration-300 flex items-center justify-center">
-                                    <div className={`absolute inset-0 rounded-full blur-xl animate-pulse bg-current opacity-20 ${healthColor}`}></div>
+                                    {/* CALMED PULSE RING: Slow 12s, Low Opacity */}
+                                    <div className={`absolute inset-0 rounded-full blur-xl animate-[slow-pulse_12s_infinite_ease-in-out] ${healthGlowColor}`}></div>
                                     <div className="absolute -top-5 z-20 pointer-events-none">
                                         <span className={`text-[8px] font-black uppercase tracking-wider whitespace-nowrap ${healthScore >= 80 ? 'text-green-500' : 'text-yellow-500'}`}>
                                             HEALTH SCORE
@@ -266,19 +281,21 @@ export const InspectorModal = ({
 
                         {/* ROW 2: STORAGE (Left) & IDENTITY (Right) */}
 
-                        {/* STORAGE CARD (DATASTREAM VESSEL) - FADED MOBILE VERSION */}
+                        {/* STORAGE CARD (DATASTREAM VESSEL) - FADED INDIGO-VIOLET SUBTLE */}
                         <div 
                           onClick={() => handleCardToggle('storage')} 
-                          className="aspect-square rounded-2xl bg-zinc-900 border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 ring-1 ring-transparent hover:ring-indigo-500/20"
+                          className="aspect-square rounded-2xl bg-indigo-950/10 border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 ring-1 ring-transparent hover:ring-indigo-500/20"
                         >
-                            {/* TANK LIQUID LAYER - FADED GRADIENT */}
+                            {/* TANK LIQUID LAYER - FADED DOWNWARDS (MENISCUS FOCUS) */}
                             <div 
                               className="absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out z-0" 
                               style={{ height: `${tankFillPercent}%` }}
                             >
-                                <div className="absolute inset-0 bg-gradient-to-t from-transparent via-indigo-900/10 to-indigo-500/20 backdrop-blur-[0.5px]"></div>
+                                {/* Minimal Fade: Visible at top, disappears at bottom */}
+                                <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/10 to-transparent"></div>
                                 <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#8b5cf6_1px,transparent_1px)] [background-size:4px_4px]"></div>
-                                <div className="absolute top-0 left-0 right-0 h-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.6)]"></div>
+                                {/* The Meniscus Line - Subtle yet visible */}
+                                <div className="absolute top-0 left-0 right-0 h-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.4)]"></div>
                             </div>
 
                             {/* CONTENT LAYER */}
@@ -286,29 +303,29 @@ export const InspectorModal = ({
                                 <div className="flex justify-between items-start mb-2">
                                     {/* Mobile Header: Icon + Name */}
                                     <div className="flex items-center gap-1.5">
-                                        <Database size={12} className="text-indigo-200 drop-shadow-md"/>
+                                        <Database size={12} className="text-indigo-300/80 drop-shadow-md"/>
                                         <span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">STORAGE</span>
                                     </div>
-                                    <div className="bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded-full text-[7px] font-mono text-indigo-100 border border-indigo-500/20 shadow-sm">
+                                    <div className="bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded-full text-[7px] font-mono text-indigo-200/80 border border-indigo-500/20 shadow-sm">
                                       {(selectedNode.storage_used || 0).toLocaleString()} B
                                     </div>
                                 </div>
                                 <div className="mt-auto flex flex-col gap-1.5">
                                     <div className="flex justify-between items-end">
                                         <div className="flex flex-col items-center">
-                                            <div className="text-[8px] font-bold text-zinc-400 uppercase shadow-black drop-shadow-sm">Used</div>
-                                            <div className="text-sm font-bold text-white drop-shadow-md">{formatBytes(selectedNode.storage_used).split(' ')[0]} <span className="text-[9px]">{formatBytes(selectedNode.storage_used).split(' ')[1]}</span></div>
+                                            <div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Used</div>
+                                            <div className="text-sm font-bold text-indigo-100 drop-shadow-md">{formatBytes(selectedNode.storage_used).split(' ')[0]} <span className="text-[9px]">{formatBytes(selectedNode.storage_used).split(' ')[1]}</span></div>
                                         </div>
-                                        <div className="w-px h-6 bg-white/10 mx-1"></div>
+                                        <div className="w-px h-6 bg-white/5 mx-1"></div>
                                         <div className="flex flex-col items-center">
-                                            <div className="text-[8px] font-bold text-zinc-400 uppercase shadow-black drop-shadow-sm">Committed</div>
-                                            <div className="text-sm font-bold text-white drop-shadow-md">{formatBytes(selectedNode.storage_committed).split(' ')[0]} <span className="text-[9px]">{formatBytes(selectedNode.storage_committed).split(' ')[1]}</span></div>
+                                            <div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Committed</div>
+                                            <div className="text-sm font-bold text-indigo-100 drop-shadow-md">{formatBytes(selectedNode.storage_committed).split(' ')[0]} <span className="text-[9px]">{formatBytes(selectedNode.storage_committed).split(' ')[1]}</span></div>
                                         </div>
                                     </div>
-                                    <div className="w-full h-1 bg-black/50 rounded-full overflow-hidden border border-white/10">
-                                        <div className="h-full bg-gradient-to-r from-indigo-900/50 to-indigo-500" style={{ width: `${internalUsagePercent}%` }}></div>
+                                    <div className="w-full h-1 bg-black/50 rounded-full overflow-hidden border border-white/5">
+                                        <div className="h-full bg-indigo-500/40" style={{ width: `${internalUsagePercent}%` }}></div>
                                     </div>
-                                    <div className="text-[8px] font-bold uppercase text-indigo-400 flex items-center gap-1 justify-center"><Maximize2 size={8}/> TAP TO EXPAND</div>
+                                    <div className={`text-[8px] font-bold uppercase text-indigo-400/80 flex items-center gap-1 justify-center ${breatheAnimation}`}><Maximize2 size={8}/> TAP TO EXPAND</div>
                                 </div>
                             </div>
                         </div>
@@ -348,18 +365,23 @@ export const InspectorModal = ({
                                       {isSelectedNodeLatest ? <CheckCircle size={8}/> : <AlertTriangle size={8}/>}
                                       {isSelectedNodeLatest ? 'Up to Date' : 'Update Needed'}
                                     </div>
-                                    <div className="text-[8px] font-bold uppercase text-zinc-400 flex items-center gap-1 justify-center pt-1"><Maximize2 size={8}/> TAP TO EXPAND</div>
+                                    <div className={`text-[8px] font-bold uppercase text-zinc-400 flex items-center gap-1 justify-center pt-1 ${breatheAnimation}`}><Maximize2 size={8}/> TAP TO EXPAND</div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* ROW 3: REPUTATION & MAP (MOBILE) */}
+                        {/* ROW 3: REPUTATION & PHYSICAL LAYER (MOBILE - 2:1 ASPECT RATIO h-24) */}
                         <div 
                             onClick={() => router.push(`/leaderboard?highlight=${selectedNode.pubkey}`)} 
-                            className={`h-40 p-3 rounded-2xl relative overflow-hidden group cursor-pointer hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50 hover:shadow-[0_4px_20px_-4px_rgba(234,179,8,0.3)] ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/80 border-yellow-900/30'}`}
+                            className={`h-24 p-3 rounded-2xl relative overflow-hidden group cursor-pointer hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50 hover:shadow-[0_4px_20px_-4px_rgba(234,179,8,0.3)] ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/80 border-yellow-900/30'}`}
                         >
                             <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:8px_8px] pointer-events-none"></div>
-                            <div className={`absolute inset-0 bg-gradient-to-r from-transparent via-yellow-100/10 to-transparent -skew-x-12 -translate-x-[150%] pointer-events-none ${shimmerAnimation}`}></div>
+                            
+                            {/* Layer 1: Passive Faint Shimmer (Always On, 12s) */}
+                            <div className={`absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -skew-x-12 -translate-x-[150%] pointer-events-none ${shimmerAnimation}`}></div>
+                            
+                            {/* Layer 2: Hover Brighter Tiered Shimmer (On Hover) */}
+                            <div className={`absolute inset-0 bg-gradient-to-r from-transparent ${hoverShimmerGradient} to-transparent -skew-x-12 -translate-x-[150%] pointer-events-none opacity-0 group-hover:opacity-100 ${hoverShimmerAnimation}`}></div>
 
                             <div className="flex justify-between items-start relative z-10 mb-2">
                                 {/* Mobile Header: Icon + Name */}
@@ -379,13 +401,13 @@ export const InspectorModal = ({
                                    <span className="text-[8px] font-bold text-zinc-500 uppercase">CREDITS EARNED</span>
                                    <span className="text-[10px] font-mono font-bold text-yellow-500">{(selectedNode.credits || 0).toLocaleString()}</span>
                                 </div>
-                                <div className="text-[8px] font-bold uppercase text-yellow-500 flex items-center gap-1 justify-center mt-1"><ExternalLink size={8}/> OPEN LEADERBOARD</div>
+                                <div className={`text-[8px] font-bold uppercase text-yellow-500 flex items-center gap-1 justify-center mt-1 ${breatheAnimation}`}><ExternalLink size={8}/> OPEN LEADERBOARD</div>
                             </div>
                         </div>
 
                         <Link 
                             href={`/map?focus=${getSafeIp(selectedNode)}`} 
-                            className={`h-40 p-3 rounded-2xl relative overflow-hidden block group cursor-pointer hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-blue-500/20 hover:ring-blue-500/50 hover:shadow-[0_4px_20px_-4px_rgba(59,130,246,0.3)] ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/80 border-blue-900/30'}`}
+                            className={`h-24 p-3 rounded-2xl relative overflow-hidden block group cursor-pointer hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-blue-500/20 hover:ring-blue-500/50 hover:shadow-[0_4px_20px_-4px_rgba(59,130,246,0.3)] ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/80 border-blue-900/30'}`}
                         >
                             <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#3b82f6_1px,transparent_1px),linear-gradient(to_bottom,#3b82f6_1px,transparent_1px)] bg-[size:16px_16px] group-hover:scale-110 transition-transform duration-700 pointer-events-none origin-center"></div>
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0 h-0 rounded-full border border-blue-500/30 animate-[ping_3s_cubic-bezier(0,0,0.2,1)_infinite] pointer-events-none"></div>
@@ -394,7 +416,7 @@ export const InspectorModal = ({
                                 {/* Mobile Header: Icon + Name */}
                                 <div className="flex items-center gap-1.5">
                                     <Globe size={12} className="text-blue-500 relative z-10"/>
-                                    <span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">LOCATION</span>
+                                    <span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">PHYSICAL LAYER</span>
                                 </div>
                                 <ArrowUpRight size={14} className="text-blue-400 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all"/>
                             </div>
@@ -406,7 +428,7 @@ export const InspectorModal = ({
                                     </span>
                                     <div className="text-[10px] font-bold text-white leading-none truncate">{selectedNode.location?.countryName || 'Unknown'}</div>
                                 </div>
-                                <div className="text-[8px] font-bold uppercase text-blue-500 flex items-center gap-1 justify-center"><ExternalLink size={8}/> OPEN MAP VIEW</div>
+                                <div className={`text-[8px] font-bold uppercase text-blue-500 flex items-center gap-1 justify-center ${breatheAnimation}`}><ExternalLink size={8}/> OPEN MAP VIEW</div>
                             </div>
 
                             <div className="absolute inset-1 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -430,7 +452,8 @@ export const InspectorModal = ({
                          </div>
                          
                          <div className="self-center hidden md:flex items-center justify-center relative z-10">
-                             <div className={`absolute inset-0 rounded-full blur-xl animate-[breathe_8s_infinite_ease-in-out] ${healthGlow}`}></div>
+                             {/* CALMED PULSE RING (DESKTOP) */}
+                             <div className={`absolute inset-0 rounded-full blur-xl animate-[slow-pulse_12s_infinite_ease-in-out] ${healthGlowColor}`}></div>
                              <div className="absolute -top-5 z-20 pointer-events-none">
                                 <span className={`text-[8px] font-black uppercase tracking-wider whitespace-nowrap ${healthScore >= 80 ? 'text-green-500' : 'text-yellow-500'}`}>
                                     HEALTH SCORE
@@ -440,29 +463,28 @@ export const InspectorModal = ({
                          </div>
                          
                          <div className="md:hidden text-4xl font-black text-white self-center">{selectedNode.health}</div>
-                         <div className="mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-green-400 flex justify-center gap-1 relative z-10"><Maximize2 size={8}/> CLICK TO EXPAND</div>
+                         <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-green-400 flex justify-center gap-1 relative z-10 ${breatheAnimation}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
                       </div>
 
-                      {/* 2. STORAGE CARD (DESKTOP) */}
-                      <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60 hover:shadow-[0_4px_20px_-4px_rgba(99,102,241,0.2)] ${zenMode ? 'bg-zinc-900' : 'bg-zinc-900/30'}`} onClick={() => handleCardToggle('storage')}>
+                      {/* 2. STORAGE CARD (DESKTOP) - UPDATED TO MATCH MOBILE SUBTLETY */}
+                      <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60 hover:shadow-[0_4px_20px_-4px_rgba(99,102,241,0.2)] bg-indigo-950/10`} onClick={() => handleCardToggle('storage')}>
                          <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#8b5cf6_1px,transparent_1px)] [background-size:6px_6px] pointer-events-none"></div>
 
                          <div className="flex justify-between items-start mb-4 relative z-10">
-                           <div className="flex items-center gap-2"><Database size={18} className="text-indigo-400"/><span className="text-xs font-bold uppercase text-zinc-500">STORAGE</span></div>
+                           <div className="flex items-center gap-2"><Database size={18} className="text-indigo-300/80"/><span className="text-xs font-bold uppercase text-zinc-500">STORAGE</span></div>
                          </div>
                          <div className="space-y-4 relative z-10">
                             <div className="flex justify-between items-end">
-                               <div><div className="text-2xl font-bold text-indigo-400">{formatBytes(selectedNode.storage_used).split(' ')[0]}</div><div className="text-[9px] font-bold text-zinc-600">USED</div></div>
-                               <div className="text-right"><div className="text-2xl font-bold text-violet-400">{formatBytes(selectedNode.storage_committed).split(' ')[0]}</div><div className="text-[9px] font-bold text-zinc-600">TOTAL</div></div>
+                               <div><div className="text-2xl font-bold text-indigo-200">{formatBytes(selectedNode.storage_used).split(' ')[0]}</div><div className="text-[9px] font-bold text-zinc-600">USED</div></div>
+                               <div className="text-right"><div className="text-2xl font-bold text-indigo-200/60">{formatBytes(selectedNode.storage_committed).split(' ')[0]}</div><div className="text-[9px] font-bold text-zinc-600">TOTAL</div></div>
                             </div>
-                            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden relative">
-                                <div className="h-full bg-gradient-to-r from-transparent via-indigo-900/50 to-indigo-500 relative overflow-hidden" style={{ width: `${Math.min(100, ((selectedNode.storage_used || 0) / (selectedNode.storage_committed || 1)) * 100)}%` }}>
-                                    <div className="absolute top-0 bottom-0 right-0 w-[1px] bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]"></div>
-                                    <div className="absolute inset-0 bg-white/10 w-full animate-[shimmer_3s_infinite_linear] -skew-x-12"></div>
+                            <div className="h-2 bg-zinc-800/50 rounded-full overflow-hidden relative">
+                                <div className="h-full bg-gradient-to-r from-transparent to-indigo-500/20 relative overflow-hidden" style={{ width: `${Math.min(100, ((selectedNode.storage_used || 0) / (selectedNode.storage_committed || 1)) * 100)}%` }}>
+                                    <div className="absolute top-0 bottom-0 right-0 w-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.4)]"></div>
                                 </div>
                             </div>
                          </div>
-                         <div className="mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-violet-400 flex justify-center gap-1 relative z-10"><Maximize2 size={8}/> CLICK TO EXPAND</div>
+                         <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-violet-300/80 flex justify-center gap-1 relative z-10 ${breatheAnimation}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
                       </div>
 
                       {/* 3. IDENTITY CARD (DESKTOP) */}
@@ -482,7 +504,7 @@ export const InspectorModal = ({
                             <Shield size={80} className={`${isSelectedNodeLatest ? 'text-blue-500' : 'text-orange-500'}`} />
                             <div className={`absolute inset-0 blur-xl rounded-full animate-pulse ${isSelectedNodeLatest ? 'bg-blue-500/40' : 'bg-orange-500/40'}`}></div>
                          </div>
-                         <div className="mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-blue-400 flex justify-center gap-1 relative z-10"><Maximize2 size={8}/> CLICK TO EXPAND</div>
+                         <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-blue-400 flex justify-center gap-1 relative z-10 ${breatheAnimation}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
                       </div>
                     </div>
 
@@ -495,7 +517,12 @@ export const InspectorModal = ({
                           className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50 hover:shadow-[0_4px_20px_-4px_rgba(234,179,8,0.3)] ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-yellow-900/30'}`}
                         >
                           <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:10px_10px] pointer-events-none"></div>
-                          <div className={`absolute inset-0 bg-gradient-to-r from-transparent via-yellow-100/10 to-transparent -skew-x-12 -translate-x-[150%] pointer-events-none ${shimmerAnimation}`}></div>
+                          
+                          {/* Layer 1: Passive Faint Shimmer (Always On, 12s) */}
+                          <div className={`absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -skew-x-12 -translate-x-[150%] pointer-events-none ${shimmerAnimation}`}></div>
+                          
+                          {/* Layer 2: Hover Brighter Tiered Shimmer (On Hover) */}
+                          <div className={`absolute inset-0 bg-gradient-to-r from-transparent ${hoverShimmerGradient} to-transparent -skew-x-12 -translate-x-[150%] pointer-events-none opacity-0 group-hover:opacity-100 ${hoverShimmerAnimation}`}></div>
 
                           <div className="flex justify-between items-start relative z-10">
                              <div className="flex items-center gap-2"><Trophy size={18} className="text-yellow-500"/><span className="text-xs font-bold uppercase text-zinc-500">REPUTATION</span></div>
@@ -518,7 +545,7 @@ export const InspectorModal = ({
                           </div>
                           
                           {/* Hover Action Text */}
-                          <div className="absolute bottom-2 right-4 text-[9px] font-bold uppercase text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity">OPEN LEADERBOARD</div>
+                          <div className={`absolute bottom-2 right-4 text-[9px] font-bold uppercase text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity ${breatheAnimation}`}>OPEN LEADERBOARD</div>
                        </div>
 
                        {/* MAP DEEP LINK (DESKTOP) */}
@@ -528,7 +555,7 @@ export const InspectorModal = ({
                             <div className="absolute top-8 right-8 w-0 h-0 rounded-full border border-blue-500/30 animate-[ping_4s_cubic-bezier(0,0,0.2,1)_infinite] pointer-events-none"></div>
                             
                             <div className="flex justify-between items-start relative z-10">
-                               <div className="flex items-center gap-2"><Globe size={18} className="text-blue-500"/><span className="text-xs font-bold uppercase text-zinc-500">LOCATION</span></div>
+                               <div className="flex items-center gap-2"><Globe size={18} className="text-blue-500"/><span className="text-xs font-bold uppercase text-zinc-500">PHYSICAL LAYER</span></div>
                                <ArrowUpRight size={18} className="text-blue-400 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all"/>
                             </div>
                             <div className="relative z-10 mt-auto flex items-end justify-between">
@@ -540,7 +567,7 @@ export const InspectorModal = ({
                             </div>
 
                             {/* Hover Action Text */}
-                            <div className="absolute bottom-2 right-4 text-[9px] font-bold uppercase text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">OPEN MAP VIEW</div>
+                            <div className={`absolute bottom-2 right-4 text-[9px] font-bold uppercase text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity ${breatheAnimation}`}>OPEN MAP VIEW</div>
 
                             <div className="absolute inset-2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                 <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-blue-400/50"></div>
