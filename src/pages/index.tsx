@@ -48,8 +48,6 @@ export default function Home() {
 
   // Cycle & UX
   const [cycleStep, setCycleStep] = useState(1);
-  // Removing cycleReset as a dependency for the interval to prevent jitter, 
-  // but keeping it to trigger immediate updates if needed.
   const [cycleReset, setCycleReset] = useState(0); 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [zenMode, setZenMode] = useState(false);
@@ -155,8 +153,6 @@ export default function Home() {
           setMedianCommitted(stats.medianStorage || 0);
         }
 
-        // --- PRE-PROCESSING CLUSTERS FOR RANKING ---
-        // While backend sends ranks, we recalculate locally for cluster logic if needed
         const sortFn = (a: Node, b: Node) => {
           if ((b.credits || 0) !== (a.credits || 0)) return (b.credits || 0) - (a.credits || 0);
           if ((b.health || 0) !== (a.health || 0)) return (b.health || 0) - (a.health || 0);
@@ -334,7 +330,6 @@ export default function Home() {
        return sortOrder === 'asc' ? res : -res;
     } else {
       // Fallback for direct properties (e.g., 'uptime')
-      // Uses "as any" but wrapped safely
       valA = (a as any)[sortBy] || 0;
       valB = (b as any)[sortBy] || 0;
     }
@@ -623,17 +618,47 @@ export default function Home() {
             </div>
         )}
 
+        {/* DEBUG: This will prove exactly how many items React is holding */}
+        {/* Remove this line after fixing */}
+        <div className="fixed bottom-0 right-0 bg-red-600 text-white p-2 z-[9999]">
+          Debug Count: {filteredNodes.length} Nodes in Array
+        </div>
+
         {loading && nodes.length === 0 ? (
           <PulseGraphLoader />
         ) : (
-          <div className={`grid gap-2 md:gap-4 ${zenMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-2 md:grid-cols-2 lg:grid-cols-3 2xl:gap-8'} pb-20`}>
-            {filteredNodes.map((node) => {
-              // Create a truly unique key for React using Pubkey + Network
-              const compositeKey = `${node.pubkey}-${node.network}`;
+          <div key={`grid-${sortBy}-${sortOrder}-${filteredNodes.length}`} className={`grid gap-2 md:gap-4 ${zenMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-2 md:grid-cols-2 lg:grid-cols-3 2xl:gap-8'} pb-20`}>
+            
+            {filteredNodes.map((node, index) => {
+              // 1. Create a bulletproof unique key
+              // using index as a fallback guarantees uniqueness even if data is bad
+              const uniqueKey = node.pubkey ? `${node.pubkey}-${node.network}` : `fallback-${index}`;
 
-              if (zenMode) return <ZenCard key={compositeKey} node={node} onClick={(n) => setSelectedNode(n)} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />;
+              if (zenMode) {
+                return (
+                   <ZenCard 
+                     key={uniqueKey} 
+                     node={node} 
+                     onClick={(n) => setSelectedNode(n)} 
+                     mostCommonVersion={mostCommonVersion} 
+                     sortBy={sortBy} 
+                   />
+                );
+              }
 
-              return <NodeCard key={compositeKey} node={node} onClick={(n) => setSelectedNode(n)} onToggleFavorite={toggleFavorite} isFav={favorites.includes(node.address || '')} cycleStep={cycleStep} zenMode={zenMode} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />
+              return (
+                <NodeCard 
+                  key={uniqueKey} 
+                  node={node} 
+                  onClick={(n) => setSelectedNode(n)} 
+                  onToggleFavorite={toggleFavorite} 
+                  isFav={favorites.includes(node.address || '')} 
+                  cycleStep={cycleStep} 
+                  zenMode={zenMode} 
+                  mostCommonVersion={mostCommonVersion} 
+                  sortBy={sortBy} 
+                />
+              );
             })}
           </div>
         )}
