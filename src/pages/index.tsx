@@ -5,9 +5,9 @@ import axios from 'axios';
 import Link from 'next/link';
 
 // --- COMPONENTS ---
-import { RadialProgress } from '../components/RadialProgress'; 
 import { WelcomeCurtain } from '../components/WelcomeCurtain'; 
-import { PhysicalLocationBadge } from '../components/PhysicalLocationBadge'; 
+// import { RadialProgress } from '../components/RadialProgress'; // Unused in this snippet
+// import { PhysicalLocationBadge } from '../components/PhysicalLocationBadge'; // Unused in this snippet
 
 // --- REFACTORED COMPONENTS ---
 import { NetworkSwitcher } from '../components/common/NetworkSwitcher';
@@ -26,11 +26,11 @@ import { getSafeIp, compareVersions } from '../utils/nodeHelpers';
 
 // --- ICONS ---
 import {
-  Search, Download, Server, Activity, Database, X,
+  Search, Download, Activity, Database, X,
   Clock, Trophy, Star, ArrowUp, ArrowDown,
   Info, ExternalLink, Maximize2, Map as MapIcon,
   BookOpen, Menu, LayoutDashboard, HeartPulse,
-  Swords, Monitor, AlertTriangle, RefreshCw, Twitter
+  Swords, Monitor, AlertTriangle, RefreshCw, Twitter, Server
 } from 'lucide-react';
 
 export default function Home() {
@@ -48,6 +48,8 @@ export default function Home() {
 
   // Cycle & UX
   const [cycleStep, setCycleStep] = useState(1);
+  // Removing cycleReset as a dependency for the interval to prevent jitter, 
+  // but keeping it to trigger immediate updates if needed.
   const [cycleReset, setCycleReset] = useState(0); 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [zenMode, setZenMode] = useState(false);
@@ -60,7 +62,9 @@ export default function Home() {
   const [networkStats, setNetworkStats] = useState({
     avgBreakdown: { uptime: 0, version: 0, reputation: 0, storage: 0, total: 0 },
     totalNodes: 0,
-    systemStatus: { credits: true, rpc: true } 
+    systemStatus: { credits: true, rpc: true },
+    consensusVersion: '0.0.0',
+    medianStorage: 0
   });
   const [mostCommonVersion, setMostCommonVersion] = useState('N/A');
   const [totalStorageCommitted, setTotalStorageCommitted] = useState(0);
@@ -117,11 +121,6 @@ export default function Home() {
     if (activeTooltip) setActiveTooltip(null);
   };
 
-  const toggleTooltip = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    setActiveTooltip(activeTooltip === id ? null : id);
-  };
-
   const exportCSV = () => {
     const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Health_Score,Country,Last_Seen_ISO,Is_Favorite\n';
     const rows = filteredNodes.map(n => {
@@ -156,6 +155,8 @@ export default function Home() {
           setMedianCommitted(stats.medianStorage || 0);
         }
 
+        // --- PRE-PROCESSING CLUSTERS FOR RANKING ---
+        // While backend sends ranks, we recalculate locally for cluster logic if needed
         const sortFn = (a: Node, b: Node) => {
           if ((b.credits || 0) !== (a.credits || 0)) return (b.credits || 0) - (a.credits || 0);
           if ((b.health || 0) !== (a.health || 0)) return (b.health || 0) - (a.health || 0);
@@ -174,6 +175,7 @@ export default function Home() {
         const mainnetNodes = podList.filter(n => n.network === 'MAINNET').sort(sortFn);
         const devnetNodes = podList.filter(n => n.network === 'DEVNET').sort(sortFn);
         const rankMap = new Map<string, number>();
+        
         mainnetNodes.forEach((node, idx) => { if (node.pubkey) rankMap.set(`${node.pubkey}-MAINNET`, idx + 1); });
         devnetNodes.forEach((node, idx) => { if (node.pubkey) rankMap.set(`${node.pubkey}-DEVNET`, idx + 1); });
 
@@ -230,9 +232,12 @@ export default function Home() {
   // --- EFFECTS ---
 
   useEffect(() => {
-    const cycleInterval = setInterval(() => setCycleStep((prev) => prev + 1), 9000); 
+    // Independent cycle timer
+    const cycleInterval = setInterval(() => {
+        setCycleStep((prev) => prev + 1);
+    }, 9000); 
     return () => clearInterval(cycleInterval);
-  }, [cycleReset]); 
+  }, []); 
 
   useEffect(() => {
     const tipInterval = setInterval(() => {
@@ -281,7 +286,7 @@ export default function Home() {
     }
   }, [loading, nodes, router.query]);
 
-  // --- FILTER & SORT ---
+  // --- ROBUST FILTER & SORT LOGIC ---
 
   const handleSortChange = (metric: 'uptime' | 'version' | 'storage' | 'health') => {
       if (sortBy === metric) {
@@ -290,6 +295,8 @@ export default function Home() {
           setSortBy(metric);
           setSortOrder('desc'); 
       }
+      
+      // Update cycle step to match the user's interest
       let targetStep = 1;
       if (metric === 'health') targetStep = 2;
       if (metric === 'uptime') targetStep = 3;
@@ -299,30 +306,43 @@ export default function Home() {
 
   const filteredNodes = nodes.filter(node => {
     const q = searchQuery.toLowerCase();
-    const addr = getSafeIp(node).toLowerCase();
+    
+    // Safety checks for properties that might be null/undefined
+    const addr = (getSafeIp(node) || '').toLowerCase();
     const pub = (node.pubkey || '').toLowerCase();
     const ver = (node.version || '').toLowerCase();
     const country = (node.location?.countryName || '').toLowerCase();
+    
     const networkMatch = networkFilter === 'ALL' || node.network === networkFilter;
+    
     return networkMatch && (addr.includes(q) || pub.includes(q) || ver.includes(q) || country.includes(q));
   }).sort((a, b) => {
     let valA: any, valB: any;
+    
+    // Explicit Sort Handling based on Backend Interface
     if (sortBy === 'storage') {
       valA = a.storage_committed || 0;
       valB = b.storage_committed || 0;
     } else if (sortBy === 'health') {
       valA = a.health || 0;
       valB = b.health || 0;
+    } else if (sortBy === 'version') {
+       // Semantic Version Comparison
+       const verA = a.version || '0.0.0';
+       const verB = b.version || '0.0.0';
+       const res = compareVersions(verA, verB);
+       return sortOrder === 'asc' ? res : -res;
     } else {
-      valA = (a as any)[sortBy];
-      valB = (b as any)[sortBy];
+      // Fallback for direct properties (e.g., 'uptime')
+      // Uses "as any" but wrapped safely
+      valA = (a as any)[sortBy] || 0;
+      valB = (b as any)[sortBy] || 0;
     }
-    if (sortBy === 'version') {
-      return sortOrder === 'asc'
-        ? compareVersions(a.version || '0.0.0', b.version || '0.0.0')
-        : compareVersions(b.version || '0.0.0', a.version || '0.0.0');
-    }
-    return sortOrder === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+
+    // Standard Numeric/String Comparison
+    if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+    if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+    return 0;
   });
 
   const watchListNodes = nodes.filter(node => favorites.includes(node.address || ''));
@@ -529,7 +549,6 @@ export default function Home() {
       <main className={`p-4 md:p-8 ${zenMode ? 'max-w-full' : 'max-w-7xl 2xl:max-w-[1800px] mx-auto'} transition-all duration-500`}>
         {!zenMode && !loading && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
-            {/* 1. CAPACITY CARD */}
             <div onClick={() => setActiveStatsModal('capacity')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm flex flex-col justify-between cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
@@ -542,7 +561,6 @@ export default function Home() {
               <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-purple-400 font-bold flex items-center gap-1 z-10"><Maximize2 size={8} /> DETAILS</div>
             </div>
 
-            {/* 2. VITALS CARD */}
             <div onClick={() => setActiveStatsModal('vitals')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-green-500/0 to-green-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="absolute inset-0 opacity-20 pointer-events-none"><div className="ekg-line"></div></div>
@@ -558,7 +576,6 @@ export default function Home() {
               <style jsx>{` @keyframes ekg { 0% { left: -100%; opacity: 0; } 50% { opacity: 1; } 100% { left: 100%; opacity: 0; } } .ekg-line { position: absolute; top: 0; bottom: 0; width: 50%; background: linear-gradient( 90deg, transparent 0%, rgba(34, 197, 94, 0.5) 50%, transparent 100% ); animation: ekg 2s linear infinite; } `}</style>
             </div>
 
-            {/* 3. CONSENSUS CARD */}
             <div onClick={() => setActiveStatsModal('consensus')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
@@ -568,7 +585,6 @@ export default function Home() {
               <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-blue-400 font-bold flex items-center gap-1 z-10"><Maximize2 size={8} /> DETAILS</div>
             </div>
 
-            {/* 4. FILTER CARD */}
             <div onClick={() => { const nextFilter = networkFilter === 'ALL' ? 'MAINNET' : networkFilter === 'MAINNET' ? 'DEVNET' : 'ALL'; setNetworkFilter(nextFilter); }} className="bg-zinc-900/50 border border-zinc-800 p-3 rounded-xl backdrop-blur-sm flex flex-col justify-between group relative overflow-hidden transition-all duration-300 hover:border-zinc-700 cursor-pointer select-none active:scale-[0.98] h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="flex justify-between items-center relative z-10 mb-2">
@@ -592,10 +608,9 @@ export default function Home() {
           <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="flex items-center gap-2 mb-4"><Star className="text-yellow-500" fill="currentColor" size={20} /><h3 className="text-lg font-bold text-white tracking-widest uppercase">Your Watchlist</h3></div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 border-b border-zinc-800 pb-10">
-              {watchListNodes.map((node) => {
-                const compositeKey = `${node.pubkey}-${node.network}`;
-                return <NodeCard key={compositeKey} node={node} onClick={(n) => setSelectedNode(n)} onToggleFavorite={toggleFavorite} isFav={true} cycleStep={cycleStep} zenMode={zenMode} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />
-              })}
+              {watchListNodes.map((node) => (
+                <NodeCard key={`${node.pubkey}-${node.network}`} node={node} onClick={(n) => setSelectedNode(n)} onToggleFavorite={toggleFavorite} isFav={true} cycleStep={cycleStep} zenMode={zenMode} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />
+              ))}
             </div>
           </div>
         )}
@@ -613,11 +628,12 @@ export default function Home() {
         ) : (
           <div className={`grid gap-2 md:gap-4 ${zenMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-2 md:grid-cols-2 lg:grid-cols-3 2xl:gap-8'} pb-20`}>
             {filteredNodes.map((node) => {
+              // Create a truly unique key for React using Pubkey + Network
               const compositeKey = `${node.pubkey}-${node.network}`;
-              
+
               if (zenMode) return <ZenCard key={compositeKey} node={node} onClick={(n) => setSelectedNode(n)} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />;
-              
-              return <NodeCard key={compositeKey} node={node} onClick={(n) => setSelectedNode(n)} onToggleFavorite={toggleFavorite} isFav={favorites.includes(node.address || '')} cycleStep={cycleStep} zenMode={zenMode} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />;
+
+              return <NodeCard key={compositeKey} node={node} onClick={(n) => setSelectedNode(n)} onToggleFavorite={toggleFavorite} isFav={favorites.includes(node.address || '')} cycleStep={cycleStep} zenMode={zenMode} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />
             })}
           </div>
         )}
