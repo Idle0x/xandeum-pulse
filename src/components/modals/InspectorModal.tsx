@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { 
   X, Star, Check, Copy, Shield, Maximize2, HelpCircle, Minimize2, 
   HeartPulse, Database, Server, Trophy, Globe, Clock, Link as LinkIcon, 
-  Swords, Camera, ExternalLink, Activity, CheckCircle, AlertTriangle 
+  Swords, Camera, ExternalLink, Activity, CheckCircle, AlertTriangle, Layers
 } from 'lucide-react';
 import { Node } from '../../types';
 import { ModalAvatar } from '../common/ModalAvatar';
@@ -58,13 +58,21 @@ export const InspectorModal = ({
   const isSelectedNodeLatest = checkIsLatest(selectedNode.version, mostCommonVersion);
   const avgNetworkHealth = networkStats?.avgBreakdown?.total || 0;
 
-  // --- STORAGE TANK CALCULATIONS ---
+  // --- HEALTH LOGIC ---
+  const healthScore = selectedNode.health || 0;
+  const healthColor = healthScore >= 80 ? 'text-green-500' : healthScore >= 50 ? 'text-yellow-500' : 'text-red-500';
+  const healthGlow = healthScore >= 80 ? 'bg-green-500/20' : healthScore >= 50 ? 'bg-yellow-500/20' : 'bg-red-500/20';
+
+  // --- STORAGE LOGIC ---
   const nodeCap = selectedNode.storage_committed || 0;
-  // Tank fill is percentage of the Median. Cap at 100% for visual sanity if over median.
   const tankFillPercent = Math.min(100, (nodeCap / (medianCommitted || 1)) * 100);
   const isAboveMedian = nodeCap >= medianCommitted;
-  // Internal Usage Progress (Used vs Committed)
   const internalUsagePercent = Math.min(100, ((selectedNode.storage_used || 0) / (nodeCap || 1)) * 100);
+
+  // --- IDENTITY LOGIC ---
+  const siblingCount = selectedNode.network === 'MAINNET' 
+    ? Math.max(0, (selectedNode.clusterStats?.mainnetCount || 1) - 1)
+    : Math.max(0, (selectedNode.clusterStats?.devnetCount || 1) - 1);
 
   const copyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
@@ -165,19 +173,47 @@ export const InspectorModal = ({
                     
                     {/* --- MOBILE BENTO HERO GRID (MD:HIDDEN) --- */}
                     <div className="grid grid-cols-2 gap-3 md:hidden">
-                        {/* ROW 1: HERO HEALTH (Full Width) */}
-                        <div onClick={() => handleCardToggle('health')} className="col-span-2 p-4 rounded-2xl bg-zinc-900 border border-zinc-800 flex justify-between items-center relative overflow-hidden">
-                            <div className="absolute inset-0 bg-gradient-to-r from-green-900/10 to-transparent pointer-events-none"></div>
-                            <div className="relative z-10 flex flex-col gap-1">
-                                <div className="text-[10px] font-bold tracking-widest uppercase text-zinc-500">SYSTEM DIAGNOSTICS</div>
-                                <div className="text-[9px] text-green-400 font-bold uppercase flex items-center gap-1 animate-pulse"><Maximize2 size={8}/> TAP TO EXPAND</div>
+                        {/* ROW 1: THE BIO-REACTOR (HEALTH HERO) */}
+                        <div 
+                          onClick={() => handleCardToggle('health')} 
+                          className="col-span-2 p-4 rounded-2xl bg-zinc-900 border border-zinc-800 flex justify-between items-center relative overflow-hidden group cursor-pointer"
+                        >
+                            {/* Background Texture (Scanlines) */}
+                            <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>
+                            
+                            {/* Content */}
+                            <div className="relative z-10 flex flex-col justify-between h-full py-2">
+                                <div>
+                                  <div className="text-[10px] font-bold tracking-widest uppercase text-zinc-500 flex items-center gap-1.5">
+                                    <Activity size={10} className={healthColor} /> SYSTEM DIAGNOSTICS
+                                  </div>
+                                  <div className="text-[9px] font-mono mt-1 text-zinc-600">
+                                    Status: <span className={healthScore >= 80 ? 'text-green-400' : 'text-yellow-400'}>{healthScore >= 80 ? 'OPTIMAL' : 'ATTENTION'}</span>
+                                  </div>
+                                </div>
+                                <div className="text-[9px] text-green-400 font-bold uppercase flex items-center gap-1 animate-pulse group-active:scale-95 transition-transform origin-left">
+                                  <Maximize2 size={8}/> TAP TO EXPAND
+                                </div>
                             </div>
-                            <div className="relative z-10 scale-75 origin-right"><RadialProgress score={selectedNode.health || 0} size={100} /></div>
+
+                            {/* The Reactor Core */}
+                            <div className="relative z-10 flex flex-col items-center justify-center mr-2">
+                                <span className={`text-[9px] uppercase tracking-widest font-bold mb-1 ${healthColor}`}>Health Score</span>
+                                <div className="relative scale-110 group-active:scale-125 transition-transform duration-300">
+                                    {/* Breathing Glow */}
+                                    <div className={`absolute inset-0 rounded-full blur-xl animate-pulse ${healthGlow}`}></div>
+                                    <RadialProgress score={healthScore} size={100} />
+                                    {/* Score Text Overlay (Replaces Internal Label) */}
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <span className="text-2xl font-black text-white">{healthScore}</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         {/* ROW 2: STORAGE (Left) & IDENTITY (Right) */}
                         
-                        {/* --- NEW STORAGE CARD (LIQUID TANK) --- */}
+                        {/* STORAGE CARD (LIQUID TANK) */}
                         <div 
                           onClick={() => handleCardToggle('storage')} 
                           className="aspect-square rounded-2xl bg-zinc-900 border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300"
@@ -187,27 +223,21 @@ export const InspectorModal = ({
                               className="absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out" 
                               style={{ height: `${tankFillPercent}%` }}
                             >
-                                {/* The Liquid Gradient */}
                                 <div className={`absolute inset-0 ${isAboveMedian ? 'bg-gradient-to-t from-purple-900 to-purple-500' : 'bg-gradient-to-t from-purple-950 to-purple-800'}`}></div>
-                                
-                                {/* The Water Surface Animation (Only if NOT full/above median) */}
                                 {!isAboveMedian && (
                                   <div className="absolute top-0 left-0 right-0 h-0.5 bg-purple-400 shadow-[0_0_15px_rgba(192,132,252,0.8)] animate-pulse"></div>
                                 )}
                             </div>
 
-                            {/* CONTENT LAYER (Z-10 to sit above liquid) */}
+                            {/* CONTENT LAYER */}
                             <div className="relative z-10 p-3 flex flex-col h-full">
                                 <div className="flex justify-between items-start">
                                     <Database size={16} className="text-white drop-shadow-md"/>
-                                    {/* Raw Bytes Pill */}
                                     <div className="bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded-full text-[7px] font-mono text-white border border-white/10 shadow-sm">
                                       {(selectedNode.storage_used || 0).toLocaleString()} B
                                     </div>
                                 </div>
-
                                 <div className="mt-auto flex flex-col gap-2">
-                                    {/* Data Row */}
                                     <div className="flex justify-between items-end">
                                         <div className="flex flex-col items-center">
                                             <div className="text-[8px] font-bold text-zinc-300/80 uppercase shadow-black drop-shadow-sm">Used</div>
@@ -219,8 +249,6 @@ export const InspectorModal = ({
                                             <div className="text-sm font-bold text-white drop-shadow-md">{formatBytes(selectedNode.storage_committed).split(' ')[0]} <span className="text-[9px]">{formatBytes(selectedNode.storage_committed).split(' ')[1]}</span></div>
                                         </div>
                                     </div>
-
-                                    {/* Usage Progress Bar */}
                                     <div className="w-full h-1 bg-black/50 rounded-full overflow-hidden border border-white/10">
                                         <div className="h-full bg-blue-400 shadow-[0_0_5px_rgba(96,165,250,0.8)]" style={{ width: `${internalUsagePercent}%` }}></div>
                                     </div>
@@ -228,16 +256,52 @@ export const InspectorModal = ({
                             </div>
                         </div>
 
-                        {/* IDENTITY CARD */}
-                        <div onClick={() => handleCardToggle('identity')} className="aspect-square p-3 rounded-2xl bg-zinc-900/50 border border-zinc-800 flex flex-col justify-between relative overflow-hidden">
-                            <div className="absolute inset-0 bg-gradient-to-br from-blue-900/10 to-transparent pointer-events-none"></div>
-                            <div className="flex justify-between items-start relative z-10">
-                                <Shield size={16} className="text-blue-500"/>
-                                <div className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase border ${selectedNode.network === 'MAINNET' ? 'text-green-500 border-green-500/30' : 'text-blue-500 border-blue-500/30'}`}>{selectedNode.network === 'MAINNET' ? 'MAIN' : 'DEV'}</div>
-                            </div>
-                            <div className="relative z-10 mt-auto">
-                                <div className="text-xl font-mono text-white leading-none mb-1">{getSafeVersion(selectedNode)}</div>
-                                <div className="text-[8px] font-bold uppercase text-zinc-500">VERSION</div>
+                        {/* --- IDENTITY CARD (HOLOGRAPHIC ID) --- */}
+                        <div 
+                          onClick={() => handleCardToggle('identity')} 
+                          className="aspect-square rounded-2xl border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 bg-zinc-900"
+                        >
+                            {/* Animated Background */}
+                            <div className={`absolute inset-0 bg-gradient-to-br opacity-20 ${isSelectedNodeLatest ? 'from-green-900/40 via-transparent to-blue-900/40' : 'from-orange-900/40 via-transparent to-red-900/40'}`}></div>
+                            
+                            {/* Content */}
+                            <div className="relative z-10 p-3 flex flex-col h-full">
+                                {/* Top Row */}
+                                <div className="flex justify-between items-start mb-1">
+                                    <div className="relative">
+                                      <Shield size={24} className={`text-zinc-200 drop-shadow-md ${isSelectedNodeLatest ? 'text-blue-200' : 'text-orange-200'}`} />
+                                      {/* Pulse Effect behind shield */}
+                                      <div className={`absolute inset-0 blur-md rounded-full animate-pulse ${isSelectedNodeLatest ? 'bg-blue-500/30' : 'bg-orange-500/30'}`}></div>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                      <div className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase border mb-1 ${selectedNode.network === 'MAINNET' ? 'text-green-400 border-green-500/30 bg-green-900/20' : 'text-blue-400 border-blue-500/30 bg-blue-900/20'}`}>
+                                        {selectedNode.network || 'UNKNOWN'}
+                                      </div>
+                                      {siblingCount > 0 && (
+                                        <div className="flex items-center gap-1 bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-700">
+                                          <Layers size={8} className="text-zinc-400"/>
+                                          <span className="text-[8px] font-bold text-zinc-300">+{siblingCount}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                </div>
+
+                                {/* Bottom Row (Stats) */}
+                                <div className="mt-auto space-y-1">
+                                    <div className="flex justify-between items-center">
+                                       <span className="text-[8px] font-bold uppercase text-zinc-500">Ver</span>
+                                       <span className="font-mono text-xs font-bold text-white">{getSafeVersion(selectedNode)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                       <span className="text-[8px] font-bold uppercase text-zinc-500">Up</span>
+                                       <span className="font-mono text-[9px] font-bold text-zinc-400">{formatUptime(selectedNode.uptime)}</span>
+                                    </div>
+                                    {/* Status Pill */}
+                                    <div className={`mt-1 flex items-center justify-center gap-1 py-1 rounded text-[8px] font-bold uppercase border ${isSelectedNodeLatest ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'}`}>
+                                      {isSelectedNodeLatest ? <CheckCircle size={8}/> : <AlertTriangle size={8}/>}
+                                      {isSelectedNodeLatest ? 'Up to Date' : 'Update Needed'}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
