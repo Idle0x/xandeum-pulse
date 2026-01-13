@@ -6,8 +6,6 @@ import Link from 'next/link';
 
 // --- COMPONENTS ---
 import { WelcomeCurtain } from '../components/WelcomeCurtain'; 
-// import { RadialProgress } from '../components/RadialProgress'; // Unused in this snippet
-// import { PhysicalLocationBadge } from '../components/PhysicalLocationBadge'; // Unused in this snippet
 
 // --- REFACTORED COMPONENTS ---
 import { NetworkSwitcher } from '../components/common/NetworkSwitcher';
@@ -228,7 +226,6 @@ export default function Home() {
   // --- EFFECTS ---
 
   useEffect(() => {
-    // Independent cycle timer
     const cycleInterval = setInterval(() => {
         setCycleStep((prev) => prev + 1);
     }, 9000); 
@@ -292,7 +289,6 @@ export default function Home() {
           setSortOrder('desc'); 
       }
       
-      // Update cycle step to match the user's interest
       let targetStep = 1;
       if (metric === 'health') targetStep = 2;
       if (metric === 'uptime') targetStep = 3;
@@ -302,8 +298,6 @@ export default function Home() {
 
   const filteredNodes = nodes.filter(node => {
     const q = searchQuery.toLowerCase();
-    
-    // Safety checks for properties that might be null/undefined
     const addr = (getSafeIp(node) || '').toLowerCase();
     const pub = (node.pubkey || '').toLowerCase();
     const ver = (node.version || '').toLowerCase();
@@ -315,7 +309,6 @@ export default function Home() {
   }).sort((a, b) => {
     let valA: any, valB: any;
     
-    // Explicit Sort Handling based on Backend Interface
     if (sortBy === 'storage') {
       valA = a.storage_committed || 0;
       valB = b.storage_committed || 0;
@@ -323,18 +316,15 @@ export default function Home() {
       valA = a.health || 0;
       valB = b.health || 0;
     } else if (sortBy === 'version') {
-       // Semantic Version Comparison
        const verA = a.version || '0.0.0';
        const verB = b.version || '0.0.0';
        const res = compareVersions(verA, verB);
        return sortOrder === 'asc' ? res : -res;
     } else {
-      // Fallback for direct properties (e.g., 'uptime')
       valA = (a as any)[sortBy] || 0;
       valB = (b as any)[sortBy] || 0;
     }
 
-    // Standard Numeric/String Comparison
     if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
     if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
     return 0;
@@ -618,20 +608,14 @@ export default function Home() {
             </div>
         )}
 
-        {/* DEBUG: This will prove exactly how many items React is holding */}
-        {/* Remove this line after fixing */}
-        <div className="fixed bottom-0 right-0 bg-red-600 text-white p-2 z-[9999]">
-          Debug Count: {filteredNodes.length} Nodes in Array
-        </div>
-
+        {/* --- DYNAMIC GRID WITH GHOST NODE FIX --- */}
         {loading && nodes.length === 0 ? (
           <PulseGraphLoader />
         ) : (
+          /* key forces re-render on sort change */
           <div key={`grid-${sortBy}-${sortOrder}-${filteredNodes.length}`} className={`grid gap-2 md:gap-4 ${zenMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-2 md:grid-cols-2 lg:grid-cols-3 2xl:gap-8'} pb-20`}>
             
             {filteredNodes.map((node, index) => {
-              // 1. Create a bulletproof unique key
-              // using index as a fallback guarantees uniqueness even if data is bad
               const uniqueKey = node.pubkey ? `${node.pubkey}-${node.network}` : `fallback-${index}`;
 
               if (zenMode) {
@@ -665,7 +649,7 @@ export default function Home() {
       </main>
 
       {!zenMode && (
-        <footer className="border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto text-center">
+        <footer className="relative border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto text-center overflow-hidden">
           <h3 className="text-white font-bold mb-2">XANDEUM PULSE MONITOR</h3>
           <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.</p>
           <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-600 mb-4">
@@ -674,6 +658,18 @@ export default function Home() {
             <span className="text-zinc-800">|</span><a href="https://github.com/Idle0x/xandeum-pulse" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition flex items-center gap-1">Open Source <ExternalLink size={10} /></a>
           </div>
           <Link href="/docs" className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-4 decoration-zinc-700 flex items-center justify-center gap-1 mt-4"><BookOpen size={10} /> System Architecture & Docs</Link>
+
+          {/* --- ACTIVE PODS UPLINK (Formerly Debug Count) --- */}
+          {/* Placed absolute bottom-right on desktop, centered flow on mobile */}
+          <div className="mt-6 md:mt-0 md:absolute md:bottom-6 md:right-6 flex items-center justify-center gap-2 animate-in fade-in duration-1000">
+             <div className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-600"></span>
+             </div>
+             <div className="text-[9px] font-mono font-medium text-zinc-600 tracking-widest uppercase">
+                Active Pods Uplink: <span className="text-zinc-500">{filteredNodes.length}</span>
+             </div>
+          </div>
         </footer>
       )}
     </div>
