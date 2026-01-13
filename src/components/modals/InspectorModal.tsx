@@ -196,21 +196,21 @@ export const InspectorModal = ({
                                 </div>
                             </div>
 
-                            {/* The Reactor Core - UPDATED LAYOUT */}
+                            {/* The Reactor Core - SMALLER SIZE */}
                             <div className="relative z-10 flex flex-col items-center justify-center mr-2">
-                                <div className="relative scale-110 group-active:scale-125 transition-transform duration-300 flex items-center justify-center">
+                                <div className="relative scale-100 group-active:scale-110 transition-transform duration-300 flex items-center justify-center">
                                     {/* Breathing Glow */}
                                     <div className={`absolute inset-0 rounded-full blur-xl animate-pulse ${healthGlow}`}></div>
                                     
-                                    {/* NEW: Health Score Label Overlay (Top Center) */}
-                                    <div className="absolute -top-1 z-20 pointer-events-none">
+                                    {/* Health Score Label - Adjusted position */}
+                                    <div className="absolute -top-4 z-20 pointer-events-none">
                                         <span className={`text-[8px] font-black uppercase tracking-wider ${healthScore >= 80 ? 'text-green-500' : 'text-yellow-500'}`}>
                                             HEALTH SCORE
                                         </span>
                                     </div>
 
-                                    {/* Chart */}
-                                    <RadialProgress score={healthScore} size={95} />
+                                    {/* Chart - Reduced size */}
+                                    <RadialProgress score={healthScore} size={70} stroke={8} />
                                 </div>
                             </div>
                         </div>
