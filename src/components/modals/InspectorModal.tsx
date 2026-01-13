@@ -170,7 +170,7 @@ export const InspectorModal = ({
                ) : (
                  // OVERVIEW DASHBOARD
                  <div className="flex flex-col gap-4 h-full">
-                    
+
                     {/* --- MOBILE BENTO HERO GRID (MD:HIDDEN) --- */}
                     <div className="grid grid-cols-2 gap-3 md:hidden">
                         {/* ROW 1: THE BIO-REACTOR (HEALTH HERO) */}
@@ -180,7 +180,7 @@ export const InspectorModal = ({
                         >
                             {/* Background Texture (Scanlines) */}
                             <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>
-                            
+
                             {/* Content */}
                             <div className="relative z-10 flex flex-col justify-between h-full py-2">
                                 <div>
@@ -196,19 +196,27 @@ export const InspectorModal = ({
                                 </div>
                             </div>
 
-                            {/* The Reactor Core */}
+                            {/* The Reactor Core - UPDATED LAYOUT */}
                             <div className="relative z-10 flex flex-col items-center justify-center mr-2">
-                                <div className="relative scale-110 group-active:scale-125 transition-transform duration-300">
+                                <div className="relative scale-110 group-active:scale-125 transition-transform duration-300 flex items-center justify-center">
                                     {/* Breathing Glow */}
                                     <div className={`absolute inset-0 rounded-full blur-xl animate-pulse ${healthGlow}`}></div>
-                                    <RadialProgress score={healthScore} size={100} />
-                                    {/* No manual overlay here - relying on RadialProgress */}
+                                    
+                                    {/* NEW: Health Score Label Overlay (Top Center) */}
+                                    <div className="absolute -top-1 z-20 pointer-events-none">
+                                        <span className={`text-[8px] font-black uppercase tracking-wider ${healthScore >= 80 ? 'text-green-500' : 'text-yellow-500'}`}>
+                                            HEALTH SCORE
+                                        </span>
+                                    </div>
+
+                                    {/* Chart */}
+                                    <RadialProgress score={healthScore} size={95} />
                                 </div>
                             </div>
                         </div>
 
                         {/* ROW 2: STORAGE (Left) & IDENTITY (Right) */}
-                        
+
                         {/* STORAGE CARD (LIQUID TANK) */}
                         <div 
                           onClick={() => handleCardToggle('storage')} 
@@ -259,7 +267,7 @@ export const InspectorModal = ({
                         >
                             {/* Animated Background (Increased Brightness to 40%) */}
                             <div className={`absolute inset-0 bg-gradient-to-br opacity-40 ${isSelectedNodeLatest ? 'from-green-900/40 via-transparent to-blue-900/40' : 'from-orange-900/40 via-transparent to-red-900/40'}`}></div>
-                            
+
                             {/* Content */}
                             <div className="relative z-10 p-3 flex flex-col h-full">
                                 {/* Top Row */}
