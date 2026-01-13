@@ -279,7 +279,7 @@ export default function Home() {
     }
   }, [loading, nodes, router.query]);
 
-  // --- ROBUST FILTER & SORT LOGIC ---
+  // --- FILTER & SORT LOGIC ---
 
   const handleSortChange = (metric: 'uptime' | 'version' | 'storage' | 'health') => {
       if (sortBy === metric) {
@@ -289,11 +289,16 @@ export default function Home() {
           setSortOrder('desc'); 
       }
       
-      let targetStep = 1;
+      // Update cycle step immediately for Storage/Health/Uptime sorts
+      let targetStep = -1;
+      if (metric === 'storage') targetStep = 1;
       if (metric === 'health') targetStep = 2;
       if (metric === 'uptime') targetStep = 3;
-      setCycleStep(targetStep);
-      setCycleReset(prev => prev + 1);
+      
+      if (targetStep !== -1) {
+          setCycleStep(targetStep);
+          setCycleReset(prev => prev + 1);
+      }
   };
 
   const filteredNodes = nodes.filter(node => {
@@ -316,9 +321,7 @@ export default function Home() {
       valA = a.health || 0;
       valB = b.health || 0;
     } else if (sortBy === 'version') {
-       const verA = a.version || '0.0.0';
-       const verB = b.version || '0.0.0';
-       const res = compareVersions(verA, verB);
+       const res = compareVersions(a.version || '0.0.0', b.version || '0.0.0');
        return sortOrder === 'asc' ? res : -res;
     } else {
       valA = (a as any)[sortBy] || 0;
@@ -530,7 +533,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- MAIN GRID --- */}
+      {/* --- MAIN MAIN --- */}
       <main className={`p-4 md:p-8 ${zenMode ? 'max-w-full' : 'max-w-7xl 2xl:max-w-[1800px] mx-auto'} transition-all duration-500`}>
         {!zenMode && !loading && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
@@ -612,7 +615,7 @@ export default function Home() {
         {loading && nodes.length === 0 ? (
           <PulseGraphLoader />
         ) : (
-          /* key forces re-render on sort change */
+          /* key forces re-render of entire grid on sort change to flush duplicates */
           <div key={`grid-${sortBy}-${sortOrder}-${filteredNodes.length}`} className={`grid gap-2 md:gap-4 ${zenMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-2 md:grid-cols-2 lg:grid-cols-3 2xl:gap-8'} pb-20`}>
             
             {filteredNodes.map((node, index) => {
@@ -651,51 +654,22 @@ export default function Home() {
       {!zenMode && (
         <footer className="relative border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto text-center overflow-hidden">
           <h3 className="text-white font-bold mb-2">XANDEUM PULSE MONITOR</h3>
-          <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">
-            Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage
-            capacity, and network consensus metrics directly from the blockchain.
-          </p>
+          <p className="text-zinc-500 text-sm mb-4 max-w-lg mx-auto">Real-time dashboard for the Xandeum Gossip Protocol. Monitoring pNode health, storage capacity, and network consensus metrics directly from the blockchain.</p>
           <div className="flex items-center justify-center gap-4 text-xs font-mono text-zinc-600 mb-4">
-            <span className="opacity-50">pRPC Powered</span>
-            <span className="text-zinc-800">|</span>
-            <div className="flex items-center gap-1">
-              <span>Built by</span>
-              <a
-                href="https://twitter.com/33xp_"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-zinc-400 hover:text-blue-400 transition font-bold flex items-center gap-1"
-              >
-                riot' <Twitter size={10} />
-              </a>
-            </div>
-            <span className="text-zinc-800">|</span>
-            <a
-              href="https://github.com/Idle0x/xandeum-pulse"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-zinc-400 hover:text-white transition flex items-center gap-1"
-            >
-              Open Source <ExternalLink size={10} />
-            </a>
+            <span className="opacity-50">pRPC Powered</span><span className="text-zinc-800">|</span>
+            <div className="flex items-center gap-1"><span>Built by</span><a href="https://twitter.com/33xp_" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-blue-400 transition font-bold flex items-center gap-1">riot' <Twitter size={10} /></a></div>
+            <span className="text-zinc-800">|</span><a href="https://github.com/Idle0x/xandeum-pulse" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition flex items-center gap-1">Open Source <ExternalLink size={10} /></a>
           </div>
-          <Link
-            href="/docs"
-            className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-4 decoration-zinc-700 flex items-center justify-center gap-1 mt-4"
-          >
-            <BookOpen size={10} /> System Architecture & Docs
-          </Link>
+          <Link href="/docs" className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-4 decoration-zinc-700 flex items-center justify-center gap-1 mt-4"><BookOpen size={10} /> System Architecture & Docs</Link>
 
           {/* --- ACTIVE PODS UPLINK (Integrated Dashboard Pill) --- */}
           <div className="mt-8 md:mt-0 md:absolute md:bottom-6 md:right-6 flex items-center justify-center animate-in fade-in duration-1000">
              <div className="group flex items-center gap-3 px-4 py-2 rounded-full bg-black/40 border border-white/5 shadow-[inset_0_1px_4px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all hover:border-white/10 hover:bg-black/60 cursor-help" title="Live count of filtered nodes currently in view">
-                {/* Status Beacon */}
                 <div className="relative flex h-1.5 w-1.5">
                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75 duration-1000"></span>
                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
                 </div>
                 
-                {/* Metric Readout */}
                 <div className="flex items-center gap-2 text-[9px] font-mono font-bold tracking-widest uppercase text-zinc-500 group-hover:text-zinc-400 transition-colors">
                    <span>Active Pods Uplink</span>
                    <span className="text-zinc-700">|</span>
@@ -705,3 +679,6 @@ export default function Home() {
           </div>
         </footer>
       )}
+    </div>
+  );
+}
