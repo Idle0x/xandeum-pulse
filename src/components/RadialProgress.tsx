@@ -36,9 +36,9 @@ export const RadialProgress = ({ score, size = 160, stroke = 12 }: RadialProgres
           className="transition-all duration-1000 ease-out"
         />
       </svg>
-      {/* Updated: Only showing the number, label is now external */}
+      {/* CHANGED: text-4xl -> text-2xl to reduce size by ~40% */}
       <div className="absolute flex flex-col items-center">
-        <span className="text-4xl font-extrabold text-white tracking-tighter">{score}</span>
+        <span className="text-2xl font-extrabold text-white tracking-tighter">{score}</span>
       </div>
     </div>
   );
