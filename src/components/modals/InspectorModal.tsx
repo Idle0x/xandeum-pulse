@@ -4,7 +4,7 @@ import {
   X, Star, Check, Copy, Shield, Maximize2, HelpCircle, Minimize2, 
   HeartPulse, Database, Server, Trophy, Globe, Clock, Link as LinkIcon, 
   Swords, Camera, ExternalLink, Activity, CheckCircle, AlertTriangle, Layers,
-  ArrowUpRight
+  ArrowUpRight // New Icon for Deep Links
 } from 'lucide-react';
 import { Node } from '../../types';
 import { ModalAvatar } from '../common/ModalAvatar';
@@ -188,8 +188,10 @@ export const InspectorModal = ({
                           onClick={() => handleCardToggle('health')} 
                           className="col-span-2 p-4 rounded-2xl bg-zinc-900 border border-zinc-800 flex justify-between items-center relative overflow-hidden group cursor-pointer"
                         >
+                            {/* Background Texture (Scanlines) */}
                             <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>
 
+                            {/* Content */}
                             <div className="relative z-10 flex flex-col justify-between h-full py-2">
                                 <div>
                                   <div className="text-[10px] font-bold tracking-widest uppercase text-zinc-500 flex items-center gap-1.5">
@@ -207,12 +209,17 @@ export const InspectorModal = ({
                             {/* The Reactor Core - COMPACT SIZE */}
                             <div className="relative z-10 flex flex-col items-center justify-center mr-2">
                                 <div className="relative scale-100 group-active:scale-110 transition-transform duration-300 flex items-center justify-center">
+                                    {/* Breathing Glow */}
                                     <div className={`absolute inset-0 rounded-full blur-xl animate-pulse ${healthGlow}`}></div>
+                                    
+                                    {/* Health Score Label - SINGLE LINE FIXED */}
                                     <div className="absolute -top-5 z-20 pointer-events-none">
                                         <span className={`text-[8px] font-black uppercase tracking-wider whitespace-nowrap ${healthScore >= 80 ? 'text-green-500' : 'text-yellow-500'}`}>
                                             HEALTH SCORE
                                         </span>
                                     </div>
+
+                                    {/* Chart */}
                                     <RadialProgress score={healthScore} size={54} stroke={6} />
                                 </div>
                             </div>
@@ -220,26 +227,23 @@ export const InspectorModal = ({
 
                         {/* ROW 2: STORAGE (Left) & IDENTITY (Right) */}
 
-                        {/* STORAGE CARD (DATASTREAM TANK) - SUBTLE MOBILE VERSION */}
+                        {/* STORAGE CARD (DATASTREAM VESSEL) - FADED MOBILE VERSION */}
                         <div 
                           onClick={() => handleCardToggle('storage')} 
                           className="aspect-square rounded-2xl bg-zinc-900 border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 ring-1 ring-transparent hover:ring-indigo-500/20"
                         >
-                            {/* TANK LIQUID LAYER - DRASTICALLY REDUCED OPACITY */}
+                            {/* TANK LIQUID LAYER - FADED GRADIENT */}
                             <div 
                               className="absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out z-0" 
                               style={{ height: `${tankFillPercent}%` }}
                             >
-                                {/* 1. Very faint, dark glass fill */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-indigo-950/40 to-violet-900/10 backdrop-blur-[1px]"></div>
+                                {/* 1. Subtle Vertical Fade: Visible at top, fades to transparent */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-transparent via-indigo-900/10 to-indigo-500/20 backdrop-blur-[0.5px]"></div>
                                 
                                 {/* 2. Data Texture (Dot Pattern) inside the fluid */}
                                 <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#8b5cf6_1px,transparent_1px)] [background-size:4px_4px]"></div>
                                 
-                                {/* 3. Subtle Scanline Flow */}
-                                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/5 to-transparent h-[200%] animate-[shimmer_3s_infinite_linear] opacity-20"></div>
-
-                                {/* 4. The Meniscus (Top Line) - Keeps sharpness */}
+                                {/* 3. The Meniscus (Top Line) - Laser sharp */}
                                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.6)]"></div>
                             </div>
 
@@ -263,9 +267,9 @@ export const InspectorModal = ({
                                             <div className="text-sm font-bold text-white drop-shadow-md">{formatBytes(selectedNode.storage_committed).split(' ')[0]} <span className="text-[9px]">{formatBytes(selectedNode.storage_committed).split(' ')[1]}</span></div>
                                         </div>
                                     </div>
-                                    {/* Bottom Progress Bar */}
+                                    {/* Bottom Progress Bar - Matched Faded Style */}
                                     <div className="w-full h-1 bg-black/50 rounded-full overflow-hidden border border-white/10">
-                                        <div className="h-full bg-indigo-500 shadow-[0_0_5px_rgba(99,102,241,0.8)]" style={{ width: `${internalUsagePercent}%` }}></div>
+                                        <div className="h-full bg-gradient-to-r from-indigo-900/50 to-indigo-500" style={{ width: `${internalUsagePercent}%` }}></div>
                                     </div>
                                 </div>
                             </div>
@@ -365,19 +369,35 @@ export const InspectorModal = ({
 
                     {/* --- DESKTOP GRID (HIDDEN MD:GRID) --- */}
                     <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-                      {/* 1. DIAGNOSTICS CARD */}
-                      <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 border flex flex-col justify-between cursor-pointer group min-h-[110px] md:h-64 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/30 border-zinc-800'}`} onClick={() => handleCardToggle('health')}>
-                         <div className="flex justify-between items-start mb-4">
+                      
+                      {/* 1. DIAGNOSTICS CARD (DESKTOP) - NOW ALIVE */}
+                      <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 border flex flex-col justify-between cursor-pointer group min-h-[110px] md:h-64 relative overflow-hidden ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/30 border-zinc-800'}`} onClick={() => handleCardToggle('health')}>
+                         {/* Scanlines Texture */}
+                         <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>
+                         
+                         <div className="flex justify-between items-start mb-4 relative z-10">
                            <div><h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-500">SYSTEM DIAGNOSTICS</h3></div>
                            <HelpCircle size={14} className="text-zinc-500"/>
                          </div>
-                         <div className="self-center hidden md:block"><RadialProgress score={selectedNode.health || 0} size={140} /></div>
+                         
+                         <div className="self-center hidden md:flex items-center justify-center relative z-10">
+                             {/* Breathing Glow */}
+                             <div className={`absolute inset-0 rounded-full blur-xl animate-pulse ${healthGlow}`}></div>
+                             {/* Fixed Single Line Label */}
+                             <div className="absolute -top-5 z-20 pointer-events-none">
+                                <span className={`text-[8px] font-black uppercase tracking-wider whitespace-nowrap ${healthScore >= 80 ? 'text-green-500' : 'text-yellow-500'}`}>
+                                    HEALTH SCORE
+                                </span>
+                             </div>
+                             <RadialProgress score={selectedNode.health || 0} size={140} />
+                         </div>
+                         
                          <div className="md:hidden text-4xl font-black text-white self-center">{selectedNode.health}</div>
-                         <div className="mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-green-400 flex justify-center gap-1"><Maximize2 size={8}/> EXPAND</div>
+                         <div className="mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-green-400 flex justify-center gap-1 relative z-10"><Maximize2 size={8}/> EXPAND</div>
                       </div>
 
-                      {/* 2. STORAGE CARD (DESKTOP) - UPDATED TO MATCH MOBILE THEME */}
-                      <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 border flex flex-col justify-between cursor-pointer group min-h-[110px] md:h-64 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/30 border-zinc-800'}`} onClick={() => handleCardToggle('storage')}>
+                      {/* 2. STORAGE CARD (DESKTOP) - MATCHED DATASTREAM THEME */}
+                      <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 border flex flex-col justify-between cursor-pointer group min-h-[110px] md:h-64 relative overflow-hidden ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/30 border-zinc-800'}`} onClick={() => handleCardToggle('storage')}>
                          {/* Faint Background Grid for Desktop */}
                          <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#8b5cf6_1px,transparent_1px)] [background-size:6px_6px] pointer-events-none"></div>
 
@@ -390,31 +410,41 @@ export const InspectorModal = ({
                                <div className="text-right"><div className="text-2xl font-bold text-violet-400">{formatBytes(selectedNode.storage_committed).split(' ')[0]}</div><div className="text-[9px] font-bold text-zinc-600">TOTAL</div></div>
                             </div>
                             <div className="h-2 bg-zinc-800 rounded-full overflow-hidden relative">
-                                {/* Desktop Progress Bar with Shimmer */}
-                                <div className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 relative overflow-hidden" style={{ width: `${Math.min(100, ((selectedNode.storage_used || 0) / (selectedNode.storage_committed || 1)) * 100)}%` }}>
-                                    <div className="absolute inset-0 bg-white/20 w-full animate-[shimmer_2s_infinite_linear] -skew-x-12"></div>
+                                {/* Desktop Progress Bar - Faded Gradient + Shimmer */}
+                                <div className="h-full bg-gradient-to-r from-transparent via-indigo-900/50 to-indigo-500 relative overflow-hidden" style={{ width: `${Math.min(100, ((selectedNode.storage_used || 0) / (selectedNode.storage_committed || 1)) * 100)}%` }}>
+                                    {/* Meniscus Line (Leading Edge) */}
+                                    <div className="absolute top-0 bottom-0 right-0 w-[1px] bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]"></div>
+                                    <div className="absolute inset-0 bg-white/10 w-full animate-[shimmer_3s_infinite_linear] -skew-x-12"></div>
                                 </div>
                             </div>
                          </div>
                          <div className="mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-violet-400 flex justify-center gap-1 relative z-10"><Maximize2 size={8}/> EXPAND</div>
                       </div>
 
-                      {/* 3. IDENTITY CARD */}
-                      <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 border flex flex-col justify-between cursor-pointer group min-h-[110px] md:h-64 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/30 border-zinc-800'}`} onClick={() => handleCardToggle('identity')}>
-                         <div className="flex justify-between items-start mb-4">
+                      {/* 3. IDENTITY CARD (DESKTOP) - MATCHED HOLOGRAPHIC THEME */}
+                      <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 border flex flex-col justify-between cursor-pointer group min-h-[110px] md:h-64 relative overflow-hidden ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/30 border-zinc-800'}`} onClick={() => handleCardToggle('identity')}>
+                         {/* Dynamic Background Gradient */}
+                         <div className={`absolute inset-0 bg-gradient-to-br opacity-20 pointer-events-none ${isSelectedNodeLatest ? 'from-green-900/40 via-transparent to-blue-900/40' : 'from-orange-900/40 via-transparent to-red-900/40'}`}></div>
+
+                         <div className="flex justify-between items-start mb-4 relative z-10">
                            <div className="flex items-center gap-2"><Server size={18} className="text-zinc-400"/><span className="text-xs font-bold uppercase text-zinc-500">IDENTITY</span></div>
                            <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${selectedNode.network === 'MAINNET' ? 'text-green-500 border-green-500/30' : 'text-blue-500 border-blue-500/30'}`}>{selectedNode.network}</div>
                          </div>
-                         <div className="space-y-2">
+                         <div className="space-y-2 relative z-10">
                             <div className="text-xl font-mono text-white">{getSafeVersion(selectedNode)}</div>
                             <div className="text-xs text-zinc-500 flex items-center gap-1"><Clock size={12}/> Up: {formatUptime(selectedNode.uptime)}</div>
                             {isSelectedNodeLatest ? <div className="text-[10px] text-green-500 font-bold flex items-center gap-1"><CheckCircle size={10}/> UP TO DATE</div> : <div className="text-[10px] text-orange-500 font-bold flex items-center gap-1"><AlertTriangle size={10}/> UPDATE NEEDED</div>}
                          </div>
-                         <div className="mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-blue-400 flex justify-center gap-1"><Maximize2 size={8}/> EXPAND</div>
+                         {/* Pulse behind Icon (Desktop) */}
+                         <div className="absolute bottom-16 right-6 opacity-10 pointer-events-none">
+                            <Shield size={80} className={`${isSelectedNodeLatest ? 'text-blue-500' : 'text-orange-500'}`} />
+                            <div className={`absolute inset-0 blur-xl rounded-full animate-pulse ${isSelectedNodeLatest ? 'bg-blue-500/40' : 'bg-orange-500/40'}`}></div>
+                         </div>
+                         <div className="mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-blue-400 flex justify-center gap-1 relative z-10"><Maximize2 size={8}/> EXPAND</div>
                       </div>
                     </div>
 
-                    {/* DESKTOP BOTTOM ROW - UPDATED "ALIVE" CARDS */}
+                    {/* DESKTOP BOTTOM ROW - ALIVE PORTALS */}
                     <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-4">
                        
                        {/* REPUTATION DEEP LINK (DESKTOP - Vault Theme) */}
@@ -441,8 +471,9 @@ export const InspectorModal = ({
                        {/* MAP DEEP LINK (DESKTOP - Radar Theme) */}
                        <Link href={`/map?focus=${getSafeIp(selectedNode)}`}>
                          <div className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-blue-500/20 hover:ring-blue-500/50 hover:shadow-[0_4px_20px_-4px_rgba(59,130,246,0.3)] ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-blue-900/30'}`}>
+                            {/* Radar Grid */}
                             <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#3b82f6_1px,transparent_1px),linear-gradient(to_bottom,#3b82f6_1px,transparent_1px)] bg-[size:20px_20px] group-hover:scale-105 transition-transform duration-700 pointer-events-none origin-center"></div>
-                            {/* Desktop Sonar Ping - Top Right */}
+                            {/* Sonar Ping - Offset to right */}
                             <div className="absolute top-8 right-8 w-0 h-0 rounded-full border border-blue-500/30 animate-[ping_4s_cubic-bezier(0,0,0.2,1)_infinite] pointer-events-none"></div>
                             
                             <div className="flex justify-between items-start relative z-10">
@@ -451,6 +482,7 @@ export const InspectorModal = ({
                             </div>
                             <div className="relative z-10 mt-auto flex items-end justify-between">
                                 <PhysicalLocationBadge node={selectedNode} zenMode={zenMode} />
+                                {/* Live Pulse Dot */}
                                 <span className="relative flex h-2 w-2 mb-1.5 mr-1">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                                   <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
