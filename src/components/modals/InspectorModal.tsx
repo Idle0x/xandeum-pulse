@@ -220,26 +220,26 @@ export const InspectorModal = ({
 
                         {/* ROW 2: STORAGE (Left) & IDENTITY (Right) */}
 
-                        {/* STORAGE CARD (DATASTREAM TANK) - UPDATED VISUALS */}
+                        {/* STORAGE CARD (DATASTREAM TANK) - SUBTLE MOBILE VERSION */}
                         <div 
                           onClick={() => handleCardToggle('storage')} 
                           className="aspect-square rounded-2xl bg-zinc-900 border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 ring-1 ring-transparent hover:ring-indigo-500/20"
                         >
-                            {/* TANK LIQUID LAYER - UPDATED TO SUBTLE VIOLET/INDIGO */}
+                            {/* TANK LIQUID LAYER - DRASTICALLY REDUCED OPACITY */}
                             <div 
                               className="absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out z-0" 
                               style={{ height: `${tankFillPercent}%` }}
                             >
-                                {/* 1. Glass-like Gradient Fill */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/40 via-violet-900/20 to-violet-500/10 backdrop-blur-[1px]"></div>
+                                {/* 1. Very faint, dark glass fill */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-indigo-950/40 to-violet-900/10 backdrop-blur-[1px]"></div>
                                 
                                 {/* 2. Data Texture (Dot Pattern) inside the fluid */}
-                                <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#8b5cf6_1px,transparent_1px)] [background-size:4px_4px]"></div>
+                                <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#8b5cf6_1px,transparent_1px)] [background-size:4px_4px]"></div>
                                 
-                                {/* 3. Subtle Scanline/Flow Animation */}
-                                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/5 to-transparent h-[200%] animate-[shimmer_3s_infinite_linear] opacity-30"></div>
+                                {/* 3. Subtle Scanline Flow */}
+                                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/5 to-transparent h-[200%] animate-[shimmer_3s_infinite_linear] opacity-20"></div>
 
-                                {/* 4. The Meniscus (Top Line) - Laser sharp */}
+                                {/* 4. The Meniscus (Top Line) - Keeps sharpness */}
                                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.6)]"></div>
                             </div>
 
@@ -263,7 +263,7 @@ export const InspectorModal = ({
                                             <div className="text-sm font-bold text-white drop-shadow-md">{formatBytes(selectedNode.storage_committed).split(' ')[0]} <span className="text-[9px]">{formatBytes(selectedNode.storage_committed).split(' ')[1]}</span></div>
                                         </div>
                                     </div>
-                                    {/* Bottom Progress Bar - Matching Theme */}
+                                    {/* Bottom Progress Bar */}
                                     <div className="w-full h-1 bg-black/50 rounded-full overflow-hidden border border-white/10">
                                         <div className="h-full bg-indigo-500 shadow-[0_0_5px_rgba(99,102,241,0.8)]" style={{ width: `${internalUsagePercent}%` }}></div>
                                     </div>
@@ -376,19 +376,27 @@ export const InspectorModal = ({
                          <div className="mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-green-400 flex justify-center gap-1"><Maximize2 size={8}/> EXPAND</div>
                       </div>
 
-                      {/* 2. STORAGE CARD (DESKTOP) - UPDATED TO MATCH */}
+                      {/* 2. STORAGE CARD (DESKTOP) - UPDATED TO MATCH MOBILE THEME */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 border flex flex-col justify-between cursor-pointer group min-h-[110px] md:h-64 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/30 border-zinc-800'}`} onClick={() => handleCardToggle('storage')}>
-                         <div className="flex justify-between items-start mb-4">
+                         {/* Faint Background Grid for Desktop */}
+                         <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#8b5cf6_1px,transparent_1px)] [background-size:6px_6px] pointer-events-none"></div>
+
+                         <div className="flex justify-between items-start mb-4 relative z-10">
                            <div className="flex items-center gap-2"><Database size={18} className="text-indigo-400"/><span className="text-xs font-bold uppercase text-zinc-500">STORAGE</span></div>
                          </div>
-                         <div className="space-y-4">
+                         <div className="space-y-4 relative z-10">
                             <div className="flex justify-between items-end">
                                <div><div className="text-2xl font-bold text-indigo-400">{formatBytes(selectedNode.storage_used).split(' ')[0]}</div><div className="text-[9px] font-bold text-zinc-600">USED</div></div>
                                <div className="text-right"><div className="text-2xl font-bold text-violet-400">{formatBytes(selectedNode.storage_committed).split(' ')[0]}</div><div className="text-[9px] font-bold text-zinc-600">TOTAL</div></div>
                             </div>
-                            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-indigo-500 to-violet-500" style={{ width: `${Math.min(100, ((selectedNode.storage_used || 0) / (selectedNode.storage_committed || 1)) * 100)}%` }}></div></div>
+                            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden relative">
+                                {/* Desktop Progress Bar with Shimmer */}
+                                <div className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 relative overflow-hidden" style={{ width: `${Math.min(100, ((selectedNode.storage_used || 0) / (selectedNode.storage_committed || 1)) * 100)}%` }}>
+                                    <div className="absolute inset-0 bg-white/20 w-full animate-[shimmer_2s_infinite_linear] -skew-x-12"></div>
+                                </div>
+                            </div>
                          </div>
-                         <div className="mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-violet-400 flex justify-center gap-1"><Maximize2 size={8}/> EXPAND</div>
+                         <div className="mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-violet-400 flex justify-center gap-1 relative z-10"><Maximize2 size={8}/> EXPAND</div>
                       </div>
 
                       {/* 3. IDENTITY CARD */}
@@ -406,10 +414,10 @@ export const InspectorModal = ({
                       </div>
                     </div>
 
-                    {/* DESKTOP BOTTOM ROW */}
+                    {/* DESKTOP BOTTOM ROW - UPDATED "ALIVE" CARDS */}
                     <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-4">
                        
-                       {/* REPUTATION DEEP LINK (DESKTOP) */}
+                       {/* REPUTATION DEEP LINK (DESKTOP - Vault Theme) */}
                        <div 
                           onClick={() => router.push(`/leaderboard?highlight=${selectedNode.pubkey}`)} 
                           className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50 hover:shadow-[0_4px_20px_-4px_rgba(234,179,8,0.3)] ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-yellow-900/30'}`}
@@ -430,10 +438,11 @@ export const InspectorModal = ({
                           </div>
                        </div>
 
-                       {/* MAP DEEP LINK (DESKTOP) */}
+                       {/* MAP DEEP LINK (DESKTOP - Radar Theme) */}
                        <Link href={`/map?focus=${getSafeIp(selectedNode)}`}>
                          <div className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-blue-500/20 hover:ring-blue-500/50 hover:shadow-[0_4px_20px_-4px_rgba(59,130,246,0.3)] ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-blue-900/30'}`}>
                             <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#3b82f6_1px,transparent_1px),linear-gradient(to_bottom,#3b82f6_1px,transparent_1px)] bg-[size:20px_20px] group-hover:scale-105 transition-transform duration-700 pointer-events-none origin-center"></div>
+                            {/* Desktop Sonar Ping - Top Right */}
                             <div className="absolute top-8 right-8 w-0 h-0 rounded-full border border-blue-500/30 animate-[ping_4s_cubic-bezier(0,0,0.2,1)_infinite] pointer-events-none"></div>
                             
                             <div className="flex justify-between items-start relative z-10">
@@ -448,6 +457,7 @@ export const InspectorModal = ({
                                 </span>
                             </div>
 
+                            {/* Target Lock - Desktop */}
                             <div className="absolute inset-2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                 <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-blue-400/50"></div>
                                 <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-blue-400/50"></div>
