@@ -114,7 +114,10 @@ export const InspectorModal = ({
           <div className="md:hidden p-3 flex flex-col gap-2">
              {/* Row 1: Flag - Title - Close */}
              <div className="flex items-center justify-between">
-                <ModalAvatar node={selectedNode} size="sm" /> {/* Assuming you can pass size props or scale via CSS */}
+                {/* FIX: Scaled via CSS wrapper instead of passing invalid 'size' prop */}
+                <div className="scale-75 origin-left">
+                    <ModalAvatar node={selectedNode} /> 
+                </div>
                 <h2 className="text-base font-black font-sans tracking-tight text-white">NODE INSPECTOR</h2>
                 <button onClick={onClose} className="p-1.5 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 hover:bg-red-500 hover:text-white transition">
                   <X size={16} />
@@ -417,8 +420,6 @@ export const InspectorModal = ({
 
                     {/* --- DESKTOP GRID (HIDDEN MD:GRID) --- */}
                     <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-                      {/* ... (Desktop Cards remain largely consistent with previous updates but ensuring expansion text matches requirement) ... */}
-                      
                       {/* 1. DIAGNOSTICS CARD (DESKTOP) */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300 ring-1 ${zenMode ? 'bg-zinc-900' : 'bg-zinc-900/30'} ${healthRingColor}`} onClick={() => handleCardToggle('health')}>
                          <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>
