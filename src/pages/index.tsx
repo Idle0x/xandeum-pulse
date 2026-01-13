@@ -589,7 +589,7 @@ export default function Home() {
             <div className="flex items-center gap-2 mb-4"><Star className="text-yellow-500" fill="currentColor" size={20} /><h3 className="text-lg font-bold text-white tracking-widest uppercase">Your Watchlist</h3></div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 border-b border-zinc-800 pb-10">
               {watchListNodes.map((node) => (
-                <NodeCard key={node.pubkey} node={node} onClick={(n) => setSelectedNode(n)} onToggleFavorite={toggleFavorite} isFav={true} cycleStep={cycleStep} zenMode={zenMode} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />
+                <NodeCard key={`${node.pubkey}-${node.network}`} node={node} onClick={(n) => setSelectedNode(n)} onToggleFavorite={toggleFavorite} isFav={true} cycleStep={cycleStep} zenMode={zenMode} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />
               ))}
             </div>
           </div>
@@ -608,8 +608,12 @@ export default function Home() {
         ) : (
           <div className={`grid gap-2 md:gap-4 ${zenMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-2 md:grid-cols-2 lg:grid-cols-3 2xl:gap-8'} pb-20`}>
             {filteredNodes.map((node) => {
-              if (zenMode) return <ZenCard key={node.pubkey} node={node} onClick={(n) => setSelectedNode(n)} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />;
-              return <NodeCard key={node.pubkey} node={node} onClick={(n) => setSelectedNode(n)} onToggleFavorite={toggleFavorite} isFav={favorites.includes(node.address || '')} cycleStep={cycleStep} zenMode={zenMode} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />;
+              // Create a truly unique key for React using Pubkey + Network
+              const compositeKey = `${node.pubkey}-${node.network}`;
+
+              if (zenMode) return <ZenCard key={compositeKey} node={node} onClick={(n) => setSelectedNode(n)} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />;
+              
+              return <NodeCard key={compositeKey} node={node} onClick={(n) => setSelectedNode(n)} onToggleFavorite={toggleFavorite} isFav={favorites.includes(node.address || '')} cycleStep={cycleStep} zenMode={zenMode} mostCommonVersion={mostCommonVersion} sortBy={sortBy} />;
             })}
           </div>
         )}
