@@ -57,7 +57,7 @@ export const ShareProof = ({ node, onBack }: ShareProofProps) => {
     <div className="h-full flex flex-col md:justify-center animate-in zoom-in-95 duration-300">
       <div className="flex flex-col md:grid md:grid-cols-2 md:items-center gap-6 md:gap-12 w-full max-w-6xl mx-auto p-4 md:p-8">
         
-        {/* LEFT COLUMN: THE PROOF CARD */}
+        {/* LEFT COLUMN: THE PROOF CARD (HERO) */}
         <div className="flex justify-center md:justify-end w-full">
           <div
             ref={proofRef}
@@ -123,23 +123,18 @@ export const ShareProof = ({ node, onBack }: ShareProofProps) => {
         {/* RIGHT COLUMN: ACTION PANEL */}
         <div className="flex flex-col gap-4 w-full md:max-w-md mx-auto md:mx-0">
           
-          <button onClick={onBack} className="hidden md:flex px-0 py-2 w-fit text-zinc-500 hover:text-white text-xs font-bold transition items-center gap-2 group mb-2">
-            <ArrowLeft size={16} className="text-red-500 group-hover:-translate-x-1 transition-transform" />
-            Back to Details
-          </button>
-
-          {/* Primary Actions */}
-          <button onClick={shareToTwitter} className="flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm font-bold text-white shadow-lg shadow-blue-900/20 transition-all hover:scale-[1.02]">
+          {/* PRIMARY ACTIONS (STACKED) */}
+          <button onClick={shareToTwitter} className="flex items-center justify-center gap-2 px-6 py-4 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-xl text-sm font-bold text-blue-500 transition-all hover:scale-[1.02]">
              <Share2 size={16} /> Share Proof on X
           </button>
 
-          <button onClick={handleDownloadProof} className="flex items-center justify-center gap-2 px-6 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-bold text-white border border-zinc-700 transition-all hover:scale-[1.02]">
+          <button onClick={handleDownloadProof} className="flex items-center justify-center gap-2 px-6 py-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-xl text-sm font-bold text-emerald-500 transition-all hover:scale-[1.02]">
              <ImageIcon size={16} /> Download Image
           </button>
 
           <div className="h-px bg-zinc-800 w-full my-2"></div>
 
-          {/* Secondary Actions Grid */}
+          {/* SECONDARY ACTIONS (2x2 GRID) */}
           <div className="grid grid-cols-2 gap-3">
              <button onClick={copyStatusReport} className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg text-[10px] font-bold transition duration-300 border ${copiedField === 'report' ? 'bg-green-500/10 border-green-500/50 text-green-500' : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-400'}`}>
                 {copiedField === 'report' ? <Check size={12} /> : <ClipboardCopy size={12} />} {copiedField === 'report' ? 'COPIED' : 'Copy Diagnostic Report'}
@@ -149,11 +144,11 @@ export const ShareProof = ({ node, onBack }: ShareProofProps) => {
                 {copiedField === 'json' ? <Check size={12} /> : <FileJson size={12} />} {copiedField === 'json' ? 'COPIED' : 'Copy JSON Data (Dev)'}
              </button>
 
-              <button onClick={() => copyToClipboard(`${window.location.origin}/?open=${node.pubkey}`, 'url')} className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg text-[10px] font-bold transition duration-300 border ${copiedField === 'url' ? 'bg-green-500/10 border-green-500/50 text-green-500' : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-400'}`}>
+              <button onClick={() => copyToClipboard(`${window.location.origin}/?open=${node.pubkey}`, 'url')} className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg text-[10px] font-bold transition duration-300 border ${copiedField === 'url' ? 'bg-green-500/10 border-green-500/50 text-green-500' : 'bg-violet-500/10 hover:bg-violet-500/20 border-violet-500/20 text-violet-500'}`}>
                 {copiedField === 'url' ? <Check size={12} /> : <LinkIcon size={12} />} {copiedField === 'url' ? 'COPIED' : 'Copy Public Node URL'}
              </button>
 
-             <button onClick={onBack} className="md:hidden flex items-center justify-center gap-2 px-3 py-3 bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-500 hover:text-white text-[10px] font-bold transition">
+             <button onClick={onBack} className="flex items-center justify-center gap-2 px-3 py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-red-500 text-[10px] font-bold transition">
                <ArrowLeft size={12} /> Back to Details
              </button>
           </div>
