@@ -108,18 +108,18 @@ export const InspectorModal = ({
   const healthStatusLabel = healthScore >= 80 ? 'OPTIMAL' : 'FAIR'; 
   const healthColor = healthScore >= 80 ? 'text-green-500' : healthScore >= 50 ? 'text-yellow-500' : 'text-red-500';
   const healthGlowColor = healthScore >= 80 ? 'bg-green-500' : healthScore >= 50 ? 'bg-yellow-500' : 'bg-red-500';
-  
+
   const healthRingColor = healthScore >= 80 ? 'ring-green-500/20 hover:ring-green-500/60' : healthScore >= 50 ? 'ring-yellow-500/20 hover:ring-yellow-500/60' : 'ring-red-500/20 hover:ring-red-500/60';
   const identityRingColor = isSelectedNodeLatest ? 'ring-green-500/20 hover:ring-green-500/60' : 'ring-orange-500/20 hover:ring-orange-500/60';
 
   const nodeCap = selectedNode.storage_committed || 0;
   const tankFillPercent = Math.min(100, (nodeCap / (medianCommitted || 1)) * 100);
 
-  // Storage Capsule Calculations
+  // Storage Calculations (Bar Chart)
   const avgCommitted = totalStorageCommitted / (nodes.length || 1);
-  const maxValue = Math.max(nodeCap, medianCommitted, avgCommitted) * 1.1; // 10% buffer
-  
-  // Calculate raw percentages
+  const maxValue = Math.max(nodeCap, medianCommitted, avgCommitted) * 1.1; // 10% buffer used for scaling
+
+  // Calculate percentages relative to the largest value in the set for the bar chart
   const nodeP = (nodeCap / maxValue) * 100;
   const medP = (medianCommitted / maxValue) * 100;
   const avgP = (avgCommitted / maxValue) * 100;
@@ -133,14 +133,6 @@ export const InspectorModal = ({
 
   const usedDisplay = getStorageDisplay(selectedNode.storage_used || 0);
   const committedDisplay = getStorageDisplay(selectedNode.storage_committed || 0);
-  
-  // Define the capsule data with types so we can style them conditionally
-  const capsuleData = [
-    { type: 'MY_NODE', val: nodeP, color: 'bg-purple-500' }, // Bright Purple
-    { type: 'MEDIAN', val: medP, color: 'bg-yellow-500' },
-    { type: 'AVG', val: avgP, color: 'bg-blue-600' }
-  ].sort((a, b) => b.val - a.val); // Sort Largest to Smallest (Largest goes to the back)
-
 
   // --- REPUTATION VISUALS ---
   const rank = selectedNode.rank || 0;
@@ -250,73 +242,83 @@ export const InspectorModal = ({
                          </div>
                        )}
 
-                       {/* --- STORAGE HEADER (TUNNEL CAPSULE) --- */}
+                       {/* --- STORAGE HEADER (VERTICAL BAR CHART - MONOLITH STYLE) --- */}
                        {modalView === 'storage' && (
-                         <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-purple-500 ring-1 ring-purple-500 cursor-pointer shadow-[0_0_30px_rgba(168,85,247,0.1)]" onClick={() => handleCardToggle('storage')}>
-                           <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest">STORAGE</div><Minimize2 size={14} className="text-zinc-500"/></div>
+                         <div className="h-full rounded-3xl p-6 border flex flex-col justify-between bg-zinc-900 border-purple-500 ring-1 ring-purple-500 cursor-pointer shadow-[0_0_30px_rgba(168,85,247,0.1)] relative overflow-hidden" onClick={() => handleCardToggle('storage')}>
+                           {/* BACKGROUND TEXTURE: Subtle Technical Grid */}
+                           <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none"></div>
                            
-                           {/* HEADER CAPSULE */}
-                           <div className="w-full flex-1 flex flex-col justify-center gap-4">
-                                <div className="flex justify-between items-end px-1">
-                                    <div className="text-left">
-                                        <div className="text-xl font-black text-blue-400">{formatBytes(selectedNode.storage_used || 0)}</div>
-                                        <div className="text-[8px] font-bold text-zinc-500 uppercase">Used</div>
-                                    </div>
-                                    <div className="text-right">
-                                        {/* COMMITTED TEXT IS NOW PURPLE */}
-                                        <div className="text-xl font-black text-purple-400">{formatBytes(nodeCap)}</div>
-                                        <div className="text-[8px] font-bold text-zinc-500 uppercase">Committed</div>
-                                    </div>
-                                </div>
-                                
-                                {/* TUNNEL CAPSULE */}
-                                <div className="relative h-14 w-full bg-black rounded-full border border-zinc-800 shadow-[inset_0_2px_10px_rgba(0,0,0,0.8)] overflow-hidden">
-                                    
-                                    {capsuleData.map((bar, i) => {
-                                        // LOGIC:
-                                        // 1. Is this 'MY_NODE'? 
-                                        //    - Body: opacity-60 (Glassy, see-through volume)
-                                        //    - Glow: High Z-index + Shadow
-                                        // 2. Is this a comparison? 
-                                        //    - Body: opacity-20 (Ghost, barely there)
-                                        const isMyNode = bar.type === 'MY_NODE';
-                                        
-                                        // Dynamic Styles
-                                        // MY NODE: opacity-60 for body (not too bright), z-20 (on top)
-                                        // OTHERS: opacity-20 (ghost), z-10 or 0
-                                        const opacityClass = isMyNode ? 'opacity-60' : 'opacity-20 mix-blend-screen'; 
-                                        const glowClass = isMyNode ? 'shadow-[0_0_20px_rgba(168,85,247,0.5)] z-20' : 'z-10';
-                                        
-                                        // We use min-width: 6px to ensure even 0% progress is visible as a sliver
-                                        return (
-                                            <div 
-                                                key={i} 
-                                                className={`absolute top-0 bottom-0 left-0 transition-all duration-1000 ease-out flex items-center overflow-hidden ${bar.color} ${opacityClass} ${glowClass}`} 
-                                                style={{ width: `${bar.val}%`, minWidth: '6px' }}
-                                            >
-                                                {/* LEAD EDGE: Always 100% Opacity + Bright Glow. This is the "Needle" */}
-                                                <div className={`absolute top-0 bottom-0 right-0 w-[2px] ${isMyNode ? 'bg-white shadow-[0_0_15px_white] opacity-100' : 'bg-white/30'}`}></div>
-                                            </div>
-                                        );
-                                    })}
-                                    
-                                    {/* VIGNETTE TUNNEL OVERLAY (Vertical Fade) */}
-                                    <div 
-                                        className="absolute inset-0 pointer-events-none z-30" 
-                                        style={{ background: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 5%, rgba(0,0,0,0) 25%, rgba(0,0,0,0) 75%, rgba(0,0,0,1) 95%, rgba(0,0,0,1) 100%)' }}
-                                    ></div>
-                                </div>
-
-                                {/* LEGEND */}
-                                <div className="flex justify-center gap-4 mt-1">
-                                    {/* "YOUR NODE" LABEL */}
-                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-purple-600"></div><span className="text-[8px] text-zinc-400 uppercase font-bold">Your Node</span></div>
-                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-yellow-500"></div><span className="text-[8px] text-zinc-400 uppercase font-bold">Median</span></div>
-                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-600"></div><span className="text-[8px] text-zinc-400 uppercase font-bold">Avg</span></div>
-                                </div>
+                           {/* HEADER */}
+                           <div className="w-full flex justify-between items-start mb-2 relative z-10">
+                               <div className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest">STORAGE</div>
+                               <Minimize2 size={14} className="text-zinc-500"/>
                            </div>
                            
-                           <div className="mt-6 text-[9px] font-bold uppercase text-red-400/80 flex items-center gap-1 hover:text-red-400 transition"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
+                           {/* BIG METRICS (Your Data) */}
+                           <div className="flex justify-between items-end px-1 mb-6 relative z-10">
+                                <div className="text-left">
+                                    <div className="text-2xl font-black text-blue-400 drop-shadow-md">{formatBytes(selectedNode.storage_used || 0)}</div>
+                                    <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Used Space</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-2xl font-black text-purple-400 drop-shadow-md">{formatBytes(nodeCap)}</div>
+                                    <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Committed</div>
+                                </div>
+                           </div>
+
+                           {/* CHART CONTAINER */}
+                           <div className="flex-1 w-full flex items-end justify-between gap-4 relative z-10 px-2 pb-2">
+                                {/* Floor Line */}
+                                <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-zinc-700 to-transparent opacity-50"></div>
+
+                                {/* BARS MAPPING */}
+                                {[
+                                    { label: 'YOU', val: nodeP, raw: nodeCap, type: 'MY_NODE' },
+                                    { label: 'MED', val: medP, raw: medianCommitted, type: 'MEDIAN' },
+                                    { label: 'AVG', val: avgP, raw: avgCommitted, type: 'AVG' }
+                                ].map((bar, i) => {
+                                    const isMyNode = bar.type === 'MY_NODE';
+                                    
+                                    // Style Logic
+                                    // My Node: Gradient Purple, Glow, active look
+                                    // Others: Dark Zinc, Matte, passive look
+                                    const barColor = isMyNode 
+                                        ? 'bg-gradient-to-t from-purple-900/80 to-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]' 
+                                        : 'bg-zinc-800/60 border-t border-white/5';
+                                    
+                                    const labelColor = isMyNode ? 'text-purple-400' : 'text-zinc-600';
+                                    
+                                    return (
+                                        <div key={i} className="flex flex-col items-center justify-end h-full w-full group relative">
+                                            
+                                            {/* FLOATING DATA LABEL (Only for Avg/Med) */}
+                                            {/* We hide it for MY_NODE to avoid redundancy since big metrics are above */}
+                                            {!isMyNode && (
+                                                <div className="mb-2 text-[8px] font-mono font-bold text-zinc-600 opacity-60 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                                    {formatBytes(bar.raw)}
+                                                </div>
+                                            )}
+
+                                            {/* THE BAR (MONOLITH) */}
+                                            {/* We use min-height: 4px so 0 values are still visible as a tiny floor plate */}
+                                            <div 
+                                                className={`w-full max-w-[40px] md:max-w-[50px] rounded-t-sm md:rounded-t-md transition-all duration-1000 ease-out relative ${barColor}`} 
+                                                style={{ height: `${Math.max(bar.val, 2)}%` }} // Force min 2% height visually
+                                            >
+                                                {/* Top Highlight Line for "Cyberpunk" edge */}
+                                                <div className={`absolute top-0 left-0 right-0 h-[1px] ${isMyNode ? 'bg-white/60 shadow-[0_0_8px_white]' : 'bg-white/10'}`}></div>
+                                            </div>
+
+                                            {/* X-AXIS LABEL */}
+                                            <div className={`mt-2 text-[9px] font-bold uppercase tracking-wider ${labelColor}`}>
+                                                {bar.label}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                           </div>
+                           
+                           <div className="mt-4 text-[9px] font-bold uppercase text-red-400/80 flex items-center justify-center gap-1 hover:text-red-400 transition"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
                          </div>
                        )}
 
