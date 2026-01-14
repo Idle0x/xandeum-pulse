@@ -76,7 +76,8 @@ export const InspectorModal = ({
     n.address !== selectedNode.address
   ).length;
 
-  const ownerNodes = nodes.filter(n => n.address === selectedNode.address);
+  // FIX APPLIED HERE: Filter by PUBKEY to capture full fleet across networks, not just address
+  const ownerNodes = nodes.filter(n => n.pubkey === selectedNode.pubkey);
   const totalOwned = ownerNodes.length;
   const mainnetCount = ownerNodes.filter(n => n.network === 'MAINNET').length;
   const devnetCount = ownerNodes.filter(n => n.network !== 'MAINNET').length;
@@ -244,7 +245,6 @@ export const InspectorModal = ({
 
                        {/* --- STORAGE HEADER (VERTICAL BAR CHART - MONOLITH STYLE) --- */}
                        {modalView === 'storage' && (
-                         // FIX APPLIED HERE: Added min-h-[400px] md:min-h-0 to ensure height on mobile
                          <div className="h-full min-h-[400px] md:min-h-0 rounded-3xl p-6 border flex flex-col justify-between bg-zinc-900 border-purple-500 ring-1 ring-purple-500 cursor-pointer shadow-[0_0_30px_rgba(168,85,247,0.1)] relative overflow-hidden" onClick={() => handleCardToggle('storage')}>
                            {/* BACKGROUND TEXTURE: Subtle Technical Grid */}
                            <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none"></div>
@@ -275,9 +275,7 @@ export const InspectorModal = ({
                                 {/* BARS MAPPING */}
                                 {[
                                     { label: 'YOU', val: nodeP, raw: nodeCap, type: 'MY_NODE' },
-                                    // FIX APPLIED HERE: Renamed MED to MEDIAN
                                     { label: 'MEDIAN', val: medP, raw: medianCommitted, type: 'MEDIAN' }, 
-                                    // FIX APPLIED HERE: Renamed AVG to AVERAGE
                                     { label: 'AVERAGE', val: avgP, raw: avgCommitted, type: 'AVG' }
                                 ].map((bar, i) => {
                                     const isMyNode = bar.type === 'MY_NODE';
