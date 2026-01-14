@@ -18,8 +18,6 @@ import { StorageView } from './views/StorageView';
 import { ShareProof } from './ShareProof';
 import { VersusMode } from './VersusMode';
 import Link from 'next/link';
-// IMPORT THE NEW COMPONENT
-import { StorageDistributionChart } from '../charts/StorageDistributionChart';
 
 interface InspectorModalProps {
   selectedNode: Node;
@@ -78,7 +76,7 @@ export const InspectorModal = ({
     n.address !== selectedNode.address
   ).length;
 
-  // FIX: Filter by PUBKEY to capture full fleet across networks (Identity Logic Fix)
+  // FIX APPLIED HERE: Filter by PUBKEY to capture full fleet across networks, not just address
   const ownerNodes = nodes.filter(n => n.pubkey === selectedNode.pubkey);
   const totalOwned = ownerNodes.length;
   const mainnetCount = ownerNodes.filter(n => n.network === 'MAINNET').length;
@@ -118,8 +116,14 @@ export const InspectorModal = ({
   const nodeCap = selectedNode.storage_committed || 0;
   const tankFillPercent = Math.min(100, (nodeCap / (medianCommitted || 1)) * 100);
 
-  // Storage Calculations (REFACTORED: Now handled by component)
+  // Storage Calculations (Bar Chart)
   const avgCommitted = totalStorageCommitted / (nodes.length || 1);
+  const maxValue = Math.max(nodeCap, medianCommitted, avgCommitted) * 1.1; // 10% buffer used for scaling
+
+  // Calculate percentages relative to the largest value in the set for the bar chart
+  const nodeP = (nodeCap / maxValue) * 100;
+  const medP = (medianCommitted / maxValue) * 100;
+  const avgP = (avgCommitted / maxValue) * 100;
 
   // Helper to split value and unit safely
   const getStorageDisplay = (bytes: number) => {
@@ -239,9 +243,8 @@ export const InspectorModal = ({
                          </div>
                        )}
 
-                       {/* --- STORAGE HEADER (REFACTORED WITH COMPONENT) --- */}
+                       {/* --- STORAGE HEADER (VERTICAL BAR CHART - MONOLITH STYLE) --- */}
                        {modalView === 'storage' && (
-                         // FIX: Added min-h-[400px] md:min-h-0 to ensure height on mobile
                          <div className="h-full min-h-[400px] md:min-h-0 rounded-3xl p-6 border flex flex-col justify-between bg-zinc-900 border-purple-500 ring-1 ring-purple-500 cursor-pointer shadow-[0_0_30px_rgba(168,85,247,0.1)] relative overflow-hidden" onClick={() => handleCardToggle('storage')}>
                            {/* BACKGROUND TEXTURE: Subtle Technical Grid */}
                            <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none"></div>
@@ -264,12 +267,57 @@ export const InspectorModal = ({
                                 </div>
                            </div>
 
-                           {/* REFACTORED CHART CONTAINER */}
-                           <StorageDistributionChart 
-                              nodeCommitted={nodeCap}
-                              medianCommitted={medianCommitted}
-                              avgCommitted={avgCommitted}
-                           />
+                           {/* CHART CONTAINER */}
+                           <div className="flex-1 w-full flex items-end justify-between gap-4 relative z-10 px-2 pb-2">
+                                {/* Floor Line */}
+                                <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-zinc-700 to-transparent opacity-50"></div>
+
+                                {/* BARS MAPPING */}
+                                {[
+                                    { label: 'YOU', val: nodeP, raw: nodeCap, type: 'MY_NODE' },
+                                    { label: 'MEDIAN', val: medP, raw: medianCommitted, type: 'MEDIAN' }, 
+                                    { label: 'AVERAGE', val: avgP, raw: avgCommitted, type: 'AVG' }
+                                ].map((bar, i) => {
+                                    const isMyNode = bar.type === 'MY_NODE';
+
+                                    // Style Logic
+                                    // My Node: Gradient Purple, Glow, active look
+                                    // Others: Dark Zinc, Matte, passive look
+                                    const barColor = isMyNode 
+                                        ? 'bg-gradient-to-t from-purple-900/80 to-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]' 
+                                        : 'bg-zinc-800/60 border-t border-white/5';
+
+                                    const labelColor = isMyNode ? 'text-purple-400' : 'text-zinc-600';
+
+                                    return (
+                                        <div key={i} className="flex flex-col items-center justify-end h-full w-full group relative">
+
+                                            {/* FLOATING DATA LABEL (Only for Avg/Med) */}
+                                            {/* We hide it for MY_NODE to avoid redundancy since big metrics are above */}
+                                            {!isMyNode && (
+                                                <div className="mb-2 text-[8px] font-mono font-bold text-zinc-600 opacity-60 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                                    {formatBytes(bar.raw)}
+                                                </div>
+                                            )}
+
+                                            {/* THE BAR (MONOLITH) */}
+                                            {/* We use min-height: 4px so 0 values are still visible as a tiny floor plate */}
+                                            <div 
+                                                className={`w-full max-w-[40px] md:max-w-[50px] rounded-t-sm md:rounded-t-md transition-all duration-1000 ease-out relative ${barColor}`} 
+                                                style={{ height: `${Math.max(bar.val, 2)}%` }} // Force min 2% height visually
+                                            >
+                                                {/* Top Highlight Line for "Cyberpunk" edge */}
+                                                <div className={`absolute top-0 left-0 right-0 h-[1px] ${isMyNode ? 'bg-white/60 shadow-[0_0_8px_white]' : 'bg-white/10'}`}></div>
+                                            </div>
+
+                                            {/* X-AXIS LABEL */}
+                                            <div className={`mt-2 text-[9px] font-bold uppercase tracking-wider ${labelColor}`}>
+                                                {bar.label}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                           </div>
 
                            <div className="mt-4 text-[9px] font-bold uppercase text-red-400/80 flex items-center justify-center gap-1 hover:text-red-400 transition"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
                          </div>
