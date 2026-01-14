@@ -74,19 +74,16 @@ export const InspectorModal = ({
   const handleLeaderboardNav = (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // 1. Untracked (Node missing from API)
     if ((selectedNode as any).isUntracked) {
        onShowToast("This node is currently not receiving storage credits from the protocol. It may be in a proving phase.");
        return;
     }
 
-    // 2. API Offline (Global Failure)
     if (selectedNode.credits === null) {
        onShowToast("The Credits API is currently offline. Leaderboard data is unavailable.");
        return;
     }
 
-    // 3. Success
     if (selectedNode.pubkey) {
         router.push(`/leaderboard?highlight=${selectedNode.pubkey}`);
     } else {
@@ -107,7 +104,6 @@ export const InspectorModal = ({
 
   const nodeCap = selectedNode.storage_committed || 0;
   const tankFillPercent = Math.min(100, (nodeCap / (medianCommitted || 1)) * 100);
-  const internalUsagePercent = Math.min(100, ((selectedNode.storage_used || 0) / (nodeCap || 1)) * 100);
   const identityRingColor = isSelectedNodeLatest ? 'ring-green-500/20 hover:ring-green-500/60' : 'ring-orange-500/20 hover:ring-orange-500/60';
 
   // --- REPUTATION VISUALS ---
@@ -115,6 +111,9 @@ export const InspectorModal = ({
   let hoverShimmerGradient = "via-blue-400/20"; 
   if (rank > 0 && rank <= 100) hoverShimmerGradient = "via-yellow-300/30"; 
   else if (rank > 0 && rank <= 1000) hoverShimmerGradient = "via-slate-300/30";
+
+  // Helper boolean for cleaner JSX
+  const isValidReputation = !((selectedNode as any).isUntracked || selectedNode.credits === null);
 
   const copyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
@@ -134,7 +133,6 @@ export const InspectorModal = ({
             100% { transform: translateX(150%) skewX(-12deg); opacity: 0; }
         }
         @keyframes slow-pulse { 0%, 100% { opacity: 0.05; transform: scale(0.98); } 50% { opacity: 0.15; transform: scale(1.02); } }
-        @keyframes slow-ping { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2.5); opacity: 0; } }
         @keyframes slow-breathe { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.92); opacity: 0.7; } }
         `}</style>
       <div className={`border w-full max-w-4xl 2xl:max-w-6xl rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[85vh] md:max-h-[90vh] ${zenMode ? 'bg-black border-zinc-800 shadow-none' : 'bg-[#09090b] border-zinc-800'}`} onClick={(e) => e.stopPropagation()}>
@@ -202,8 +200,9 @@ export const InspectorModal = ({
             <div className="flex flex-col gap-3 md:gap-4 h-full">
                {modalView !== 'overview' ? (
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
+                    {/* LEFT SIDEBAR */}
                     <div className="md:col-span-1 h-full">
-                       {/* SIDEBAR TABS (Condensed for brevity) */}
+                       {/* HEALTH TAB */}
                        {modalView === 'health' && (
                          <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-green-500 ring-1 ring-green-500 cursor-pointer" onClick={() => handleCardToggle('health')}>
                            <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400">DIAGNOSTICS</div><Minimize2 size={14} className="text-zinc-500"/></div>
@@ -211,6 +210,7 @@ export const InspectorModal = ({
                            <div className="mt-6 text-[9px] font-bold uppercase text-red-400/80 flex items-center gap-1"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
                          </div>
                        )}
+                       {/* STORAGE TAB */}
                        {modalView === 'storage' && (
                          <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-purple-500 ring-1 ring-purple-500 cursor-pointer" onClick={() => handleCardToggle('storage')}>
                            <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400">STORAGE</div><Minimize2 size={14} className="text-zinc-500"/></div>
@@ -218,6 +218,7 @@ export const InspectorModal = ({
                            <div className="mt-6 text-[9px] font-bold uppercase text-red-400/80 flex items-center gap-1"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
                          </div>
                        )}
+                       {/* IDENTITY TAB */}
                        {modalView === 'identity' && (
                          <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-blue-500 ring-1 ring-blue-500 cursor-pointer" onClick={() => handleCardToggle('identity')}>
                            <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400">IDENTITY</div><Minimize2 size={14} className="text-zinc-500"/></div>
@@ -226,6 +227,7 @@ export const InspectorModal = ({
                          </div>
                        )}
                     </div>
+                    {/* RIGHT CONTENT */}
                     <div className="md:col-span-2 h-full">
                        {modalView === 'health' && <HealthView node={selectedNode} zenMode={zenMode} onBack={() => setModalView('overview')} avgNetworkHealth={avgNetworkHealth} medianStorage={medianCommitted} networkStats={networkStats} />}
                        {modalView === 'storage' && <StorageView node={selectedNode} zenMode={zenMode} onBack={() => setModalView('overview')} medianCommitted={medianCommitted} totalStorageCommitted={totalStorageCommitted} nodeCount={nodes.length} />}
@@ -236,7 +238,7 @@ export const InspectorModal = ({
                  <div className="flex flex-col gap-3 md:gap-4 h-full">
                     {/* MOBILE GRID */}
                     <div className="grid grid-cols-2 gap-2 md:hidden">
-                        {/* HEALTH CARD (MOBILE) */}
+                        {/* HEALTH CARD */}
                         <div onClick={() => handleCardToggle('health')} className="col-span-2 p-3 rounded-2xl bg-zinc-900 border border-zinc-800 flex justify-between items-center relative overflow-hidden group cursor-pointer">
                             <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>
                             <div className="relative z-10 flex flex-col justify-between h-full py-1">
@@ -246,13 +248,13 @@ export const InspectorModal = ({
                             <div className="relative z-10 flex flex-col items-center justify-center mr-2"><div className="relative scale-100 group-active:scale-110 transition-transform duration-300 flex items-center justify-center"><div className={`absolute inset-0 rounded-full blur-xl animate-[slow-pulse_12s_infinite_ease-in-out] ${healthGlowColor}`}></div><RadialProgress score={healthScore} size={54} stroke={6} /></div></div>
                         </div>
 
-                        {/* STORAGE CARD (MOBILE) */}
+                        {/* STORAGE CARD */}
                         <div onClick={() => handleCardToggle('storage')} className="aspect-square rounded-2xl bg-indigo-950/10 border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 ring-1 ring-transparent hover:ring-indigo-500/20">
                             <div className="absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out z-0" style={{ height: `${tankFillPercent}%` }}><div className="absolute inset-0 bg-gradient-to-b from-indigo-500/20 to-transparent"></div><div className="absolute top-0 left-0 right-0 h-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.4)]"></div></div>
                             <div className="relative z-10 p-3 flex flex-col h-full"><div className="flex justify-between items-start mb-2"><div className="flex items-center gap-1.5"><Database size={12} className="text-indigo-300/80 drop-shadow-md"/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">STORAGE</span></div><div className="bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded-full text-[7px] font-mono text-indigo-200/80 border border-indigo-500/20 shadow-sm">{(selectedNode.storage_used || 0).toLocaleString()} B</div></div><div className="mt-auto flex flex-col gap-1.5"><div className="flex justify-between items-end"><div className="flex flex-col items-center"><div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Used</div><div className="text-sm font-bold text-indigo-100 drop-shadow-md">{formatBytes(selectedNode.storage_used).split(' ')[0]}</div></div><div className="w-px h-6 bg-white/5 mx-1"></div><div className="flex flex-col items-center"><div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Committed</div><div className="text-sm font-bold text-indigo-100 drop-shadow-md">{formatBytes(selectedNode.storage_committed).split(' ')[0]}</div></div></div></div></div>
                         </div>
 
-                        {/* IDENTITY CARD (MOBILE) */}
+                        {/* IDENTITY CARD */}
                         <div onClick={() => handleCardToggle('identity')} className="aspect-square rounded-2xl border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 bg-zinc-900">
                             <div className={`absolute inset-0 bg-gradient-to-br opacity-40 ${isSelectedNodeLatest ? 'from-green-900/40 via-transparent to-blue-900/40' : 'from-orange-900/40 via-transparent to-red-900/40'}`}></div>
                             <div className="relative z-10 p-3 flex flex-col h-full"><div className="flex justify-between items-start mb-1"><div className="relative flex items-center gap-1.5"><Shield size={12} className={`text-zinc-200 drop-shadow-md ${isSelectedNodeLatest ? 'text-blue-200' : 'text-orange-200'}`} /><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">IDENTITY</span></div><div className="flex flex-col items-end"><div className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase border mb-1 ${selectedNode.network === 'MAINNET' ? 'text-green-400 border-green-500/30 bg-green-900/20' : 'text-blue-400 border-blue-500/30 bg-blue-900/20'}`}>{selectedNode.network || 'UNKNOWN'}</div></div></div><div className="mt-auto space-y-1"><div className="flex justify-between items-center"><span className="text-[8px] font-bold uppercase text-zinc-500">Ver</span><span className="font-mono text-xs font-bold text-white">{getSafeVersion(selectedNode)}</span></div><div className={`mt-1 flex items-center justify-center gap-1 py-1 rounded text-[8px] font-bold uppercase border ${isSelectedNodeLatest ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'}`}>{isSelectedNodeLatest ? <CheckCircle size={8}/> : <AlertTriangle size={8}/>}{isSelectedNodeLatest ? 'Up to Date' : 'Update Needed'}</div></div></div>
@@ -267,17 +269,17 @@ export const InspectorModal = ({
                                 <ArrowUpRight size={14} className="text-yellow-400 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all"/>
                             </div>
                             <div className="relative z-10 flex flex-col h-full justify-between pb-3">
-                                <div className="flex items-center gap-2">
-                                    <div className="text-[9px] font-bold uppercase text-zinc-500">Global Rank</div>
-                                    <div className="text-xl font-black text-white leading-none">
-                                        {/* STRICT RANK CHECK */}
-                                        {(selectedNode as any).isUntracked || selectedNode.credits === null ? '---' : `#${selectedNode.rank || '-'}`}
-                                    </div>
-                                </div>
+                                {/* CONDITIONAL RANK DISPLAY */}
+                                {isValidReputation && (
+                                  <div className="flex items-center gap-2">
+                                      <div className="text-[9px] font-bold uppercase text-zinc-500">Global Rank</div>
+                                      <div className="text-xl font-black text-white leading-none">#{selectedNode.rank || '-'}</div>
+                                  </div>
+                                )}
+                                
                                 <div className="w-full bg-white/5 border border-white/10 rounded-full px-2 py-1.5 flex items-center justify-between mt-auto">
                                    <span className="text-[8px] font-bold text-zinc-500 uppercase">CREDITS</span>
-                                   <span className={`text-[10px] font-mono font-bold ${(selectedNode as any).isUntracked || selectedNode.credits === null ? 'text-zinc-500' : 'text-yellow-500'}`}>
-                                       {/* STRICT CREDITS CHECK */}
+                                   <span className={`text-[9px] font-mono font-bold whitespace-nowrap ${(selectedNode as any).isUntracked || selectedNode.credits === null ? 'text-zinc-500' : 'text-yellow-500'}`}>
                                        {(selectedNode as any).isUntracked ? 'NO STORAGE CREDITS' : selectedNode.credits === null ? 'API OFFLINE' : selectedNode.credits.toLocaleString()}
                                    </span>
                                 </div>
@@ -295,7 +297,7 @@ export const InspectorModal = ({
 
                     {/* --- DESKTOP GRID (HIDDEN MD:GRID) --- */}
                     <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-                      {/* DESKTOP HEALTH */}
+                      {/* HEALTH */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300 ring-1 ${zenMode ? 'bg-zinc-900' : 'bg-zinc-900/30'} ${healthRingColor}`} onClick={() => handleCardToggle('health')}>
                          <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>
                          <div className="flex justify-between items-start mb-4 relative z-10"><div><h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-500">SYSTEM DIAGNOSTICS</h3></div><HelpCircle size={14} className="text-zinc-500"/></div>
@@ -303,14 +305,14 @@ export const InspectorModal = ({
                          <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-green-400 flex justify-center gap-1 relative z-10 ${breatheAnimation}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
                       </div>
 
-                      {/* DESKTOP STORAGE */}
+                      {/* STORAGE */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60 bg-indigo-950/10`} onClick={() => handleCardToggle('storage')}>
                          <div className="flex justify-between items-start mb-4 relative z-10"><div className="flex items-center gap-2"><Database size={18} className="text-indigo-300/80"/><span className="text-xs font-bold uppercase text-zinc-500">STORAGE</span></div></div>
                          <div className="space-y-4 relative z-10"><div className="flex justify-between items-end"><div><div className="text-2xl font-bold text-indigo-200">{formatBytes(selectedNode.storage_used).split(' ')[0]}</div><div className="text-[9px] font-bold text-zinc-600">USED</div></div><div className="text-right"><div className="text-2xl font-bold text-indigo-200/60">{formatBytes(selectedNode.storage_committed).split(' ')[0]}</div><div className="text-[9px] font-bold text-zinc-600">TOTAL</div></div></div><div className="h-2 bg-zinc-800/50 rounded-full overflow-hidden relative"><div className="h-full bg-gradient-to-r from-transparent to-indigo-500/20 relative overflow-hidden" style={{ width: `${Math.min(100, ((selectedNode.storage_used || 0) / (selectedNode.storage_committed || 1)) * 100)}%` }}><div className="absolute top-0 bottom-0 right-0 w-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.4)]"></div></div></div></div>
                          <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-violet-300/80 flex justify-center gap-1 relative z-10 ${breatheAnimation}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
                       </div>
 
-                      {/* DESKTOP IDENTITY */}
+                      {/* IDENTITY */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300 ring-1 ${zenMode ? 'bg-zinc-900' : 'bg-zinc-900/30'} ${identityRingColor}`} onClick={() => handleCardToggle('identity')}>
                          <div className={`absolute inset-0 bg-gradient-to-br opacity-20 pointer-events-none ${isSelectedNodeLatest ? 'from-green-900/40 via-transparent to-blue-900/40' : 'from-orange-900/40 via-transparent to-red-900/40'}`}></div>
                          <div className="flex justify-between items-start mb-4 relative z-10"><div className="flex items-center gap-2"><Server size={18} className="text-zinc-400"/><span className="text-xs font-bold uppercase text-zinc-500">IDENTITY</span></div><div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${selectedNode.network === 'MAINNET' ? 'text-green-500 border-green-500/30' : 'text-blue-500 border-blue-500/30'}`}>{selectedNode.network}</div></div>
@@ -321,7 +323,7 @@ export const InspectorModal = ({
 
                     {/* DESKTOP BOTTOM ROW */}
                     <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-4">
-                       {/* DESKTOP REPUTATION CARD - FIXED */}
+                       {/* DESKTOP REPUTATION - FIXED */}
                        <div 
                           onClick={handleLeaderboardNav} 
                           className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-yellow-900/30'}`}
@@ -334,18 +336,18 @@ export const InspectorModal = ({
                           </div>
                           <div className="relative z-10 flex flex-col gap-2">
                              <div className="flex items-center justify-center">
-                                <div className="text-center">
-                                    <div className="text-[10px] font-bold uppercase text-zinc-500 mb-0.5">Global Rank</div>
-                                    <div className="text-4xl font-black text-white leading-none">
-                                        {/* STRICT RANK CHECK */}
-                                        {(selectedNode as any).isUntracked || selectedNode.credits === null ? '---' : `#${selectedNode.rank || '-'}`}
-                                    </div>
-                                </div>
+                                {/* CONDITIONAL RANK DISPLAY (DESKTOP) */}
+                                {isValidReputation && (
+                                  <div className="text-center">
+                                      <div className="text-[10px] font-bold uppercase text-zinc-500 mb-0.5">Global Rank</div>
+                                      <div className="text-4xl font-black text-white leading-none">#{selectedNode.rank || '-'}</div>
+                                  </div>
+                                )}
                              </div>
                              <div className="w-full bg-white/5 border border-white/10 rounded-full px-4 py-2 flex items-center justify-between mt-1">
                                 <span className="text-[10px] font-bold text-zinc-500 uppercase">CREDITS EARNED</span>
-                                <span className={`text-sm font-mono font-bold ${(selectedNode as any).isUntracked || selectedNode.credits === null ? 'text-zinc-500' : 'text-yellow-500'}`}>
-                                    {/* STRICT CREDITS CHECK */}
+                                <span className={`text-[9px] font-mono font-bold whitespace-nowrap ${(selectedNode as any).isUntracked || selectedNode.credits === null ? 'text-zinc-500' : 'text-yellow-500'}`}>
+                                    {/* STRICT CREDITS CHECK (DESKTOP) */}
                                     {(selectedNode as any).isUntracked ? 'NO STORAGE CREDITS' : selectedNode.credits === null ? 'API OFFLINE' : selectedNode.credits.toLocaleString()}
                                 </span>
                              </div>
@@ -353,7 +355,7 @@ export const InspectorModal = ({
                           <div className={`absolute bottom-2 right-4 text-[9px] font-bold uppercase text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity ${breatheAnimation}`}>OPEN LEADERBOARD</div>
                        </div>
 
-                       {/* DESKTOP PHYSICAL CARD */}
+                       {/* PHYSICAL */}
                        <Link href={`/map?focus=${getSafeIp(selectedNode)}`}>
                          <div className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-blue-500/20 hover:ring-blue-500/50 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-blue-900/30'}`}>
                             <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#3b82f6_1px,transparent_1px),linear-gradient(to_bottom,#3b82f6_1px,transparent_1px)] bg-[size:20px_20px] origin-center group-hover:scale-[3.0] transition-transform duration-700 ease-in-out pointer-events-none"></div>
