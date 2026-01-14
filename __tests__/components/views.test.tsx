@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { HealthView } from '../../src/components/modals/views/HealthView';
 import { StorageView } from '../../src/components/modals/views/StorageView';
@@ -37,24 +37,27 @@ describe('Component Views (Visual Logic)', () => {
 
   describe('<StorageView />', () => {
     test('LOGIC: Should detect "Above Majority" status', () => {
-      render(<StorageView node={createMockNode({ storage_committed: 2000 })} zenMode={false} onBack={jest.fn()} medianCommitted={1000} totalStorageCommitted={5000} nodeCount={5} />);
+      render(<StorageView node={createMockNode({ storage_committed: 2000 * (1024**3) })} zenMode={false} onBack={jest.fn()} medianCommitted={1000 * (1024**3)} totalStorageCommitted={5000 * (1024**3)} nodeCount={5} />);
       expect(screen.getByText(/Higher/)).toBeInTheDocument();
     });
 
     test('VISUALS: Tank/Bar should calculate fill percentage correctly (with buffer)', () => {
-        // Calculation: Max = 1000 * 1.1 = 1100. 500 / 1100 = 45.45%
-        const { container } = render(<StorageView 
+        // Calculation: Max = 1000 * 1.1 = 1100. 500 / 1100 = ~45.45%
+        render(<StorageView 
             node={createMockNode({ storage_committed: 500 * (1024**3) })} 
             zenMode={false} onBack={jest.fn()} medianCommitted={1000 * (1024**3)} 
             totalStorageCommitted={5000 * (1024**3)} nodeCount={5} 
         />);
 
-        // FIX: Instead of querySelectorAll on a string, we find the bar by iterating 
-        // through the divs and checking the style.height property.
-        const divs = Array.from(container.querySelectorAll('div'));
-        const bufferedBar = divs.find(d => d.style.height.startsWith('45'));
+        // Instead of searching style.height, we search for the bar container 
+        // that holds the "YOU" label.
+        const youLabel = screen.getByText('YOU');
+        const barContainer = youLabel.parentElement;
+        const bar = barContainer?.querySelector('div[class*="bg-gradient-to-t"]');
         
-        expect(bufferedBar).toBeDefined();
+        // We verify the bar exists and check the raw style attribute string
+        expect(bar).toBeInTheDocument();
+        expect(bar?.getAttribute('style')).toContain('height: 45');
     });
   });
 
