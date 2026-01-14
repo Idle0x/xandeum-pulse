@@ -13,12 +13,20 @@ interface StorageViewProps {
 
 export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStorageCommitted, nodeCount }: StorageViewProps) => {
   const nodeCap = node?.storage_committed || 0;
+  const nodeUsed = node?.storage_used || 0;
   const median = medianCommitted || 1;
   const avgCommitted = totalStorageCommitted / (nodeCount || 1);
   const diff = nodeCap - median;
   const isPos = diff >= 0;
-  const percentDiff = Math.abs((diff / median) * 100);
-  const tankFill = isPos ? 100 : Math.max(10, (nodeCap / median) * 100);
+  
+  // Multiplier Calculation (e.g., 131x)
+  const multiplier = median > 0 ? (nodeCap / median) : 0;
+  const multiplierDisplay = multiplier >= 1 ? `${multiplier.toFixed(1)}x` : `${(1/multiplier).toFixed(1)}x`;
+
+  // Utilization (Efficiency)
+  const utilization = nodeCap > 0 ? (nodeUsed / nodeCap) * 100 : 0;
+  const dashArray = 2 * Math.PI * 18; // r=18
+  const dashOffset = dashArray - ((utilization / 100) * dashArray);
 
   return (
     <div className="animate-in fade-in slide-in-from-right-2 duration-300 h-full flex flex-col">
@@ -30,33 +38,46 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
       </div>
 
       <div className="flex-grow flex flex-col gap-4">
-        {/* Comparison Text */}
+        {/* Network Comparison (Multiplier) */}
         <div className={`p-4 rounded-xl border text-center relative overflow-hidden ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/40 border-zinc-800/60'}`}>
           <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1 flex items-center justify-center gap-1 tracking-wider">NETWORK COMPARISON</div>
           <div className="text-sm text-zinc-300 relative z-10">
-            Storage is <span className={`font-mono font-black text-base ${isPos ? 'text-green-400' : 'text-red-400'}`}>{percentDiff.toFixed(1)}% {isPos ? 'Higher' : 'Lower'}</span> than median
+            Storage is <span className={`font-mono font-black text-lg ${isPos ? 'text-green-400' : 'text-red-400'}`}>{multiplierDisplay} {isPos ? 'Higher' : 'Lower'}</span> than median
           </div>
         </div>
 
-        {/* Capacity Bar */}
-        <div className="block p-4 rounded-xl border bg-zinc-900/30 border-zinc-800">
-          <div className="flex justify-between text-[10px] uppercase font-bold text-zinc-500 mb-2">
-            <span>Your Capacity</span>
-            <span className={isPos ? 'text-green-500' : 'text-red-500'}>{isPos ? 'ABOVE MAJORITY' : 'BELOW MAJORITY'}</span>
-          </div>
-          <div className="h-3 w-full bg-zinc-900 rounded-full relative overflow-hidden">
-            {isPos ? (
-              <>
-                <div className="absolute top-0 bottom-0 left-0 bg-purple-600 w-3/4"></div>
-                <div className="absolute top-0 bottom-0 left-3/4 bg-green-500/20 border-l border-green-500 w-1/4"></div>
-              </>
-            ) : (
-              <>
-                <div className="absolute top-0 bottom-0 left-0 bg-purple-600" style={{ width: `${tankFill}%` }}></div>
-                <div className="absolute top-0 bottom-0 right-0 bg-red-500/10 border-l border-red-500/50" style={{ width: `${100 - tankFill}%` }}></div>
-              </>
-            )}
-          </div>
+        {/* Utilization Donut & Status */}
+        <div className="flex gap-3">
+            {/* Donut Chart */}
+            <div className="flex-1 bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex items-center gap-4">
+                <div className="relative w-12 h-12 shrink-0">
+                    <svg className="w-full h-full -rotate-90" viewBox="0 0 40 40">
+                        {/* Background Circle */}
+                        <circle cx="20" cy="20" r="18" fill="none" stroke="#27272a" strokeWidth="4" />
+                        {/* Fill Circle */}
+                        <circle 
+                            cx="20" cy="20" r="18" fill="none" 
+                            stroke={utilization > 90 ? '#ef4444' : '#3b82f6'} 
+                            strokeWidth="4" 
+                            strokeDasharray={dashArray} 
+                            strokeDashoffset={dashOffset} 
+                            strokeLinecap="round"
+                            className="transition-all duration-1000 ease-out"
+                        />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white">{Math.round(utilization)}%</div>
+                </div>
+                <div>
+                    <div className="text-[9px] font-bold text-zinc-500 uppercase">Efficiency</div>
+                    <div className="text-xs font-bold text-white">Utilization</div>
+                </div>
+            </div>
+
+            {/* Status Badge */}
+            <div className={`flex-1 border rounded-xl p-3 flex flex-col justify-center items-center ${isPos ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                <div className={`text-[9px] font-black uppercase tracking-wider ${isPos ? 'text-green-400' : 'text-red-400'}`}>{isPos ? 'ABOVE' : 'BELOW'}</div>
+                <div className={`text-[9px] font-black uppercase tracking-wider ${isPos ? 'text-green-400' : 'text-red-400'}`}>MAJORITY</div>
+            </div>
         </div>
 
         {/* Benchmarks */}
@@ -65,7 +86,7 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-zinc-400">Median Storage</span>
-              <span className="text-sm font-mono text-white">{formatBytes(medianCommitted)}</span>
+              <span className="text-sm font-mono text-white">{formatBytes(median)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-zinc-400">Average Storage</span>
@@ -74,10 +95,11 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
           </div>
         </div>
 
-        {/* Used Space Info */}
-        <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-lg p-3 flex justify-between items-center">
-             <span className="text-[9px] font-bold text-zinc-500 uppercase">Actual Used Space</span>
-             <span className="text-xs font-mono font-bold text-blue-400">{formatBytes(node?.storage_used)}</span>
+        {/* Used Space Info (With Raw Bytes) */}
+        <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-lg p-3 text-center">
+             <div className="text-[9px] font-bold text-zinc-500 uppercase mb-1">Actual Used Space</div>
+             <div className="text-xl font-mono font-black text-blue-400 leading-none">{formatBytes(nodeUsed)}</div>
+             <div className="text-[9px] font-mono text-zinc-600 mt-1">raw {nodeUsed.toLocaleString()} bytes</div>
         </div>
       </div>
     </div>
