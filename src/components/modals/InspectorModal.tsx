@@ -120,8 +120,9 @@ export const InspectorModal = ({
     return { val: parts[0], unit: parts[1] || '' };
   };
 
-  const usedDisplay = getStorageDisplay(selectedNode.storage_used);
-  const committedDisplay = getStorageDisplay(selectedNode.storage_committed);
+  // FIX: Added '|| 0' to handle potential undefined values
+  const usedDisplay = getStorageDisplay(selectedNode.storage_used || 0);
+  const committedDisplay = getStorageDisplay(selectedNode.storage_committed || 0);
 
   // --- REPUTATION VISUALS ---
   const rank = selectedNode.rank || 0;
