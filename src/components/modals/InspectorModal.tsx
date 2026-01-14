@@ -317,7 +317,8 @@ export const InspectorModal = ({
                                 <div className="w-full bg-black/20 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] border-b border-white/5 rounded-full px-2 py-1.5 flex items-center justify-between mt-auto">
                                    <span className="text-[8px] font-bold text-zinc-500 uppercase">CREDITS</span>
                                    <span className={`text-[9px] font-mono font-bold whitespace-nowrap ${(selectedNode as any).isUntracked || selectedNode.credits === null ? 'text-zinc-500' : 'text-yellow-500'}`}>
-                                       {(selectedNode as any).isUntracked ? 'NO CREDITS' : selectedNode.credits === null ? 'OFFLINE' : selectedNode.credits.toLocaleString()}
+                                       {/* FIX: Changed 'OFFLINE' to 'API OFFLINE' to match test expectations */}
+                                       {(selectedNode as any).isUntracked ? 'NO CREDITS' : selectedNode.credits === null ? 'API OFFLINE' : selectedNode.credits.toLocaleString()}
                                    </span>
                                 </div>
                             </div>
@@ -400,7 +401,8 @@ export const InspectorModal = ({
                              <div className="w-full bg-black/20 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] border-b border-white/5 rounded-full px-4 py-2 flex items-center justify-between mt-1">
                                 <span className="text-[10px] font-bold text-zinc-500 uppercase">CREDITS EARNED</span>
                                 <span className={`text-[9px] font-mono font-bold whitespace-nowrap ${(selectedNode as any).isUntracked || selectedNode.credits === null ? 'text-zinc-500' : 'text-yellow-500'}`}>
-                                    {(selectedNode as any).isUntracked ? 'NO CREDITS' : selectedNode.credits === null ? 'OFFLINE' : selectedNode.credits.toLocaleString()}
+                                    {/* FIX: Changed 'OFFLINE' to 'API OFFLINE' to match test expectations */}
+                                    {(selectedNode as any).isUntracked ? 'NO CREDITS' : selectedNode.credits === null ? 'API OFFLINE' : selectedNode.credits.toLocaleString()}
                                 </span>
                              </div>
                           </div>
