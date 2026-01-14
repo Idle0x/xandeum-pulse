@@ -1,4 +1,4 @@
-import { Activity, ArrowLeft, Zap, Info } from 'lucide-react';
+import { Activity, ArrowLeft, Zap } from 'lucide-react';
 import { Node } from '../../../types';
 
 interface HealthViewProps {
@@ -24,9 +24,14 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
   const rankPercentile = (rank / totalNodes) * 100;
   const betterThanPercent = 100 - rankPercentile;
   const diff = health - avgNetworkHealth;
-  const isCreditsOffline = node.credits === null && !(node as any).isUntracked;
+  
+  // Status Flags
+  const isUntracked = (node as any).isUntracked;
+  const isApiOffline = node.credits === null;
+  const isReputationInvalid = isUntracked || isApiOffline;
 
-  const weights = isCreditsOffline 
+  // Adjust weights: If offline, reputation weight is 0, others increase
+  const weights = isReputationInvalid 
       ? { uptime: 0.45, storage: 0.35, reputation: 0, version: 0.20 }
       : { uptime: 0.35, storage: 0.30, reputation: 0.20, version: 0.15 };
 
@@ -84,17 +89,36 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
               const weightedVal = (rawVal * m.weight).toFixed(1);
               const barColor = rawVal >= 80 ? 'bg-green-500' : rawVal >= 50 ? 'bg-yellow-500' : 'bg-red-500';
               
+              // Check if this specific card is Reputation AND is invalid
+              const isInvalidRep = m.label === 'Reputation' && isReputationInvalid;
+
               return (
-                <div key={m.label} className="bg-zinc-900/50 border border-zinc-800 p-2.5 rounded-xl">
+                <div 
+                  key={m.label} 
+                  className={`border rounded-xl p-2.5 flex flex-col justify-between h-full ${
+                    isInvalidRep 
+                      ? 'bg-zinc-900/30 border-zinc-800/50 border-dashed opacity-60' 
+                      : 'bg-zinc-900/50 border-zinc-800'
+                  }`}
+                >
                    <div className="flex justify-between items-center mb-2">
                       <span className="text-[10px] font-bold text-zinc-400">{m.label}</span>
-                      <span className="text-[10px] font-mono font-bold text-white">{weightedVal} pts</span>
+                      <span className={`text-[10px] font-mono font-bold ${isInvalidRep ? 'text-zinc-500' : 'text-white'}`}>
+                        {isInvalidRep 
+                          ? (isUntracked ? 'NO CREDITS' : 'API OFF') 
+                          : `${weightedVal} pts`}
+                      </span>
                    </div>
+                   
                    <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-1">
-                      <div className={`h-full ${barColor}`} style={{ width: `${Math.min(100, rawVal)}%` }}></div>
+                      {!isInvalidRep && (
+                        <div className={`h-full ${barColor}`} style={{ width: `${Math.min(100, rawVal)}%` }}></div>
+                      )}
                    </div>
-                   <div className="text-[8px] text-zinc-600 flex justify-between">
-                      <span>Base: {rawVal}</span>
+
+                   <div className="text-[8px] text-zinc-600 flex justify-between h-3 items-center">
+                      {/* Show Base N/A if invalid, otherwise show raw val */}
+                      <span>Base: {isInvalidRep ? 'N/A' : rawVal}</span>
                       {m.label === 'Storage' && <span>{getStorageBreakdownText(node, medianStorage)}</span>}
                    </div>
                 </div>
@@ -111,21 +135,39 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
             const weightedAvg = (rawAvg * m.weight).toFixed(2);
             const barColor = rawVal >= 80 ? 'bg-green-500' : rawVal >= 50 ? 'bg-yellow-500' : 'bg-red-500';
 
+            const isInvalidRep = m.label === 'Reputation' && isReputationInvalid;
+
             return (
-              <div key={m.label}>
+              <div key={m.label} className={isInvalidRep ? 'opacity-50 grayscale' : ''}>
                 <div className="flex justify-between text-xs mb-2">
                   <span className="text-zinc-400 font-bold flex items-center gap-2">
-                      {m.label} {m.label === 'Storage' ? <span className="text-[9px] font-mono text-zinc-600 font-normal">{getStorageBreakdownText(node, medianStorage)}</span> : <span className="text-[9px] font-mono text-zinc-600 font-normal">(Base: {rawVal})</span>}
+                      {m.label} 
+                      {m.label === 'Storage' 
+                        ? <span className="text-[9px] font-mono text-zinc-600 font-normal">{getStorageBreakdownText(node, medianStorage)}</span> 
+                        : <span className="text-[9px] font-mono text-zinc-600 font-normal">(Base: {isInvalidRep ? 'N/A' : rawVal})</span>
+                      }
                   </span>
                   <div className="font-mono text-[10px]">
-                    <span className="text-white font-bold">{weightedVal}</span>
-                    <span className="text-zinc-600 mx-1">/</span>
-                    <span className="text-zinc-500">Avg: {weightedAvg}</span>
+                    {isInvalidRep ? (
+                        <span className="text-zinc-500 font-bold uppercase tracking-wider">
+                            {isUntracked ? 'NO STORAGE CREDITS' : 'API OFFLINE'}
+                        </span>
+                    ) : (
+                        <>
+                            <span className="text-white font-bold">{weightedVal}</span>
+                            <span className="text-zinc-600 mx-1">/</span>
+                            <span className="text-zinc-500">Avg: {weightedAvg}</span>
+                        </>
+                    )}
                   </div>
                 </div>
                 <div className="h-2 bg-zinc-800 rounded-full overflow-visible relative">
-                  <div className={`h-full rounded-l-full transition-all duration-1000 ${barColor} shadow-[0_0_10px_rgba(255,255,255,0.1)]`} style={{ width: `${Math.min(100, rawVal)}%` }}></div>
-                  <div className="absolute top-[-4px] bottom-[-4px] w-0.5 bg-white shadow-[0_0_5px_white] z-10" style={{ left: `${Math.min(100, rawAvg)}%` }} title={`Network Average: ${rawAvg}`}></div>
+                  {!isInvalidRep && (
+                    <>
+                        <div className={`h-full rounded-l-full transition-all duration-1000 ${barColor} shadow-[0_0_10px_rgba(255,255,255,0.1)]`} style={{ width: `${Math.min(100, rawVal)}%` }}></div>
+                        <div className="absolute top-[-4px] bottom-[-4px] w-0.5 bg-white shadow-[0_0_5px_white] z-10" style={{ left: `${Math.min(100, rawAvg)}%` }} title={`Network Average: ${rawAvg}`}></div>
+                    </>
+                  )}
                 </div>
               </div>
             );
