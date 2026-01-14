@@ -1,4 +1,4 @@
-Import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Node } from '../../../types';
 import { formatBytes } from '../../../utils/formatters';
 
