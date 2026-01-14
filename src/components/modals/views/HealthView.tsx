@@ -24,7 +24,7 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
   const rankPercentile = (rank / totalNodes) * 100;
   const betterThanPercent = 100 - rankPercentile;
   const diff = health - avgNetworkHealth;
-  
+
   // Status Flags
   const isUntracked = (node as any).isUntracked;
   const isApiOffline = node.credits === null;
@@ -54,18 +54,18 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
   };
 
   return (
-    <div className="animate-in fade-in slide-in-from-right-2 duration-200 h-full flex flex-col">
+    <div className="animate-in fade-in slide-in-from-right-2 duration-300 h-full flex flex-col">
       {/* HEADER */}
-      <div className="flex justify-between items-center mb-4 md:mb-6">
+      <div className="flex justify-between items-center mb-4 md:mb-6 shrink-0">
         <h3 className={`text-xs font-bold tracking-widest uppercase flex items-center gap-2 ${zenMode ? 'text-zinc-200' : 'text-zinc-500'}`}>
           <Activity size={14} /> DIAGNOSTICS & VITALITY
         </h3>
-        <button onClick={onBack} className="text-[10px] font-bold text-red-500 hover:text-red-400 flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded border border-zinc-800 transition">
+        <button onClick={onBack} className="text-[10px] font-bold text-red-500 hover:text-red-400 flex items-center gap-1 bg-zinc-900 px-2.5 py-1.5 rounded-lg border border-zinc-800 transition hover:bg-zinc-800">
           <ArrowLeft size={10} /> BACK
         </button>
       </div>
 
-      <div className="flex-grow flex flex-col gap-4 md:gap-6">
+      <div className="flex-grow flex flex-col gap-4 md:gap-6 overflow-y-auto custom-scrollbar pr-1">
         {/* SCORE CARD */}
         <div className="p-4 md:p-6 bg-black rounded-2xl border border-zinc-800 flex justify-between items-center relative overflow-hidden">
           <div className="absolute top-0 right-0 p-12 bg-green-500/5 blur-2xl rounded-full pointer-events-none"></div>
@@ -82,44 +82,42 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
           </div>
         </div>
 
-        {/* --- MOBILE LAYOUT: 2x2 GRID (No Scroll) --- */}
+        {/* --- MOBILE LAYOUT: 2x2 GRID (UPDATED AESTHETICS) --- */}
         <div className="grid grid-cols-2 gap-2 md:hidden">
            {metrics.map((m) => {
               const rawVal = m.rawVal || 0;
               const weightedVal = (rawVal * m.weight).toFixed(1);
               const barColor = rawVal >= 80 ? 'bg-green-500' : rawVal >= 50 ? 'bg-yellow-500' : 'bg-red-500';
-              
-              // Check if this specific card is Reputation AND is invalid
+
               const isInvalidRep = m.label === 'Reputation' && isReputationInvalid;
 
               return (
                 <div 
                   key={m.label} 
-                  className={`border rounded-xl p-2.5 flex flex-col justify-between h-full ${
+                  className={`border rounded-xl p-3 flex flex-col justify-between h-full transition-all ${
                     isInvalidRep 
                       ? 'bg-zinc-900/30 border-zinc-800/50 border-dashed opacity-60' 
-                      : 'bg-zinc-900/50 border-zinc-800'
+                      : 'bg-zinc-900/40 border-zinc-800/60'
                   }`}
                 >
                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-bold text-zinc-400">{m.label}</span>
+                      <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">{m.label}</span>
                       <span className={`text-[10px] font-mono font-bold ${isInvalidRep ? 'text-zinc-500' : 'text-white'}`}>
                         {isInvalidRep 
                           ? (isUntracked ? 'NO CREDITS' : 'API OFF') 
                           : `${weightedVal} pts`}
                       </span>
                    </div>
-                   
-                   <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-1">
+
+                   <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-2">
                       {!isInvalidRep && (
                         <div className={`h-full ${barColor}`} style={{ width: `${Math.min(100, rawVal)}%` }}></div>
                       )}
                    </div>
 
-                   <div className="text-[8px] text-zinc-600 flex justify-between h-3 items-center">
-                      {/* Show Base N/A if invalid, otherwise show raw val */}
+                   <div className="text-[8px] text-zinc-600 flex justify-between items-center mt-auto pt-1 border-t border-white/5">
                       <span>Base: {isInvalidRep ? 'N/A' : rawVal}</span>
-                      {m.label === 'Storage' && <span>{getStorageBreakdownText(node, medianStorage)}</span>}
+                      {m.label === 'Storage' && <span className="opacity-70">{getStorageBreakdownText(node, medianStorage)}</span>}
                    </div>
                 </div>
               );
