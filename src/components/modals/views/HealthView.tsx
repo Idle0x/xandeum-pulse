@@ -42,15 +42,21 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
     { label: 'Consensus', rawVal: bd.version, avgRaw: avgs.version, weight: weights.version },
   ];
 
-  const getStorageBreakdownText = (node: Node, median: number) => {
-      const commGB = (node.storage_committed || 0) / (1024**3);
+  // Helper to extract the specific bonus points for display
+  const getStorageBonusText = (node: Node, median: number) => {
       const usedGB = (node.storage_used || 0) / (1024**3);
-      const medGB = (median || 0) / (1024**3);
-      let base = 0;
-      if(medGB > 0) base = Math.min(100, 50 * Math.log2((commGB / medGB) + 1));
       let bonus = 0;
       if(usedGB > 0) bonus = Math.min(15, 5 * Math.log2(usedGB + 2));
-      return `(Base: ${Math.round(base)} + Bonus: ${Math.round(bonus)})`;
+      const rounded = Math.round(bonus);
+      return rounded > 0 ? `(+${rounded} Bonus)` : '';
+  };
+
+  // Helper to extract the base score (Total - Bonus)
+  const getStorageBase = (total: number, node: Node) => {
+      const usedGB = (node.storage_used || 0) / (1024**3);
+      let bonus = 0;
+      if(usedGB > 0) bonus = Math.min(15, 5 * Math.log2(usedGB + 2));
+      return Math.max(0, Math.round(total - Math.round(bonus)));
   };
 
   return (
@@ -79,14 +85,19 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
           </div>
         </div>
 
-        {/* --- METRICS GRID (UPDATED AESTHETICS) --- */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* --- METRICS GRID (MOBILE) --- */}
+        <div className="grid grid-cols-2 gap-2 md:hidden">
            {metrics.map((m) => {
               const rawVal = m.rawVal || 0;
               const weightedVal = (rawVal * m.weight).toFixed(1);
+              const weightedAvg = (m.avgRaw * m.weight).toFixed(1); // Weighted Avg for Comparison
               const barColor = rawVal >= 80 ? 'bg-green-500' : rawVal >= 50 ? 'bg-yellow-500' : 'bg-red-500';
 
               const isInvalidRep = m.label === 'Reputation' && isReputationInvalid;
+              
+              // Formatting for Base/Bonus
+              const baseVal = m.label === 'Storage' ? getStorageBase(rawVal, node) : rawVal;
+              const bonusText = m.label === 'Storage' ? getStorageBonusText(node, medianStorage) : '';
 
               return (
                 <div 
@@ -113,12 +124,66 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
                    </div>
 
                    <div className="text-[8px] text-zinc-600 flex justify-between items-center mt-auto pt-1 border-t border-white/5">
-                      <span>Base: {isInvalidRep ? 'N/A' : rawVal}</span>
-                      {m.label === 'Storage' && <span className="opacity-70">{getStorageBreakdownText(node, medianStorage)}</span>}
+                      <div className="flex items-center gap-1">
+                          <span>Base: {isInvalidRep ? 'N/A' : baseVal}</span>
+                          {bonusText && <span className="text-zinc-500">{bonusText}</span>}
+                      </div>
+                      {!isInvalidRep && <span className="opacity-70">vs Avg: {weightedAvg}</span>}
                    </div>
                 </div>
               );
            })}
+        </div>
+
+        {/* --- DESKTOP STACK (PRESERVED & POLISHED) --- */}
+        <div className="hidden md:flex flex-col gap-5">
+          {metrics.map((m) => {
+            const rawVal = m.rawVal || 0; 
+            const rawAvg = m.avgRaw || 0;
+            const weightedVal = (rawVal * m.weight).toFixed(2);
+            const weightedAvg = (rawAvg * m.weight).toFixed(2);
+            const barColor = rawVal >= 80 ? 'bg-green-500' : rawVal >= 50 ? 'bg-yellow-500' : 'bg-red-500';
+
+            const isInvalidRep = m.label === 'Reputation' && isReputationInvalid;
+            
+            // Formatting for Base/Bonus (Desktop)
+            const baseVal = m.label === 'Storage' ? getStorageBase(rawVal, node) : rawVal;
+            const bonusText = m.label === 'Storage' ? getStorageBonusText(node, medianStorage) : '';
+
+            return (
+              <div key={m.label} className={isInvalidRep ? 'opacity-50 grayscale' : ''}>
+                <div className="flex justify-between text-xs mb-2">
+                  <span className="text-zinc-400 font-bold flex items-center gap-2">
+                      {m.label} 
+                      <span className="text-[9px] font-mono text-zinc-600 font-normal">
+                          (Base: {isInvalidRep ? 'N/A' : baseVal}{bonusText ? ` ${bonusText}` : ''})
+                      </span>
+                  </span>
+                  <div className="font-mono text-[10px]">
+                    {isInvalidRep ? (
+                        <span className="text-zinc-500 font-bold uppercase tracking-wider">
+                            {isUntracked ? 'NO STORAGE CREDITS' : 'API OFFLINE'}
+                        </span>
+                    ) : (
+                        <>
+                            <span className="text-white font-bold">{weightedVal}</span>
+                            <span className="text-zinc-600 mx-1">/</span>
+                            <span className="text-zinc-500">Avg: {weightedAvg}</span>
+                        </>
+                    )}
+                  </div>
+                </div>
+                <div className="h-2 bg-zinc-800 rounded-full overflow-visible relative">
+                  {!isInvalidRep && (
+                    <>
+                        <div className={`h-full rounded-l-full transition-all duration-1000 ${barColor} shadow-[0_0_10px_rgba(255,255,255,0.1)]`} style={{ width: `${Math.min(100, rawVal)}%` }}></div>
+                        <div className="absolute top-[-4px] bottom-[-4px] w-0.5 bg-white shadow-[0_0_5px_white] z-10" style={{ left: `${Math.min(100, rawAvg)}%` }} title={`Network Average: ${rawAvg}`}></div>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="mt-auto pt-2 flex justify-center text-center">
