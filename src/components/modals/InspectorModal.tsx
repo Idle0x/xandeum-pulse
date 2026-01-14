@@ -4,7 +4,7 @@ import {
   X, Star, Check, Copy, Shield, Maximize2, HelpCircle, Minimize2, 
   Database, Server, Trophy, Globe, Clock, Link as LinkIcon, 
   Swords, Camera, Activity, CheckCircle, AlertTriangle,
-  ArrowUpRight, MapPin
+  ArrowUpRight, MapPin, Boxes, Network
 } from 'lucide-react';
 import { Node } from '../../types';
 import { ModalAvatar } from '../common/ModalAvatar';
@@ -69,12 +69,18 @@ export const InspectorModal = ({
   const isSelectedNodeLatest = checkIsLatest(selectedNode.version, mostCommonVersion);
   const avgNetworkHealth = networkStats?.avgBreakdown?.total || 0;
 
-  // --- SIBLINGS LOGIC ---
+  // --- SIBLINGS & FLEET LOGIC ---
   const siblingCount = nodes.filter(n => 
     n.pubkey === selectedNode.pubkey && 
     n.network === selectedNode.network && 
     n.address !== selectedNode.address
   ).length;
+
+  // Calculate Fleet Topology for the Identity Header
+  const ownerNodes = nodes.filter(n => n.address === selectedNode.address);
+  const totalOwned = ownerNodes.length;
+  const mainnetCount = ownerNodes.filter(n => n.network === 'MAINNET').length;
+  const devnetCount = ownerNodes.filter(n => n.network !== 'MAINNET').length;
 
   // --- STRICT NAVIGATION GUARD ---
   const handleLeaderboardNav = (e: React.MouseEvent) => {
@@ -106,12 +112,21 @@ export const InspectorModal = ({
   const healthStatusLabel = healthScore >= 80 ? 'OPTIMAL' : 'FAIR'; 
   const healthColor = healthScore >= 80 ? 'text-green-500' : healthScore >= 50 ? 'text-yellow-500' : 'text-red-500';
   const healthGlowColor = healthScore >= 80 ? 'bg-green-500' : healthScore >= 50 ? 'bg-yellow-500' : 'bg-red-500';
-
+  
   const healthRingColor = healthScore >= 80 ? 'ring-green-500/20 hover:ring-green-500/60' : healthScore >= 50 ? 'ring-yellow-500/20 hover:ring-yellow-500/60' : 'ring-red-500/20 hover:ring-red-500/60';
   const identityRingColor = isSelectedNodeLatest ? 'ring-green-500/20 hover:ring-green-500/60' : 'ring-orange-500/20 hover:ring-orange-500/60';
 
   const nodeCap = selectedNode.storage_committed || 0;
   const tankFillPercent = Math.min(100, (nodeCap / (medianCommitted || 1)) * 100);
+
+  // Storage Capsule Calculations (Mobile Header)
+  const avgCommitted = totalStorageCommitted / (nodes.length || 1);
+  const maxValue = Math.max(nodeCap, medianCommitted, avgCommitted) * 1.1; 
+  const nodeWidth = (nodeCap / maxValue) * 100;
+  const medianPos = (medianCommitted / maxValue) * 100;
+  const avgPos = (avgCommitted / maxValue) * 100;
+  const diff = nodeCap - medianCommitted;
+  const isPos = diff >= 0;
 
   // Helper to split value and unit safely
   const getStorageDisplay = (bytes: number) => {
@@ -120,7 +135,6 @@ export const InspectorModal = ({
     return { val: parts[0], unit: parts[1] || '' };
   };
 
-  // FIX: Added '|| 0' to handle potential undefined values
   const usedDisplay = getStorageDisplay(selectedNode.storage_used || 0);
   const committedDisplay = getStorageDisplay(selectedNode.storage_committed || 0);
 
@@ -217,37 +231,102 @@ export const InspectorModal = ({
             <div className="flex flex-col gap-3 md:gap-4 h-full">
                {modalView !== 'overview' ? (
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
-                    {/* LEFT SIDEBAR (EXPANDED VIEW) */}
+                    {/* LEFT SIDEBAR (EXPANDED HEADER VIEW) */}
                     <div className="md:col-span-1 h-full">
-                       {/* HEALTH TAB */}
+                       
+                       {/* --- HEALTH HEADER (POLISHED) --- */}
                        {modalView === 'health' && (
-                         <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-green-500 ring-1 ring-green-500 cursor-pointer" onClick={() => handleCardToggle('health')}>
-                           <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400">DIAGNOSTICS</div><Minimize2 size={14} className="text-zinc-500"/></div>
-                           <div className="scale-90"><RadialProgress score={selectedNode.health || 0} size={115} /></div>
-                           <div className="mt-6 text-[9px] font-bold uppercase text-red-400/80 flex items-center gap-1"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
+                         <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-green-500 ring-1 ring-green-500 cursor-pointer shadow-[0_0_30px_rgba(34,197,94,0.1)]" onClick={() => handleCardToggle('health')}>
+                           <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest">DIAGNOSTICS</div><Minimize2 size={14} className="text-zinc-500"/></div>
+                           <div className="relative scale-95">
+                                <div className="absolute inset-0 bg-green-500/20 blur-2xl rounded-full animate-pulse"></div>
+                                <RadialProgress score={selectedNode.health || 0} size={115} />
+                           </div>
+                           <div className="mt-6 text-[9px] font-bold uppercase text-red-400/80 flex items-center gap-1 hover:text-red-400 transition"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
                          </div>
                        )}
-                       {/* STORAGE TAB */}
+
+                       {/* --- STORAGE HEADER (LIQUID CAPSULE IMPLEMENTATION) --- */}
                        {modalView === 'storage' && (
-                         <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-purple-500 ring-1 ring-purple-500 cursor-pointer" onClick={() => handleCardToggle('storage')}>
-                           <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400">STORAGE</div><Minimize2 size={14} className="text-zinc-500"/></div>
-                           <div className="w-full space-y-2 text-sm"><div className="flex justify-between text-purple-400"><span>Committed</span><span>{formatBytes(selectedNode.storage_committed)}</span></div><div className="flex justify-between text-blue-400"><span>Used</span><span>{formatBytes(selectedNode.storage_used)}</span></div></div>
-                           <div className="mt-6 text-[9px] font-bold uppercase text-red-400/80 flex items-center gap-1"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
+                         <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-purple-500 ring-1 ring-purple-500 cursor-pointer shadow-[0_0_30px_rgba(168,85,247,0.1)]" onClick={() => handleCardToggle('storage')}>
+                           <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest">STORAGE</div><Minimize2 size={14} className="text-zinc-500"/></div>
+                           
+                           {/* LIQUID CAPSULE VISUALIZATION */}
+                           <div className="w-full flex-1 flex flex-col justify-center gap-4">
+                                <div className="text-center mb-2">
+                                     <div className="text-3xl font-black text-white tracking-tight">{formatBytes(nodeCap)}</div>
+                                     <div className="text-[9px] font-bold text-purple-400 uppercase tracking-widest">Committed</div>
+                                </div>
+                                <div className="relative h-14 w-full bg-black/40 rounded-full border border-zinc-800 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] overflow-hidden">
+                                    <div className={`absolute top-0 bottom-0 left-0 transition-all duration-1000 ease-out flex items-center overflow-hidden ${isPos ? 'bg-purple-600' : 'bg-purple-900/60'}`} style={{ width: `${nodeWidth}%` }}>
+                                        <div className="absolute inset-0 opacity-30 w-full h-full"><div className="absolute top-0 left-0 h-[1px] w-full bg-white/40 animate-[shimmer-once_2s_infinite]"></div></div>
+                                        <div className="absolute top-0 bottom-0 right-0 w-[2px] bg-white/50 shadow-[0_0_15px_rgba(255,255,255,0.8)]"></div>
+                                    </div>
+                                    <div className="absolute top-0 bottom-0 w-[2px] bg-yellow-400 z-10 shadow-[0_0_8px_rgba(234,179,8,1)]" style={{ left: `${medianPos}%` }}></div>
+                                    <div className="absolute top-0 bottom-0 w-[2px] bg-blue-500 z-10 shadow-[0_0_8px_rgba(59,130,246,1)]" style={{ left: `${avgPos}%` }}></div>
+                                </div>
+                                <div className="flex justify-between px-1">
+                                    <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-yellow-400"></div><span className="text-[8px] text-zinc-500 uppercase font-bold">Median</span></div>
+                                    <div className="flex items-center gap-1"><span className="text-[8px] text-zinc-500 uppercase font-bold">Avg</span><div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div></div>
+                                </div>
+                           </div>
+                           
+                           <div className="mt-6 text-[9px] font-bold uppercase text-red-400/80 flex items-center gap-1 hover:text-red-400 transition"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
                          </div>
                        )}
-                       {/* IDENTITY TAB */}
+
+                       {/* --- IDENTITY HEADER (FLEET TOPOLOGY HUD) --- */}
                        {modalView === 'identity' && (
-                         <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-blue-500 ring-1 ring-blue-500 cursor-pointer" onClick={() => handleCardToggle('identity')}>
-                           <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400">IDENTITY</div><Minimize2 size={14} className="text-zinc-500"/></div>
-                           <Shield size={64} className="text-blue-500 opacity-80" />
-                           <div className="mt-6 text-[9px] font-bold uppercase text-red-400/80 flex items-center gap-1"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
+                         <div className="h-full rounded-3xl border flex flex-col justify-between relative overflow-hidden bg-zinc-900 border-blue-500 ring-1 ring-blue-500 cursor-pointer shadow-[0_0_30px_rgba(59,130,246,0.1)]" onClick={() => handleCardToggle('identity')}>
+                           {/* Background FX */}
+                           <div className="absolute top-0 right-0 p-24 bg-blue-500/5 blur-3xl rounded-full pointer-events-none"></div>
+                           
+                           {/* Top Section: Shield & Network */}
+                           <div className="p-6 relative z-10">
+                               <div className="w-full flex justify-between items-start mb-6">
+                                   <div className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest">IDENTITY</div>
+                                   <Minimize2 size={14} className="text-zinc-500"/>
+                               </div>
+                               <div className="flex flex-col items-center text-center">
+                                   <Shield size={48} className="text-blue-500 mb-3 drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]" />
+                                   <div className="text-[9px] text-zinc-500 font-bold uppercase mb-1">Current Network</div>
+                                   <div className={`text-xl font-black tracking-tight ${selectedNode.network === 'MAINNET' ? 'text-green-400' : 'text-blue-400'}`}>
+                                       {selectedNode.network || 'UNKNOWN'}
+                                   </div>
+                               </div>
+                           </div>
+
+                           {/* Bottom Section: Fleet Topology Grid */}
+                           <div className="p-4 bg-black/40 border-t border-blue-500/20 grid grid-cols-2 gap-2 relative z-10">
+                               <div className="col-span-2 bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 flex justify-between items-center">
+                                   <div className="flex items-center gap-2">
+                                       <Boxes size={14} className="text-zinc-500"/>
+                                       <span className="text-[9px] font-bold text-zinc-500 uppercase">Fleet Size</span>
+                                   </div>
+                                   <span className="text-lg font-mono font-bold text-white">{totalOwned}</span>
+                               </div>
+                               <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 flex flex-col justify-center">
+                                   <span className="text-[8px] font-bold text-zinc-500 uppercase mb-1">Mainnet</span>
+                                   <span className="text-sm font-mono font-bold text-green-500">{mainnetCount}</span>
+                               </div>
+                               <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 flex flex-col justify-center">
+                                   <span className="text-[8px] font-bold text-zinc-500 uppercase mb-1">Devnet</span>
+                                   <span className="text-sm font-mono font-bold text-blue-500">{devnetCount}</span>
+                               </div>
+                           </div>
+
+                           <div className="absolute bottom-1 w-full text-center pb-1">
+                               <div className="text-[8px] font-bold uppercase text-red-400/60 flex items-center justify-center gap-1"><Minimize2 size={8}/> COLLAPSE</div>
+                           </div>
                          </div>
                        )}
                     </div>
+                    
                     {/* RIGHT CONTENT */}
                     <div className="md:col-span-2 h-full">
                        {modalView === 'health' && <HealthView node={selectedNode} zenMode={zenMode} onBack={() => setModalView('overview')} avgNetworkHealth={avgNetworkHealth} medianStorage={medianCommitted} networkStats={networkStats} />}
                        {modalView === 'storage' && <StorageView node={selectedNode} zenMode={zenMode} onBack={() => setModalView('overview')} medianCommitted={medianCommitted} totalStorageCommitted={totalStorageCommitted} nodeCount={nodes.length} />}
+                       {/* PASSING NODES PROP TO IDENTITY VIEW */}
                        {modalView === 'identity' && (
                          <IdentityView 
                             node={selectedNode} 
