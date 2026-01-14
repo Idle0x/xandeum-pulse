@@ -41,28 +41,27 @@ describe('Xandeum Pulse - Inspector Integration', () => {
     });
   });
 
-  test('REPUTATION LINK: Navigates to leaderboard via card click', async () => {
+  test('REPUTATION LINK: Navigates to leaderboard', async () => {
     await act(async () => { render(<Home />); });
 
-    // Open Modal
+    // Step 1: Open the Modal
     const nodeCard = await screen.findByText(/1.2.3.4/);
     fireEvent.click(nodeCard.closest('.group')!);
 
-    // Find the Reputation container. In your code, handleLeaderboardNav is 
-    // attached to the wrapper div.
-    const repHeader = await screen.findByText('REPUTATION');
-    const clickableContainer = repHeader.closest('div[onClick]');
+    // Step 2: Find "REPUTATION" labels (there are multiple)
+    // We pick the one that belongs to the clickable card
+    const repLabels = await screen.findAllByText('REPUTATION');
+    const clickableRep = repLabels.find(el => el.closest('[onClick]'));
     
-    expect(clickableContainer).not.toBeNull();
-    fireEvent.click(clickableContainer!);
+    expect(clickableRep).toBeDefined();
+    fireEvent.click(clickableRep!);
 
-    // Final check for navigation
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('highlight=8xTestNodeKey123'));
     });
   });
 
-  test('API STATUS: Shows "API OFFLINE" when credits are null', async () => {
+  test('API STATUS: Shows offline badge', async () => {
     mockedAxios.get.mockResolvedValue({
       data: {
         result: { pods: [{ ...SAMPLE_NODE, credits: null }] },
@@ -73,7 +72,6 @@ describe('Xandeum Pulse - Inspector Integration', () => {
     await act(async () => { render(<Home />); });
     fireEvent.click((await screen.findByText(/1.2.3.4/)).closest('.group')!);
 
-    const offlineText = await screen.findAllByText(/API OFFLINE/i);
-    expect(offlineText.length).toBeGreaterThan(0);
+    expect(await screen.findByText(/API OFFLINE/i)).toBeInTheDocument();
   });
 });
