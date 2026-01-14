@@ -32,14 +32,14 @@ describe('Component Views (Visual Logic)', () => {
   // 1. HEALTH VIEW TESTS
   // =========================================================
   describe('<HealthView />', () => {
-    
+
     test('VISUALS: High health (>=80) should render GREEN elements', () => {
       // @ts-ignore - partial node mock is fine
       render(<HealthView node={createMockNode({ health: 95 })} zenMode={false} onBack={jest.fn()} avgNetworkHealth={80} medianStorage={1000} networkStats={MOCK_STATS} />);
-      
+
       // Check for the score text
       expect(screen.getByText('95')).toBeInTheDocument();
-      
+
       // Check if the "Better than" badge is rendered
       expect(screen.getByText(/BETTER THAN/)).toBeInTheDocument();
     });
@@ -47,7 +47,7 @@ describe('Component Views (Visual Logic)', () => {
     test('VISUALS: Low health (<50) should render RED elements', () => {
       // @ts-ignore
       render(<HealthView node={createMockNode({ health: 40 })} zenMode={false} onBack={jest.fn()} avgNetworkHealth={80} medianStorage={1000} networkStats={MOCK_STATS} />);
-      
+
       expect(screen.getByText('40')).toBeInTheDocument();
       // We look for a red indicator (checking class names is brittle, but logic verification via text is robust)
       // The logic calculates diff: 40 - 80 = -40
@@ -78,15 +78,17 @@ describe('Component Views (Visual Logic)', () => {
       expect(screen.getByText(/Lower/)).toBeInTheDocument();
     });
 
-    test('VISUALS: Tank should calculate fill percentage correctly', () => {
-        // Node 500, Median 1000 -> 50%
+    test('VISUALS: Tank/Bar should calculate fill percentage correctly (with buffer)', () => {
+        // Node 500, Median 1000, Avg 1000
+        // New Logic: Max = max(500, 1000, 1000) * 1.1 (Buffer) = 1100
+        // Expected % = (500 / 1100) * 100 = 45.45...%
+        
         // @ts-ignore
         const { container } = render(<StorageView node={createMockNode({ storage_committed: 500 })} zenMode={false} onBack={jest.fn()} medianCommitted={1000} totalStorageCommitted={5000} nodeCount={5} />);
+
+        // We search for a style attribute that contains "45." instead of "50%" to match the buffered calculation
+        const elements = container.querySelectorAll('[style*="45."]');
         
-        // Find the tank div (Desktop)
-        // We look for the inline style.
-        // Since we have responsive layouts, we just ensure ONE of them has the correct width/height style
-        const elements = container.querySelectorAll('[style*="50%"]');
         expect(elements.length).toBeGreaterThan(0);
     });
   });
