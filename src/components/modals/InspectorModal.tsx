@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { 
   X, Star, Check, Copy, Shield, Maximize2, HelpCircle, Minimize2, 
@@ -69,17 +69,13 @@ export const InspectorModal = ({
   const isSelectedNodeLatest = checkIsLatest(selectedNode.version, mostCommonVersion);
   const avgNetworkHealth = networkStats?.avgBreakdown?.total || 0;
 
-  // --- SIBLING CALCULATION ---
-  // Count OTHER nodes that share the same pubkey on the same network
-  const siblingCount = useMemo(() => {
-    if (!selectedNode.pubkey) return 0;
-    const count = nodes.filter(n => 
-      n.pubkey === selectedNode.pubkey && 
-      n.network === selectedNode.network
-    ).length;
-    // Subtract 1 to exclude the node itself
-    return Math.max(0, count - 1);
-  }, [nodes, selectedNode.pubkey, selectedNode.network]);
+  // --- SIBLINGS LOGIC ---
+  // Count nodes with same pubkey + same network, excluding self
+  const siblingCount = nodes.filter(n => 
+    n.pubkey === selectedNode.pubkey && 
+    n.network === selectedNode.network && 
+    n.address !== selectedNode.address
+  ).length;
 
   // --- STRICT NAVIGATION GUARD ---
   const handleLeaderboardNav = (e: React.MouseEvent) => {
@@ -106,27 +102,26 @@ export const InspectorModal = ({
      setModalView(modalView === view ? 'overview' : view);
   };
 
-  // --- VISUAL HELPERS ---
+  // --- HEALTH & STORAGE CALCULATIONS ---
   const healthScore = selectedNode.health || 0;
   const healthStatusLabel = healthScore >= 80 ? 'OPTIMAL' : 'FAIR'; 
   const healthColor = healthScore >= 80 ? 'text-green-500' : healthScore >= 50 ? 'text-yellow-500' : 'text-red-500';
   const healthGlowColor = healthScore >= 80 ? 'bg-green-500' : healthScore >= 50 ? 'bg-yellow-500' : 'bg-red-500';
-  // Context-aware rings for both Mobile and Desktop
-  const healthRingColor = healthScore >= 80 ? 'ring-green-500/30 hover:ring-green-500/60' : healthScore >= 50 ? 'ring-yellow-500/30 hover:ring-yellow-500/60' : 'ring-red-500/30 hover:ring-red-500/60';
-  const healthBorderColor = healthScore >= 80 ? 'border-green-500/20' : healthScore >= 50 ? 'border-yellow-500/20' : 'border-red-500/20';
+  
+  // Dynamic Rings for both Mobile & Desktop
+  const healthRingColor = healthScore >= 80 ? 'ring-green-500/20 hover:ring-green-500/60' : healthScore >= 50 ? 'ring-yellow-500/20 hover:ring-yellow-500/60' : 'ring-red-500/20 hover:ring-red-500/60';
+  const identityRingColor = isSelectedNodeLatest ? 'ring-green-500/20 hover:ring-green-500/60' : 'ring-orange-500/20 hover:ring-orange-500/60';
 
   const nodeCap = selectedNode.storage_committed || 0;
   const tankFillPercent = Math.min(100, (nodeCap / (medianCommitted || 1)) * 100);
-  const identityRingColor = isSelectedNodeLatest ? 'ring-blue-500/30 hover:ring-blue-500/60' : 'ring-orange-500/30 hover:ring-orange-500/60';
-  const identityBorderColor = isSelectedNodeLatest ? 'border-blue-500/20' : 'border-orange-500/20';
 
-  const isValidReputation = !((selectedNode as any).isUntracked || selectedNode.credits === null);
-  
-  // Rank visual Logic
+  // --- REPUTATION VISUALS ---
   const rank = selectedNode.rank || 0;
   let hoverShimmerGradient = "via-blue-400/20"; 
   if (rank > 0 && rank <= 100) hoverShimmerGradient = "via-yellow-300/30"; 
   else if (rank > 0 && rank <= 1000) hoverShimmerGradient = "via-slate-300/30";
+
+  const isValidReputation = !((selectedNode as any).isUntracked || selectedNode.credits === null);
 
   const copyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
@@ -213,11 +208,11 @@ export const InspectorModal = ({
             <div className="flex flex-col gap-3 md:gap-4 h-full">
                {modalView !== 'overview' ? (
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
-                    {/* LEFT SIDEBAR - EXPANDED VIEW */}
+                    {/* LEFT SIDEBAR (EXPANDED VIEW) */}
                     <div className="md:col-span-1 h-full">
                        {/* HEALTH TAB */}
                        {modalView === 'health' && (
-                         <div className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 ${healthBorderColor} ${healthRingColor} ring-1 cursor-pointer`} onClick={() => handleCardToggle('health')}>
+                         <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-green-500 ring-1 ring-green-500 cursor-pointer" onClick={() => handleCardToggle('health')}>
                            <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400">DIAGNOSTICS</div><Minimize2 size={14} className="text-zinc-500"/></div>
                            <div className="scale-90"><RadialProgress score={selectedNode.health || 0} size={115} /></div>
                            <div className="mt-6 text-[9px] font-bold uppercase text-red-400/80 flex items-center gap-1"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
@@ -225,7 +220,7 @@ export const InspectorModal = ({
                        )}
                        {/* STORAGE TAB */}
                        {modalView === 'storage' && (
-                         <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-indigo-500/20 ring-1 ring-indigo-500/20 cursor-pointer" onClick={() => handleCardToggle('storage')}>
+                         <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-purple-500 ring-1 ring-purple-500 cursor-pointer" onClick={() => handleCardToggle('storage')}>
                            <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400">STORAGE</div><Minimize2 size={14} className="text-zinc-500"/></div>
                            <div className="w-full space-y-2 text-sm"><div className="flex justify-between text-purple-400"><span>Committed</span><span>{formatBytes(selectedNode.storage_committed)}</span></div><div className="flex justify-between text-blue-400"><span>Used</span><span>{formatBytes(selectedNode.storage_used)}</span></div></div>
                            <div className="mt-6 text-[9px] font-bold uppercase text-red-400/80 flex items-center gap-1"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
@@ -233,7 +228,7 @@ export const InspectorModal = ({
                        )}
                        {/* IDENTITY TAB */}
                        {modalView === 'identity' && (
-                         <div className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 ${identityBorderColor} ${identityRingColor} ring-1 cursor-pointer`} onClick={() => handleCardToggle('identity')}>
+                         <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-blue-500 ring-1 ring-blue-500 cursor-pointer" onClick={() => handleCardToggle('identity')}>
                            <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400">IDENTITY</div><Minimize2 size={14} className="text-zinc-500"/></div>
                            <Shield size={64} className="text-blue-500 opacity-80" />
                            <div className="mt-6 text-[9px] font-bold uppercase text-red-400/80 flex items-center gap-1"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
@@ -249,10 +244,10 @@ export const InspectorModal = ({
                  </div>
                ) : (
                  <div className="flex flex-col gap-3 md:gap-4 h-full">
-                    {/* --- MOBILE GRID --- */}
+                    {/* MOBILE GRID */}
                     <div className="grid grid-cols-2 gap-2 md:hidden">
-                        {/* HEALTH CARD (MOBILE) */}
-                        <div onClick={() => handleCardToggle('health')} className={`col-span-2 p-3 rounded-2xl bg-zinc-900 border flex justify-between items-center relative overflow-hidden group cursor-pointer ring-1 ${healthRingColor} ${healthBorderColor}`}>
+                        {/* HEALTH CARD (MOBILE) - ADDED RING */}
+                        <div onClick={() => handleCardToggle('health')} className={`col-span-2 p-3 rounded-2xl bg-zinc-900 border border-zinc-800 flex justify-between items-center relative overflow-hidden group cursor-pointer ring-1 ${healthRingColor}`}>
                             <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>
                             <div className="relative z-10 flex flex-col justify-between h-full py-1">
                                 <div><div className="text-[10px] font-bold tracking-widest uppercase text-zinc-500 flex items-center gap-1.5 leading-tight"><Activity size={10} className={healthColor} /> SYSTEM DIAGNOSTICS</div><div className="text-[9px] font-mono mt-1 text-zinc-600">Status: <span className={healthScore >= 80 ? 'text-green-400' : 'text-yellow-400'}>{healthStatusLabel}</span></div></div>
@@ -261,22 +256,36 @@ export const InspectorModal = ({
                             <div className="relative z-10 flex flex-col items-center justify-center mr-2"><div className="relative scale-100 group-active:scale-110 transition-transform duration-300 flex items-center justify-center"><div className={`absolute inset-0 rounded-full blur-xl animate-[slow-pulse_12s_infinite_ease-in-out] ${healthGlowColor}`}></div><RadialProgress score={healthScore} size={54} stroke={6} /></div></div>
                         </div>
 
-                        {/* STORAGE CARD (MOBILE) */}
-                        <div onClick={() => handleCardToggle('storage')} className="aspect-square rounded-2xl bg-zinc-900 border border-indigo-500/20 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 ring-1 ring-indigo-500/20 hover:ring-indigo-500/40">
+                        {/* STORAGE CARD (MOBILE) - ADDED RING & FIXED COLORS */}
+                        <div onClick={() => handleCardToggle('storage')} className="aspect-square rounded-2xl bg-indigo-950/10 border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60">
                             <div className="absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out z-0" style={{ height: `${tankFillPercent}%` }}><div className="absolute inset-0 bg-gradient-to-b from-indigo-500/20 to-transparent"></div><div className="absolute top-0 left-0 right-0 h-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.4)]"></div></div>
                             <div className="relative z-10 p-3 flex flex-col h-full"><div className="flex justify-between items-start mb-2"><div className="flex items-center gap-1.5"><Database size={12} className="text-indigo-300/80 drop-shadow-md"/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">STORAGE</span></div><div className="bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded-full text-[7px] font-mono text-indigo-200/80 border border-indigo-500/20 shadow-sm">{(selectedNode.storage_used || 0).toLocaleString()} B</div></div><div className="mt-auto flex flex-col gap-1.5"><div className="flex justify-between items-end"><div className="flex flex-col items-center"><div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Used</div><div className="text-sm font-bold text-blue-400 drop-shadow-md">{formatBytes(selectedNode.storage_used).split(' ')[0]}</div></div><div className="w-px h-6 bg-white/5 mx-1"></div><div className="flex flex-col items-center"><div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Committed</div><div className="text-sm font-bold text-purple-400 drop-shadow-md">{formatBytes(selectedNode.storage_committed).split(' ')[0]}</div></div></div></div></div>
                         </div>
 
-                        {/* IDENTITY CARD (MOBILE) */}
-                        <div onClick={() => handleCardToggle('identity')} className={`aspect-square rounded-2xl border flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 bg-zinc-900 ${identityBorderColor} ring-1 ${identityRingColor}`}>
+                        {/* IDENTITY CARD (MOBILE) - ADDED RING & SIBLINGS */}
+                        <div onClick={() => handleCardToggle('identity')} className={`aspect-square rounded-2xl border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 bg-zinc-900 ring-1 ${identityRingColor}`}>
                             <div className={`absolute inset-0 bg-gradient-to-br opacity-40 ${isSelectedNodeLatest ? 'from-green-900/40 via-transparent to-blue-900/40' : 'from-orange-900/40 via-transparent to-red-900/40'}`}></div>
-                            <div className="relative z-10 p-3 flex flex-col h-full"><div className="flex justify-between items-start mb-1"><div className="relative flex items-center gap-1.5"><Shield size={12} className={`text-zinc-200 drop-shadow-md ${isSelectedNodeLatest ? 'text-blue-200' : 'text-orange-200'}`} /><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">IDENTITY</span></div><div className="flex flex-col items-end"><div className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase border mb-1 flex items-center gap-1 ${selectedNode.network === 'MAINNET' ? 'text-green-400 border-green-500/30 bg-green-900/20' : 'text-blue-400 border-blue-500/30 bg-blue-900/20'}`}>
-                                {selectedNode.network || 'UNKNOWN'}
-                                {siblingCount > 0 && <span className="text-[8px] opacity-80 border-l pl-1 border-white/20">+{siblingCount}</span>}
-                            </div></div></div><div className="mt-auto space-y-1"><div className="flex justify-between items-center"><span className="text-[8px] font-bold uppercase text-zinc-500">Ver</span><span className="font-mono text-xs font-bold text-white">{getSafeVersion(selectedNode)}</span></div><div className={`mt-1 flex items-center justify-center gap-1 py-1 rounded text-[8px] font-bold uppercase border ${isSelectedNodeLatest ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'}`}>{isSelectedNodeLatest ? <CheckCircle size={8}/> : <AlertTriangle size={8}/>}{isSelectedNodeLatest ? 'Up to Date' : 'Update Needed'}</div></div></div>
+                            <div className="relative z-10 p-3 flex flex-col h-full">
+                                <div className="flex justify-between items-start mb-1">
+                                    <div className="relative flex items-center gap-1.5"><Shield size={12} className={`text-zinc-200 drop-shadow-md ${isSelectedNodeLatest ? 'text-blue-200' : 'text-orange-200'}`} /><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">IDENTITY</span></div>
+                                    <div className="flex flex-col items-end">
+                                      <div className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase border mb-1 ${selectedNode.network === 'MAINNET' ? 'text-green-400 border-green-500/30 bg-green-900/20' : 'text-blue-400 border-blue-500/30 bg-blue-900/20'}`}>{selectedNode.network || 'UNKNOWN'}</div>
+                                    </div>
+                                </div>
+                                <div className="mt-auto space-y-1">
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-[8px] font-bold uppercase text-zinc-500">Ver</span>
+                                      <div className="flex items-center gap-1">
+                                        <span className="font-mono text-xs font-bold text-white">{getSafeVersion(selectedNode)}</span>
+                                        {siblingCount > 0 && <span className="text-[9px] font-bold text-zinc-500">+{siblingCount}</span>}
+                                      </div>
+                                    </div>
+                                    <div className={`mt-1 flex items-center justify-center gap-1 py-1 rounded text-[8px] font-bold uppercase border ${isSelectedNodeLatest ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'}`}>{isSelectedNodeLatest ? <CheckCircle size={8}/> : <AlertTriangle size={8}/>}{isSelectedNodeLatest ? 'Up to Date' : 'Update Needed'}</div>
+                                </div>
+                            </div>
                         </div>
 
-                        {/* REPUTATION CARD (MOBILE) */}
+                        {/* REPUTATION CARD (MOBILE) - RIGHT ALIGN, SIZE, PILL */}
                         <div onClick={handleLeaderboardNav} className={`h-24 p-3 rounded-2xl relative overflow-hidden group cursor-pointer hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/80 border-yellow-900/30'}`}>
                             <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:8px_8px] pointer-events-none"></div>
                             <div className={`absolute inset-0 bg-gradient-to-r from-transparent ${hoverShimmerGradient} to-transparent -skew-x-12 -translate-x-[150%] pointer-events-none opacity-0 group-hover:opacity-100 ${shimmerOnceAnimation}`}></div>
@@ -286,81 +295,74 @@ export const InspectorModal = ({
                             </div>
                             <div className="relative z-10 flex flex-col h-full justify-between pb-3">
                                 {isValidReputation && (
-                                  <div className="flex flex-col items-end gap-0.5 mt-1">
-                                      <div className="text-[8px] font-bold uppercase text-zinc-600">Global Rank</div>
+                                  <div className="flex flex-col items-end gap-0.5">
+                                      <div className="text-[9px] font-bold uppercase text-zinc-500">Global Rank</div>
                                       <div className="text-xl font-black text-white leading-none">#{selectedNode.rank || '-'}</div>
                                   </div>
                                 )}
-
-                                <div className="w-full bg-black/40 shadow-inner border border-white/5 rounded-lg px-2 py-1.5 flex items-center justify-between mt-auto">
+                                {/* GLASS DASHBOARD PILL */}
+                                <div className="w-full bg-black/20 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] border-b border-white/5 rounded-full px-2 py-1.5 flex items-center justify-between mt-auto">
                                    <span className="text-[8px] font-bold text-zinc-500 uppercase">CREDITS</span>
                                    <span className={`text-[9px] font-mono font-bold whitespace-nowrap ${(selectedNode as any).isUntracked || selectedNode.credits === null ? 'text-zinc-500' : 'text-yellow-500'}`}>
-                                       {(selectedNode as any).isUntracked ? 'NO STORAGE CREDITS' : selectedNode.credits === null ? 'API OFFLINE' : selectedNode.credits.toLocaleString()}
+                                       {(selectedNode as any).isUntracked ? 'NO CREDITS' : selectedNode.credits === null ? 'OFFLINE' : selectedNode.credits.toLocaleString()}
                                    </span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* PHYSICAL CARD (MOBILE) */}
+                        {/* PHYSICAL CARD (MOBILE) - FIXED PIN & REMOVED PULSE */}
                         <Link href={`/map?focus=${getSafeIp(selectedNode)}`} className={`h-24 p-3 rounded-2xl relative overflow-hidden block group cursor-pointer ring-1 ring-blue-500/20 hover:ring-blue-500/50 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/80 border-blue-900/30'}`}>
                             <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#3b82f6_1px,transparent_1px),linear-gradient(to_bottom,#3b82f6_1px,transparent_1px)] bg-[size:16px_16px] origin-center group-hover:scale-[3.0] transition-transform duration-700 ease-in-out pointer-events-none"></div>
-                            {/* Removed pulsing dot, added static pin */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 opacity-20"><MapPin size={32} className="text-blue-500" /></div>
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0">
+                                {/* FIXED PIN ICON */}
+                                <MapPin size={24} className="text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
+                            </div>
                             <div className="flex justify-between items-start relative z-10 w-full"><div className="flex items-center gap-1.5"><Globe size={12} className="text-blue-500 relative z-10"/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">PHYSICAL</span></div></div>
-                            <div className="relative z-10 flex flex-col h-full justify-between pb-3 pt-2"><div className="text-[10px] font-mono text-zinc-400 truncate w-full">{getSafeIp(selectedNode)}</div><div className="flex items-center gap-2 text-[10px] font-bold text-white leading-none ml-auto">
-                                {/* Swapped Flag and Name */}
-                                <span className="text-sm leading-none">{getFlagEmoji(selectedNode.location?.countryCode)}</span>
-                                <span>{selectedNode.location?.countryName || 'Unknown'}</span>
-                                <MapPin size={8} className="text-blue-500/80 ml-1" />
-                            </div></div>
+                            <div className="relative z-10 flex flex-col h-full justify-between pb-3 pt-2"><div className="text-[10px] font-mono text-zinc-400 truncate w-full">{getSafeIp(selectedNode)}</div><div className="flex items-center gap-2 text-[10px] font-bold text-white leading-none"><span className="text-lg leading-none">{getFlagEmoji(selectedNode.location?.countryCode)}</span><span>{selectedNode.location?.countryName || 'Unknown'}</span><MapPin size={8} className="text-blue-500/80 ml-auto" /></div></div>
                         </Link>
                     </div>
 
-                    {/* --- DESKTOP GRID --- */}
+                    {/* --- DESKTOP GRID (HIDDEN MD:GRID) --- */}
                     <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-                      {/* HEALTH (DESKTOP) */}
+                      {/* HEALTH (DESKTOP) - REDUCED SIZE & ADDED STATUS */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300 ring-1 ${zenMode ? 'bg-zinc-900' : 'bg-zinc-900/30'} ${healthRingColor}`} onClick={() => handleCardToggle('health')}>
                          <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>
                          <div className="flex justify-between items-start mb-4 relative z-10"><div><h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-500">SYSTEM DIAGNOSTICS</h3></div><HelpCircle size={14} className="text-zinc-500"/></div>
-                         {/* Reduced size to 115, added status text */}
                          <div className="self-center hidden md:flex flex-col items-center justify-center relative z-10">
-                            <div className="relative mb-2">
-                                <div className={`absolute inset-0 rounded-full blur-xl animate-[slow-pulse_12s_infinite_ease-in-out] ${healthGlowColor}`}></div>
-                                <RadialProgress score={selectedNode.health || 0} size={115} />
-                            </div>
-                            <div className="text-[10px] font-bold text-zinc-400 mt-2">STATUS: <span className={healthScore >= 80 ? 'text-green-400' : 'text-yellow-400'}>{healthStatusLabel}</span></div>
+                            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full rounded-full blur-xl animate-[slow-pulse_12s_infinite_ease-in-out] ${healthGlowColor}`}></div>
+                            {/* REDUCED SIZE TO 115 */}
+                            <RadialProgress score={selectedNode.health || 0} size={115} />
+                            {/* ADDED STATUS TEXT */}
+                            <div className="mt-4 text-[10px] font-mono text-zinc-600">Status: <span className={healthScore >= 80 ? 'text-green-400' : 'text-yellow-400'}>{healthStatusLabel}</span></div>
                          </div>
                          <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-green-400 flex justify-center gap-1 relative z-10 ${breatheAnimation}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
                       </div>
 
-                      {/* STORAGE (DESKTOP) */}
+                      {/* STORAGE (DESKTOP) - COLORS FIXED */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60 bg-indigo-950/10`} onClick={() => handleCardToggle('storage')}>
                          <div className="flex justify-between items-start mb-4 relative z-10"><div className="flex items-center gap-2"><Database size={18} className="text-indigo-300/80"/><span className="text-xs font-bold uppercase text-zinc-500">STORAGE</span></div></div>
-                         <div className="space-y-4 relative z-10"><div className="flex justify-between items-end">
-                            {/* Updated colors: Blue Used, Purple Committed */}
-                            <div><div className="text-2xl font-bold text-blue-400">{formatBytes(selectedNode.storage_used).split(' ')[0]}</div><div className="text-[9px] font-bold text-zinc-600">USED</div></div>
-                            <div className="text-right"><div className="text-2xl font-bold text-purple-400">{formatBytes(selectedNode.storage_committed).split(' ')[0]}</div><div className="text-[9px] font-bold text-zinc-600">TOTAL</div></div>
-                         </div><div className="h-2 bg-zinc-800/50 rounded-full overflow-hidden relative"><div className="h-full bg-gradient-to-r from-transparent to-indigo-500/20 relative overflow-hidden" style={{ width: `${Math.min(100, ((selectedNode.storage_used || 0) / (selectedNode.storage_committed || 1)) * 100)}%` }}><div className="absolute top-0 bottom-0 right-0 w-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.4)]"></div></div></div></div>
+                         <div className="space-y-4 relative z-10"><div className="flex justify-between items-end"><div><div className="text-2xl font-bold text-blue-400">{formatBytes(selectedNode.storage_used).split(' ')[0]}</div><div className="text-[9px] font-bold text-zinc-600">USED</div></div><div className="text-right"><div className="text-2xl font-bold text-purple-400">{formatBytes(selectedNode.storage_committed).split(' ')[0]}</div><div className="text-[9px] font-bold text-zinc-600">COMMITTED</div></div></div><div className="h-2 bg-zinc-800/50 rounded-full overflow-hidden relative"><div className="h-full bg-gradient-to-r from-transparent to-indigo-500/20 relative overflow-hidden" style={{ width: `${Math.min(100, ((selectedNode.storage_used || 0) / (selectedNode.storage_committed || 1)) * 100)}%` }}><div className="absolute top-0 bottom-0 right-0 w-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.4)]"></div></div></div></div>
                          <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-violet-300/80 flex justify-center gap-1 relative z-10 ${breatheAnimation}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
                       </div>
 
-                      {/* IDENTITY (DESKTOP) */}
+                      {/* IDENTITY (DESKTOP) - ADDED SIBLINGS */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300 ring-1 ${zenMode ? 'bg-zinc-900' : 'bg-zinc-900/30'} ${identityRingColor}`} onClick={() => handleCardToggle('identity')}>
                          <div className={`absolute inset-0 bg-gradient-to-br opacity-20 pointer-events-none ${isSelectedNodeLatest ? 'from-green-900/40 via-transparent to-blue-900/40' : 'from-orange-900/40 via-transparent to-red-900/40'}`}></div>
-                         <div className="flex justify-between items-start mb-4 relative z-10"><div className="flex items-center gap-2"><Server size={18} className="text-zinc-400"/><span className="text-xs font-bold uppercase text-zinc-500">IDENTITY</span></div>
-                           <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border flex items-center gap-1 ${selectedNode.network === 'MAINNET' ? 'text-green-500 border-green-500/30' : 'text-blue-500 border-blue-500/30'}`}>
-                             {selectedNode.network}
-                             {siblingCount > 0 && <span className="border-l border-zinc-500/30 pl-1 opacity-80">+{siblingCount}</span>}
-                           </div>
+                         <div className="flex justify-between items-start mb-4 relative z-10"><div className="flex items-center gap-2"><Server size={18} className="text-zinc-400"/><span className="text-xs font-bold uppercase text-zinc-500">IDENTITY</span></div><div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${selectedNode.network === 'MAINNET' ? 'text-green-500 border-green-500/30' : 'text-blue-500 border-blue-500/30'}`}>{selectedNode.network}</div></div>
+                         <div className="space-y-2 relative z-10">
+                            <div className="flex items-center gap-2">
+                              <div className="text-xl font-mono text-white">{getSafeVersion(selectedNode)}</div>
+                              {siblingCount > 0 && <span className="text-xs font-bold text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded-md border border-zinc-700">+{siblingCount}</span>}
+                            </div>
+                            <div className="text-xs text-zinc-500 flex items-center gap-1"><Clock size={12}/> Up: {formatUptime(selectedNode.uptime)}</div>{isSelectedNodeLatest ? <div className="text-[10px] text-green-500 font-bold flex items-center gap-1"><CheckCircle size={10}/> UP TO DATE</div> : <div className="text-[10px] text-orange-500 font-bold flex items-center gap-1"><AlertTriangle size={10}/> UPDATE NEEDED</div>}
                          </div>
-                         <div className="space-y-2 relative z-10"><div className="text-xl font-mono text-white">{getSafeVersion(selectedNode)}</div><div className="text-xs text-zinc-500 flex items-center gap-1"><Clock size={12}/> Up: {formatUptime(selectedNode.uptime)}</div>{isSelectedNodeLatest ? <div className="text-[10px] text-green-500 font-bold flex items-center gap-1"><CheckCircle size={10}/> UP TO DATE</div> : <div className="text-[10px] text-orange-500 font-bold flex items-center gap-1"><AlertTriangle size={10}/> UPDATE NEEDED</div>}</div>
                          <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-blue-400 flex justify-center gap-1 relative z-10 ${breatheAnimation}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
                       </div>
                     </div>
 
                     {/* DESKTOP BOTTOM ROW */}
                     <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-4">
-                       {/* DESKTOP REPUTATION */}
+                       {/* REPUTATION (DESKTOP) - RIGHT ALIGNED, SIZE, PILL */}
                        <div 
                           onClick={handleLeaderboardNav} 
                           className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-yellow-900/30'}`}
@@ -372,51 +374,58 @@ export const InspectorModal = ({
                              <ArrowUpRight size={18} className="text-yellow-400 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all"/>
                           </div>
                           <div className="relative z-10 flex flex-col gap-2">
-                             <div className="flex items-center justify-end w-full">
-                                {/* Right Aligned + Smaller Font (xl) */}
+                             {/* ALIGN RIGHT */}
+                             <div className="flex flex-col items-end">
                                 {isValidReputation && (
                                   <div className="text-right">
                                       <div className="text-[10px] font-bold uppercase text-zinc-500 mb-0.5">Global Rank</div>
+                                      {/* REDUCED FONT SIZE */}
                                       <div className="text-xl font-black text-white leading-none">#{selectedNode.rank || '-'}</div>
                                   </div>
                                 )}
                              </div>
-                             {/* Recessed Dashboard Pill */}
-                             <div className="w-full bg-black/40 shadow-inner border border-white/5 rounded-lg px-4 py-2 flex items-center justify-between mt-1">
+                             {/* GLASS DASHBOARD PILL (DESKTOP) */}
+                             <div className="w-full bg-black/20 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] border-b border-white/5 rounded-full px-4 py-2 flex items-center justify-between mt-1">
                                 <span className="text-[10px] font-bold text-zinc-500 uppercase">CREDITS EARNED</span>
                                 <span className={`text-[9px] font-mono font-bold whitespace-nowrap ${(selectedNode as any).isUntracked || selectedNode.credits === null ? 'text-zinc-500' : 'text-yellow-500'}`}>
-                                    {(selectedNode as any).isUntracked ? 'NO STORAGE CREDITS' : selectedNode.credits === null ? 'API OFFLINE' : selectedNode.credits.toLocaleString()}
+                                    {(selectedNode as any).isUntracked ? 'NO CREDITS' : selectedNode.credits === null ? 'OFFLINE' : selectedNode.credits.toLocaleString()}
                                 </span>
                              </div>
                           </div>
                           <div className={`absolute bottom-2 right-4 text-[9px] font-bold uppercase text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity ${breatheAnimation}`}>OPEN LEADERBOARD</div>
                        </div>
 
-                       {/* PHYSICAL (DESKTOP) */}
+                       {/* PHYSICAL (DESKTOP) - SWAPPED FLAG ORDER */}
                        <Link href={`/map?focus=${getSafeIp(selectedNode)}`}>
                          <div className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-blue-500/20 hover:ring-blue-500/50 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-blue-900/30'}`}>
                             <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#3b82f6_1px,transparent_1px),linear-gradient(to_bottom,#3b82f6_1px,transparent_1px)] bg-[size:20px_20px] origin-center group-hover:scale-[3.0] transition-transform duration-700 ease-in-out pointer-events-none"></div>
-                            {/* Static Pin, No dot */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 opacity-10"><MapPin size={64} className="text-blue-500" /></div>
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0">
+                                {/* FIXED PIN */}
+                                <MapPin size={48} className="text-blue-500/20 drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]" />
+                            </div>
                             <div className="flex justify-between items-start relative z-10"><div className="flex items-center gap-2"><Globe size={18} className="text-blue-500"/><span className="text-xs font-bold uppercase text-zinc-500">PHYSICAL LAYER</span></div><ArrowUpRight size={18} className="text-blue-400 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all"/></div>
-                            <div className="relative z-10 mt-auto flex items-end justify-between w-full"><div className="text-xs font-mono text-zinc-400">{getSafeIp(selectedNode)}</div>
-                              <div className="flex items-center gap-2 text-sm font-bold text-white">
-                                {/* Swapped Flag and Name */}
-                                <span className="text-lg leading-none">{getFlagEmoji(selectedNode.location?.countryCode)}</span>
-                                <span>{selectedNode.location?.countryName || 'Unknown'}</span>
-                              </div>
+                            <div className="relative z-10 mt-auto flex items-end justify-between w-full">
+                                <div className="text-xs font-mono text-zinc-400">{getSafeIp(selectedNode)}</div>
+                                {/* SWAPPED ORDER: FLAG FIRST, THEN NAME */}
+                                <div className="flex items-center gap-2 text-sm font-bold text-white">
+                                    <span className="text-lg">{getFlagEmoji(selectedNode.location?.countryCode)}</span>
+                                    <span>{selectedNode.location?.countryName || 'Unknown'}</span>
+                                </div>
                             </div>
                             <div className={`absolute bottom-2 right-4 text-[9px] font-bold uppercase text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity ${breatheAnimation}`}>OPEN MAP VIEW</div>
                          </div>
                        </Link>
                     </div>
 
-                    {/* FOOTER - MOBILE REFACTORED */}
-                    <div className="mt-auto pt-2 border-t border-zinc-800 flex flex-col gap-2">
-                      <div className="flex flex-row items-center justify-between gap-2">
-                        <div className="flex-1 text-[10px] text-zinc-500 flex items-center justify-center gap-1.5 bg-black/40 px-3 py-2 rounded-xl border border-zinc-800/50"><Clock size={10} /> Last Seen: <span className="text-zinc-300 font-mono">{timeAgo}</span></div>
-                        <button onClick={() => copyToClipboard(`${window.location.origin}/?open=${selectedNode.pubkey}`, 'url')} className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/20 rounded-xl text-[10px] font-bold text-blue-400 transition`}>{copiedField === 'url' ? <Check size={12} /> : <LinkIcon size={12} />} {copiedField === 'url' ? 'LINK COPIED' : 'COPY NODE URL'}</button>
+                    {/* FOOTER (REFACTORED MOBILE) */}
+                    <div className="mt-auto pt-2 md:pt-6 border-t border-zinc-800 flex flex-col gap-2 md:gap-4">
+                      {/* LAST SEEN / COPY (SIDE BY SIDE ON MOBILE) */}
+                      <div className="flex flex-row md:flex-col items-center justify-between md:justify-center gap-2 md:gap-3">
+                        <div className="flex-1 md:flex-none text-[9px] md:text-[10px] text-zinc-500 flex items-center justify-center gap-1.5 bg-black/40 px-3 py-1.5 md:py-1 rounded-full border border-zinc-800/50"><Clock size={10} /> <span className="hidden md:inline">Last Seen:</span> <span className="text-zinc-300 font-mono">{timeAgo}</span></div>
+                        <button onClick={() => copyToClipboard(`${window.location.origin}/?open=${selectedNode.pubkey}`, 'url')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-1.5 md:py-2 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/20 rounded-full text-[9px] md:text-[10px] font-bold text-blue-400 transition`}>{copiedField === 'url' ? <Check size={12} /> : <LinkIcon size={12} />} {copiedField === 'url' ? 'COPIED' : 'COPY NODE URL'}</button>
                       </div>
+                      
+                      {/* ACTION BUTTONS */}
                       <div className="flex gap-2 md:gap-4">
                         <button onClick={() => setMode('COMPARE')} className="flex-1 py-3 md:py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border border-zinc-700"><Swords size={16} className="text-red-400" /> <span className="hidden md:inline">COMPARE NODES</span><span className="md:hidden">COMPARE</span></button>
                         <button onClick={() => setMode('SHARE')} className="flex-1 py-3 md:py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20"><Camera size={16} /> <span className="hidden md:inline">PROOF OF PULSE</span><span className="md:hidden">PROOF</span></button>
