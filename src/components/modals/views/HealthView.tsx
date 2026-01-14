@@ -1,4 +1,4 @@
-import { Activity, ArrowLeft, Zap } from 'lucide-react';
+import { ArrowLeft, Zap } from 'lucide-react';
 import { Node } from '../../../types';
 
 interface HealthViewProps {
@@ -30,7 +30,7 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
   const isApiOffline = node.credits === null;
   const isReputationInvalid = isUntracked || isApiOffline;
 
-  // Adjust weights: If offline, reputation weight is 0, others increase
+  // Adjust weights
   const weights = isReputationInvalid 
       ? { uptime: 0.45, storage: 0.35, reputation: 0, version: 0.20 }
       : { uptime: 0.35, storage: 0.30, reputation: 0.20, version: 0.15 };
@@ -55,19 +55,16 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
 
   return (
     <div className="animate-in fade-in slide-in-from-right-2 duration-300 h-full flex flex-col">
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-4 md:mb-6 shrink-0">
-        <h3 className={`text-xs font-bold tracking-widest uppercase flex items-center gap-2 ${zenMode ? 'text-zinc-200' : 'text-zinc-500'}`}>
-          <Activity size={14} /> DIAGNOSTICS & VITALITY
-        </h3>
+      {/* HEADER: Back Button Only */}
+      <div className="flex justify-end items-center mb-4 shrink-0 md:hidden">
         <button onClick={onBack} className="text-[10px] font-bold text-red-500 hover:text-red-400 flex items-center gap-1 bg-zinc-900 px-2.5 py-1.5 rounded-lg border border-zinc-800 transition hover:bg-zinc-800">
           <ArrowLeft size={10} /> BACK
         </button>
       </div>
 
-      <div className="flex-grow flex flex-col gap-4 md:gap-6 overflow-y-auto custom-scrollbar pr-1">
+      <div className="flex-grow flex flex-col gap-4 overflow-y-auto custom-scrollbar pr-1">
         {/* SCORE CARD */}
-        <div className="p-4 md:p-6 bg-black rounded-2xl border border-zinc-800 flex justify-between items-center relative overflow-hidden">
+        <div className="p-4 bg-black rounded-2xl border border-zinc-800 flex justify-between items-center relative overflow-hidden">
           <div className="absolute top-0 right-0 p-12 bg-green-500/5 blur-2xl rounded-full pointer-events-none"></div>
           <div>
             <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">YOUR SCORE</div>
@@ -82,8 +79,8 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
           </div>
         </div>
 
-        {/* --- MOBILE LAYOUT: 2x2 GRID (UPDATED AESTHETICS) --- */}
-        <div className="grid grid-cols-2 gap-2 md:hidden">
+        {/* --- METRICS GRID (UPDATED AESTHETICS) --- */}
+        <div className="grid grid-cols-2 gap-2">
            {metrics.map((m) => {
               const rawVal = m.rawVal || 0;
               const weightedVal = (rawVal * m.weight).toFixed(1);
@@ -97,7 +94,7 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
                   className={`border rounded-xl p-3 flex flex-col justify-between h-full transition-all ${
                     isInvalidRep 
                       ? 'bg-zinc-900/30 border-zinc-800/50 border-dashed opacity-60' 
-                      : 'bg-zinc-900/40 border-zinc-800/60'
+                      : zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/40 border-zinc-800/60'
                   }`}
                 >
                    <div className="flex justify-between items-center mb-2">
@@ -124,55 +121,7 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
            })}
         </div>
 
-        {/* --- DESKTOP LAYOUT: VERTICAL STACK (Preserved) --- */}
-        <div className="hidden md:flex flex-col gap-5">
-          {metrics.map((m) => {
-            const rawVal = m.rawVal || 0; 
-            const rawAvg = m.avgRaw || 0;
-            const weightedVal = (rawVal * m.weight).toFixed(2);
-            const weightedAvg = (rawAvg * m.weight).toFixed(2);
-            const barColor = rawVal >= 80 ? 'bg-green-500' : rawVal >= 50 ? 'bg-yellow-500' : 'bg-red-500';
-
-            const isInvalidRep = m.label === 'Reputation' && isReputationInvalid;
-
-            return (
-              <div key={m.label} className={isInvalidRep ? 'opacity-50 grayscale' : ''}>
-                <div className="flex justify-between text-xs mb-2">
-                  <span className="text-zinc-400 font-bold flex items-center gap-2">
-                      {m.label} 
-                      {m.label === 'Storage' 
-                        ? <span className="text-[9px] font-mono text-zinc-600 font-normal">{getStorageBreakdownText(node, medianStorage)}</span> 
-                        : <span className="text-[9px] font-mono text-zinc-600 font-normal">(Base: {isInvalidRep ? 'N/A' : rawVal})</span>
-                      }
-                  </span>
-                  <div className="font-mono text-[10px]">
-                    {isInvalidRep ? (
-                        <span className="text-zinc-500 font-bold uppercase tracking-wider">
-                            {isUntracked ? 'NO STORAGE CREDITS' : 'API OFFLINE'}
-                        </span>
-                    ) : (
-                        <>
-                            <span className="text-white font-bold">{weightedVal}</span>
-                            <span className="text-zinc-600 mx-1">/</span>
-                            <span className="text-zinc-500">Avg: {weightedAvg}</span>
-                        </>
-                    )}
-                  </div>
-                </div>
-                <div className="h-2 bg-zinc-800 rounded-full overflow-visible relative">
-                  {!isInvalidRep && (
-                    <>
-                        <div className={`h-full rounded-l-full transition-all duration-1000 ${barColor} shadow-[0_0_10px_rgba(255,255,255,0.1)]`} style={{ width: `${Math.min(100, rawVal)}%` }}></div>
-                        <div className="absolute top-[-4px] bottom-[-4px] w-0.5 bg-white shadow-[0_0_5px_white] z-10" style={{ left: `${Math.min(100, rawAvg)}%` }} title={`Network Average: ${rawAvg}`}></div>
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-auto pt-4 border-t border-zinc-800 flex justify-center text-center">
+        <div className="mt-auto pt-2 flex justify-center text-center">
           <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 px-3 py-2 rounded-xl text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center gap-2">
             <Zap size={14} className="shrink-0" /> 
             <span>RANK #{rank} • BETTER THAN {betterThanPercent < 1 ? '<1' : Math.floor(betterThanPercent)}%</span>
