@@ -4,7 +4,7 @@ import {
   X, Star, Check, Copy, Shield, Maximize2, HelpCircle, Minimize2, 
   HeartPulse, Database, Server, Trophy, Globe, Clock, Link as LinkIcon, 
   Swords, Camera, ExternalLink, Activity, CheckCircle, AlertTriangle, Layers,
-  ArrowUpRight, MapPin
+  ArrowUpRight, MapPin, AlertOctagon
 } from 'lucide-react';
 import { Node } from '../../types';
 import { ModalAvatar } from '../common/ModalAvatar';
@@ -31,6 +31,7 @@ interface InspectorModalProps {
   medianCommitted: number;
   totalStorageCommitted: number;
   mostCommonVersion: string;
+  onShowToast: (msg: string) => void; // ADDED: Required for notifications
 }
 
 // Helper to get flag emoji from country code
@@ -53,7 +54,8 @@ export const InspectorModal = ({
   networkStats,
   medianCommitted,
   totalStorageCommitted,
-  mostCommonVersion
+  mostCommonVersion,
+  onShowToast
 }: InspectorModalProps) => {
   const router = useRouter();
   const [modalView, setModalView] = useState<'overview' | 'health' | 'storage' | 'identity'>('overview');
@@ -68,6 +70,30 @@ export const InspectorModal = ({
   const timeAgo = useTimeAgo(selectedNode.last_seen_timestamp);
   const isSelectedNodeLatest = checkIsLatest(selectedNode.version, mostCommonVersion);
   const avgNetworkHealth = networkStats?.avgBreakdown?.total || 0;
+
+  // --- RESTORED: NAVIGATION LOGIC ---
+  const handleLeaderboardNav = (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    // Priority 1: Check if node is explicitly untracked
+    if ((selectedNode as any).isUntracked) {
+       onShowToast("This node is currently not receiving storage credits. It may be in a proving phase or below stake thresholds.");
+       return;
+    }
+
+    // Priority 2: Check if API is globally offline
+    if (selectedNode.credits === null) {
+       onShowToast("The Credits API is currently offline. Leaderboard data is unavailable.");
+       return;
+    }
+
+    // Priority 3: Navigate to Leaderboard
+    if (selectedNode.pubkey) {
+        router.push(`/leaderboard?highlight=${selectedNode.pubkey}`);
+    } else {
+        router.push('/leaderboard');
+    }
+  };
 
   // --- HEALTH LOGIC ---
   const healthScore = selectedNode.health || 0;
@@ -84,12 +110,12 @@ export const InspectorModal = ({
   // --- IDENTITY LOGIC ---
   const identityRingColor = isSelectedNodeLatest ? 'ring-green-500/20 hover:ring-green-500/60' : 'ring-orange-500/20 hover:ring-orange-500/60';
 
-  // --- REPUTATION TIER LOGIC ---
-  const rank = selectedNode.rank || 999999;
+  // --- REPUTATION TIER LOGIC (RESTORED NO HYPOTHETICAL RANK) ---
+  const rank = selectedNode.rank || 0;
   let hoverShimmerGradient = "via-blue-400/20"; 
-  if (rank <= 100) {
+  if (rank > 0 && rank <= 100) {
       hoverShimmerGradient = "via-yellow-300/30"; // Gold Tier
-  } else if (rank <= 1000) {
+  } else if (rank > 0 && rank <= 1000) {
       hoverShimmerGradient = "via-slate-300/30"; // Platinum Tier
   }
 
@@ -103,8 +129,8 @@ export const InspectorModal = ({
      setModalView(modalView === view ? 'overview' : view);
   };
 
-  const shimmerAnimation = "animate-[shimmer_12s_infinite_linear]"; // Passive
-  const shimmerOnceAnimation = "group-hover:animate-[shimmer-once_2.5s_forwards]"; // Active ONCE (Slowed to 2.5s)
+  const shimmerAnimation = "animate-[shimmer_12s_infinite_linear]"; 
+  const shimmerOnceAnimation = "group-hover:animate-[shimmer-once_2.5s_forwards]";
   const breatheAnimation = "animate-[slow-breathe_5s_infinite_ease-in-out]";
 
   return (
@@ -136,12 +162,11 @@ export const InspectorModal = ({
         className={`border w-full max-w-4xl 2xl:max-w-6xl rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[85vh] md:max-h-[90vh] ${zenMode ? 'bg-black border-zinc-800 shadow-none' : 'bg-[#09090b] border-zinc-800'}`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* --- HEADER (RESTORED & ADAPTIVE) --- */}
+        {/* --- HEADER --- */}
         <div className={`shrink-0 border-b ${zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
-          
-          {/* MOBILE HEADER (Restored with Scaled Avatar) */}
+
+          {/* MOBILE HEADER */}
           <div className="md:hidden p-3 flex flex-col gap-2">
-             {/* Row 1: Flag - Title - Close */}
              <div className="flex items-center justify-between">
                 <div className="scale-75 origin-left">
                     <ModalAvatar node={selectedNode} /> 
@@ -152,7 +177,6 @@ export const InspectorModal = ({
                 </button>
              </div>
 
-             {/* Row 2: Pubkey - Watchlist (RESTORED) */}
              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono bg-zinc-900/80 px-2 py-1.5 rounded-lg border border-zinc-800">
                   <span className="text-zinc-400">{selectedNode.pubkey ? `${selectedNode.pubkey.slice(0, 12)}...` : 'Unknown'}</span>
@@ -166,7 +190,6 @@ export const InspectorModal = ({
                 </button>
              </div>
 
-             {/* Row 3: Status Pill (RESTORED) */}
              <div className="flex justify-start">
                <span className={`text-[9px] font-bold px-2 py-0.5 rounded border w-fit ${selectedNode.is_public ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-orange-500/10 border-orange-500/30 text-orange-400'}`}>
                   {selectedNode.is_public ? 'STORAGE LAYER FULLY INDEXED' : 'STORAGE LAYER NOT INDEXED'}
@@ -174,7 +197,7 @@ export const InspectorModal = ({
              </div>
           </div>
 
-          {/* DESKTOP HEADER (Unchanged) */}
+          {/* DESKTOP HEADER */}
           <div className="hidden md:flex p-6 justify-between items-start">
             <div className="flex flex-row items-center gap-4">
               <ModalAvatar node={selectedNode} />
@@ -218,7 +241,7 @@ export const InspectorModal = ({
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
                     {/* LEFT SIDEBAR */}
                     <div className="md:col-span-1 h-full">
-                       {/* HEALTH TAB */}
+                       {/* TABS (Health, Storage, Identity) */}
                        {modalView === 'health' && (
                          <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-green-500 ring-1 ring-green-500 cursor-pointer" onClick={() => handleCardToggle('health')}>
                            <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400">DIAGNOSTICS</div><Minimize2 size={14} className="text-zinc-500"/></div>
@@ -226,7 +249,6 @@ export const InspectorModal = ({
                            <div className="mt-6 text-[9px] font-bold uppercase text-red-400/80 flex items-center gap-1"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
                          </div>
                        )}
-                       {/* STORAGE TAB */}
                        {modalView === 'storage' && (
                          <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-purple-500 ring-1 ring-purple-500 cursor-pointer" onClick={() => handleCardToggle('storage')}>
                            <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400">STORAGE</div><Minimize2 size={14} className="text-zinc-500"/></div>
@@ -234,7 +256,6 @@ export const InspectorModal = ({
                            <div className="mt-6 text-[9px] font-bold uppercase text-red-400/80 flex items-center gap-1"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
                          </div>
                        )}
-                       {/* IDENTITY TAB */}
                        {modalView === 'identity' && (
                          <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-blue-500 ring-1 ring-blue-500 cursor-pointer" onClick={() => handleCardToggle('identity')}>
                            <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400">IDENTITY</div><Minimize2 size={14} className="text-zinc-500"/></div>
@@ -262,7 +283,6 @@ export const InspectorModal = ({
                           className="col-span-2 p-3 rounded-2xl bg-zinc-900 border border-zinc-800 flex justify-between items-center relative overflow-hidden group cursor-pointer"
                         >
                             <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>
-
                             <div className="relative z-10 flex flex-col justify-between h-full py-1">
                                 <div>
                                   <div className="text-[10px] font-bold tracking-widest uppercase text-zinc-500 flex items-center gap-1.5 leading-tight">
@@ -276,15 +296,9 @@ export const InspectorModal = ({
                                   <Maximize2 size={8}/> TAP TO EXPAND
                                 </div>
                             </div>
-
                             <div className="relative z-10 flex flex-col items-center justify-center mr-2">
                                 <div className="relative scale-100 group-active:scale-110 transition-transform duration-300 flex items-center justify-center">
                                     <div className={`absolute inset-0 rounded-full blur-xl animate-[slow-pulse_12s_infinite_ease-in-out] ${healthGlowColor}`}></div>
-                                    <div className="absolute -top-5 z-20 pointer-events-none">
-                                        <span className={`text-[8px] font-black uppercase tracking-wider whitespace-nowrap ${healthScore >= 80 ? 'text-green-500' : 'text-yellow-500'}`}>
-                                            HEALTH SCORE
-                                        </span>
-                                    </div>
                                     <RadialProgress score={healthScore} size={54} stroke={6} />
                                 </div>
                             </div>
@@ -295,14 +309,10 @@ export const InspectorModal = ({
                           onClick={() => handleCardToggle('storage')} 
                           className="aspect-square rounded-2xl bg-indigo-950/10 border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 ring-1 ring-transparent hover:ring-indigo-500/20"
                         >
-                            <div 
-                              className="absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out z-0" 
-                              style={{ height: `${tankFillPercent}%` }}
-                            >
+                            <div className="absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out z-0" style={{ height: `${tankFillPercent}%` }}>
                                 <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/20 to-transparent"></div>
                                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.4)]"></div>
                             </div>
-
                             <div className="relative z-10 p-3 flex flex-col h-full">
                                 <div className="flex justify-between items-start mb-2">
                                     <div className="flex items-center gap-1.5">
@@ -317,18 +327,14 @@ export const InspectorModal = ({
                                     <div className="flex justify-between items-end">
                                         <div className="flex flex-col items-center">
                                             <div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Used</div>
-                                            <div className="text-sm font-bold text-indigo-100 drop-shadow-md">{formatBytes(selectedNode.storage_used).split(' ')[0]} <span className="text-[9px]">{formatBytes(selectedNode.storage_used).split(' ')[1]}</span></div>
+                                            <div className="text-sm font-bold text-indigo-100 drop-shadow-md">{formatBytes(selectedNode.storage_used).split(' ')[0]}</div>
                                         </div>
                                         <div className="w-px h-6 bg-white/5 mx-1"></div>
                                         <div className="flex flex-col items-center">
                                             <div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Committed</div>
-                                            <div className="text-sm font-bold text-indigo-100 drop-shadow-md">{formatBytes(selectedNode.storage_committed).split(' ')[0]} <span className="text-[9px]">{formatBytes(selectedNode.storage_committed).split(' ')[1]}</span></div>
+                                            <div className="text-sm font-bold text-indigo-100 drop-shadow-md">{formatBytes(selectedNode.storage_committed).split(' ')[0]}</div>
                                         </div>
                                     </div>
-                                    <div className="w-full h-1 bg-black/50 rounded-full overflow-hidden border border-white/5">
-                                        <div className="h-full bg-indigo-500/40" style={{ width: `${internalUsagePercent}%` }}></div>
-                                    </div>
-                                    <div className={`text-[8px] font-bold uppercase text-indigo-400/80 flex items-center gap-1 justify-center ${breatheAnimation}`}><Maximize2 size={8}/> TAP TO EXPAND</div>
                                 </div>
                             </div>
                         </div>
@@ -339,13 +345,11 @@ export const InspectorModal = ({
                           className="aspect-square rounded-2xl border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 bg-zinc-900"
                         >
                             <div className={`absolute inset-0 bg-gradient-to-br opacity-40 ${isSelectedNodeLatest ? 'from-green-900/40 via-transparent to-blue-900/40' : 'from-orange-900/40 via-transparent to-red-900/40'}`}></div>
-
                             <div className="relative z-10 p-3 flex flex-col h-full">
                                 <div className="flex justify-between items-start mb-1">
                                     <div className="relative flex items-center gap-1.5">
                                       <Shield size={12} className={`text-zinc-200 drop-shadow-md ${isSelectedNodeLatest ? 'text-blue-200' : 'text-orange-200'}`} />
                                       <span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">IDENTITY</span>
-                                      <div className={`absolute inset-0 blur-md rounded-full animate-pulse ${isSelectedNodeLatest ? 'bg-blue-500/30' : 'bg-orange-500/30'}`}></div>
                                     </div>
                                     <div className="flex flex-col items-end">
                                       <div className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase border mb-1 ${selectedNode.network === 'MAINNET' ? 'text-green-400 border-green-500/30 bg-green-900/20' : 'text-blue-400 border-blue-500/30 bg-blue-900/20'}`}>
@@ -358,27 +362,20 @@ export const InspectorModal = ({
                                        <span className="text-[8px] font-bold uppercase text-zinc-500">Ver</span>
                                        <span className="font-mono text-xs font-bold text-white">{getSafeVersion(selectedNode)}</span>
                                     </div>
-                                    <div className="flex justify-between items-center">
-                                       <span className="text-[8px] font-bold uppercase text-zinc-500">Up</span>
-                                       <span className="font-mono text-[9px] font-bold text-zinc-400">{formatUptime(selectedNode.uptime)}</span>
-                                    </div>
                                     <div className={`mt-1 flex items-center justify-center gap-1 py-1 rounded text-[8px] font-bold uppercase border ${isSelectedNodeLatest ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'}`}>
                                       {isSelectedNodeLatest ? <CheckCircle size={8}/> : <AlertTriangle size={8}/>}
                                       {isSelectedNodeLatest ? 'Up to Date' : 'Update Needed'}
                                     </div>
-                                    <div className={`text-[8px] font-bold uppercase text-zinc-400 flex items-center gap-1 justify-center pt-1 ${breatheAnimation}`}><Maximize2 size={8}/> TAP TO EXPAND</div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* ROW 3: REPUTATION */}
+                        {/* ROW 3: REPUTATION (MOBILE) - RESTORED LOGIC */}
                         <div 
-                            onClick={() => router.push(`/leaderboard?highlight=${selectedNode.pubkey}`)} 
-                            className={`h-24 p-3 rounded-2xl relative overflow-hidden group cursor-pointer hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50 hover:shadow-[0_4px_20px_-4px_rgba(234,179,8,0.3)] ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/80 border-yellow-900/30'}`}
+                            onClick={handleLeaderboardNav} 
+                            className={`h-24 p-3 rounded-2xl relative overflow-hidden group cursor-pointer hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/80 border-yellow-900/30'}`}
                         >
                             <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:8px_8px] pointer-events-none"></div>
-                            
-                            {/* UPDATED: Shimmer Once Slowed to 2.5s */}
                             <div className={`absolute inset-0 bg-gradient-to-r from-transparent ${hoverShimmerGradient} to-transparent -skew-x-12 -translate-x-[150%] pointer-events-none opacity-0 group-hover:opacity-100 ${shimmerOnceAnimation}`}></div>
 
                             <div className="flex justify-between items-start relative z-10 mb-2">
@@ -391,54 +388,48 @@ export const InspectorModal = ({
                             <div className="relative z-10 flex flex-col h-full justify-between pb-3">
                                 <div className="flex items-center gap-2">
                                     <div className="text-[9px] font-bold uppercase text-zinc-500">Global Rank</div>
-                                    <div className="text-xl font-black text-white leading-none">#{selectedNode.rank || '-'}</div>
+                                    <div className="text-xl font-black text-white leading-none">
+                                        {(selectedNode as any).isUntracked ? '---' : `#${selectedNode.rank || '-'}`}
+                                    </div>
                                 </div>
                                 <div className="w-full bg-white/5 border border-white/10 rounded-full px-2 py-1.5 flex items-center justify-between mt-auto">
-                                   <span className="text-[8px] font-bold text-zinc-500 uppercase">CREDITS EARNED</span>
-                                   <span className="text-[10px] font-mono font-bold text-yellow-500">{(selectedNode.credits || 0).toLocaleString()}</span>
+                                   <span className="text-[8px] font-bold text-zinc-500 uppercase">CREDITS</span>
+                                   <span className={`text-[10px] font-mono font-bold ${(selectedNode as any).isUntracked || selectedNode.credits === null ? 'text-zinc-500' : 'text-yellow-500'}`}>
+                                       {(selectedNode as any).isUntracked 
+                                         ? 'NO STORAGE CREDITS' 
+                                         : selectedNode.credits === null 
+                                         ? 'API OFFLINE' 
+                                         : selectedNode.credits.toLocaleString()}
+                                   </span>
                                 </div>
-                                <div className={`text-[8px] font-bold uppercase text-yellow-500 flex items-center gap-1 justify-center mt-1 ${breatheAnimation}`}><ExternalLink size={8}/> OPEN LEADERBOARD</div>
                             </div>
                         </div>
 
-                        {/* ROW 3: PHYSICAL LAYER (MOBILE - UPDATED LAYOUT) */}
+                        {/* ROW 3: PHYSICAL LAYER (MOBILE) */}
                         <Link 
                             href={`/map?focus=${getSafeIp(selectedNode)}`} 
-                            className={`h-24 p-3 rounded-2xl relative overflow-hidden block group cursor-pointer ring-1 ring-blue-500/20 hover:ring-blue-500/50 hover:shadow-[0_4px_20px_-4px_rgba(59,130,246,0.3)] ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/80 border-blue-900/30'}`}
+                            className={`h-24 p-3 rounded-2xl relative overflow-hidden block group cursor-pointer ring-1 ring-blue-500/20 hover:ring-blue-500/50 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/80 border-blue-900/30'}`}
                         >
-                            {/* Deep Zoom Background */}
                             <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#3b82f6_1px,transparent_1px),linear-gradient(to_bottom,#3b82f6_1px,transparent_1px)] bg-[size:16px_16px] origin-center group-hover:scale-[3.0] transition-transform duration-700 ease-in-out pointer-events-none"></div>
-
-                            {/* UPDATED: Tiny Pin (h-1.5 w-1.5), Centered, Slow Ping (3s) */}
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0">
                                 <div className="relative flex h-1.5 w-1.5">
                                   <span className="animate-[slow-ping_3s_infinite] absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500 border border-white/20"></span>
                                 </div>
                             </div>
-
-                            {/* Header */}
                             <div className="flex justify-between items-start relative z-10 w-full">
                                 <div className="flex items-center gap-1.5">
                                     <Globe size={12} className="text-blue-500 relative z-10"/>
-                                    <span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">PHYSICAL LAYER</span>
+                                    <span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">PHYSICAL</span>
                                 </div>
-                                <ArrowUpRight size={14} className="text-blue-400 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all"/>
                             </div>
-
-                            {/* UPDATED: Layout - Flex Col, IP Top, Flag+Name Bottom with MapPin Icon */}
                             <div className="relative z-10 flex flex-col h-full justify-between pb-3 pt-2">
-                                {/* Top: IP */}
-                                <div className="text-[10px] font-mono text-zinc-400 truncate w-full">
-                                    {getSafeIp(selectedNode)}
-                                </div>
-                                {/* Bottom: Flag | Name | Pin */}
+                                <div className="text-[10px] font-mono text-zinc-400 truncate w-full">{getSafeIp(selectedNode)}</div>
                                 <div className="flex items-center gap-2 text-[10px] font-bold text-white leading-none">
                                     <span className="text-sm leading-none">{getFlagEmoji(selectedNode.location?.countryCode)}</span>
                                     <span>{selectedNode.location?.countryName || 'Unknown'}</span>
                                     <MapPin size={8} className="text-blue-500/80 ml-auto" />
                                 </div>
-                                <div className={`text-[8px] font-bold uppercase text-blue-500 flex items-center gap-1 justify-center ${breatheAnimation}`}><ExternalLink size={8}/> OPEN MAP VIEW</div>
                             </div>
                         </Link>
                     </div>
@@ -448,28 +439,22 @@ export const InspectorModal = ({
                       {/* 1. DIAGNOSTICS CARD (DESKTOP) */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300 ring-1 ${zenMode ? 'bg-zinc-900' : 'bg-zinc-900/30'} ${healthRingColor}`} onClick={() => handleCardToggle('health')}>
                          <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>
-                         
+
                          <div className="flex justify-between items-start mb-4 relative z-10">
                            <div><h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-500">SYSTEM DIAGNOSTICS</h3></div>
                            <HelpCircle size={14} className="text-zinc-500"/>
                          </div>
-                         
+
                          <div className="self-center hidden md:flex items-center justify-center relative z-10">
                              <div className={`absolute inset-0 rounded-full blur-xl animate-[slow-pulse_12s_infinite_ease-in-out] ${healthGlowColor}`}></div>
-                             <div className="absolute -top-5 z-20 pointer-events-none">
-                                <span className={`text-[8px] font-black uppercase tracking-wider whitespace-nowrap ${healthScore >= 80 ? 'text-green-500' : 'text-yellow-500'}`}>
-                                    HEALTH SCORE
-                                </span>
-                             </div>
                              <RadialProgress score={selectedNode.health || 0} size={140} />
                          </div>
-                         
-                         <div className="md:hidden text-4xl font-black text-white self-center">{selectedNode.health}</div>
+
                          <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-green-400 flex justify-center gap-1 relative z-10 ${breatheAnimation}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
                       </div>
 
                       {/* 2. STORAGE CARD (DESKTOP) */}
-                      <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60 hover:shadow-[0_4px_20px_-4px_rgba(99,102,241,0.2)] bg-indigo-950/10`} onClick={() => handleCardToggle('storage')}>
+                      <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60 bg-indigo-950/10`} onClick={() => handleCardToggle('storage')}>
                          <div className="flex justify-between items-start mb-4 relative z-10">
                            <div className="flex items-center gap-2"><Database size={18} className="text-indigo-300/80"/><span className="text-xs font-bold uppercase text-zinc-500">STORAGE</span></div>
                          </div>
@@ -499,75 +484,71 @@ export const InspectorModal = ({
                             <div className="text-xs text-zinc-500 flex items-center gap-1"><Clock size={12}/> Up: {formatUptime(selectedNode.uptime)}</div>
                             {isSelectedNodeLatest ? <div className="text-[10px] text-green-500 font-bold flex items-center gap-1"><CheckCircle size={10}/> UP TO DATE</div> : <div className="text-[10px] text-orange-500 font-bold flex items-center gap-1"><AlertTriangle size={10}/> UPDATE NEEDED</div>}
                          </div>
-                         <div className="absolute bottom-16 right-6 opacity-10 pointer-events-none">
-                            <Shield size={80} className={`${isSelectedNodeLatest ? 'text-blue-500' : 'text-orange-500'}`} />
-                            <div className={`absolute inset-0 blur-xl rounded-full animate-pulse ${isSelectedNodeLatest ? 'bg-blue-500/40' : 'bg-orange-500/40'}`}></div>
-                         </div>
                          <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-blue-400 flex justify-center gap-1 relative z-10 ${breatheAnimation}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
                       </div>
                     </div>
 
                     {/* DESKTOP BOTTOM ROW */}
                     <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-4">
-                       
-                       {/* REPUTATION DEEP LINK */}
+
+                       {/* REPUTATION DEEP LINK (RESTORED LOGIC) */}
                        <div 
-                          onClick={() => router.push(`/leaderboard?highlight=${selectedNode.pubkey}`)} 
-                          className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50 hover:shadow-[0_4px_20px_-4px_rgba(234,179,8,0.3)] ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-yellow-900/30'}`}
+                          onClick={handleLeaderboardNav} 
+                          className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-yellow-900/30'}`}
                         >
                           <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:10px_10px] pointer-events-none"></div>
-                          {/* UPDATED: Shimmer Once Slowed to 2.5s */}
                           <div className={`absolute inset-0 bg-gradient-to-r from-transparent ${hoverShimmerGradient} to-transparent -skew-x-12 -translate-x-[150%] pointer-events-none opacity-0 group-hover:opacity-100 ${shimmerOnceAnimation}`}></div>
 
                           <div className="flex justify-between items-start relative z-10">
                              <div className="flex items-center gap-2"><Trophy size={18} className="text-yellow-500"/><span className="text-xs font-bold uppercase text-zinc-500">REPUTATION</span></div>
                              <ArrowUpRight size={18} className="text-yellow-400 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all"/>
                           </div>
-                          
+
                           <div className="relative z-10 flex flex-col gap-2">
                              <div className="flex items-center justify-center">
                                 <div className="text-center">
                                     <div className="text-[10px] font-bold uppercase text-zinc-500 mb-0.5">Global Rank</div>
-                                    <div className="text-4xl font-black text-white leading-none">#{selectedNode.rank || '-'}</div>
+                                    <div className="text-4xl font-black text-white leading-none">
+                                        {(selectedNode as any).isUntracked ? '---' : `#${selectedNode.rank || '-'}`}
+                                    </div>
                                 </div>
                              </div>
-                             
+
                              <div className="w-full bg-white/5 border border-white/10 rounded-full px-4 py-2 flex items-center justify-between mt-1">
                                 <span className="text-[10px] font-bold text-zinc-500 uppercase">CREDITS EARNED</span>
-                                <span className="text-sm font-mono font-bold text-yellow-500">{(selectedNode.credits || 0).toLocaleString()}</span>
+                                <span className={`text-sm font-mono font-bold ${(selectedNode as any).isUntracked || selectedNode.credits === null ? 'text-zinc-500' : 'text-yellow-500'}`}>
+                                    {(selectedNode as any).isUntracked 
+                                      ? 'NO STORAGE CREDITS' 
+                                      : selectedNode.credits === null 
+                                      ? 'API OFFLINE' 
+                                      : selectedNode.credits.toLocaleString()}
+                                </span>
                              </div>
                           </div>
-                          
-                          <div className={`absolute bottom-2 right-4 text-[9px] font-bold uppercase text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity ${breatheAnimation}`}>OPEN LEADERBOARD</div>
+                          <div className={`absolute bottom-2 right-4 text-[9px] font-bold uppercase ${(selectedNode as any).isUntracked ? 'text-zinc-600' : 'text-yellow-500 opacity-0 group-hover:opacity-100'} transition-opacity ${breatheAnimation}`}>OPEN LEADERBOARD</div>
                        </div>
 
                        {/* MAP DEEP LINK (DESKTOP) */}
                        <Link href={`/map?focus=${getSafeIp(selectedNode)}`}>
-                         <div className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-blue-500/20 hover:ring-blue-500/50 hover:shadow-[0_4px_20px_-4px_rgba(59,130,246,0.3)] ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-blue-900/30'}`}>
+                         <div className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-blue-500/20 hover:ring-blue-500/50 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-blue-900/30'}`}>
                             <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#3b82f6_1px,transparent_1px),linear-gradient(to_bottom,#3b82f6_1px,transparent_1px)] bg-[size:20px_20px] origin-center group-hover:scale-[3.0] transition-transform duration-700 ease-in-out pointer-events-none"></div>
-                            
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0">
                                 <div className="relative flex h-4 w-4">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                                   <span className="relative inline-flex rounded-full h-4 w-4 bg-blue-500 border border-white/20"></span>
                                 </div>
                             </div>
-
                             <div className="flex justify-between items-start relative z-10">
                                <div className="flex items-center gap-2"><Globe size={18} className="text-blue-500"/><span className="text-xs font-bold uppercase text-zinc-500">PHYSICAL LAYER</span></div>
                                <ArrowUpRight size={18} className="text-blue-400 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all"/>
                             </div>
-
                             <div className="relative z-10 mt-auto flex items-end justify-between w-full">
-                                <div className="text-xs font-mono text-zinc-400">
-                                    {getSafeIp(selectedNode)}
-                                </div>
+                                <div className="text-xs font-mono text-zinc-400">{getSafeIp(selectedNode)}</div>
                                 <div className="flex items-center gap-2 text-sm font-bold text-white">
                                    <span>{selectedNode.location?.countryName || 'Unknown'}</span>
                                    <span className="text-lg">{getFlagEmoji(selectedNode.location?.countryCode)}</span>
                                 </div>
                             </div>
-
                             <div className={`absolute bottom-2 right-4 text-[9px] font-bold uppercase text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity ${breatheAnimation}`}>OPEN MAP VIEW</div>
                          </div>
                        </Link>
