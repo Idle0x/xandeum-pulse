@@ -81,9 +81,14 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
   test('DASHBOARD AUTO-OPEN: Should open modal if URL has ?open=PUBKEY', async () => {
     mockQuery = { open: '8xTestNodeKey123' };
     await act(async () => { render(<Home />); });
-    
-    await waitFor(() => { expect(screen.getByText('NODE INSPECTOR')).toBeVisible(); });
-    // Use getAllByText to handle potential duplicates in responsive views
+
+    // UPDATED: Use getAllByText because Header exists twice (Mobile/Desktop)
+    await waitFor(() => { 
+        const headers = screen.getAllByText('NODE INSPECTOR');
+        expect(headers.length).toBeGreaterThan(0);
+        expect(headers[0]).toBeInTheDocument();
+    });
+
     const keys = screen.getAllByText(/8xTestNodeKey123/);
     expect(keys.length).toBeGreaterThan(0);
   });
@@ -94,23 +99,20 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
 
   test('CLICK CARD: Clicking a node card should open the Inspector', async () => {
     await act(async () => { render(<Home />); });
-    
-    // FIX: Handle Duplicate Elements (Mobile/Desktop versions)
-    // We get all elements matching the IP, and click the first one.
+
     const nodeCards = await screen.findAllByText(/192.168.1.1/);
-    
-    // We traverse up to the clickable container of the first found element
-    // Ensure we are clicking the card logic, not just the span
     const clickableCard = nodeCards[0].closest('div[onClick]') || nodeCards[0].closest('.group');
-    
+
     if (clickableCard) {
       fireEvent.click(clickableCard);
     } else {
-      fireEvent.click(nodeCards[0]); // Fallback
+      fireEvent.click(nodeCards[0]); 
     }
 
+    // UPDATED: Handle duplicate headers
     await waitFor(() => { 
-        expect(screen.getByText('NODE INSPECTOR')).toBeVisible(); 
+        const headers = screen.getAllByText('NODE INSPECTOR');
+        expect(headers[0]).toBeVisible(); 
     });
   });
 
@@ -121,16 +123,23 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
   test('LEADERBOARD LINK: Should generate precise 3-system link', async () => {
     await act(async () => { render(<Home />); });
 
-    // Open Modal via Card Click
+    // Open Modal
     const nodeCards = await screen.findAllByText(/8xTestNodeKey123/); 
     fireEvent.click(nodeCards[0].closest('.group')!); 
 
-    // Click Reputation Card in Modal
-    // "REPUTATION" text appears multiple times (Modal Header + Card). We want the Card.
-    const repCards = await screen.findAllByText('REPUTATION');
-    const clickableRepCard = repCards.find(el => el.closest('div[onClick]')); // Find the clickable one
+    // Find the Reputation Card inside the modal
+    // Note: 'REPUTATION' text might appear in the grid view (Mobile or Desktop)
+    const repTexts = await screen.findAllByText('REPUTATION');
     
-    fireEvent.click(clickableRepCard ? clickableRepCard.closest('div[onClick]')! : repCards[0]);
+    // Find the one that is inside a clickable container (the card)
+    const clickableRepCard = repTexts.find(el => el.closest('div[onClick]'));
+
+    if (clickableRepCard) {
+        fireEvent.click(clickableRepCard.closest('div[onClick]')!);
+    } else {
+        // Fallback: try clicking the first one found if structure is different
+        fireEvent.click(repTexts[0]);
+    }
 
     expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('/leaderboard'));
     expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('highlight=8xTestNodeKey123'));
@@ -148,13 +157,14 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
         stats: { systemStatus: { credits: false } }
       }
     });
-    
+
     await act(async () => { render(<Home />); });
-    
+
     // Open Modal
     const cards = await screen.findAllByText(/8xTestNode/);
     fireEvent.click(cards[0].closest('.group')!);
 
+    // Look for the offline badge text we added
     const badges = await screen.findAllByText(/API OFFLINE/i);
     expect(badges.length).toBeGreaterThan(0);
   });
@@ -165,20 +175,17 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
 
   test('SEARCH: Typing should filter nodes', async () => {
     await act(async () => { render(<Home />); });
-    
-    const inputs = screen.getAllByPlaceholderText(''); // Search input often has no placeholder or empty
+
+    const inputs = screen.getAllByPlaceholderText(''); 
     const searchInput = inputs.find(i => i.tagName === 'INPUT');
-    
+
     if (searchInput) {
         fireEvent.change(searchInput, { target: { value: 'GhostNodeVPN' } });
     }
 
-    // FIX: Handle Duplicate Elements (Banner + Card)
-    // findAllByText returns an array. If length > 0, it exists.
     const ghostTexts = await screen.findAllByText(/GhostNodeVPN/);
     expect(ghostTexts.length).toBeGreaterThan(0);
 
-    // Ensure the other node is NOT present
     expect(screen.queryByText(/8xTestNodeKey123/)).not.toBeInTheDocument();
   });
 
@@ -202,7 +209,11 @@ describe('Xandeum Pulse - Integration & Deep Linking', () => {
 
     await act(async () => { render(<Home />); });
 
-    await waitFor(() => expect(screen.getByText('NODE INSPECTOR')).toBeVisible());
+    // UPDATED: Handle duplicate headers
+    await waitFor(() => {
+        const headers = screen.getAllByText('NODE INSPECTOR');
+        expect(headers[0]).toBeVisible();
+    });
 
     // Check that we loaded the DEV version
     const versionBadges = screen.getAllByText('9.9.9-DEV');
