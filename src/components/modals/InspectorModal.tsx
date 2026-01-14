@@ -257,7 +257,7 @@ export const InspectorModal = ({
                         {/* STORAGE CARD (MOBILE) */}
                         <div onClick={() => handleCardToggle('storage')} className="aspect-square rounded-2xl bg-indigo-950/10 border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60">
                             <div className="absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out z-0" style={{ height: `${tankFillPercent}%` }}><div className="absolute inset-0 bg-gradient-to-b from-indigo-500/20 to-transparent"></div><div className="absolute top-0 left-0 right-0 h-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.4)]"></div></div>
-                            <div className="relative z-10 p-3 flex flex-col h-full"><div className="flex justify-between items-start mb-2"><div className="flex items-center gap-1.5"><Database size={12} className="text-indigo-300/80 drop-shadow-md"/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">STORAGE</span></div><div className="bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded-full text-[7px] font-mono text-indigo-200/80 border border-indigo-500/20 shadow-sm">{(selectedNode.storage_used || 0).toLocaleString()} B</div></div><div className="mt-auto flex flex-col gap-1.5"><div className="flex justify-between items-end"><div className="flex flex-col items-center"><div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Used</div><div className="text-sm font-bold text-blue-400 drop-shadow-md">{formatBytes(selectedNode.storage_used).split(' ')[0]}</div></div><div className="w-px h-6 bg-white/5 mx-1"></div><div className="flex flex-col items-center"><div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Committed</div><div className="text-sm font-bold text-purple-400 drop-shadow-md">{formatBytes(selectedNode.storage_committed).split(' ')[0]}</div></div></div></div></div>
+                            <div className="relative z-10 p-3 flex flex-col h-full"><div className="flex justify-between items-start mb-2"><div className="flex items-center gap-1.5"><Database size={12} className="text-indigo-300/80 drop-shadow-md"/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">STORAGE</span></div><div className="bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded-full text-[7px] font-mono text-indigo-200/80 border border-indigo-500/20 shadow-sm">{(selectedNode.storage_used || 0).toLocaleString()} B</div></div><div className="mt-auto flex flex-col gap-1.5"><div className="flex justify-between items-end"><div className="flex flex-col items-center"><div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Used</div><div className="text-sm font-bold text-blue-400 drop-shadow-md">{formatBytes(selectedNode.storage_used).split(' ')[0]}</div></div><div className="w-px h-6 bg-white/20 mx-1"></div><div className="flex flex-col items-center"><div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Committed</div><div className="text-sm font-bold text-purple-400 drop-shadow-md">{formatBytes(selectedNode.storage_committed).split(' ')[0]}</div></div></div></div></div>
                         </div>
 
                         {/* IDENTITY CARD (MOBILE) - SIBLINGS MOVED TO HEADER */}
@@ -277,6 +277,10 @@ export const InspectorModal = ({
                                       <span className="text-[8px] font-bold uppercase text-zinc-500">Ver</span>
                                       <span className="font-mono text-xs font-bold text-white">{getSafeVersion(selectedNode)}</span>
                                     </div>
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-[8px] font-bold uppercase text-zinc-500">Up</span>
+                                      <span className="font-mono text-[10px] text-zinc-300">{formatUptime(selectedNode.uptime)}</span>
+                                    </div>
                                     <div className={`mt-1 flex items-center justify-center gap-1 py-1 rounded text-[8px] font-bold uppercase border ${isSelectedNodeLatest ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'}`}>{isSelectedNodeLatest ? <CheckCircle size={8}/> : <AlertTriangle size={8}/>}{isSelectedNodeLatest ? 'Up to Date' : 'Update Needed'}</div>
                                 </div>
                             </div>
@@ -295,7 +299,7 @@ export const InspectorModal = ({
                                   // SINGLE ROW, JUSTIFY BETWEEN, REDUCED SIZE
                                   <div className="flex justify-between items-center w-full mb-1">
                                       <div className="text-[9px] font-bold uppercase text-zinc-500">Global Rank</div>
-                                      <div className="text-sm font-black text-white">#{selectedNode.rank || '-'}</div>
+                                      <div className="text-xs font-black text-zinc-200">#{selectedNode.rank || '-'}</div>
                                   </div>
                                 )}
                                 {/* GLASS DASHBOARD PILL */}
@@ -313,9 +317,9 @@ export const InspectorModal = ({
                             <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#3b82f6_1px,transparent_1px),linear-gradient(to_bottom,#3b82f6_1px,transparent_1px)] bg-[size:16px_16px] origin-center group-hover:scale-[3.0] transition-transform duration-700 ease-in-out pointer-events-none"></div>
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0">
                                 {/* FIXED PIN ICON */}
-                                <MapPin size={24} className="text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
+                                <MapPin size={24} className="text-blue-500/30 drop-shadow-none" />
                             </div>
-                            <div className="flex justify-between items-start relative z-10 w-full"><div className="flex items-center gap-1.5"><Globe size={12} className="text-blue-500 relative z-10"/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">PHYSICAL</span></div></div>
+                            <div className="flex justify-between items-start relative z-10 w-full"><div className="flex items-center gap-1.5"><Globe size={12} className="text-blue-500 relative z-10"/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">PHYSICAL LAYER</span></div></div>
                             <div className="relative z-10 flex flex-col h-full justify-between pb-3 pt-2"><div className="text-[10px] font-mono text-zinc-400 truncate w-full">{getSafeIp(selectedNode)}</div><div className="flex items-center gap-2 text-[10px] font-bold text-white leading-none"><span className="text-lg leading-none">{getFlagEmoji(selectedNode.location?.countryCode)}</span><span>{selectedNode.location?.countryName || 'Unknown'}</span></div></div>
                         </Link>
                     </div>
@@ -378,7 +382,7 @@ export const InspectorModal = ({
                                 <div className="flex justify-between items-center w-full px-1">
                                     <div className="text-[10px] font-bold uppercase text-zinc-500">Global Rank</div>
                                     {/* REDUCED SIZE */}
-                                    <div className="text-sm font-black text-white">#{selectedNode.rank || '-'}</div>
+                                    <div className="text-xs font-black text-zinc-200">#{selectedNode.rank || '-'}</div>
                                 </div>
                              )}
                              {/* GLASS DASHBOARD PILL (DESKTOP) */}
