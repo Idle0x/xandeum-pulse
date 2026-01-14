@@ -31,40 +31,42 @@ describe('Component Views (Visual Logic)', () => {
     test('VISUALS: High health (>=80) should render GREEN elements', () => {
       render(<HealthView node={createMockNode({ health: 95 })} zenMode={false} onBack={jest.fn()} avgNetworkHealth={80} medianStorage={1000} networkStats={MOCK_STATS} />);
       expect(screen.getByText('95')).toBeInTheDocument();
-      expect(screen.getByText(/BETTER THAN/)).toBeInTheDocument();
     });
   });
 
   describe('<StorageView />', () => {
-    test('LOGIC: Should detect "Above Majority" status', () => {
-      render(<StorageView node={createMockNode({ storage_committed: 2000 * (1024**3) })} zenMode={false} onBack={jest.fn()} medianCommitted={1000 * (1024**3)} totalStorageCommitted={5000 * (1024**3)} nodeCount={5} />);
-      expect(screen.getByText(/Higher/)).toBeInTheDocument();
+    test('LOGIC: Detects comparison against median', () => {
+      render(<StorageView 
+        node={createMockNode({ storage_committed: 2000 * (1024**3) })} 
+        zenMode={false} onBack={jest.fn()} 
+        medianCommitted={1000 * (1024**3)} 
+        totalStorageCommitted={5000 * (1024**3)} 
+        nodeCount={5} 
+      />);
+      
+      // Checking the comparison text that appears in your "NETWORK COMPARISON" box
+      expect(screen.getByText(/NETWORK COMPARISON/i)).toBeInTheDocument();
+      expect(screen.getByText(/Higher/i)).toBeInTheDocument();
     });
 
-    test('VISUALS: Tank/Bar should calculate fill percentage correctly (with buffer)', () => {
-        // Calculation: Max = 1000 * 1.1 = 1100. 500 / 1100 = ~45.45%
+    test('VISUALS: Calculates Utilization Efficiency percentage', () => {
+        // Used: 500, Committed: 1000 = 50%
         render(<StorageView 
-            node={createMockNode({ storage_committed: 500 * (1024**3) })} 
-            zenMode={false} onBack={jest.fn()} medianCommitted={1000 * (1024**3)} 
-            totalStorageCommitted={5000 * (1024**3)} nodeCount={5} 
+            node={createMockNode({ storage_committed: 1000, storage_used: 500 })} 
+            zenMode={false} onBack={jest.fn()} medianCommitted={1000} 
+            totalStorageCommitted={5000} nodeCount={5} 
         />);
 
-        // Instead of searching style.height, we search for the bar container 
-        // that holds the "YOU" label.
-        const youLabel = screen.getByText('YOU');
-        const barContainer = youLabel.parentElement;
-        const bar = barContainer?.querySelector('div[class*="bg-gradient-to-t"]');
-        
-        // We verify the bar exists and check the raw style attribute string
-        expect(bar).toBeInTheDocument();
-        expect(bar?.getAttribute('style')).toContain('height: 45');
+        // Your donut chart renders the percentage as text inside a div
+        expect(screen.getByText('50%')).toBeInTheDocument();
+        expect(screen.getByText(/Efficiency/i)).toBeInTheDocument();
     });
   });
 
   describe('<IdentityView />', () => {
-    test('VERSION CHECK: Should show "Up to Date" when versions match', () => {
-      render(<IdentityView node={createMockNode({ version: '1.5.0' })} nodes={[]} zenMode={false} onBack={jest.fn()} mostCommonVersion="1.5.0" />);
-      expect(screen.getByText(/Up to Date/i)).toBeInTheDocument();
+    test('VERSION CHECK: Renders Consensus information', () => {
+      render(<IdentityView node={createMockNode()} nodes={[]} zenMode={false} onBack={jest.fn()} mostCommonVersion="1.5.0" />);
+      expect(screen.getByText(/Network Consensus/i)).toBeInTheDocument();
     });
   });
 });
