@@ -28,7 +28,7 @@ import {
   Clock, Trophy, Star, ArrowUp, ArrowDown,
   Info, ExternalLink, Maximize2, Map as MapIcon,
   BookOpen, Menu, LayoutDashboard, HeartPulse,
-  Swords, Monitor, AlertTriangle, RefreshCw, Twitter, Server
+  Swords, Monitor, AlertTriangle, RefreshCw, Twitter
 } from 'lucide-react';
 
 export default function Home() {
@@ -98,7 +98,7 @@ export default function Home() {
   const showToast = (msg: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ visible: true, msg });
-    toastTimer.current = setTimeout(() => setToast(null), 1000); 
+    toastTimer.current = setTimeout(() => setToast(null), 3000); 
   };
 
   const toggleFavorite = (e: React.MouseEvent, address: string) => {
@@ -169,7 +169,7 @@ export default function Home() {
         const mainnetNodes = podList.filter(n => n.network === 'MAINNET').sort(sortFn);
         const devnetNodes = podList.filter(n => n.network === 'DEVNET').sort(sortFn);
         const rankMap = new Map<string, number>();
-        
+
         mainnetNodes.forEach((node, idx) => { if (node.pubkey) rankMap.set(`${node.pubkey}-MAINNET`, idx + 1); });
         devnetNodes.forEach((node, idx) => { if (node.pubkey) rankMap.set(`${node.pubkey}-DEVNET`, idx + 1); });
 
@@ -288,13 +288,12 @@ export default function Home() {
           setSortBy(metric);
           setSortOrder('desc'); 
       }
-      
-      // Update cycle step immediately for Storage/Health/Uptime sorts
+
       let targetStep = -1;
       if (metric === 'storage') targetStep = 1;
       if (metric === 'health') targetStep = 2;
       if (metric === 'uptime') targetStep = 3;
-      
+
       if (targetStep !== -1) {
           setCycleStep(targetStep);
           setCycleReset(prev => prev + 1);
@@ -307,13 +306,13 @@ export default function Home() {
     const pub = (node.pubkey || '').toLowerCase();
     const ver = (node.version || '').toLowerCase();
     const country = (node.location?.countryName || '').toLowerCase();
-    
+
     const networkMatch = networkFilter === 'ALL' || node.network === networkFilter;
-    
+
     return networkMatch && (addr.includes(q) || pub.includes(q) || ver.includes(q) || country.includes(q));
   }).sort((a, b) => {
     let valA: any, valB: any;
-    
+
     if (sortBy === 'storage') {
       valA = a.storage_committed || 0;
       valB = b.storage_committed || 0;
@@ -388,6 +387,7 @@ export default function Home() {
           medianCommitted={medianCommitted}
           totalStorageCommitted={totalStorageCommitted}
           mostCommonVersion={mostCommonVersion}
+          onShowToast={showToast} /* Added prop */
         />
       )}
 
@@ -617,7 +617,7 @@ export default function Home() {
         ) : (
           /* key forces re-render of entire grid on sort change to flush duplicates */
           <div key={`grid-${sortBy}-${sortOrder}-${filteredNodes.length}`} className={`grid gap-2 md:gap-4 ${zenMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-2 md:grid-cols-2 lg:grid-cols-3 2xl:gap-8'} pb-20`}>
-            
+
             {filteredNodes.map((node, index) => {
               const uniqueKey = node.pubkey ? `${node.pubkey}-${node.network}` : `fallback-${index}`;
 
@@ -669,7 +669,7 @@ export default function Home() {
                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75 duration-1000"></span>
                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
                 </div>
-                
+
                 <div className="flex items-center gap-2 text-[9px] font-mono font-bold tracking-widest uppercase text-zinc-500 group-hover:text-zinc-400 transition-colors">
                    <span>Active Pods Uplink</span>
                    <span className="text-zinc-700">|</span>
