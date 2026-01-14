@@ -229,7 +229,7 @@ export const InspectorModal = ({
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
                     {/* LEFT SIDEBAR (EXPANDED HEADER VIEW) */}
                     <div className="md:col-span-1 h-full">
-                       
+
                        {/* --- HEALTH HEADER --- */}
                        {modalView === 'health' && (
                          <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-green-500 ring-1 ring-green-500 cursor-pointer shadow-[0_0_30px_rgba(34,197,94,0.1)]" onClick={() => handleCardToggle('health')}>
@@ -244,16 +244,17 @@ export const InspectorModal = ({
 
                        {/* --- STORAGE HEADER (VERTICAL BAR CHART - MONOLITH STYLE) --- */}
                        {modalView === 'storage' && (
-                         <div className="h-full rounded-3xl p-6 border flex flex-col justify-between bg-zinc-900 border-purple-500 ring-1 ring-purple-500 cursor-pointer shadow-[0_0_30px_rgba(168,85,247,0.1)] relative overflow-hidden" onClick={() => handleCardToggle('storage')}>
+                         // FIX APPLIED HERE: Added min-h-[400px] md:min-h-0 to ensure height on mobile
+                         <div className="h-full min-h-[400px] md:min-h-0 rounded-3xl p-6 border flex flex-col justify-between bg-zinc-900 border-purple-500 ring-1 ring-purple-500 cursor-pointer shadow-[0_0_30px_rgba(168,85,247,0.1)] relative overflow-hidden" onClick={() => handleCardToggle('storage')}>
                            {/* BACKGROUND TEXTURE: Subtle Technical Grid */}
                            <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none"></div>
-                           
+
                            {/* HEADER */}
                            <div className="w-full flex justify-between items-start mb-2 relative z-10">
                                <div className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest">STORAGE</div>
                                <Minimize2 size={14} className="text-zinc-500"/>
                            </div>
-                           
+
                            {/* BIG METRICS (Your Data) */}
                            <div className="flex justify-between items-end px-1 mb-6 relative z-10">
                                 <div className="text-left">
@@ -274,23 +275,25 @@ export const InspectorModal = ({
                                 {/* BARS MAPPING */}
                                 {[
                                     { label: 'YOU', val: nodeP, raw: nodeCap, type: 'MY_NODE' },
-                                    { label: 'MED', val: medP, raw: medianCommitted, type: 'MEDIAN' },
-                                    { label: 'AVG', val: avgP, raw: avgCommitted, type: 'AVG' }
+                                    // FIX APPLIED HERE: Renamed MED to MEDIAN
+                                    { label: 'MEDIAN', val: medP, raw: medianCommitted, type: 'MEDIAN' }, 
+                                    // FIX APPLIED HERE: Renamed AVG to AVERAGE
+                                    { label: 'AVERAGE', val: avgP, raw: avgCommitted, type: 'AVG' }
                                 ].map((bar, i) => {
                                     const isMyNode = bar.type === 'MY_NODE';
-                                    
+
                                     // Style Logic
                                     // My Node: Gradient Purple, Glow, active look
                                     // Others: Dark Zinc, Matte, passive look
                                     const barColor = isMyNode 
                                         ? 'bg-gradient-to-t from-purple-900/80 to-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]' 
                                         : 'bg-zinc-800/60 border-t border-white/5';
-                                    
+
                                     const labelColor = isMyNode ? 'text-purple-400' : 'text-zinc-600';
-                                    
+
                                     return (
                                         <div key={i} className="flex flex-col items-center justify-end h-full w-full group relative">
-                                            
+
                                             {/* FLOATING DATA LABEL (Only for Avg/Med) */}
                                             {/* We hide it for MY_NODE to avoid redundancy since big metrics are above */}
                                             {!isMyNode && (
@@ -317,7 +320,7 @@ export const InspectorModal = ({
                                     );
                                 })}
                            </div>
-                           
+
                            <div className="mt-4 text-[9px] font-bold uppercase text-red-400/80 flex items-center justify-center gap-1 hover:text-red-400 transition"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
                          </div>
                        )}
@@ -327,7 +330,7 @@ export const InspectorModal = ({
                          <div className="h-full rounded-3xl border flex flex-col justify-between relative overflow-hidden bg-zinc-900 border-blue-500 ring-1 ring-blue-500 cursor-pointer shadow-[0_0_30px_rgba(59,130,246,0.1)]" onClick={() => handleCardToggle('identity')}>
                            {/* Background FX */}
                            <div className="absolute top-0 right-0 p-24 bg-blue-500/5 blur-3xl rounded-full pointer-events-none"></div>
-                           
+
                            {/* Top Section */}
                            <div className="p-6 relative z-10">
                                <div className="w-full flex justify-between items-start mb-6">
@@ -368,7 +371,7 @@ export const InspectorModal = ({
                          </div>
                        )}
                     </div>
-                    
+
                     {/* RIGHT CONTENT */}
                     <div className="md:col-span-2 h-full">
                        {modalView === 'health' && <HealthView node={selectedNode} zenMode={zenMode} onBack={() => setModalView('overview')} avgNetworkHealth={avgNetworkHealth} medianStorage={medianCommitted} networkStats={networkStats} />}
