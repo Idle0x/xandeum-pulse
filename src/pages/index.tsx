@@ -28,7 +28,7 @@ import {
   Clock, Trophy, Star, ArrowUp, ArrowDown,
   Info, ExternalLink, Maximize2, Map as MapIcon,
   BookOpen, Menu, LayoutDashboard, HeartPulse,
-  Swords, Monitor, AlertTriangle, RefreshCw, Twitter
+  Swords, Monitor, AlertTriangle, RefreshCw, Twitter, Server
 } from 'lucide-react';
 
 export default function Home() {
