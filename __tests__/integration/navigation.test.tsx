@@ -3,8 +3,14 @@ import Home from '../../src/pages/index';
 import '@testing-library/jest-dom';
 import axios from 'axios';
 
+// --- MOCKS ---
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
+
+// Bypass the Curtain to reach the dashboard instantly
+jest.mock('../../src/components/WelcomeCurtain', () => ({
+  WelcomeCurtain: () => <div data-testid="curtain-mocked" />
+}));
 
 const mockPush = jest.fn();
 jest.mock('next/router', () => ({
@@ -44,17 +50,13 @@ describe('Xandeum Pulse - Inspector Integration', () => {
   test('REPUTATION LINK: Navigates to leaderboard', async () => {
     await act(async () => { render(<Home />); });
 
-    // Step 1: Open the Modal
-    const nodeCard = await screen.findByText(/1.2.3.4/);
-    fireEvent.click(nodeCard.closest('.group')!);
+    // 1. Open Modal (Using the card container directly)
+    const nodeCardText = await screen.findByText(/1.2.3.4/);
+    fireEvent.click(nodeCardText.closest('div')!);
 
-    // Step 2: Find "REPUTATION" labels (there are multiple)
-    // We pick the one that belongs to the clickable card
+    // 2. Click Reputation (Handle multiple responsive instances)
     const repLabels = await screen.findAllByText('REPUTATION');
-    const clickableRep = repLabels.find(el => el.closest('[onClick]'));
-    
-    expect(clickableRep).toBeDefined();
-    fireEvent.click(clickableRep!);
+    fireEvent.click(repLabels[0]); // Clicks the first one found
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('highlight=8xTestNodeKey123'));
@@ -70,8 +72,15 @@ describe('Xandeum Pulse - Inspector Integration', () => {
     });
 
     await act(async () => { render(<Home />); });
-    fireEvent.click((await screen.findByText(/1.2.3.4/)).closest('.group')!);
+    
+    // Find card and open modal
+    const nodeCardText = await screen.findByText(/1.2.3.4/);
+    fireEvent.click(nodeCardText.closest('div')!);
 
-    expect(await screen.findByText(/API OFFLINE/i)).toBeInTheDocument();
+    // Check for "API OFFLINE" - handle multiple instances in responsive layout
+    await waitFor(() => {
+      const offlineBadges = screen.getAllByText(/API OFFLINE/i);
+      expect(offlineBadges.length).toBeGreaterThan(0);
+    });
   });
 });
