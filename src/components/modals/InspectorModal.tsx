@@ -274,10 +274,10 @@ export const InspectorModal = ({
                                             </div>
                                     ))}
                                     
-                                    {/* VIGNETTE TUNNEL OVERLAY (The Fade Effect) */}
+                                    {/* VIGNETTE TUNNEL OVERLAY (The Fade Effect) - UPDATED TO 180deg (Vertical) */}
                                     <div 
                                         className="absolute inset-0 pointer-events-none z-30" 
-                                        style={{ background: 'linear-gradient(90deg, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 8%, rgba(0,0,0,0) 25%, rgba(0,0,0,0) 75%, rgba(0,0,0,1) 92%, rgba(0,0,0,1) 100%)' }}
+                                        style={{ background: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 8%, rgba(0,0,0,0) 25%, rgba(0,0,0,0) 75%, rgba(0,0,0,1) 92%, rgba(0,0,0,1) 100%)' }}
                                     ></div>
                                 </div>
 
