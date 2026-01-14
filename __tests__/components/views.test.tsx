@@ -44,20 +44,17 @@ describe('Component Views (Visual Logic)', () => {
         nodeCount={5} 
       />);
       
-      // Checking the comparison text that appears in your "NETWORK COMPARISON" box
       expect(screen.getByText(/NETWORK COMPARISON/i)).toBeInTheDocument();
       expect(screen.getByText(/Higher/i)).toBeInTheDocument();
     });
 
     test('VISUALS: Calculates Utilization Efficiency percentage', () => {
-        // Used: 500, Committed: 1000 = 50%
         render(<StorageView 
             node={createMockNode({ storage_committed: 1000, storage_used: 500 })} 
             zenMode={false} onBack={jest.fn()} medianCommitted={1000} 
             totalStorageCommitted={5000} nodeCount={5} 
         />);
 
-        // Your donut chart renders the percentage as text inside a div
         expect(screen.getByText('50%')).toBeInTheDocument();
         expect(screen.getByText(/Efficiency/i)).toBeInTheDocument();
     });
