@@ -1,7 +1,6 @@
 import { ArrowLeft, Minimize2 } from 'lucide-react';
 import { Node } from '../../../types';
 import { formatBytes } from '../../../utils/formatters';
-// IMPORT THE NEW COMPONENT
 import { StorageDistributionChart } from '../../charts/StorageDistributionChart';
 
 interface StorageViewProps {
@@ -23,11 +22,11 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
   const diff = nodeCap - median;
   const isPos = diff >= 0;
 
-  // Multiplier Calculation (e.g., 131x)
+  // Multiplier Calculation
   const multiplier = median > 0 ? (nodeCap / median) : 0;
   const multiplierDisplay = multiplier >= 1 ? `${multiplier.toFixed(1)}x` : `${(1/multiplier).toFixed(1)}x`;
 
-  // Utilization (Efficiency)
+  // Utilization
   const utilization = nodeCap > 0 ? (nodeUsed / nodeCap) * 100 : 0;
   const dashArray = 2 * Math.PI * 18; // r=18
   const dashOffset = dashArray - ((utilization / 100) * dashArray);
@@ -43,19 +42,20 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
 
       <div className="flex-grow flex flex-col gap-4">
         
-        {/* TOP ROW: Multiplier & Status */}
+        {/* TOP ROW: Multiplier & Status - REVERTED TO MATCH TESTS */}
         <div className="flex gap-3">
             <div className={`flex-1 p-3 rounded-xl border text-center relative overflow-hidden flex flex-col justify-center ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/40 border-zinc-800/60'}`}>
                 <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1 tracking-wider">vs Median</div>
                 <div className={`font-mono font-black text-xl ${isPos ? 'text-green-400' : 'text-red-400'}`}>{multiplierDisplay}</div>
             </div>
              <div className={`flex-1 border rounded-xl p-3 flex flex-col justify-center items-center ${isPos ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
-                <div className={`text-[9px] font-black uppercase tracking-wider ${isPos ? 'text-green-400' : 'text-red-400'}`}>{isPos ? 'ABOVE' : 'BELOW'}</div>
-                <div className={`text-[9px] font-black uppercase tracking-wider ${isPos ? 'text-green-400' : 'text-red-400'}`}>MAJORITY</div>
+                {/* Reverted Text to satisfy Regex /Higher/ and /Lower/ in tests */}
+                <div className={`text-[9px] font-black uppercase tracking-wider ${isPos ? 'text-green-400' : 'text-red-400'}`}>{isPos ? 'Higher' : 'Lower'}</div>
+                <div className={`text-[9px] font-black uppercase tracking-wider ${isPos ? 'text-green-400' : 'text-red-400'}`}>Than Median</div>
             </div>
         </div>
 
-        {/* COMPARISON CHART CONTAINER */}
+        {/* COMPARISON CHART */}
         <div className="p-4 rounded-xl border bg-zinc-900/30 border-zinc-800 relative overflow-hidden">
              <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none"></div>
              <div className="text-[10px] text-zinc-500 uppercase font-bold mb-4 flex justify-between relative z-10">
@@ -63,7 +63,6 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
                  <Minimize2 size={12} className="opacity-50"/>
              </div>
 
-             {/* REFACTORED CHART COMPONENT */}
              <div className="h-32 relative z-10">
                 <StorageDistributionChart 
                     nodeCommitted={nodeCap}
