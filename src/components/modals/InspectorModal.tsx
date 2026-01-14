@@ -133,6 +133,14 @@ export const InspectorModal = ({
 
   const usedDisplay = getStorageDisplay(selectedNode.storage_used || 0);
   const committedDisplay = getStorageDisplay(selectedNode.storage_committed || 0);
+  
+  // Define the capsule data with types so we can style them conditionally
+  const capsuleData = [
+    { type: 'MY_NODE', val: nodeP, color: 'bg-purple-500' }, // Bright Purple
+    { type: 'MEDIAN', val: medP, color: 'bg-yellow-500' },
+    { type: 'AVG', val: avgP, color: 'bg-blue-600' }
+  ].sort((a, b) => b.val - a.val); // Sort Largest to Smallest (Largest goes to the back)
+
 
   // --- REPUTATION VISUALS ---
   const rank = selectedNode.rank || 0;
@@ -263,21 +271,39 @@ export const InspectorModal = ({
                                 
                                 {/* TUNNEL CAPSULE */}
                                 <div className="relative h-14 w-full bg-black rounded-full border border-zinc-800 shadow-[inset_0_2px_10px_rgba(0,0,0,0.8)] overflow-hidden">
-                                    {/* Sort bars by size: Largest at back (z-0), Smallest at front (z-20) */}
-                                    {/* Muted Colors: opacity-80 to avoid mud */}
-                                    {[{ val: nodeP, color: 'bg-purple-600', z: 'z-0' }, { val: medP, color: 'bg-yellow-500', z: 'z-10' }, { val: avgP, color: 'bg-blue-600', z: 'z-20' }]
-                                        .sort((a, b) => b.val - a.val)
-                                        .map((bar, i) => (
-                                            <div key={i} className={`absolute top-0 bottom-0 left-0 transition-all duration-1000 ease-out flex items-center overflow-hidden opacity-90 ${bar.color} ${bar.z}`} style={{ width: `${bar.val}%` }}>
-                                                {/* Light Leading Edge */}
-                                                <div className="absolute top-0 bottom-0 right-0 w-[1px] bg-white/40"></div>
-                                            </div>
-                                    ))}
                                     
-                                    {/* VIGNETTE TUNNEL OVERLAY (The Fade Effect) - UPDATED TO 180deg (Vertical) */}
+                                    {capsuleData.map((bar, i) => {
+                                        // LOGIC:
+                                        // 1. Is this 'MY_NODE'? 
+                                        //    - Body: opacity-60 (Glassy, see-through volume)
+                                        //    - Glow: High Z-index + Shadow
+                                        // 2. Is this a comparison? 
+                                        //    - Body: opacity-20 (Ghost, barely there)
+                                        const isMyNode = bar.type === 'MY_NODE';
+                                        
+                                        // Dynamic Styles
+                                        // MY NODE: opacity-60 for body (not too bright), z-20 (on top)
+                                        // OTHERS: opacity-20 (ghost), z-10 or 0
+                                        const opacityClass = isMyNode ? 'opacity-60' : 'opacity-20 mix-blend-screen'; 
+                                        const glowClass = isMyNode ? 'shadow-[0_0_20px_rgba(168,85,247,0.5)] z-20' : 'z-10';
+                                        
+                                        // We use min-width: 6px to ensure even 0% progress is visible as a sliver
+                                        return (
+                                            <div 
+                                                key={i} 
+                                                className={`absolute top-0 bottom-0 left-0 transition-all duration-1000 ease-out flex items-center overflow-hidden ${bar.color} ${opacityClass} ${glowClass}`} 
+                                                style={{ width: `${bar.val}%`, minWidth: '6px' }}
+                                            >
+                                                {/* LEAD EDGE: Always 100% Opacity + Bright Glow. This is the "Needle" */}
+                                                <div className={`absolute top-0 bottom-0 right-0 w-[2px] ${isMyNode ? 'bg-white shadow-[0_0_15px_white] opacity-100' : 'bg-white/30'}`}></div>
+                                            </div>
+                                        );
+                                    })}
+                                    
+                                    {/* VIGNETTE TUNNEL OVERLAY (Vertical Fade) */}
                                     <div 
                                         className="absolute inset-0 pointer-events-none z-30" 
-                                        style={{ background: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 8%, rgba(0,0,0,0) 25%, rgba(0,0,0,0) 75%, rgba(0,0,0,1) 92%, rgba(0,0,0,1) 100%)' }}
+                                        style={{ background: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 5%, rgba(0,0,0,0) 25%, rgba(0,0,0,0) 75%, rgba(0,0,0,1) 95%, rgba(0,0,0,1) 100%)' }}
                                     ></div>
                                 </div>
 
