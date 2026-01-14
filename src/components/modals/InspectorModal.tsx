@@ -106,7 +106,7 @@ export const InspectorModal = ({
   const healthStatusLabel = healthScore >= 80 ? 'OPTIMAL' : 'FAIR'; 
   const healthColor = healthScore >= 80 ? 'text-green-500' : healthScore >= 50 ? 'text-yellow-500' : 'text-red-500';
   const healthGlowColor = healthScore >= 80 ? 'bg-green-500' : healthScore >= 50 ? 'bg-yellow-500' : 'bg-red-500';
-  
+
   const healthRingColor = healthScore >= 80 ? 'ring-green-500/20 hover:ring-green-500/60' : healthScore >= 50 ? 'ring-yellow-500/20 hover:ring-yellow-500/60' : 'ring-red-500/20 hover:ring-red-500/60';
   const identityRingColor = isSelectedNodeLatest ? 'ring-green-500/20 hover:ring-green-500/60' : 'ring-orange-500/20 hover:ring-orange-500/60';
 
@@ -248,7 +248,15 @@ export const InspectorModal = ({
                     <div className="md:col-span-2 h-full">
                        {modalView === 'health' && <HealthView node={selectedNode} zenMode={zenMode} onBack={() => setModalView('overview')} avgNetworkHealth={avgNetworkHealth} medianStorage={medianCommitted} networkStats={networkStats} />}
                        {modalView === 'storage' && <StorageView node={selectedNode} zenMode={zenMode} onBack={() => setModalView('overview')} medianCommitted={medianCommitted} totalStorageCommitted={totalStorageCommitted} nodeCount={nodes.length} />}
-                       {modalView === 'identity' && <IdentityView node={selectedNode} zenMode={zenMode} onBack={() => setModalView('overview')} mostCommonVersion={mostCommonVersion} />}
+                       {modalView === 'identity' && (
+                         <IdentityView 
+                            node={selectedNode} 
+                            nodes={nodes} 
+                            zenMode={zenMode} 
+                            onBack={() => setModalView('overview')} 
+                            mostCommonVersion={mostCommonVersion} 
+                         />
+                       )}
                     </div>
                  </div>
                ) : (
