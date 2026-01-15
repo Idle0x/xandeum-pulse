@@ -76,7 +76,6 @@ export const InspectorModal = ({
     n.address !== selectedNode.address
   ).length;
 
-  // FIX APPLIED HERE: Filter by PUBKEY to capture full fleet across networks, not just address
   const ownerNodes = nodes.filter(n => n.pubkey === selectedNode.pubkey);
   const totalOwned = ownerNodes.length;
   const mainnetCount = ownerNodes.filter(n => n.network === 'MAINNET').length;
@@ -107,18 +106,30 @@ export const InspectorModal = ({
   // --- HEALTH & STORAGE CALCULATIONS ---
   const healthScore = selectedNode.health || 0;
   const healthStatusLabel = healthScore >= 80 ? 'OPTIMAL' : 'FAIR'; 
-  const healthColor = healthScore >= 80 ? 'text-green-500' : healthScore >= 50 ? 'text-yellow-500' : 'text-red-500';
-  const healthGlowColor = healthScore >= 80 ? 'bg-green-500' : healthScore >= 50 ? 'bg-yellow-500' : 'bg-red-500';
+  
+  // Zen Mode: Monochrome logic
+  const healthColor = zenMode 
+    ? 'text-white' 
+    : healthScore >= 80 ? 'text-green-500' : healthScore >= 50 ? 'text-yellow-500' : 'text-red-500';
+  
+  const healthGlowColor = zenMode 
+    ? '' 
+    : healthScore >= 80 ? 'bg-green-500' : healthScore >= 50 ? 'bg-yellow-500' : 'bg-red-500';
 
-  const healthRingColor = healthScore >= 80 ? 'ring-green-500/20 hover:ring-green-500/60' : healthScore >= 50 ? 'ring-yellow-500/20 hover:ring-yellow-500/60' : 'ring-red-500/20 hover:ring-red-500/60';
-  const identityRingColor = isSelectedNodeLatest ? 'ring-green-500/20 hover:ring-green-500/60' : 'ring-orange-500/20 hover:ring-orange-500/60';
+  const healthRingColor = zenMode 
+    ? 'border border-zinc-800'
+    : healthScore >= 80 ? 'ring-green-500/20 hover:ring-green-500/60' : healthScore >= 50 ? 'ring-yellow-500/20 hover:ring-yellow-500/60' : 'ring-red-500/20 hover:ring-red-500/60';
+  
+  const identityRingColor = zenMode 
+    ? 'border border-zinc-800'
+    : isSelectedNodeLatest ? 'ring-green-500/20 hover:ring-green-500/60' : 'ring-orange-500/20 hover:ring-orange-500/60';
 
   const nodeCap = selectedNode.storage_committed || 0;
   const tankFillPercent = Math.min(100, (nodeCap / (medianCommitted || 1)) * 100);
 
   // Storage Calculations (Bar Chart)
   const avgCommitted = totalStorageCommitted / (nodes.length || 1);
-  const maxValue = Math.max(nodeCap, medianCommitted, avgCommitted) * 1.1; // 10% buffer used for scaling
+  const maxValue = Math.max(nodeCap, medianCommitted, avgCommitted) * 1.1; 
 
   // Calculate percentages relative to the largest value in the set for the bar chart
   const nodeP = (nodeCap / maxValue) * 100;
@@ -149,21 +160,24 @@ export const InspectorModal = ({
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const shimmerOnceAnimation = "group-hover:animate-[shimmer-once_2.5s_forwards]";
-  const breatheAnimation = "animate-[slow-breathe_5s_infinite_ease-in-out]";
+  // ZEN MODE: Disable animations
+  const shimmerOnceAnimation = zenMode ? "" : "group-hover:animate-[shimmer-once_2.5s_forwards]";
+  const breatheAnimation = zenMode ? "" : "animate-[slow-breathe_5s_infinite_ease-in-out]";
 
   return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[200] flex items-center justify-center p-4" onClick={onClose}>
-        <style jsx global>{`
-        @keyframes shimmer-once {
-            0% { transform: translateX(-150%) skewX(-12deg); opacity: 0; }
-            20% { opacity: 1; }
-            100% { transform: translateX(150%) skewX(-12deg); opacity: 0; }
-        }
-        @keyframes slow-pulse { 0%, 100% { opacity: 0.05; transform: scale(0.98); } 50% { opacity: 0.15; transform: scale(1.02); } }
-        @keyframes slow-breathe { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.92); opacity: 0.7; } }
-        `}</style>
-      <div className={`border w-full max-w-4xl 2xl:max-w-6xl rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[85vh] md:max-h-[90vh] ${zenMode ? 'bg-black border-zinc-800 shadow-none' : 'bg-[#09090b] border-zinc-800'}`} onClick={(e) => e.stopPropagation()}>
+    <div className={`fixed inset-0 z-[200] flex items-center justify-center p-4 ${zenMode ? 'bg-black' : 'bg-black/90 backdrop-blur-md'}`} onClick={onClose}>
+        {!zenMode && (
+           <style jsx global>{`
+           @keyframes shimmer-once {
+               0% { transform: translateX(-150%) skewX(-12deg); opacity: 0; }
+               20% { opacity: 1; }
+               100% { transform: translateX(150%) skewX(-12deg); opacity: 0; }
+           }
+           @keyframes slow-pulse { 0%, 100% { opacity: 0.05; transform: scale(0.98); } 50% { opacity: 0.15; transform: scale(1.02); } }
+           @keyframes slow-breathe { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.92); opacity: 0.7; } }
+           `}</style>
+        )}
+      <div className={`w-full max-w-4xl 2xl:max-w-6xl rounded-3xl overflow-hidden relative flex flex-col max-h-[85vh] md:max-h-[90vh] ${zenMode ? 'bg-black border border-zinc-800 shadow-none' : 'bg-[#09090b] border border-zinc-800 shadow-2xl'}`} onClick={(e) => e.stopPropagation()}>
 
         {/* HEADER */}
         <div className={`shrink-0 border-b ${zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
@@ -179,13 +193,13 @@ export const InspectorModal = ({
                   <span className="text-zinc-400">{selectedNode.pubkey ? `${selectedNode.pubkey.slice(0, 12)}...` : 'Unknown'}</span>
                   <button onClick={() => copyToClipboard(selectedNode.pubkey || '', 'pubkey')} className="hover:text-white transition">{copiedField === 'pubkey' ? <Check size={10} className="text-green-500" /> : <Copy size={10} />}</button>
                 </div>
-                <button onClick={(e) => onToggleFavorite(e, selectedNode.address || '')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition text-[10px] font-bold uppercase ${favorites.includes(selectedNode.address || '') ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}>
-                  <Star size={12} className={favorites.includes(selectedNode.address || '') ? 'fill-yellow-500' : ''} />
+                <button onClick={(e) => onToggleFavorite(e, selectedNode.address || '')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition text-[10px] font-bold uppercase ${favorites.includes(selectedNode.address || '') ? (zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-yellow-500/10 border-yellow-500 text-yellow-500') : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}>
+                  <Star size={12} className={favorites.includes(selectedNode.address || '') ? 'fill-current' : ''} />
                   {favorites.includes(selectedNode.address || '') ? 'Saved' : 'Watchlist'}
                 </button>
              </div>
              <div className="flex justify-start">
-               <span className={`text-[9px] font-bold px-2 py-0.5 rounded border w-fit ${selectedNode.is_public ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-orange-500/10 border-orange-500/30 text-orange-400'}`}>
+               <span className={`text-[9px] font-bold px-2 py-0.5 rounded border w-fit ${zenMode ? 'bg-zinc-900 border-zinc-700 text-zinc-400' : (selectedNode.is_public ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-orange-500/10 border-orange-500/30 text-orange-400')}`}>
                   {selectedNode.is_public ? 'STORAGE LAYER FULLY INDEXED' : 'STORAGE LAYER NOT INDEXED'}
                 </span>
              </div>
@@ -198,8 +212,8 @@ export const InspectorModal = ({
               <div className="min-w-0">
                 <div className="flex flex-row items-center gap-4">
                   <h2 className="text-2xl font-black font-sans tracking-tight text-white mb-0.5 truncate">NODE INSPECTOR</h2>
-                  <button onClick={(e) => onToggleFavorite(e, selectedNode.address || '')} className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition group w-fit ${favorites.includes(selectedNode.address || '') ? 'bg-yellow-500/10 border-yellow-500 text-yellow-500 hover:bg-yellow-500/20' : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-400'}`}>
-                    <Star size={14} className={favorites.includes(selectedNode.address || '') ? 'fill-yellow-500' : 'group-hover:text-yellow-500'} />
+                  <button onClick={(e) => onToggleFavorite(e, selectedNode.address || '')} className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition group w-fit ${favorites.includes(selectedNode.address || '') ? (zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-yellow-500/10 border-yellow-500 text-yellow-500 hover:bg-yellow-500/20') : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-400'}`}>
+                    <Star size={14} className={favorites.includes(selectedNode.address || '') ? 'fill-current' : 'group-hover:text-yellow-500'} />
                     <span className="text-xs font-bold uppercase leading-none">{favorites.includes(selectedNode.address || '') ? 'REMOVE WATCHLIST' : 'ADD TO WATCHLIST'}</span>
                   </button>
                 </div>
@@ -208,13 +222,13 @@ export const InspectorModal = ({
                   <button onClick={() => copyToClipboard(selectedNode.pubkey || '', 'pubkey')} className="hover:text-white transition">{copiedField === 'pubkey' ? <Check size={10} className="text-green-500 animate-in zoom-in" /> : <Copy size={10} />}</button>
                 </div>
                 <div className="mt-1">
-                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${selectedNode.is_public ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-orange-500/10 border-orange-500/30 text-orange-400'}`}>
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${zenMode ? 'bg-zinc-900 border-zinc-700 text-zinc-500' : (selectedNode.is_public ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-orange-500/10 border-orange-500/30 text-orange-400')}`}>
                     {selectedNode.is_public ? 'STORAGE LAYER FULLY INDEXED' : 'STORAGE LAYER NOT INDEXED'}
                   </span>
                 </div>
               </div>
             </div>
-            <button onClick={onClose} className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition group"><X size={20} className="group-hover:scale-110 transition-transform" /></button>
+            <button onClick={onClose} className={`p-3 rounded-xl transition group ${zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white' : 'bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white'}`}><X size={20} className={zenMode ? '' : "group-hover:scale-110 transition-transform"} /></button>
           </div>
         </div>
 
@@ -233,21 +247,20 @@ export const InspectorModal = ({
 
                        {/* --- HEALTH HEADER --- */}
                        {modalView === 'health' && (
-                         <div className="h-full rounded-3xl p-6 border flex flex-col items-center justify-between bg-zinc-900 border-green-500 ring-1 ring-green-500 cursor-pointer shadow-[0_0_30px_rgba(34,197,94,0.1)]" onClick={() => handleCardToggle('health')}>
+                         <div className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between cursor-pointer ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900 border-green-500 ring-1 ring-green-500 shadow-[0_0_30px_rgba(34,197,94,0.1)]'}`} onClick={() => handleCardToggle('health')}>
                            <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest">DIAGNOSTICS</div><Minimize2 size={14} className="text-zinc-500"/></div>
                            <div className="relative scale-95">
-                                <div className="absolute inset-0 bg-green-500/20 blur-2xl rounded-full animate-pulse"></div>
-                                <RadialProgress score={selectedNode.health || 0} size={115} />
+                                {!zenMode && <div className="absolute inset-0 bg-green-500/20 blur-2xl rounded-full animate-pulse"></div>}
+                                <RadialProgress score={selectedNode.health || 0} size={115} zenMode={zenMode} />
                            </div>
-                           <div className="mt-6 text-[9px] font-bold uppercase text-red-400/80 flex items-center gap-1 hover:text-red-400 transition"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
+                           <div className={`mt-6 text-[9px] font-bold uppercase flex items-center gap-1 transition ${zenMode ? 'text-zinc-500' : 'text-red-400/80 hover:text-red-400'}`}><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
                          </div>
                        )}
 
                        {/* --- STORAGE HEADER (VERTICAL BAR CHART - MONOLITH STYLE) --- */}
                        {modalView === 'storage' && (
-                         <div className="h-full min-h-[400px] md:min-h-0 rounded-3xl p-6 border flex flex-col justify-between bg-zinc-900 border-purple-500 ring-1 ring-purple-500 cursor-pointer shadow-[0_0_30px_rgba(168,85,247,0.1)] relative overflow-hidden" onClick={() => handleCardToggle('storage')}>
-                           {/* BACKGROUND TEXTURE: Subtle Technical Grid */}
-                           <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none"></div>
+                         <div className={`h-full min-h-[400px] md:min-h-0 rounded-3xl p-6 border flex flex-col justify-between cursor-pointer relative overflow-hidden ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900 border-purple-500 ring-1 ring-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.1)]'}`} onClick={() => handleCardToggle('storage')}>
+                           {!zenMode && <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none"></div>}
 
                            {/* HEADER */}
                            <div className="w-full flex justify-between items-start mb-2 relative z-10">
@@ -255,62 +268,49 @@ export const InspectorModal = ({
                                <Minimize2 size={14} className="text-zinc-500"/>
                            </div>
 
-                           {/* BIG METRICS (Your Data) */}
+                           {/* BIG METRICS */}
                            <div className="flex justify-between items-end px-1 mb-6 relative z-10">
                                 <div className="text-left">
-                                    <div className="text-2xl font-black text-blue-400 drop-shadow-md">{formatBytes(selectedNode.storage_used || 0)}</div>
+                                    <div className={`text-2xl font-black drop-shadow-md ${zenMode ? 'text-white' : 'text-blue-400'}`}>{formatBytes(selectedNode.storage_used || 0)}</div>
                                     <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Used Space</div>
                                 </div>
                                 <div className="text-right">
-                                    <div className="text-2xl font-black text-purple-400 drop-shadow-md">{formatBytes(nodeCap)}</div>
+                                    <div className={`text-2xl font-black drop-shadow-md ${zenMode ? 'text-zinc-300' : 'text-purple-400'}`}>{formatBytes(nodeCap)}</div>
                                     <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Committed</div>
                                 </div>
                            </div>
 
                            {/* CHART CONTAINER */}
                            <div className="flex-1 w-full flex items-end justify-between gap-4 relative z-10 px-2 pb-2">
-                                {/* Floor Line */}
                                 <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-zinc-700 to-transparent opacity-50"></div>
 
-                                {/* BARS MAPPING */}
                                 {[
                                     { label: 'YOU', val: nodeP, raw: nodeCap, type: 'MY_NODE' },
                                     { label: 'MEDIAN', val: medP, raw: medianCommitted, type: 'MEDIAN' }, 
                                     { label: 'AVERAGE', val: avgP, raw: avgCommitted, type: 'AVG' }
                                 ].map((bar, i) => {
                                     const isMyNode = bar.type === 'MY_NODE';
+                                    
+                                    // Zen Logic for Bars
+                                    const barColor = zenMode 
+                                        ? (isMyNode ? 'bg-white' : 'bg-zinc-800')
+                                        : (isMyNode ? 'bg-gradient-to-t from-purple-900/80 to-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]' : 'bg-zinc-800/60 border-t border-white/5');
 
-                                    // Style Logic
-                                    // My Node: Gradient Purple, Glow, active look
-                                    // Others: Dark Zinc, Matte, passive look
-                                    const barColor = isMyNode 
-                                        ? 'bg-gradient-to-t from-purple-900/80 to-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]' 
-                                        : 'bg-zinc-800/60 border-t border-white/5';
-
-                                    const labelColor = isMyNode ? 'text-purple-400' : 'text-zinc-600';
+                                    const labelColor = isMyNode ? (zenMode ? 'text-white' : 'text-purple-400') : 'text-zinc-600';
 
                                     return (
                                         <div key={i} className="flex flex-col items-center justify-end h-full w-full group relative">
-
-                                            {/* FLOATING DATA LABEL (Only for Avg/Med) */}
-                                            {/* We hide it for MY_NODE to avoid redundancy since big metrics are above */}
                                             {!isMyNode && (
                                                 <div className="mb-2 text-[8px] font-mono font-bold text-zinc-600 opacity-60 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                                                     {formatBytes(bar.raw)}
                                                 </div>
                                             )}
-
-                                            {/* THE BAR (MONOLITH) */}
-                                            {/* We use min-height: 4px so 0 values are still visible as a tiny floor plate */}
                                             <div 
                                                 className={`w-full max-w-[40px] md:max-w-[50px] rounded-t-sm md:rounded-t-md transition-all duration-1000 ease-out relative ${barColor}`} 
-                                                style={{ height: `${Math.max(bar.val, 2)}%` }} // Force min 2% height visually
+                                                style={{ height: `${Math.max(bar.val, 2)}%` }}
                                             >
-                                                {/* Top Highlight Line for "Cyberpunk" edge */}
-                                                <div className={`absolute top-0 left-0 right-0 h-[1px] ${isMyNode ? 'bg-white/60 shadow-[0_0_8px_white]' : 'bg-white/10'}`}></div>
+                                                {!zenMode && <div className={`absolute top-0 left-0 right-0 h-[1px] ${isMyNode ? 'bg-white/60 shadow-[0_0_8px_white]' : 'bg-white/10'}`}></div>}
                                             </div>
-
-                                            {/* X-AXIS LABEL */}
                                             <div className={`mt-2 text-[9px] font-bold uppercase tracking-wider ${labelColor}`}>
                                                 {bar.label}
                                             </div>
@@ -319,52 +319,50 @@ export const InspectorModal = ({
                                 })}
                            </div>
 
-                           <div className="mt-4 text-[9px] font-bold uppercase text-red-400/80 flex items-center justify-center gap-1 hover:text-red-400 transition"><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
+                           <div className={`mt-4 text-[9px] font-bold uppercase flex items-center justify-center gap-1 transition ${zenMode ? 'text-zinc-500' : 'text-red-400/80 hover:text-red-400'}`}><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
                          </div>
                        )}
 
                        {/* --- IDENTITY HEADER --- */}
                        {modalView === 'identity' && (
-                         <div className="h-full rounded-3xl border flex flex-col justify-between relative overflow-hidden bg-zinc-900 border-blue-500 ring-1 ring-blue-500 cursor-pointer shadow-[0_0_30px_rgba(59,130,246,0.1)]" onClick={() => handleCardToggle('identity')}>
-                           {/* Background FX */}
-                           <div className="absolute top-0 right-0 p-24 bg-blue-500/5 blur-3xl rounded-full pointer-events-none"></div>
-
-                           {/* Top Section */}
+                         <div className={`h-full rounded-3xl border flex flex-col justify-between relative overflow-hidden cursor-pointer ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900 border-blue-500 ring-1 ring-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.1)]'}`} onClick={() => handleCardToggle('identity')}>
+                           {!zenMode && <div className="absolute top-0 right-0 p-24 bg-blue-500/5 blur-3xl rounded-full pointer-events-none"></div>}
+                           
                            <div className="p-6 relative z-10">
                                <div className="w-full flex justify-between items-start mb-6">
                                    <div className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest">IDENTITY</div>
                                    <Minimize2 size={14} className="text-zinc-500"/>
                                </div>
                                <div className="flex flex-col items-center text-center">
-                                   <Shield size={48} className="text-blue-500 mb-3 drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]" />
+                                   <Shield size={48} className={`${zenMode ? 'text-zinc-500' : 'text-blue-500 mb-3 drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]'}`} />
                                    <div className="text-[9px] text-zinc-500 font-bold uppercase mb-1">Current Network</div>
-                                   <div className={`text-xl font-black tracking-tight ${selectedNode.network === 'MAINNET' ? 'text-green-400' : 'text-blue-400'}`}>
+                                   <div className={`text-xl font-black tracking-tight ${zenMode ? 'text-white' : (selectedNode.network === 'MAINNET' ? 'text-green-400' : 'text-blue-400')}`}>
                                        {selectedNode.network || 'UNKNOWN'}
                                    </div>
                                </div>
                            </div>
 
                            {/* Bottom Section: Fleet Topology Grid */}
-                           <div className="p-4 bg-black/40 border-t border-blue-500/20 grid grid-cols-2 gap-2 relative z-10">
-                               <div className="col-span-2 bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 flex justify-between items-center">
+                           <div className={`p-4 border-t grid grid-cols-2 gap-2 relative z-10 ${zenMode ? 'bg-black border-zinc-800' : 'bg-black/40 border-blue-500/20'}`}>
+                               <div className={`col-span-2 border rounded-xl p-2.5 flex justify-between items-center ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
                                    <div className="flex items-center gap-2">
                                        <Boxes size={14} className="text-zinc-500"/>
                                        <span className="text-[9px] font-bold text-zinc-500 uppercase">Fleet Size</span>
                                    </div>
                                    <span className="text-lg font-mono font-bold text-white">{totalOwned}</span>
                                </div>
-                               <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 flex flex-col justify-center">
+                               <div className={`border rounded-xl p-2.5 flex flex-col justify-center ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
                                    <span className="text-[8px] font-bold text-zinc-500 uppercase mb-1">Mainnet</span>
-                                   <span className="text-sm font-mono font-bold text-green-500">{mainnetCount}</span>
+                                   <span className={`text-sm font-mono font-bold ${zenMode ? 'text-white' : 'text-green-500'}`}>{mainnetCount}</span>
                                </div>
-                               <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 flex flex-col justify-center">
+                               <div className={`border rounded-xl p-2.5 flex flex-col justify-center ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
                                    <span className="text-[8px] font-bold text-zinc-500 uppercase mb-1">Devnet</span>
-                                   <span className="text-sm font-mono font-bold text-blue-500">{devnetCount}</span>
+                                   <span className={`text-sm font-mono font-bold ${zenMode ? 'text-zinc-300' : 'text-blue-500'}`}>{devnetCount}</span>
                                </div>
                            </div>
 
                            <div className="absolute bottom-1 w-full text-center pb-1">
-                               <div className="text-[8px] font-bold uppercase text-red-400/60 flex items-center justify-center gap-1"><Minimize2 size={8}/> COLLAPSE</div>
+                               <div className={`text-[8px] font-bold uppercase flex items-center justify-center gap-1 ${zenMode ? 'text-zinc-500' : 'text-red-400/60'}`}><Minimize2 size={8}/> COLLAPSE</div>
                            </div>
                          </div>
                        )}
@@ -390,29 +388,32 @@ export const InspectorModal = ({
                     {/* MOBILE OVERVIEW GRID */}
                     <div className="grid grid-cols-2 gap-2 md:hidden">
                         {/* HEALTH CARD (MOBILE) */}
-                        <div onClick={() => handleCardToggle('health')} className={`col-span-2 p-3 rounded-2xl bg-zinc-900 border border-zinc-800 flex justify-between items-center relative overflow-hidden group cursor-pointer ring-1 ${healthRingColor}`}>
-                            <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>
+                        <div onClick={() => handleCardToggle('health')} className={`col-span-2 p-3 rounded-2xl border flex justify-between items-center relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border-zinc-800' : `bg-zinc-900 border-zinc-800 ring-1 ${healthRingColor}`}`}>
+                            {!zenMode && <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>}
                             <div className="relative z-10 flex flex-col justify-between h-full py-1">
-                                <div><div className="text-[10px] font-bold tracking-widest uppercase text-zinc-500 flex items-center gap-1.5 leading-tight"><Activity size={10} className={healthColor} /> SYSTEM DIAGNOSTICS</div><div className="text-[9px] font-mono mt-1 text-zinc-600">Status: <span className={healthScore >= 80 ? 'text-green-400' : 'text-yellow-400'}>{healthStatusLabel}</span></div></div>
-                                <div className={`text-[9px] text-green-400 font-bold uppercase flex items-center gap-1 transition-transform origin-left mt-2 ${breatheAnimation}`}><Maximize2 size={8}/> TAP TO EXPAND</div>
+                                <div><div className="text-[10px] font-bold tracking-widest uppercase text-zinc-500 flex items-center gap-1.5 leading-tight"><Activity size={10} className={healthColor} /> SYSTEM DIAGNOSTICS</div><div className="text-[9px] font-mono mt-1 text-zinc-600">Status: <span className={zenMode ? 'text-white' : (healthScore >= 80 ? 'text-green-400' : 'text-yellow-400')}>{healthStatusLabel}</span></div></div>
+                                <div className={`text-[9px] font-bold uppercase flex items-center gap-1 transition-transform origin-left mt-2 ${zenMode ? 'text-zinc-400' : `text-green-400 ${breatheAnimation}`}`}><Maximize2 size={8}/> TAP TO EXPAND</div>
                             </div>
-                            <div className="relative z-10 flex flex-col items-center justify-center mr-2"><div className="relative scale-100 group-active:scale-110 transition-transform duration-300 flex items-center justify-center"><div className={`absolute inset-0 rounded-full blur-xl animate-[slow-pulse_12s_infinite_ease-in-out] ${healthGlowColor}`}></div><RadialProgress score={healthScore} size={54} stroke={6} /></div></div>
+                            <div className="relative z-10 flex flex-col items-center justify-center mr-2"><div className="relative scale-100 group-active:scale-110 transition-transform duration-300 flex items-center justify-center">{!zenMode && <div className={`absolute inset-0 rounded-full blur-xl animate-[slow-pulse_12s_infinite_ease-in-out] ${healthGlowColor}`}></div>}<RadialProgress score={healthScore} size={54} stroke={6} zenMode={zenMode} /></div></div>
                         </div>
 
                         {/* STORAGE CARD (MOBILE) */}
-                        <div onClick={() => handleCardToggle('storage')} className="aspect-square rounded-2xl bg-indigo-950/10 border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60">
-                            <div className="absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out z-0" style={{ height: `${tankFillPercent}%` }}><div className="absolute inset-0 bg-gradient-to-b from-indigo-500/20 to-transparent"></div><div className="absolute top-0 left-0 right-0 h-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.4)]"></div></div>
-                            <div className="relative z-10 p-3 flex flex-col h-full"><div className="flex justify-between items-start mb-2"><div className="flex items-center gap-1.5"><Database size={12} className="text-indigo-300/80 drop-shadow-md"/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">STORAGE</span></div><div className="bg-black/40 backdrop-blur-sm px-1.5 py-0.5 rounded-full text-[7px] font-mono text-indigo-200/80 border border-indigo-500/20 shadow-sm">{(selectedNode.storage_used || 0).toLocaleString()} B</div></div><div className="mt-auto flex flex-col gap-1.5"><div className="flex justify-between items-end"><div className="flex flex-col items-center"><div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Used</div><div className="text-sm font-bold text-blue-400 drop-shadow-md whitespace-nowrap">{usedDisplay.val}<span className="text-[9px] ml-0.5 opacity-80">{usedDisplay.unit}</span></div></div><div className="w-px h-6 bg-white/20 mx-1"></div><div className="flex flex-col items-center"><div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Committed</div><div className="text-sm font-bold text-purple-400 drop-shadow-md whitespace-nowrap">{committedDisplay.val}<span className="text-[9px] ml-0.5 opacity-80">{committedDisplay.unit}</span></div></div></div></div></div>
+                        <div onClick={() => handleCardToggle('storage')} className={`aspect-square rounded-2xl border flex flex-col justify-between relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border-zinc-800' : 'bg-indigo-950/10 border-zinc-800 hover:scale-[1.02] transition-transform duration-300 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60'}`}>
+                            <div className="absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out z-0" style={{ height: `${tankFillPercent}%` }}>
+                                {!zenMode && <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/20 to-transparent"></div>}
+                                <div className={`absolute top-0 left-0 right-0 h-[1px] ${zenMode ? 'bg-white/20' : 'bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.4)]'}`}></div>
+                            </div>
+                            <div className="relative z-10 p-3 flex flex-col h-full"><div className="flex justify-between items-start mb-2"><div className="flex items-center gap-1.5"><Database size={12} className={zenMode ? 'text-zinc-500' : 'text-indigo-300/80 drop-shadow-md'}/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">STORAGE</span></div><div className={`px-1.5 py-0.5 rounded-full text-[7px] font-mono border shadow-sm ${zenMode ? 'bg-black border-zinc-800 text-zinc-400' : 'bg-black/40 backdrop-blur-sm text-indigo-200/80 border-indigo-500/20'}`}>{(selectedNode.storage_used || 0).toLocaleString()} B</div></div><div className="mt-auto flex flex-col gap-1.5"><div className="flex justify-between items-end"><div className="flex flex-col items-center"><div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Used</div><div className={`text-sm font-bold drop-shadow-md whitespace-nowrap ${zenMode ? 'text-white' : 'text-blue-400'}`}>{usedDisplay.val}<span className="text-[9px] ml-0.5 opacity-80">{usedDisplay.unit}</span></div></div><div className="w-px h-6 bg-white/20 mx-1"></div><div className="flex flex-col items-center"><div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Committed</div><div className={`text-sm font-bold drop-shadow-md whitespace-nowrap ${zenMode ? 'text-zinc-400' : 'text-purple-400'}`}>{committedDisplay.val}<span className="text-[9px] ml-0.5 opacity-80">{committedDisplay.unit}</span></div></div></div></div></div>
                         </div>
 
                         {/* IDENTITY CARD (MOBILE) */}
-                        <div onClick={() => handleCardToggle('identity')} className={`aspect-square rounded-2xl border border-zinc-800 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform duration-300 bg-zinc-900 ring-1 ${identityRingColor}`}>
-                            <div className={`absolute inset-0 bg-gradient-to-br opacity-40 ${isSelectedNodeLatest ? 'from-green-900/40 via-transparent to-blue-900/40' : 'from-orange-900/40 via-transparent to-red-900/40'}`}></div>
+                        <div onClick={() => handleCardToggle('identity')} className={`aspect-square rounded-2xl border flex flex-col justify-between relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border-zinc-800' : `bg-zinc-900 border-zinc-800 hover:scale-[1.02] transition-transform duration-300 ring-1 ${identityRingColor}`}`}>
+                            {!zenMode && <div className={`absolute inset-0 bg-gradient-to-br opacity-40 ${isSelectedNodeLatest ? 'from-green-900/40 via-transparent to-blue-900/40' : 'from-orange-900/40 via-transparent to-red-900/40'}`}></div>}
                             <div className="relative z-10 p-3 flex flex-col h-full">
                                 <div className="flex justify-between items-start mb-1">
-                                    <div className="relative flex items-center gap-1.5"><Shield size={12} className={`text-zinc-200 drop-shadow-md ${isSelectedNodeLatest ? 'text-blue-200' : 'text-orange-200'}`} /><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">IDENTITY</span></div>
+                                    <div className="relative flex items-center gap-1.5"><Shield size={12} className={`drop-shadow-md ${zenMode ? 'text-zinc-500' : (isSelectedNodeLatest ? 'text-blue-200' : 'text-orange-200')}`} /><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">IDENTITY</span></div>
                                     <div className="flex flex-col items-end gap-1">
-                                      <div className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase border ${selectedNode.network === 'MAINNET' ? 'text-green-400 border-green-500/30 bg-green-900/20' : 'text-blue-400 border-blue-500/30 bg-blue-900/20'}`}>{selectedNode.network || 'UNKNOWN'}</div>
+                                      <div className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase border ${zenMode ? 'text-zinc-300 bg-zinc-900 border-zinc-800' : (selectedNode.network === 'MAINNET' ? 'text-green-400 border-green-500/30 bg-green-900/20' : 'text-blue-400 border-blue-500/30 bg-blue-900/20')}`}>{selectedNode.network || 'UNKNOWN'}</div>
                                       {siblingCount > 0 && <span className="text-[8px] font-bold text-zinc-500 bg-black/40 px-1 rounded border border-white/5">+{siblingCount}</span>}
                                     </div>
                                 </div>
@@ -425,18 +426,18 @@ export const InspectorModal = ({
                                       <span className="text-[8px] font-bold uppercase text-zinc-500">Up</span>
                                       <span className="font-mono text-[10px] text-zinc-300">{formatUptime(selectedNode.uptime)}</span>
                                     </div>
-                                    <div className={`mt-1 flex items-center justify-center gap-1 py-1 rounded text-[8px] font-bold uppercase border ${isSelectedNodeLatest ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'}`}>{isSelectedNodeLatest ? <CheckCircle size={8}/> : <AlertTriangle size={8}/>}{isSelectedNodeLatest ? 'Up to Date' : 'Update Needed'}</div>
+                                    <div className={`mt-1 flex items-center justify-center gap-1 py-1 rounded text-[8px] font-bold uppercase border ${zenMode ? 'bg-zinc-900 border-zinc-800 text-zinc-400' : (isSelectedNodeLatest ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-400')}`}>{isSelectedNodeLatest ? <CheckCircle size={8}/> : <AlertTriangle size={8}/>}{isSelectedNodeLatest ? 'Up to Date' : 'Update Needed'}</div>
                                 </div>
                             </div>
                         </div>
 
                         {/* REPUTATION CARD (MOBILE) */}
-                        <div onClick={handleLeaderboardNav} className={`h-24 p-3 rounded-2xl relative overflow-hidden group cursor-pointer hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/80 border-yellow-900/30'}`}>
-                            <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:8px_8px] pointer-events-none"></div>
-                            <div className={`absolute inset-0 bg-gradient-to-r from-transparent ${hoverShimmerGradient} to-transparent -skew-x-12 -translate-x-[150%] pointer-events-none opacity-0 group-hover:opacity-100 ${shimmerOnceAnimation}`}></div>
+                        <div onClick={handleLeaderboardNav} className={`h-24 p-3 rounded-2xl relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : `bg-zinc-900/80 border border-yellow-900/30 hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50`}`}>
+                            {!zenMode && <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:8px_8px] pointer-events-none"></div>}
+                            {!zenMode && <div className={`absolute inset-0 bg-gradient-to-r from-transparent ${hoverShimmerGradient} to-transparent -skew-x-12 -translate-x-[150%] pointer-events-none opacity-0 group-hover:opacity-100 ${shimmerOnceAnimation}`}></div>}
                             <div className="flex justify-between items-start relative z-10 mb-2">
-                                <div className="flex items-center gap-1.5"><Trophy size={12} className="text-yellow-500 relative z-10"/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">REPUTATION</span></div>
-                                <ArrowUpRight size={14} className="text-yellow-400 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all"/>
+                                <div className="flex items-center gap-1.5"><Trophy size={12} className={`${zenMode ? 'text-zinc-500' : 'text-yellow-500'} relative z-10`}/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">REPUTATION</span></div>
+                                {!zenMode && <ArrowUpRight size={14} className="text-yellow-400 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all"/>}
                             </div>
                             <div className="relative z-10 flex flex-col h-full justify-between pb-3">
                                 {isValidReputation && (
@@ -445,9 +446,9 @@ export const InspectorModal = ({
                                       <div className="text-xs font-black text-zinc-200">#{selectedNode.rank || '-'}</div>
                                   </div>
                                 )}
-                                <div className="w-full bg-black/20 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] border-b border-white/5 rounded-full px-2 py-1.5 flex items-center justify-between mt-auto">
+                                <div className={`w-full rounded-full px-2 py-1.5 flex items-center justify-between mt-auto ${zenMode ? 'bg-zinc-900 border border-zinc-800' : 'bg-black/20 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] border-b border-white/5'}`}>
                                    <span className="text-[8px] font-bold text-zinc-500 uppercase">CREDITS</span>
-                                   <span className={`text-[9px] font-mono font-bold whitespace-nowrap ${(selectedNode as any).isUntracked || selectedNode.credits === null ? 'text-zinc-500' : 'text-yellow-500'}`}>
+                                   <span className={`text-[9px] font-mono font-bold whitespace-nowrap ${(selectedNode as any).isUntracked || selectedNode.credits === null ? 'text-zinc-500' : (zenMode ? 'text-white' : 'text-yellow-500')}`}>
                                        {(selectedNode as any).isUntracked ? 'NO CREDITS' : selectedNode.credits === null ? 'API OFFLINE' : selectedNode.credits.toLocaleString()}
                                    </span>
                                 </div>
@@ -455,80 +456,80 @@ export const InspectorModal = ({
                         </div>
 
                         {/* PHYSICAL CARD (MOBILE) */}
-                        <Link href={`/map?focus=${getSafeIp(selectedNode)}`} className={`h-24 p-3 rounded-2xl relative overflow-hidden block group cursor-pointer ring-1 ring-blue-500/20 hover:ring-blue-500/50 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/80 border-blue-900/30'}`}>
-                            <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#3b82f6_1px,transparent_1px),linear-gradient(to_bottom,#3b82f6_1px,transparent_1px)] bg-[size:16px_16px] origin-center group-hover:scale-[3.0] transition-transform duration-700 ease-in-out pointer-events-none"></div>
+                        <Link href={`/map?focus=${getSafeIp(selectedNode)}`} className={`h-24 p-3 rounded-2xl relative overflow-hidden block group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : `bg-zinc-900/80 border border-blue-900/30 ring-1 ring-blue-500/20 hover:ring-blue-500/50 hover:scale-[1.02] transition-transform duration-300`}`}>
+                            {!zenMode && <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#3b82f6_1px,transparent_1px),linear-gradient(to_bottom,#3b82f6_1px,transparent_1px)] bg-[size:16px_16px] origin-center group-hover:scale-[3.0] transition-transform duration-700 ease-in-out pointer-events-none"></div>}
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0">
-                                <MapPin size={24} className="text-blue-500/30 drop-shadow-none" />
+                                <MapPin size={24} className={`${zenMode ? 'text-zinc-800' : 'text-blue-500/30'} drop-shadow-none`} />
                             </div>
-                            <div className="flex justify-between items-start relative z-10 w-full"><div className="flex items-center gap-1.5"><Globe size={12} className="text-blue-500 relative z-10"/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">PHYSICAL LAYER</span></div></div>
-                            <div className="relative z-10 flex flex-col h-full justify-between pb-3 pt-2"><div className="text-[10px] font-mono text-zinc-400 truncate w-full">{getSafeIp(selectedNode)}</div><div className="flex items-center gap-2 text-[10px] font-bold text-white leading-none"><span className="text-lg">{getFlagEmoji(selectedNode.location?.countryCode)}</span><span>{selectedNode.location?.countryName || 'Unknown'}</span></div></div>
+                            <div className="flex justify-between items-start relative z-10 w-full"><div className="flex items-center gap-1.5"><Globe size={12} className={`${zenMode ? 'text-zinc-500' : 'text-blue-500'} relative z-10`}/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">PHYSICAL LAYER</span></div></div>
+                            <div className="relative z-10 flex flex-col h-full justify-between pb-3 pt-2"><div className="text-[10px] font-mono text-zinc-400 truncate w-full">{getSafeIp(selectedNode)}</div><div className="flex items-center gap-2 text-[10px] font-bold text-white leading-none"><span className={`text-lg ${zenMode ? 'grayscale' : ''}`}>{getFlagEmoji(selectedNode.location?.countryCode)}</span><span>{selectedNode.location?.countryName || 'Unknown'}</span></div></div>
                         </Link>
                     </div>
 
                     {/* --- DESKTOP GRID --- */}
                     <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                       {/* HEALTH (DESKTOP) */}
-                      <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300 ring-1 ${zenMode ? 'bg-zinc-900' : 'bg-zinc-900/30'} ${healthRingColor}`} onClick={() => handleCardToggle('health')}>
-                         <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>
+                      <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : `bg-zinc-900/30 ring-1 ${healthRingColor} hover:-translate-y-1 transition-all duration-300`}`} onClick={() => handleCardToggle('health')}>
+                         {!zenMode && <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>}
                          <div className="flex justify-between items-start mb-4 relative z-10"><div><h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-500">SYSTEM DIAGNOSTICS</h3></div><HelpCircle size={14} className="text-zinc-500"/></div>
                          <div className="self-center hidden md:flex flex-col items-center justify-center relative z-10">
-                            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full rounded-full blur-xl animate-[slow-pulse_12s_infinite_ease-in-out] ${healthGlowColor}`}></div>
-                            <RadialProgress score={selectedNode.health || 0} size={115} />
-                            <div className="mt-4 text-[10px] font-mono text-zinc-600">Status: <span className={healthScore >= 80 ? 'text-green-400' : 'text-yellow-400'}>{healthStatusLabel}</span></div>
+                            {!zenMode && <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full rounded-full blur-xl animate-[slow-pulse_12s_infinite_ease-in-out] ${healthGlowColor}`}></div>}
+                            <RadialProgress score={selectedNode.health || 0} size={115} zenMode={zenMode} />
+                            <div className="mt-4 text-[10px] font-mono text-zinc-600">Status: <span className={zenMode ? 'text-white' : (healthScore >= 80 ? 'text-green-400' : 'text-yellow-400')}>{healthStatusLabel}</span></div>
                          </div>
-                         <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-green-400 flex justify-center gap-1 relative z-10 ${breatheAnimation}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
+                         <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest flex justify-center gap-1 relative z-10 ${zenMode ? 'text-zinc-500' : `text-green-400 ${breatheAnimation}`}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
                       </div>
 
                       {/* STORAGE (DESKTOP) */}
-                      <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60 bg-indigo-950/10`} onClick={() => handleCardToggle('storage')}>
-                         <div className="flex justify-between items-start mb-4 relative z-10"><div className="flex items-center gap-2"><Database size={18} className="text-indigo-300/80"/><span className="text-xs font-bold uppercase text-zinc-500">STORAGE</span></div></div>
-                         <div className="space-y-4 relative z-10"><div className="flex justify-between items-end"><div><div className="text-2xl font-bold text-blue-400 whitespace-nowrap">{usedDisplay.val}<span className="text-sm ml-1 opacity-80">{usedDisplay.unit}</span></div><div className="text-[9px] font-bold text-zinc-600">USED</div></div><div className="text-right"><div className="text-2xl font-bold text-purple-400 whitespace-nowrap">{committedDisplay.val}<span className="text-sm ml-1 opacity-80">{committedDisplay.unit}</span></div><div className="text-[9px] font-bold text-zinc-600">COMMITTED</div></div></div><div className="h-2 bg-zinc-800/50 rounded-full overflow-hidden relative"><div className="h-full bg-gradient-to-r from-transparent to-indigo-500/20 relative overflow-hidden" style={{ width: `${Math.min(100, ((selectedNode.storage_used || 0) / (selectedNode.storage_committed || 1)) * 100)}%` }}><div className="absolute top-0 bottom-0 right-0 w-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.4)]"></div></div></div></div>
-                         <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-violet-300/80 flex justify-center gap-1 relative z-10 ${breatheAnimation}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
+                      <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : 'bg-indigo-950/10 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60 hover:-translate-y-1 transition-all duration-300'}`} onClick={() => handleCardToggle('storage')}>
+                         <div className="flex justify-between items-start mb-4 relative z-10"><div className="flex items-center gap-2"><Database size={18} className={zenMode ? 'text-zinc-500' : 'text-indigo-300/80'}/><span className="text-xs font-bold uppercase text-zinc-500">STORAGE</span></div></div>
+                         <div className="space-y-4 relative z-10"><div className="flex justify-between items-end"><div><div className={`text-2xl font-bold whitespace-nowrap ${zenMode ? 'text-white' : 'text-blue-400'}`}>{usedDisplay.val}<span className="text-sm ml-1 opacity-80">{usedDisplay.unit}</span></div><div className="text-[9px] font-bold text-zinc-600">USED</div></div><div className="text-right"><div className={`text-2xl font-bold whitespace-nowrap ${zenMode ? 'text-zinc-400' : 'text-purple-400'}`}>{committedDisplay.val}<span className="text-sm ml-1 opacity-80">{committedDisplay.unit}</span></div><div className="text-[9px] font-bold text-zinc-600">COMMITTED</div></div></div><div className="h-2 bg-zinc-800/50 rounded-full overflow-hidden relative"><div className={`h-full relative overflow-hidden ${zenMode ? 'bg-white' : 'bg-gradient-to-r from-transparent to-indigo-500/20'}`} style={{ width: `${Math.min(100, ((selectedNode.storage_used || 0) / (selectedNode.storage_committed || 1)) * 100)}%` }}>{!zenMode && <div className="absolute top-0 bottom-0 right-0 w-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.4)]"></div>}</div></div></div>
+                         <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest flex justify-center gap-1 relative z-10 ${zenMode ? 'text-zinc-500' : `text-violet-300/80 ${breatheAnimation}`}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
                       </div>
 
                       {/* IDENTITY (DESKTOP) */}
-                      <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer hover:-translate-y-1 transition-all duration-300 ring-1 ${zenMode ? 'bg-zinc-900' : 'bg-zinc-900/30'} ${identityRingColor}`} onClick={() => handleCardToggle('identity')}>
-                         <div className={`absolute inset-0 bg-gradient-to-br opacity-20 pointer-events-none ${isSelectedNodeLatest ? 'from-green-900/40 via-transparent to-blue-900/40' : 'from-orange-900/40 via-transparent to-red-900/40'}`}></div>
+                      <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : `bg-zinc-900/30 ring-1 ${identityRingColor} hover:-translate-y-1 transition-all duration-300`}`} onClick={() => handleCardToggle('identity')}>
+                         {!zenMode && <div className={`absolute inset-0 bg-gradient-to-br opacity-20 pointer-events-none ${isSelectedNodeLatest ? 'from-green-900/40 via-transparent to-blue-900/40' : 'from-orange-900/40 via-transparent to-red-900/40'}`}></div>}
                          <div className="flex justify-between items-start mb-4 relative z-10">
                              <div className="flex items-center gap-2"><Server size={18} className="text-zinc-400"/><span className="text-xs font-bold uppercase text-zinc-500">IDENTITY</span></div>
                              <div className="flex flex-col items-end gap-1">
-                                <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${selectedNode.network === 'MAINNET' ? 'text-green-500 border-green-500/30' : 'text-blue-500 border-blue-500/30'}`}>{selectedNode.network}</div>
+                                <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${zenMode ? 'bg-zinc-900 border-zinc-800 text-zinc-400' : (selectedNode.network === 'MAINNET' ? 'text-green-500 border-green-500/30' : 'text-blue-500 border-blue-500/30')}`}>{selectedNode.network}</div>
                                 {siblingCount > 0 && <span className="text-[9px] font-bold text-zinc-500 bg-black/40 px-1.5 rounded border border-white/5">+{siblingCount}</span>}
                              </div>
                          </div>
                          <div className="space-y-2 relative z-10">
                             <div className="text-xl font-mono text-white">{getSafeVersion(selectedNode)}</div>
-                            <div className="text-xs text-zinc-500 flex items-center gap-1"><Clock size={12}/> Up: {formatUptime(selectedNode.uptime)}</div>{isSelectedNodeLatest ? <div className="text-[10px] text-green-500 font-bold flex items-center gap-1"><CheckCircle size={10}/> UP TO DATE</div> : <div className="text-[10px] text-orange-500 font-bold flex items-center gap-1"><AlertTriangle size={10}/> UPDATE NEEDED</div>}
+                            <div className="text-xs text-zinc-500 flex items-center gap-1"><Clock size={12}/> Up: {formatUptime(selectedNode.uptime)}</div>{isSelectedNodeLatest ? <div className={`text-[10px] font-bold flex items-center gap-1 ${zenMode ? 'text-zinc-400' : 'text-green-500'}`}><CheckCircle size={10}/> UP TO DATE</div> : <div className={`text-[10px] font-bold flex items-center gap-1 ${zenMode ? 'text-white' : 'text-orange-500'}`}><AlertTriangle size={10}/> UPDATE NEEDED</div>}
                          </div>
-                         <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest text-blue-400 flex justify-center gap-1 relative z-10 ${breatheAnimation}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
+                         <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest flex justify-center gap-1 relative z-10 ${zenMode ? 'text-zinc-500' : `text-blue-400 ${breatheAnimation}`}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
                       </div>
                     </div>
 
                     {/* DESKTOP BOTTOM ROW */}
                     <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <div onClick={handleLeaderboardNav} className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-yellow-900/30'}`}>
-                          <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:10px_10px] pointer-events-none"></div>
-                          <div className={`absolute inset-0 bg-gradient-to-r from-transparent ${hoverShimmerGradient} to-transparent -skew-x-12 -translate-x-[150%] pointer-events-none opacity-0 group-hover:opacity-100 ${shimmerOnceAnimation}`}></div>
+                       <div onClick={handleLeaderboardNav} className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between ${zenMode ? 'bg-black border-zinc-800' : `bg-zinc-900/50 border-yellow-900/30 hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50`}`}>
+                          {!zenMode && <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:10px_10px] pointer-events-none"></div>}
+                          {!zenMode && <div className={`absolute inset-0 bg-gradient-to-r from-transparent ${hoverShimmerGradient} to-transparent -skew-x-12 -translate-x-[150%] pointer-events-none opacity-0 group-hover:opacity-100 ${shimmerOnceAnimation}`}></div>}
                           <div className="flex justify-between items-start relative z-10">
-                             <div className="flex items-center gap-2"><Trophy size={18} className="text-yellow-500"/><span className="text-xs font-bold uppercase text-zinc-500">REPUTATION</span></div>
-                             <ArrowUpRight size={18} className="text-yellow-400 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all"/>
+                             <div className="flex items-center gap-2"><Trophy size={18} className={zenMode ? 'text-zinc-500' : 'text-yellow-500'}/><span className="text-xs font-bold uppercase text-zinc-500">REPUTATION</span></div>
+                             {!zenMode && <ArrowUpRight size={18} className="text-yellow-400 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all"/>}
                           </div>
                           <div className="relative z-10 flex flex-col gap-2">
                              {isValidReputation && (<div className="flex justify-between items-center w-full px-1"><div className="text-[10px] font-bold uppercase text-zinc-500">Global Rank</div><div className="text-xs font-black text-zinc-200">#{selectedNode.rank || '-'}</div></div>)}
-                             <div className="w-full bg-black/20 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] border-b border-white/5 rounded-full px-4 py-2 flex items-center justify-between mt-1">
+                             <div className={`w-full rounded-full px-4 py-2 flex items-center justify-between mt-1 ${zenMode ? 'bg-zinc-900 border border-zinc-800' : 'bg-black/20 shadow-[inset_0_2px_4px_rgba(0,0,0,0.6)] border-b border-white/5'}`}>
                                 <span className="text-[10px] font-bold text-zinc-500 uppercase">CREDITS EARNED</span>
-                                <span className={`text-[9px] font-mono font-bold whitespace-nowrap ${(selectedNode as any).isUntracked || selectedNode.credits === null ? 'text-zinc-500' : 'text-yellow-500'}`}>{(selectedNode as any).isUntracked ? 'NO CREDITS' : selectedNode.credits === null ? 'API OFFLINE' : selectedNode.credits.toLocaleString()}</span>
+                                <span className={`text-[9px] font-mono font-bold whitespace-nowrap ${(selectedNode as any).isUntracked || selectedNode.credits === null ? 'text-zinc-500' : (zenMode ? 'text-white' : 'text-yellow-500')}`}>{(selectedNode as any).isUntracked ? 'NO CREDITS' : selectedNode.credits === null ? 'API OFFLINE' : selectedNode.credits.toLocaleString()}</span>
                              </div>
                           </div>
-                          <div className={`absolute bottom-2 right-4 text-[9px] font-bold uppercase text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity ${breatheAnimation}`}>OPEN LEADERBOARD</div>
+                          <div className={`absolute bottom-2 right-4 text-[9px] font-bold uppercase opacity-0 group-hover:opacity-100 transition-opacity ${zenMode ? 'text-zinc-400' : `text-yellow-500 ${breatheAnimation}`}`}>OPEN LEADERBOARD</div>
                        </div>
                        <Link href={`/map?focus=${getSafeIp(selectedNode)}`}>
-                         <div className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-blue-500/20 hover:ring-blue-500/50 ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-blue-900/30'}`}>
-                            <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#3b82f6_1px,transparent_1px),linear-gradient(to_bottom,#3b82f6_1px,transparent_1px)] bg-[size:20px_20px] origin-center group-hover:scale-[3.0] transition-transform duration-700 ease-in-out pointer-events-none"></div>
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0"><MapPin size={48} className="text-blue-500/20 drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]" /></div>
-                            <div className="flex justify-between items-start relative z-10"><div className="flex items-center gap-2"><Globe size={18} className="text-blue-500"/><span className="text-xs font-bold uppercase text-zinc-500">PHYSICAL LAYER</span></div><ArrowUpRight size={18} className="text-blue-400 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all"/></div>
-                            <div className="relative z-10 mt-auto flex items-end justify-between w-full"><div className="text-xs font-mono text-zinc-400">{getSafeIp(selectedNode)}</div><div className="flex items-center gap-2 text-sm font-bold text-white"><span className="text-lg">{getFlagEmoji(selectedNode.location?.countryCode)}</span><span>{selectedNode.location?.countryName || 'Unknown'}</span></div></div>
-                            <div className={`absolute bottom-2 right-4 text-[9px] font-bold uppercase text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity ${breatheAnimation}`}>OPEN MAP VIEW</div>
+                         <div className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between ${zenMode ? 'bg-black border-zinc-800' : `bg-zinc-900/50 border-blue-900/30 hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-blue-500/20 hover:ring-blue-500/50`}`}>
+                            {!zenMode && <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#3b82f6_1px,transparent_1px),linear-gradient(to_bottom,#3b82f6_1px,transparent_1px)] bg-[size:20px_20px] origin-center group-hover:scale-[3.0] transition-transform duration-700 ease-in-out pointer-events-none"></div>}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0"><MapPin size={48} className={`${zenMode ? 'text-zinc-800' : 'text-blue-500/20 drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]'}`} /></div>
+                            <div className="flex justify-between items-start relative z-10"><div className="flex items-center gap-2"><Globe size={18} className={zenMode ? 'text-zinc-500' : 'text-blue-500'}/><span className="text-xs font-bold uppercase text-zinc-500">PHYSICAL LAYER</span></div>{!zenMode && <ArrowUpRight size={18} className="text-blue-400 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all"/>}</div>
+                            <div className="relative z-10 mt-auto flex items-end justify-between w-full"><div className="text-xs font-mono text-zinc-400">{getSafeIp(selectedNode)}</div><div className="flex items-center gap-2 text-sm font-bold text-white"><span className={`text-lg ${zenMode ? 'grayscale' : ''}`}>{getFlagEmoji(selectedNode.location?.countryCode)}</span><span>{selectedNode.location?.countryName || 'Unknown'}</span></div></div>
+                            <div className={`absolute bottom-2 right-4 text-[9px] font-bold uppercase opacity-0 group-hover:opacity-100 transition-opacity ${zenMode ? 'text-zinc-400' : `text-blue-500 ${breatheAnimation}`}`}>OPEN MAP VIEW</div>
                          </div>
                        </Link>
                     </div>
@@ -537,11 +538,11 @@ export const InspectorModal = ({
                     <div className="mt-auto pt-2 md:pt-6 border-t border-zinc-800 flex flex-col gap-2 md:gap-4">
                       <div className="flex flex-row md:flex-col items-center justify-between md:justify-center gap-2 md:gap-3">
                         <div className="flex-1 md:flex-none text-[9px] md:text-[10px] text-zinc-500 flex items-center justify-center gap-1.5 bg-black/40 px-3 py-1.5 md:py-1 rounded-full border border-zinc-800/50"><Clock size={10} /> <span className="hidden md:inline">Last Seen:</span> <span className="text-zinc-300 font-mono">{timeAgo}</span></div>
-                        <button onClick={() => copyToClipboard(`${window.location.origin}/?open=${selectedNode.pubkey}`, 'url')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-1.5 md:py-2 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/20 rounded-full text-[9px] md:text-[10px] font-bold text-blue-400 transition`}>{copiedField === 'url' ? <Check size={12} /> : <LinkIcon size={12} />} {copiedField === 'url' ? 'COPIED' : 'COPY NODE URL'}</button>
+                        <button onClick={() => copyToClipboard(`${window.location.origin}/?open=${selectedNode.pubkey}`, 'url')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-1.5 md:py-2 rounded-full text-[9px] md:text-[10px] font-bold transition ${zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white' : 'bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/20 text-blue-400'}`}>{copiedField === 'url' ? <Check size={12} /> : <LinkIcon size={12} />} {copiedField === 'url' ? 'COPIED' : 'COPY NODE URL'}</button>
                       </div>
                       <div className="flex gap-2 md:gap-4">
-                        <button onClick={() => setMode('COMPARE')} className="flex-1 py-3 md:py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border border-zinc-700"><Swords size={16} className="text-red-400" /> <span className="hidden md:inline">COMPARE NODES</span><span className="md:hidden">COMPARE</span></button>
-                        <button onClick={() => setMode('SHARE')} className="flex-1 py-3 md:py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20"><Camera size={16} /> <span className="hidden md:inline">PROOF OF PULSE</span><span className="md:hidden">PROOF</span></button>
+                        <button onClick={() => setMode('COMPARE')} className={`flex-1 py-3 md:py-4 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border ${zenMode ? 'bg-black border-zinc-700 hover:bg-zinc-900' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700'}`}><Swords size={16} className={zenMode ? 'text-white' : 'text-red-400'} /> <span className="hidden md:inline">COMPARE NODES</span><span className="md:hidden">COMPARE</span></button>
+                        <button onClick={() => setMode('SHARE')} className={`flex-1 py-3 md:py-4 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 ${zenMode ? 'bg-white text-black border-transparent hover:bg-zinc-200' : 'bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20'}`}><Camera size={16} /> <span className="hidden md:inline">PROOF OF PULSE</span><span className="md:hidden">PROOF</span></button>
                       </div>
                     </div>
                  </div>
