@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
@@ -28,7 +28,7 @@ import {
   Clock, Trophy, Star, ArrowUp, ArrowDown,
   Info, ExternalLink, Maximize2, Map as MapIcon,
   BookOpen, Menu, LayoutDashboard, HeartPulse,
-  Swords, Monitor, AlertTriangle, RefreshCw, Twitter, Server
+  Swords, Monitor, AlertTriangle, RefreshCw, Twitter, Server, Globe
 } from 'lucide-react';
 
 export default function Home() {
@@ -45,7 +45,6 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Cycle & UX
-  // Default to step 1 (Committed) because default sort is 'storage'
   const [cycleStep, setCycleStep] = useState(1); 
   const [cycleReset, setCycleReset] = useState(0); 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -238,15 +237,14 @@ export default function Home() {
     };
   }, []); 
 
-  // CHANGED: Timer Logic with Cycle Reset
   useEffect(() => {
-    // 13 seconds per cycle as requested
+    // 13s Cycle Interval (Interruptible via cycleReset)
     const cycleInterval = setInterval(() => {
         setCycleStep((prev) => prev + 1);
     }, 13000); 
 
     return () => clearInterval(cycleInterval);
-  }, [cycleReset]); // Dependency on cycleReset forces the timer to restart when we sort!
+  }, [cycleReset]);
 
   useEffect(() => {
     const tipInterval = setInterval(() => {
@@ -282,6 +280,31 @@ export default function Home() {
     }
   }, [loading, nodes, router.query]);
 
+  // --- DERIVED STATS (New for Context-Aware Capacity) ---
+  const splitStats = useMemo(() => {
+    let mainnetC = 0, mainnetU = 0;
+    let devnetC = 0, devnetU = 0;
+    
+    nodes.forEach(n => {
+        const c = n.storage_committed || 0;
+        const u = n.storage_used || 0;
+        if (n.network === 'MAINNET') {
+            mainnetC += c;
+            mainnetU += u;
+        } else if (n.network === 'DEVNET') {
+            devnetC += c;
+            devnetU += u;
+        }
+    });
+
+    return { mainnetC, mainnetU, devnetC, devnetU };
+  }, [nodes]);
+
+  // Determine what to show on the Capacity Card
+  const isGlobalView = networkFilter === 'ALL';
+  const displayCommitted = isGlobalView ? totalStorageCommitted : (networkFilter === 'MAINNET' ? splitStats.mainnetC : splitStats.devnetC);
+  const displayUsed = isGlobalView ? totalStorageUsed : (networkFilter === 'MAINNET' ? splitStats.mainnetU : splitStats.devnetU);
+
   // --- FILTER & SORT LOGIC ---
 
   const handleSortChange = (metric: 'uptime' | 'version' | 'storage' | 'health') => {
@@ -292,15 +315,8 @@ export default function Home() {
           setSortOrder('desc'); 
       }
 
-      // CHANGED: Explicitly set cycle step based on sort
-      // This "pushes the data to the front"
+      // Interrupt & Reset Logic (Skips for Version)
       let targetStep = -1;
-      
-      // NodeCard Logic Mapping:
-      // Step 0: Storage Used 
-      // Step 1: Committed (Matches Sort: Storage)
-      // Step 2: Health (Matches Sort: Health)
-      // Step 3: Uptime (Matches Sort: Uptime)
       
       if (metric === 'storage') targetStep = 1;
       if (metric === 'health') targetStep = 2;
@@ -308,7 +324,6 @@ export default function Home() {
       
       if (targetStep !== -1) {
           setCycleStep(targetStep);
-          // Incrementing this triggers the useEffect, restarting the 13s timer
           setCycleReset(prev => prev + 1); 
       }
   };
@@ -365,10 +380,16 @@ export default function Home() {
       {activeStatsModal === 'capacity' && (
         <CapacityModal 
           onClose={() => setActiveStatsModal(null)}
+          nodes={nodes}
+          // Pass GLOBAL totals
           totalCommitted={totalStorageCommitted}
           totalUsed={totalStorageUsed}
-          nodes={nodes}
           medianCommitted={medianCommitted}
+          // Pass SPLIT totals
+          mainnetCommitted={splitStats.mainnetC}
+          mainnetUsed={splitStats.mainnetU}
+          devnetCommitted={splitStats.devnetC}
+          devnetUsed={splitStats.devnetU}
         />
       )}
       {activeStatsModal === 'vitals' && (
@@ -541,16 +562,35 @@ export default function Home() {
       <main className={`p-4 md:p-8 ${zenMode ? 'max-w-full' : 'max-w-7xl 2xl:max-w-[1800px] mx-auto'} transition-all duration-500`}>
         {!zenMode && !loading && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
+            
+            {/* --- UPDATED CAPACITY CARD --- */}
             <div onClick={() => setActiveStatsModal('capacity')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm flex flex-col justify-between cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
-                <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Network Capacity</div>
+                <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1 flex items-center gap-1">
+                   {/* Context-Aware Icon */}
+                   <Database size={10} className={isGlobalView ? 'text-zinc-500' : networkFilter === 'MAINNET' ? 'text-green-500' : 'text-blue-500'} /> 
+                   {isGlobalView ? 'Network Capacity' : `${networkFilter} Capacity`}
+                </div>
                 <div>
-                  <div className="text-lg md:text-3xl font-bold text-purple-400">{formatBytes(totalStorageCommitted)}</div>
-                  <div className="text-[9px] md:text-xs font-bold text-blue-400 mt-0.5 md:mt-1 flex items-center gap-1">{formatBytes(totalStorageUsed)} <span className="text-zinc-600 font-normal">Used</span></div>
+                  {/* Context-Aware Values */}
+                  <div className={`text-lg md:text-3xl font-bold ${isGlobalView ? 'text-purple-400' : 'text-white'}`}>{formatBytes(displayCommitted)}</div>
+                  <div className="text-[9px] md:text-xs font-bold text-blue-400 mt-0.5 md:mt-1 flex items-center gap-1">{formatBytes(displayUsed)} <span className="text-zinc-600 font-normal">Used</span></div>
                 </div>
               </div>
-              <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-purple-400 font-bold flex items-center gap-1 z-10"><Maximize2 size={8} /> DETAILS</div>
+
+              {/* Dynamic Footer: Shows "Global Anchor" when drilled down, OR "Details" when global */}
+              <div className="absolute bottom-2 right-2 z-10">
+                 {!isGlobalView ? (
+                    <div className="flex items-center gap-1 text-[8px] text-zinc-600 font-mono">
+                       <Globe size={8} /> Global: <span className="text-zinc-500">{formatBytes(totalStorageCommitted)}</span>
+                    </div>
+                 ) : (
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-purple-400 font-bold flex items-center gap-1">
+                       <Maximize2 size={8} /> DETAILS
+                    </div>
+                 )}
+              </div>
             </div>
 
             <div onClick={() => setActiveStatsModal('vitals')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform h-24 md:h-auto">
