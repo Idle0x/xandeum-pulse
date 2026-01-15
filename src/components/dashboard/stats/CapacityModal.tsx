@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { X, Database, TrendingUp, Users, PieChart, Globe, Activity, Server, Share2 } from 'lucide-react';
+import { X, Database, TrendingUp, Users, PieChart, Globe, Activity, Server } from 'lucide-react';
 import { Node } from '../../../types';
 import { formatBytes } from '../../../utils/formatters';
 
@@ -158,7 +158,7 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
              
              {/* LEFT CARD: Logic split based on Tab */}
              {activeTab === 'ALL' ? (
-                 // --- ALL: Split Chart ---
+                 // --- ALL: Split Chart (Horizontal) ---
                  <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex items-center gap-4">
                     <div className="relative w-14 h-14 shrink-0">
                        {renderPie([
@@ -220,46 +220,47 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
              </div>
           </div>
 
-          {/* --- ROW 3: WHALE WATCHER (Revised Layout) --- */}
-          <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 md:p-5 relative">
-             <div className="flex justify-between items-start mb-2">
+          {/* --- ROW 3: WHALE WATCHER (REVERTED TO SNIPPET LAYOUT) --- */}
+          <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-xl p-4 md:p-5 relative">
+             <div className="flex justify-between items-start mb-4">
                 
-                {/* LEFT: Text Info & Legend */}
-                <div className="flex-1 pr-6 flex flex-col justify-between h-full">
-                   <div>
-                      <div className="flex items-center gap-2 mb-2">
-                          <h4 className="text-xs font-bold text-white uppercase tracking-wider">Top 10 Dominance</h4>
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-bold border border-zinc-700">
-                             {((dashboardData.top10Sum / (dashboardData.totalCommitted || 1)) * 100).toFixed(2)}%
-                          </span>
-                      </div>
-                      <p className="text-[10px] text-zinc-400 leading-relaxed mb-4 max-w-sm">
-                          {getWhaleText()} <span className="text-white font-mono font-bold">{formatBytes(dashboardData.top10Sum)}</span> combined.
-                      </p>
+                {/* LEFT: Text Info */}
+                <div className="max-w-[65%] pr-4">
+                   <div className="flex items-center gap-2 mb-2">
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Top 10 Dominance</h4>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-500 font-bold border border-yellow-500/30">
+                         {((dashboardData.top10Sum / (dashboardData.totalCommitted || 1)) * 100).toFixed(2)}%
+                      </span>
                    </div>
-
-                   {/* Legend */}
-                   <div className="flex items-center gap-4 pt-1">
-                      <div>
-                         <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div><span className="text-[8px] font-bold text-zinc-500 uppercase">Top 10</span></div>
-                      </div>
-                      <div>
-                         <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-cyan-500"></div><span className="text-[8px] font-bold text-zinc-500 uppercase">11-100</span></div>
-                      </div>
-                      <div>
-                         <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-zinc-400"></div><span className="text-[8px] font-bold text-zinc-500 uppercase">Rest</span></div>
-                      </div>
-                   </div>
+                   <p className="text-[10px] text-zinc-400 leading-relaxed mb-0">
+                      {getWhaleText()} <span className="text-white font-mono font-bold">{formatBytes(dashboardData.top10Sum)}</span> combined.
+                   </p>
                 </div>
 
                 {/* RIGHT: Chart */}
-                <div className="w-16 h-16 shrink-0 relative mt-1">
+                <div className="w-16 h-16 shrink-0 relative">
                    {renderPie([
                       { value: dashboardData.top10Sum, color: '#eab308' },  // Gold
-                      { value: dashboardData.midTierSum, color: '#06b6d4' }, // Cyan
-                      { value: dashboardData.restSum, color: '#a1a1aa' }    // Ash
+                      { value: dashboardData.midTierSum, color: '#06b6d4' }, // Cyan (11-100)
+                      { value: dashboardData.restSum, color: '#a1a1aa' }    // Ash (Rest)
                    ])}
-                   <div className="absolute inset-0 flex items-center justify-center text-zinc-500"><Users size={12} /></div>
+                   <div className="absolute inset-0 flex items-center justify-center text-yellow-500"><Users size={12} /></div>
+                </div>
+             </div>
+
+             {/* BOTTOM: Legend */}
+             <div className="grid grid-cols-3 gap-2 border-t border-yellow-500/10 pt-3">
+                <div>
+                   <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div><span className="text-[8px] font-bold text-zinc-500 uppercase">Top 10</span></div>
+                   <div className="text-[9px] font-mono text-zinc-300">{((dashboardData.top10Sum / (dashboardData.totalCommitted || 1)) * 100).toFixed(1)}%</div>
+                </div>
+                <div>
+                   <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-cyan-500"></div><span className="text-[8px] font-bold text-zinc-500 uppercase">11-100</span></div>
+                   <div className="text-[9px] font-mono text-zinc-300">{((dashboardData.midTierSum / (dashboardData.totalCommitted || 1)) * 100).toFixed(1)}%</div>
+                </div>
+                <div>
+                   <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-zinc-400"></div><span className="text-[8px] font-bold text-zinc-500 uppercase">Rest</span></div>
+                   <div className="text-[9px] font-mono text-zinc-300">{((dashboardData.restSum / (dashboardData.totalCommitted || 1)) * 100).toFixed(1)}%</div>
                 </div>
              </div>
           </div>
