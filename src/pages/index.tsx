@@ -24,7 +24,7 @@ import { getSafeIp, compareVersions } from '../utils/nodeHelpers';
 
 // --- ICONS ---
 import {
-  Search, Download, Activity, Database, X,
+  Search, Activity, Database, X,
   Clock, Trophy, Star, ArrowUp, ArrowDown,
   Info, ExternalLink, Maximize2, Map as MapIcon,
   BookOpen, Menu, LayoutDashboard, HeartPulse,
@@ -45,7 +45,8 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Cycle & UX
-  const [cycleStep, setCycleStep] = useState(1);
+  // Default to step 1 (Committed) because default sort is 'storage'
+  const [cycleStep, setCycleStep] = useState(1); 
   const [cycleReset, setCycleReset] = useState(0); 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [zenMode, setZenMode] = useState(false);
@@ -117,25 +118,10 @@ export default function Home() {
     if (activeTooltip) setActiveTooltip(null);
   };
 
-  // PERSISTENCE: Toggle Zen Mode & Save to LocalStorage
   const toggleZenMode = () => {
     const newState = !zenMode;
     setZenMode(newState);
     localStorage.setItem('xandeum_zen_mode', String(newState));
-  };
-
-  const exportCSV = () => {
-    const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Health_Score,Country,Last_Seen_ISO,Is_Favorite\n';
-    const rows = filteredNodes.map(n => {
-      const creditVal = n.credits !== null ? n.credits : 'NULL';
-      return `${getSafeIp(n)},${n.pubkey || 'Unknown'},${n.rank},${creditVal},${n.version},${n.uptime},${n.storage_committed},${n.storage_used},${n.health},${n.location?.countryName},${new Date(n.last_seen_timestamp || 0).toISOString()},${favorites.includes(n.address || '')}`;
-    });
-    const blob = new Blob([headers + rows.join('\n')], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `xandeum_pulse_export_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
   };
 
   // --- DATA FETCHING ---
@@ -237,10 +223,6 @@ export default function Home() {
     const savedZen = localStorage.getItem('xandeum_zen_mode');
     if (savedZen === 'true') setZenMode(true);
 
-    const cycleInterval = setInterval(() => {
-        setCycleStep((prev) => prev + 1);
-    }, 9000); 
-    
     // RESTORE FAVORITES
     const savedFavs = localStorage.getItem('xandeum_favorites');
     if (savedFavs) setFavorites(JSON.parse(savedFavs));
@@ -249,13 +231,22 @@ export default function Home() {
     const dataInterval = setInterval(() => fetchData('swarm'), 30000);
     const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener('scroll', handleScroll);
-    
+
     return () => {
-      clearInterval(cycleInterval);
       clearInterval(dataInterval);
       window.removeEventListener('scroll', handleScroll);
     };
   }, []); 
+
+  // CHANGED: Timer Logic with Cycle Reset
+  useEffect(() => {
+    // 13 seconds per cycle as requested
+    const cycleInterval = setInterval(() => {
+        setCycleStep((prev) => prev + 1);
+    }, 13000); 
+
+    return () => clearInterval(cycleInterval);
+  }, [cycleReset]); // Dependency on cycleReset forces the timer to restart when we sort!
 
   useEffect(() => {
     const tipInterval = setInterval(() => {
@@ -301,14 +292,24 @@ export default function Home() {
           setSortOrder('desc'); 
       }
 
+      // CHANGED: Explicitly set cycle step based on sort
+      // This "pushes the data to the front"
       let targetStep = -1;
+      
+      // NodeCard Logic Mapping:
+      // Step 0: Storage Used 
+      // Step 1: Committed (Matches Sort: Storage)
+      // Step 2: Health (Matches Sort: Health)
+      // Step 3: Uptime (Matches Sort: Uptime)
+      
       if (metric === 'storage') targetStep = 1;
       if (metric === 'health') targetStep = 2;
       if (metric === 'uptime') targetStep = 3;
-
+      
       if (targetStep !== -1) {
           setCycleStep(targetStep);
-          setCycleReset(prev => prev + 1);
+          // Incrementing this triggers the useEffect, restarting the 13s timer
+          setCycleReset(prev => prev + 1); 
       }
   };
 
@@ -474,7 +475,6 @@ export default function Home() {
           <div className="flex-1 max-w-xl mx-4 relative overflow-hidden group flex flex-col items-center">
             <div className="relative w-full">
               <Search className={`absolute left-3 top-2.5 size-4 z-10 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
-              {/* ZEN CHANGE: Hide Marquee completely in Zen */}
               {!zenMode && !searchQuery && !isSearchFocused && (
                 <div className="absolute inset-0 flex items-center pointer-events-none pl-10 pr-4 overflow-hidden z-0">
                   <div className="whitespace-nowrap animate-marquee text-sm text-zinc-600 font-mono opacity-80">
@@ -482,11 +482,9 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              {/* ZEN CHANGE: Flat Input vs Glowing Input */}
               <input type="text" placeholder={zenMode ? "Search..." : ""} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full rounded-lg py-2 pl-10 pr-8 md:pr-4 text-sm outline-none transition-all relative z-10 bg-transparent ${zenMode ? 'border border-zinc-800 text-zinc-300 focus:border-zinc-600 placeholder:text-zinc-700' : 'border border-zinc-800 text-white focus:border-blue-500 shadow-inner'}`} onFocus={() => setIsSearchFocused(true)} onBlur={() => setIsSearchFocused(false)} />
               {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-2.5 text-zinc-500 hover:text-white transition z-20 p-0.5 bg-black/20 rounded-full hover:bg-zinc-700"><X size={14} /></button>}
             </div>
-            {/* ZEN CHANGE: Hide Tips in Zen */}
             {!zenMode && (
               <div className="mt-1 md:mt-2 w-full text-center pointer-events-none min-h-[16px] md:min-h-[20px] transition-all duration-300 hidden md:block">
                 <p key={searchTipIndex} className="text-[9px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 whitespace-normal text-center leading-tight">
