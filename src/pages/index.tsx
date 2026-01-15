@@ -117,6 +117,13 @@ export default function Home() {
     if (activeTooltip) setActiveTooltip(null);
   };
 
+  // PERSISTENCE: Toggle Zen Mode & Save to LocalStorage
+  const toggleZenMode = () => {
+    const newState = !zenMode;
+    setZenMode(newState);
+    localStorage.setItem('xandeum_zen_mode', String(newState));
+  };
+
   const exportCSV = () => {
     const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Health_Score,Country,Last_Seen_ISO,Is_Favorite\n';
     const rows = filteredNodes.map(n => {
@@ -226,10 +233,28 @@ export default function Home() {
   // --- EFFECTS ---
 
   useEffect(() => {
+    // RESTORE ZEN PREFERENCE
+    const savedZen = localStorage.getItem('xandeum_zen_mode');
+    if (savedZen === 'true') setZenMode(true);
+
     const cycleInterval = setInterval(() => {
         setCycleStep((prev) => prev + 1);
     }, 9000); 
-    return () => clearInterval(cycleInterval);
+    
+    // RESTORE FAVORITES
+    const savedFavs = localStorage.getItem('xandeum_favorites');
+    if (savedFavs) setFavorites(JSON.parse(savedFavs));
+
+    fetchData('fast');
+    const dataInterval = setInterval(() => fetchData('swarm'), 30000);
+    const handleScroll = () => setScrolled(window.scrollY > 50);
+    window.addEventListener('scroll', handleScroll);
+    
+    return () => {
+      clearInterval(cycleInterval);
+      clearInterval(dataInterval);
+      window.removeEventListener('scroll', handleScroll);
+    };
   }, []); 
 
   useEffect(() => {
@@ -238,19 +263,6 @@ export default function Home() {
     }, 9000);
     return () => clearInterval(tipInterval);
   }, [isSearchFocused]);
-
-  useEffect(() => {
-    fetchData('fast');
-    const saved = localStorage.getItem('xandeum_favorites');
-    if (saved) setFavorites(JSON.parse(saved));
-    const dataInterval = setInterval(() => fetchData('swarm'), 30000);
-    const handleScroll = () => setScrolled(window.scrollY > 50);
-    window.addEventListener('scroll', handleScroll);
-    return () => {
-      clearInterval(dataInterval);
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
 
   useEffect(() => {
     if (!loading && nodes.length > 0 && router.query.open) {
@@ -387,7 +399,7 @@ export default function Home() {
           medianCommitted={medianCommitted}
           totalStorageCommitted={totalStorageCommitted}
           mostCommonVersion={mostCommonVersion}
-          onShowToast={showToast} /* Added prop */
+          onShowToast={showToast}
         />
       )}
 
@@ -399,14 +411,14 @@ export default function Home() {
 
       {/* --- SIDE NAVIGATION --- */}
       <div
-        className={`fixed inset-y-0 left-0 w-72 bg-[#09090b] border-r border-zinc-800 z-[200] transform transition-transform duration-300 ease-in-out ${
+        className={`fixed inset-y-0 left-0 w-72 bg-black border-r border-zinc-800 z-[200] transform transition-transform duration-300 ease-in-out ${
           isMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="p-6 flex flex-col h-full relative overflow-hidden">
           <div className="flex justify-between items-center mb-8 shrink-0 relative z-10">
             <h2 className="font-bold text-white tracking-widest uppercase flex items-center gap-2">
-              <Activity className="text-blue-500" size={18} /> Menu
+              <Activity className={zenMode ? 'text-zinc-500' : 'text-blue-500'} size={18} /> Menu
             </h2>
             <button onClick={() => setIsMenuOpen(false)} className="text-zinc-500 hover:text-white p-2 rounded-lg bg-zinc-900 border border-zinc-800 transition-colors cursor-pointer">
               <X size={24} />
@@ -414,10 +426,10 @@ export default function Home() {
           </div>
 
           <div className="mb-8 shrink-0 relative z-10">
-            <div className="bg-zinc-900/80 border border-white/5 p-4 rounded-2xl relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition-all duration-700 pointer-events-none z-0"></div>
+            <div className={`border p-4 rounded-2xl relative overflow-hidden group ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900/80 border-white/5'}`}>
+              {!zenMode && <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition-all duration-700 pointer-events-none z-0"></div>}
               <div className="flex items-center gap-2 mb-3 relative z-10">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+                <div className={`w-1.5 h-1.5 rounded-full ${zenMode ? 'bg-white' : 'bg-blue-500 animate-pulse'}`}></div>
                 <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">Protocol Context</span>
               </div>
               <div className="relative z-20">
@@ -425,7 +437,7 @@ export default function Home() {
               </div>
               <div className="mt-4 flex items-center justify-between relative z-10">
                 <span className="text-[9px] text-zinc-600 font-mono font-bold uppercase tracking-tight">Active Stream</span>
-                <span className={`text-[9px] font-mono font-bold ${networkFilter === 'MAINNET' ? 'text-green-500' : networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-zinc-400'}`}>
+                <span className={`text-[9px] font-mono font-bold ${zenMode ? 'text-white' : (networkFilter === 'MAINNET' ? 'text-green-500' : networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-zinc-400')}`}>
                   {networkFilter === 'ALL' ? 'GLOBAL_SYNC' : `${networkFilter}_READY`}
                 </span>
               </div>
@@ -439,29 +451,20 @@ export default function Home() {
             <button onClick={() => { router.push('/compare'); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800"><Swords size={18} /><span className="text-sm font-bold">Compare Nodes</span></button>
             <Link href="/docs" onClick={() => setIsMenuOpen(false)}><div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800"><BookOpen size={18} /><span className="text-sm font-bold">Documentation</span></div></Link>
           </nav>
-
-          <div className="mt-auto border-t border-zinc-800 pt-6 space-y-4 shrink-0 relative z-10">
-            <div className="bg-zinc-900 p-4 rounded-xl border border-zinc-800">
-              <div className="text-[10px] text-zinc-500 uppercase font-bold mb-2">Quick Actions</div>
-              <button onClick={() => { exportCSV(); setIsMenuOpen(false); }} className="w-full py-2 bg-black border border-zinc-700 rounded-lg text-xs font-bold text-zinc-300 hover:text-white hover:border-zinc-500 transition flex items-center justify-center gap-2 cursor-pointer">
-                <Download size={14} /> Export Data
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
       {isMenuOpen && <div className="fixed inset-0 bg-black/50 z-[190] backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* --- HEADER --- */}
-      <header className={`sticky top-0 z-[50] backdrop-blur-md border-b px-4 py-2 md:px-6 md:py-4 flex flex-col gap-2 md:gap-6 transition-all duration-500 ${zenMode ? 'bg-black/90 border-zinc-800' : 'bg-[#09090b]/90 border-zinc-800'}`}>
+      <header className={`sticky top-0 z-[50] border-b px-4 py-2 md:px-6 md:py-4 flex flex-col gap-2 md:gap-6 transition-all duration-500 ${zenMode ? 'bg-black border-zinc-800' : 'bg-[#09090b]/90 backdrop-blur-md border-zinc-800'}`}>
         <div className="flex justify-between items-center w-full">
           <div className="flex items-center gap-4">
-            <button onClick={() => setIsMenuOpen(true)} className={`p-2.5 md:p-3.5 rounded-xl transition ${zenMode ? 'text-zinc-400 border border-zinc-800' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white hover:bg-zinc-800'}`}>
+            <button onClick={() => setIsMenuOpen(true)} className={`p-2.5 md:p-3.5 rounded-xl transition ${zenMode ? 'text-zinc-400 border border-zinc-800 hover:text-white' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white hover:bg-zinc-800'}`}>
               <Menu size={24} className="md:w-7 md:h-7" />
             </button>
             <div className="flex flex-col">
-              <h1 className={`text-lg md:text-xl font-extrabold tracking-tight flex items-center gap-2 ${zenMode ? 'text-white' : 'text-white'}`}>
+              <h1 className="text-lg md:text-xl font-extrabold tracking-tight flex items-center gap-2 text-white">
                 <Activity className={zenMode ? 'text-zinc-500' : 'text-blue-500'} size={20} /> PULSE
               </h1>
               <span className="text-[9px] text-zinc-600 font-mono tracking-wider ml-1">Sync: {lastSync}</span>
@@ -471,16 +474,19 @@ export default function Home() {
           <div className="flex-1 max-w-xl mx-4 relative overflow-hidden group flex flex-col items-center">
             <div className="relative w-full">
               <Search className={`absolute left-3 top-2.5 size-4 z-10 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
-              {!searchQuery && !isSearchFocused && (
+              {/* ZEN CHANGE: Hide Marquee completely in Zen */}
+              {!zenMode && !searchQuery && !isSearchFocused && (
                 <div className="absolute inset-0 flex items-center pointer-events-none pl-10 pr-4 overflow-hidden z-0">
                   <div className="whitespace-nowrap animate-marquee text-sm text-zinc-600 font-mono opacity-80">
                     Search nodes by Version, IP Address, Country, or Public Key...
                   </div>
                 </div>
               )}
-              <input type="text" placeholder="" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full rounded-lg py-2 pl-10 pr-8 md:pr-4 text-sm outline-none shadow-inner transition-all relative z-10 bg-transparent ${zenMode ? 'border border-zinc-800 text-zinc-300 focus:border-zinc-600' : 'border border-zinc-800 text-white focus:border-blue-500'}`} onFocus={() => setIsSearchFocused(true)} onBlur={() => setIsSearchFocused(false)} />
+              {/* ZEN CHANGE: Flat Input vs Glowing Input */}
+              <input type="text" placeholder={zenMode ? "Search..." : ""} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full rounded-lg py-2 pl-10 pr-8 md:pr-4 text-sm outline-none transition-all relative z-10 bg-transparent ${zenMode ? 'border border-zinc-800 text-zinc-300 focus:border-zinc-600 placeholder:text-zinc-700' : 'border border-zinc-800 text-white focus:border-blue-500 shadow-inner'}`} onFocus={() => setIsSearchFocused(true)} onBlur={() => setIsSearchFocused(false)} />
               {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-2.5 text-zinc-500 hover:text-white transition z-20 p-0.5 bg-black/20 rounded-full hover:bg-zinc-700"><X size={14} /></button>}
             </div>
+            {/* ZEN CHANGE: Hide Tips in Zen */}
             {!zenMode && (
               <div className="mt-1 md:mt-2 w-full text-center pointer-events-none min-h-[16px] md:min-h-[20px] transition-all duration-300 hidden md:block">
                 <p key={searchTipIndex} className="text-[9px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 whitespace-normal text-center leading-tight">
@@ -489,10 +495,10 @@ export default function Home() {
                 </p>
               </div>
             )}
-            <style jsx>{` @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } } .animate-marquee { animation: marquee 15s linear infinite; } `}</style>
+            {!zenMode && <style jsx>{` @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } } .animate-marquee { animation: marquee 15s linear infinite; } `}</style>}
           </div>
 
-          <button onClick={() => setZenMode(!zenMode)} className={`p-2 rounded-lg transition flex items-center gap-2 group ${zenMode ? 'bg-zinc-800 border border-zinc-700 text-zinc-400' : 'bg-red-900/10 border border-red-500/20 text-red-500 hover:bg-red-900/30'}`} title={zenMode ? 'Exit Zen Mode' : 'Enter Zen Mode'}>
+          <button onClick={toggleZenMode} className={`p-2 rounded-lg transition flex items-center gap-2 group ${zenMode ? 'bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white' : 'bg-red-900/10 border border-red-500/20 text-red-500 hover:bg-red-900/30'}`} title={zenMode ? 'Exit Zen Mode' : 'Enter Zen Mode'}>
             <Monitor size={18} />
             <span className="hidden md:inline text-xs font-bold">{zenMode ? 'EXIT ZEN' : 'ZEN MODE'}</span>
           </button>
@@ -504,20 +510,20 @@ export default function Home() {
           </button>
           <div className="flex gap-2 relative">
             {['uptime', 'storage', 'version', 'health'].map((opt) => (
-              <button key={opt} onClick={() => handleSortChange(opt as any)} className={`flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg text-[10px] md:text-xs font-bold transition border whitespace-nowrap h-9 md:h-auto ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-zinc-200' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
+              <button key={opt} onClick={() => handleSortChange(opt as any)} className={`flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg text-[10px] md:text-xs font-bold transition border whitespace-nowrap h-9 md:h-auto ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-black border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
                 {opt === 'uptime' && <Clock size={12} />}{opt === 'storage' && <Database size={12} />}{opt === 'version' && <Server size={12} />}{opt === 'health' && <HeartPulse size={12} />}
                 {opt.toUpperCase()}
                 {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={10} className="ml-1" /> : <ArrowDown size={10} className="ml-1" />)}
               </button>
             ))}
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#09090b] to-transparent pointer-events-none md:hidden"></div>
+            {!zenMode && <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#09090b] to-transparent pointer-events-none md:hidden"></div>}
           </div>
         </div>
       </header>
 
-      <div className={`sticky top-0 z-[80] w-full h-1 bg-gradient-to-b from-black/50 to-transparent pointer-events-none transition-opacity duration-300 ${scrolled ? 'opacity-100' : 'opacity-0'}`}></div>
+      {!zenMode && <div className={`sticky top-0 z-[80] w-full h-1 bg-gradient-to-b from-black/50 to-transparent pointer-events-none transition-opacity duration-300 ${scrolled ? 'opacity-100' : 'opacity-0'}`}></div>}
 
-      {searchQuery && (
+      {searchQuery && !zenMode && (
         <div className="sticky top-[140px] z-[85] w-full bg-blue-900/90 border-b border-blue-500/30 py-2 px-6 text-center backdrop-blur-md animate-in slide-in-from-top-1">
             <div className="text-xs font-mono text-blue-100">Found <span className="font-bold text-white">{filteredNodes.length}</span> matches for <span className="italic">"{searchQuery}"</span></div>
         </div>
@@ -525,8 +531,8 @@ export default function Home() {
 
       {toast && toast.visible && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-top-4 duration-300 w-full max-w-md px-4 pointer-events-none">
-            <div className="bg-zinc-900 border border-yellow-500/30 text-zinc-200 px-4 py-3 rounded-xl shadow-2xl flex items-start gap-3 pointer-events-auto">
-               <AlertTriangle size={20} className="text-yellow-500 shrink-0 mt-0.5" />
+            <div className={`border px-4 py-3 rounded-xl shadow-2xl flex items-start gap-3 pointer-events-auto ${zenMode ? 'bg-black border-zinc-700 text-white' : 'bg-zinc-900 border-yellow-500/30 text-zinc-200'}`}>
+               <AlertTriangle size={20} className={zenMode ? 'text-white' : 'text-yellow-500'} />
                <div className="text-xs font-bold leading-relaxed">{toast.msg}</div>
                <button onClick={() => setToast(null)} className="text-zinc-500 hover:text-white ml-auto"><X size={16}/></button>
             </div>
@@ -605,22 +611,19 @@ export default function Home() {
 
         {!loading && nodes.length > 0 && (
              <div className="flex items-center gap-2 mb-4 mt-8">
-                <Activity className={networkFilter === 'MAINNET' ? "text-green-500" : networkFilter === 'DEVNET' ? "text-blue-500" : "text-white"} size={20} />
-                <h3 className="text-lg font-bold text-white tracking-widest uppercase">{networkFilter === 'ALL' ? 'Nodes across all networks' : networkFilter === 'MAINNET' ? <span className="text-green-500">Nodes on Mainnet</span> : <span className="text-blue-500">Nodes on Devnet</span>} <span className="text-zinc-600 ml-2 text-sm">({filteredNodes.length})</span></h3>
+                <Activity className={zenMode ? 'text-zinc-500' : (networkFilter === 'MAINNET' ? "text-green-500" : networkFilter === 'DEVNET' ? "text-blue-500" : "text-white")} size={20} />
+                <h3 className="text-lg font-bold text-white tracking-widest uppercase">{networkFilter === 'ALL' ? 'Nodes across all networks' : networkFilter === 'MAINNET' ? <span className={zenMode ? 'text-white' : "text-green-500"}>Nodes on Mainnet</span> : <span className={zenMode ? 'text-white' : "text-blue-500"}>Nodes on Devnet</span>} <span className="text-zinc-600 ml-2 text-sm">({filteredNodes.length})</span></h3>
                 <div className="flex flex-col justify-center ml-2 leading-none"><span className="text-[7px] md:text-[9px] font-mono text-zinc-500 uppercase">(Distributed by <span className="text-zinc-300">{sortBy}</span></span><span className="text-[7px] md:text-[9px] font-mono text-zinc-500 uppercase text-center">{sortOrder === 'asc' ? 'Lowest to Highest' : 'Highest to Lowest'})</span></div>
             </div>
         )}
 
-        {/* --- DYNAMIC GRID WITH GHOST NODE FIX --- */}
+        {/* --- DYNAMIC GRID --- */}
         {loading && nodes.length === 0 ? (
           <PulseGraphLoader />
         ) : (
-          /* key forces re-render of entire grid on sort change to flush duplicates */
           <div key={`grid-${sortBy}-${sortOrder}-${filteredNodes.length}`} className={`grid gap-2 md:gap-4 ${zenMode ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-2 md:grid-cols-2 lg:grid-cols-3 2xl:gap-8'} pb-20`}>
-
             {filteredNodes.map((node, index) => {
               const uniqueKey = node.pubkey ? `${node.pubkey}-${node.network}` : `fallback-${index}`;
-
               if (zenMode) {
                 return (
                    <ZenCard 
@@ -632,7 +635,6 @@ export default function Home() {
                    />
                 );
               }
-
               return (
                 <NodeCard 
                   key={uniqueKey} 
@@ -677,6 +679,17 @@ export default function Home() {
                 </div>
              </div>
           </div>
+        </footer>
+      )}
+
+      {/* ZEN MODE FOOTER */}
+      {zenMode && (
+        <footer className="fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 p-2 px-6 flex justify-between items-center text-[9px] text-zinc-600 font-mono z-40">
+           <div>ZEN MODE ACTIVE</div>
+           <div className="flex items-center gap-2">
+             <div className="w-1.5 h-1.5 rounded-full bg-zinc-700"></div>
+             <span>{filteredNodes.length} NODES SYNCED</span>
+           </div>
         </footer>
       )}
     </div>
