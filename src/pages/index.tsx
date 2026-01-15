@@ -26,7 +26,7 @@ import {
   Clock, Trophy, Star, ArrowUp, ArrowDown,
   Info, ExternalLink, Maximize2, Map as MapIcon,
   BookOpen, Menu, LayoutDashboard, HeartPulse,
-  Swords, Monitor, AlertTriangle, RefreshCw, Twitter, Server, Globe
+  Swords, Monitor, AlertTriangle, RefreshCw, Twitter, Server, Globe, ShieldCheck, GitBranch
 } from 'lucide-react';
 
 export default function Home() {
@@ -64,9 +64,9 @@ export default function Home() {
   const [totalStorageCommitted, setTotalStorageCommitted] = useState(0);
   const [totalStorageUsed, setTotalStorageUsed] = useState(0);
   const [medianCommitted, setMedianCommitted] = useState(0);
-  const [networkHealth, setNetworkHealth] = useState('0.00'); // Global fallback
-  const [avgNetworkHealth, setAvgNetworkHealth] = useState(0); // Global fallback
-  const [networkConsensus, setNetworkConsensus] = useState(0); // Global fallback
+  const [networkHealth, setNetworkHealth] = useState('0.00');
+  const [avgNetworkHealth, setAvgNetworkHealth] = useState(0);
+  const [networkConsensus, setNetworkConsensus] = useState(0);
   const [lastSync, setLastSync] = useState<string>('Syncing...');
   const [searchTipIndex, setSearchTipIndex] = useState(0);
 
@@ -278,7 +278,7 @@ export default function Home() {
     }
   }, [loading, nodes, router.query]);
 
-  // --- FILTER & SORT LOGIC ---
+  // --- 1. FILTER LOGIC (Capacity Split) ---
   const splitStats = useMemo(() => {
     let mainnetC = 0, mainnetU = 0;
     let devnetC = 0, devnetU = 0;
@@ -296,33 +296,50 @@ export default function Home() {
     return { mainnetC, mainnetU, devnetC, devnetU };
   }, [nodes]);
 
-  // --- NEW: Calculate Context-Aware Vitals ---
+  // --- 2. VITALS LOGIC (Context Aware) ---
   const vitalsStats = useMemo(() => {
-    // 1. Filter Nodes based on context
     const targetNodes = networkFilter === 'ALL' 
       ? nodes 
       : nodes.filter(n => n.network === networkFilter);
-    
     const count = targetNodes.length || 1;
 
-    // 2. Avg Health
+    // Avg Health
     const totalHealth = targetNodes.reduce((acc, n) => acc + (n.health || 0), 0);
     const avg = Math.round(totalHealth / count);
 
-    // 3. Stability (>24h uptime)
+    // Stability
     const stable = targetNodes.filter(n => (n.uptime || 0) > 86400).length;
     const stability = ((stable / count) * 100).toFixed(2);
 
-    // 4. Consensus
-    // We check against global consensus version for compliance
-    const consensusCount = targetNodes.filter(n => (n.version || 'Unknown') === mostCommonVersion).length;
-    const consensus = ((consensusCount / count) * 100).toFixed(1);
+    return { avg, stability };
+  }, [nodes, networkFilter]);
 
-    return { avg, stability, consensus };
-  }, [nodes, networkFilter, mostCommonVersion]);
+  // --- 3. CONSENSUS LOGIC (Context Aware) ---
+  const consensusStats = useMemo(() => {
+    const targetNodes = networkFilter === 'ALL' 
+      ? nodes 
+      : nodes.filter(n => n.network === networkFilter);
+    const count = targetNodes.length || 1;
+
+    // Determine common version in this context
+    const versionMap: Record<string, number> = {};
+    targetNodes.forEach(n => {
+       const v = n.version || 'Unknown';
+       versionMap[v] = (versionMap[v] || 0) + 1;
+    });
+    
+    // Sort descending by count
+    const sorted = Object.entries(versionMap).sort((a, b) => b[1] - a[1]);
+    const winnerVer = sorted[0]?.[0] || 'N/A';
+    const winnerCount = sorted[0]?.[1] || 0;
+    
+    const score = ((winnerCount / count) * 100).toFixed(1);
+    
+    return { version: winnerVer, score };
+  }, [nodes, networkFilter]);
 
 
-  // --- RENDER LOGIC for Card ---
+  // --- RENDER HELPERS ---
   const isGlobalView = networkFilter === 'ALL';
   const displayCommitted = isGlobalView ? totalStorageCommitted : (networkFilter === 'MAINNET' ? splitStats.mainnetC : splitStats.devnetC);
   const displayUsed = isGlobalView ? totalStorageUsed : (networkFilter === 'MAINNET' ? splitStats.mainnetU : splitStats.devnetU);
@@ -336,7 +353,6 @@ export default function Home() {
       }
 
       let targetStep = -1;
-
       if (metric === 'storage') targetStep = 1;
       if (metric === 'health') targetStep = 2;
       if (metric === 'uptime') targetStep = 3;
@@ -381,8 +397,6 @@ export default function Home() {
 
   const watchListNodes = nodes.filter(node => favorites.includes(node.address || ''));
 
-  // --- RENDER ---
-
   return (
     <div
       className={`min-h-screen font-sans transition-colors duration-500 ${
@@ -397,18 +411,10 @@ export default function Home() {
 
       {/* --- MODALS --- */}
       {activeStatsModal === 'capacity' && (
-        <CapacityModal 
-          onClose={() => setActiveStatsModal(null)}
-          nodes={nodes}
-        />
+        <CapacityModal onClose={() => setActiveStatsModal(null)} nodes={nodes} />
       )}
-
       {activeStatsModal === 'vitals' && (
-        <VitalsModal
-           onClose={() => setActiveStatsModal(null)}
-           nodes={nodes}
-           // Removed extra props, the modal is now smart!
-        />
+        <VitalsModal onClose={() => setActiveStatsModal(null)} nodes={nodes} />
       )}
       {activeStatsModal === 'consensus' && (
         <ConsensusModal
@@ -441,11 +447,8 @@ export default function Home() {
       )}
 
       {/* --- SIDE NAVIGATION --- */}
-      <div
-        className={`fixed inset-y-0 left-0 w-72 bg-black border-r border-zinc-800 z-[200] transform transition-transform duration-300 ease-in-out ${
-          isMenuOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
+      <div className={`fixed inset-y-0 left-0 w-72 bg-black border-r border-zinc-800 z-[200] transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        {/* ... (Nav Content remains unchanged) ... */}
         <div className="p-6 flex flex-col h-full relative overflow-hidden">
           <div className="flex justify-between items-center mb-8 shrink-0 relative z-10">
             <h2 className="font-bold text-white tracking-widest uppercase flex items-center gap-2">
@@ -572,7 +575,7 @@ export default function Home() {
         {!zenMode && !loading && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
 
-            {/* --- CAPACITY CARD --- */}
+            {/* --- 1. CAPACITY CARD --- */}
             <div onClick={() => setActiveStatsModal('capacity')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm flex flex-col justify-between cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
@@ -585,22 +588,16 @@ export default function Home() {
                   <div className="text-[9px] md:text-xs font-bold text-blue-400 mt-0.5 md:mt-1 flex items-center gap-1">{formatBytes(displayUsed)} <span className="text-zinc-600 font-normal">Used</span></div>
                 </div>
               </div>
-
-              {/* Footer */}
               <div className="absolute bottom-2 right-2 flex items-center gap-1 z-10">
                  {!isGlobalView ? (
-                    <div className="flex items-center gap-1 text-[8px] text-zinc-600 font-mono">
-                       <Globe size={8} /> Global: <span className="text-zinc-500">{formatBytes(totalStorageCommitted)}</span>
-                    </div>
+                    <div className="flex items-center gap-1 text-[8px] text-zinc-600 font-mono"><Globe size={8} /> Global: <span className="text-zinc-500">{formatBytes(totalStorageCommitted)}</span></div>
                  ) : (
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-purple-400 font-bold flex items-center gap-1">
-                       <Maximize2 size={8} /> DETAILS
-                    </div>
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-purple-400 font-bold flex items-center gap-1"><Maximize2 size={8} /> DETAILS</div>
                  )}
               </div>
             </div>
 
-            {/* --- UPDATED CONTEXT-AWARE VITALS CARD --- */}
+            {/* --- 2. VITALS CARD (Smart) --- */}
             <div onClick={() => setActiveStatsModal('vitals')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-green-500/0 to-green-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="absolute inset-0 opacity-20 pointer-events-none"><div className="ekg-line"></div></div>
@@ -612,22 +609,33 @@ export default function Home() {
                 <div className="space-y-1 mt-1">
                   <div className="flex justify-between text-[8px] md:text-xs"><span className="text-zinc-400">Stability</span><span className="font-mono font-bold text-white">{vitalsStats.stability}%</span></div>
                   <div className="flex justify-between text-[8px] md:text-xs"><span className="text-zinc-400">Avg Health</span><span className="font-mono font-bold text-green-400">{vitalsStats.avg}/100</span></div>
-                  <div className="flex justify-between text-[8px] md:text-xs"><span className="text-zinc-400">Consensus</span><span className="font-mono font-bold text-blue-400">{vitalsStats.consensus}%</span></div>
+                  <div className="flex justify-between text-[8px] md:text-xs"><span className="text-zinc-400">Consensus</span><span className="font-mono font-bold text-blue-400">{consensusStats.score}%</span></div>
                 </div>
               </div>
               <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-green-400 font-bold flex items-center gap-1 z-10"><Maximize2 size={8} /> DETAILS</div>
               <style jsx>{` @keyframes ekg { 0% { left: -100%; opacity: 0; } 50% { opacity: 1; } 100% { left: 100%; opacity: 0; } } .ekg-line { position: absolute; top: 0; bottom: 0; width: 50%; background: linear-gradient( 90deg, transparent 0%, rgba(34, 197, 94, 0.5) 50%, transparent 100% ); animation: ekg 2s linear infinite; } `}</style>
             </div>
 
+            {/* --- 3. CONSENSUS CARD (Smart) --- */}
             <div onClick={() => setActiveStatsModal('consensus')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
-                <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Consensus Ver</div>
-                <div className="text-lg md:text-3xl font-bold text-blue-400 mt-1">{mostCommonVersion}</div>
+                <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                   <GitBranch size={10} className="text-blue-500"/>
+                   {isGlobalView ? 'Global Consensus' : `${networkFilter} Target`}
+                </div>
+                <div className="text-lg md:text-3xl font-bold text-white mt-1">{consensusStats.version}</div>
+                <div className="flex items-center gap-1.5 mt-1">
+                   <div className={`w-1.5 h-1.5 rounded-full ${parseFloat(consensusStats.score) > 66 ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]'}`}></div>
+                   <span className={`text-[9px] md:text-xs font-mono font-bold ${parseFloat(consensusStats.score) > 66 ? 'text-green-400' : 'text-yellow-400'}`}>
+                      {consensusStats.score}% Agreement
+                   </span>
+                </div>
               </div>
               <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-blue-400 font-bold flex items-center gap-1 z-10"><Maximize2 size={8} /> DETAILS</div>
             </div>
 
+            {/* --- 4. FILTER CARD --- */}
             <div onClick={() => { const nextFilter = networkFilter === 'ALL' ? 'MAINNET' : networkFilter === 'MAINNET' ? 'DEVNET' : 'ALL'; setNetworkFilter(nextFilter); }} className="bg-zinc-900/50 border border-zinc-800 p-3 rounded-xl backdrop-blur-sm flex flex-col justify-between group relative overflow-hidden transition-all duration-300 hover:border-zinc-700 cursor-pointer select-none active:scale-[0.98] h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="flex justify-between items-center relative z-10 mb-2">
@@ -647,7 +655,7 @@ export default function Home() {
         )}
 
         {/* ... Rest of Main content ... */}
-        {/* (Keep the rest of the file exactly as provided in your prompt, including dynamic grid and footers) */}
+        {/* (Dynamic Grid & Footer logic preserved) */}
         
         {error && <div className="mb-8 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center gap-2 text-blue-400 animate-pulse"><RefreshCw size={14} className="animate-spin" /><span className="text-xs font-bold">{error}</span></div>}
 
@@ -705,7 +713,6 @@ export default function Home() {
         )}
       </main>
       
-      {/* ... Footers ... */}
       {!zenMode && (
         <footer className="relative border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto text-center overflow-hidden">
           <h3 className="text-white font-bold mb-2">XANDEUM PULSE MONITOR</h3>
