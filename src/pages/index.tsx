@@ -6,8 +6,6 @@ import Link from 'next/link';
 
 // --- COMPONENTS ---
 import { WelcomeCurtain } from '../components/WelcomeCurtain'; 
-
-// --- REFACTORED COMPONENTS ---
 import { NetworkSwitcher } from '../components/common/NetworkSwitcher';
 import { LiveWireLoader, PulseGraphLoader } from '../components/common/Loaders';
 import { NodeCard } from '../components/dashboard/cards/NodeCard';
@@ -238,13 +236,13 @@ export default function Home() {
   }, []); 
 
   useEffect(() => {
-    // 13s Cycle Interval (Interruptible via cycleReset)
+    // 13 seconds per cycle as requested
     const cycleInterval = setInterval(() => {
         setCycleStep((prev) => prev + 1);
     }, 13000); 
 
     return () => clearInterval(cycleInterval);
-  }, [cycleReset]);
+  }, [cycleReset]); 
 
   useEffect(() => {
     const tipInterval = setInterval(() => {
@@ -280,32 +278,28 @@ export default function Home() {
     }
   }, [loading, nodes, router.query]);
 
-  // --- DERIVED STATS (New for Context-Aware Capacity) ---
+  // --- FILTER & SORT LOGIC ---
   const splitStats = useMemo(() => {
     let mainnetC = 0, mainnetU = 0;
     let devnetC = 0, devnetU = 0;
     
     nodes.forEach(n => {
-        const c = n.storage_committed || 0;
-        const u = n.storage_used || 0;
         if (n.network === 'MAINNET') {
-            mainnetC += c;
-            mainnetU += u;
+            mainnetC += (n.storage_committed || 0);
+            mainnetU += (n.storage_used || 0);
         } else if (n.network === 'DEVNET') {
-            devnetC += c;
-            devnetU += u;
+            devnetC += (n.storage_committed || 0);
+            devnetU += (n.storage_used || 0);
         }
     });
 
     return { mainnetC, mainnetU, devnetC, devnetU };
   }, [nodes]);
 
-  // Determine what to show on the Capacity Card
+  // --- RENDER LOGIC for Card ---
   const isGlobalView = networkFilter === 'ALL';
   const displayCommitted = isGlobalView ? totalStorageCommitted : (networkFilter === 'MAINNET' ? splitStats.mainnetC : splitStats.devnetC);
   const displayUsed = isGlobalView ? totalStorageUsed : (networkFilter === 'MAINNET' ? splitStats.mainnetU : splitStats.devnetU);
-
-  // --- FILTER & SORT LOGIC ---
 
   const handleSortChange = (metric: 'uptime' | 'version' | 'storage' | 'health') => {
       if (sortBy === metric) {
@@ -315,7 +309,6 @@ export default function Home() {
           setSortOrder('desc'); 
       }
 
-      // Interrupt & Reset Logic (Skips for Version)
       let targetStep = -1;
       
       if (metric === 'storage') targetStep = 1;
@@ -377,21 +370,14 @@ export default function Home() {
       <WelcomeCurtain />
 
       {/* --- MODALS --- */}
+      {/* FIXED: Removed extra props, only passing nodes & onClose */}
       {activeStatsModal === 'capacity' && (
         <CapacityModal 
           onClose={() => setActiveStatsModal(null)}
           nodes={nodes}
-          // Pass GLOBAL totals
-          totalCommitted={totalStorageCommitted}
-          totalUsed={totalStorageUsed}
-          medianCommitted={medianCommitted}
-          // Pass SPLIT totals
-          mainnetCommitted={splitStats.mainnetC}
-          mainnetUsed={splitStats.mainnetU}
-          devnetCommitted={splitStats.devnetC}
-          devnetUsed={splitStats.devnetU}
         />
       )}
+      
       {activeStatsModal === 'vitals' && (
         <VitalsModal
            onClose={() => setActiveStatsModal(null)}
@@ -568,19 +554,17 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
                 <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1 flex items-center gap-1">
-                   {/* Context-Aware Icon */}
                    <Database size={10} className={isGlobalView ? 'text-zinc-500' : networkFilter === 'MAINNET' ? 'text-green-500' : 'text-blue-500'} /> 
                    {isGlobalView ? 'Network Capacity' : `${networkFilter} Capacity`}
                 </div>
                 <div>
-                  {/* Context-Aware Values */}
                   <div className={`text-lg md:text-3xl font-bold ${isGlobalView ? 'text-purple-400' : 'text-white'}`}>{formatBytes(displayCommitted)}</div>
                   <div className="text-[9px] md:text-xs font-bold text-blue-400 mt-0.5 md:mt-1 flex items-center gap-1">{formatBytes(displayUsed)} <span className="text-zinc-600 font-normal">Used</span></div>
                 </div>
               </div>
 
-              {/* Dynamic Footer: Shows "Global Anchor" when drilled down, OR "Details" when global */}
-              <div className="absolute bottom-2 right-2 z-10">
+              {/* Footer: Shows "Global Total" anchor when drilled down, OR "Details" when global */}
+              <div className="absolute bottom-2 right-2 flex items-center gap-1 z-10">
                  {!isGlobalView ? (
                     <div className="flex items-center gap-1 text-[8px] text-zinc-600 font-mono">
                        <Globe size={8} /> Global: <span className="text-zinc-500">{formatBytes(totalStorageCommitted)}</span>
@@ -631,6 +615,7 @@ export default function Home() {
                 </div>
               </div>
             </div>
+
           </div>
         )}
 
