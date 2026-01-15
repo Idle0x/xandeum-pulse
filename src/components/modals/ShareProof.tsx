@@ -11,9 +11,10 @@ import { formatBytes } from '../../utils/formatters';
 interface ShareProofProps {
   node: Node;
   onBack: () => void;
+  zenMode: boolean; // Added zenMode prop
 }
 
-export const ShareProof = ({ node, onBack }: ShareProofProps) => {
+export const ShareProof = ({ node, onBack, zenMode }: ShareProofProps) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const proofRef = useRef<HTMLDivElement>(null);
 
@@ -53,10 +54,27 @@ export const ShareProof = ({ node, onBack }: ShareProofProps) => {
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent("https://xandeum-pulse.vercel.app")}`, '_blank');
   };
 
-  // ZEN STYLING:
-  // The Card (proofRef) retains Color because it is the "Image" to be shared.
-  // The UI buttons become monochromatic outline buttons suitable for Zen Mode.
+  // --- BUTTON STYLES (Subtle/Minimal vs Zen) ---
   
+  const twitterStyle = !zenMode 
+    ? "bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/20 text-blue-500" 
+    : "bg-zinc-900 hover:bg-zinc-800 border-zinc-700 text-white";
+
+  const downloadStyle = !zenMode 
+    ? "bg-green-500/10 hover:bg-green-500/20 border-green-500/20 text-green-500" 
+    : "bg-black hover:bg-zinc-900 border-zinc-700 text-white";
+
+  const backStyle = !zenMode 
+    ? "bg-red-500/10 hover:bg-red-500/20 border-red-500/20 text-red-500" 
+    : "bg-black hover:bg-zinc-900 border-zinc-800 text-zinc-500";
+
+  // Helper for small copy buttons to handle "Copied" state + Zen state + Color state
+  const getSmallButtonStyle = (id: string, colorClass: string) => {
+    if (copiedField === id) return "bg-white text-black border-white"; // Copied state (High contrast)
+    if (zenMode) return "bg-black hover:bg-zinc-900 border-zinc-800 text-zinc-400"; // Zen state
+    return colorClass; // Color state
+  };
+
   return (
     <div className="h-full flex flex-col md:justify-center animate-in zoom-in-95 duration-300">
       <div className="flex flex-col md:grid md:grid-cols-2 md:items-center gap-6 md:gap-12 w-full max-w-6xl mx-auto p-4 md:p-8">
@@ -95,7 +113,7 @@ export const ShareProof = ({ node, onBack }: ShareProofProps) => {
                 </div>
                 <span className="font-mono font-bold text-base md:text-lg text-white">{node?.health || 0}</span>
               </div>
-              
+
               <div className="bg-gradient-to-r from-purple-900/10 to-transparent border border-purple-500/20 rounded-lg px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Database size={12} className="text-purple-500" />
@@ -126,15 +144,21 @@ export const ShareProof = ({ node, onBack }: ShareProofProps) => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: ACTION PANEL - ZEN UI */}
+        {/* RIGHT COLUMN: ACTION PANEL */}
         <div className="flex flex-col gap-4 w-full md:max-w-md mx-auto md:mx-0">
 
-          {/* PRIMARY ACTIONS - Monochrome in Zen Context */}
-          <button onClick={shareToTwitter} className="flex items-center justify-center gap-2 px-6 py-4 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-xl text-sm font-bold text-white transition-all">
+          {/* PRIMARY ACTIONS - Share (Blue) & Download (Green) */}
+          <button 
+            onClick={shareToTwitter} 
+            className={`flex items-center justify-center gap-2 px-6 py-4 border rounded-xl text-sm font-bold transition-all ${twitterStyle}`}
+          >
              <Share2 size={16} /> Share Proof on X
           </button>
 
-          <button onClick={handleDownloadProof} className="flex items-center justify-center gap-2 px-6 py-4 bg-black hover:bg-zinc-900 border border-zinc-700 rounded-xl text-sm font-bold text-white transition-all">
+          <button 
+            onClick={handleDownloadProof} 
+            className={`flex items-center justify-center gap-2 px-6 py-4 border rounded-xl text-sm font-bold transition-all ${downloadStyle}`}
+          >
              <ImageIcon size={16} /> Download Image
           </button>
 
@@ -142,19 +166,34 @@ export const ShareProof = ({ node, onBack }: ShareProofProps) => {
 
           {/* SECONDARY ACTIONS - Flat Design */}
           <div className="grid grid-cols-2 gap-3">
-             <button onClick={copyStatusReport} className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg text-[10px] font-bold transition duration-300 border ${copiedField === 'report' ? 'bg-white text-black border-white' : 'bg-black hover:bg-zinc-900 border-zinc-800 text-zinc-400'}`}>
+             {/* Default Gray/Zinc Buttons */}
+             <button 
+                onClick={copyStatusReport} 
+                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg text-[10px] font-bold transition duration-300 border ${getSmallButtonStyle('report', 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700')}`}
+             >
                 {copiedField === 'report' ? <Check size={12} /> : <ClipboardCopy size={12} />} {copiedField === 'report' ? 'COPIED' : 'Copy Report'}
              </button>
 
-             <button onClick={() => copyToClipboard(JSON.stringify(node, null, 2), 'json')} className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg text-[10px] font-bold transition duration-300 border ${copiedField === 'json' ? 'bg-white text-black border-white' : 'bg-black hover:bg-zinc-900 border-zinc-800 text-zinc-400'}`}>
+             <button 
+                onClick={() => copyToClipboard(JSON.stringify(node, null, 2), 'json')} 
+                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg text-[10px] font-bold transition duration-300 border ${getSmallButtonStyle('json', 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700')}`}
+             >
                 {copiedField === 'json' ? <Check size={12} /> : <FileJson size={12} />} {copiedField === 'json' ? 'COPIED' : 'Copy JSON'}
              </button>
 
-              <button onClick={() => copyToClipboard(`${window.location.origin}/?open=${node.pubkey}`, 'url')} className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg text-[10px] font-bold transition duration-300 border ${copiedField === 'url' ? 'bg-white text-black border-white' : 'bg-black hover:bg-zinc-900 border-zinc-800 text-zinc-400'}`}>
+             {/* Copy URL - Indigo Touch */}
+              <button 
+                onClick={() => copyToClipboard(`${typeof window !== 'undefined' ? window.location.origin : ''}/?open=${node.pubkey}`, 'url')} 
+                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg text-[10px] font-bold transition duration-300 border ${getSmallButtonStyle('url', 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20')}`}
+              >
                 {copiedField === 'url' ? <Check size={12} /> : <LinkIcon size={12} />} {copiedField === 'url' ? 'COPIED' : 'Copy Link'}
              </button>
 
-             <button onClick={onBack} className="flex items-center justify-center gap-2 px-3 py-3 bg-black hover:bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-500 text-[10px] font-bold transition">
+             {/* Back Button - Red */}
+             <button 
+                onClick={onBack} 
+                className={`flex items-center justify-center gap-2 px-3 py-3 border rounded-lg text-[10px] font-bold transition ${backStyle}`}
+             >
                <ArrowLeft size={12} /> Back
              </button>
           </div>
