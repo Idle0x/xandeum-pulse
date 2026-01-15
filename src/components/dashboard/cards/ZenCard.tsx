@@ -14,23 +14,26 @@ export const ZenCard = ({ node, onClick, mostCommonVersion, sortBy }: ZenCardPro
   const cleanVer = (node.version || '').replace(/[^0-9.]/g, '');
   const cleanConsensus = mostCommonVersion.replace(/[^0-9.]/g, '');
   const isLatest = cleanVer === cleanConsensus || compareVersions(cleanVer, cleanConsensus) > 0;
-  
+
   const health = node.health || 0;
   const isVersionSort = sortBy === 'version';
 
   return (
     <div
       onClick={() => onClick(node)}
-      className="group relative border border-zinc-800 bg-black/50 hover:border-zinc-600 p-3 md:p-4 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-lg flex flex-col justify-between"
+      // Removed hover:shadow-lg, transition-all, hover:border-zinc-600
+      // Strict OLED black box
+      className="group relative border border-zinc-800 bg-black p-3 md:p-4 rounded-xl cursor-pointer flex flex-col justify-between"
     >
       <div className="flex justify-between items-start mb-2 md:mb-4 border-b border-zinc-800 pb-2 md:pb-3">
         <div>
-          <div className="text-[8px] md:text-[9px] text-zinc-500 font-bold uppercase tracking-widest mb-1">NODE ID</div>
-          <div className="font-mono text-xs md:text-sm text-zinc-300 truncate w-24 md:w-32 lg:w-48">{node.pubkey || 'Unknown'}</div>
-          <div className="text-[9px] md:text-[10px] text-zinc-600 font-mono mt-0.5">{getSafeIp(node)}</div>
+          <div className="text-[8px] md:text-[9px] text-zinc-600 font-bold uppercase tracking-widest mb-1">NODE ID</div>
+          <div className="font-mono text-xs md:text-sm text-white truncate w-24 md:w-32 lg:w-48">{node.pubkey || 'Unknown'}</div>
+          <div className="text-[9px] md:text-[10px] text-zinc-500 font-mono mt-0.5">{getSafeIp(node)}</div>
         </div>
-        <div className={`text-lg md:text-xl font-bold ${health && health >= 80 ? 'text-green-500' : 'text-yellow-500'}`}>
-          {health}
+        {/* Health: White if good, Zinc if bad. No Green/Yellow. */}
+        <div className="text-lg md:text-xl font-bold font-mono text-white">
+          {health}<span className="text-zinc-600 text-xs">/100</span>
         </div>
       </div>
 
@@ -38,23 +41,25 @@ export const ZenCard = ({ node, onClick, mostCommonVersion, sortBy }: ZenCardPro
         <div>
           <div className="text-[8px] md:text-[9px] text-zinc-600 uppercase font-bold mb-1">Storage</div>
           <div className="font-mono text-zinc-300">{formatBytes(node.storage_used)}</div>
+          {/* Progress Bar: High contrast White on Zinc-900 */}
           <div className="w-full h-1 bg-zinc-900 rounded-full mt-1">
-            <div className="h-full bg-zinc-600" style={{ width: node.storage_usage_percentage }}></div>
+            <div className="h-full bg-white" style={{ width: node.storage_usage_percentage }}></div>
           </div>
         </div>
         <div>
           <div className="text-[8px] md:text-[9px] text-zinc-600 uppercase font-bold mb-1">Uptime</div>
-          <div className="font-mono text-orange-400">{formatUptime(node.uptime)}</div>
+          <div className="font-mono text-zinc-300">{formatUptime(node.uptime)}</div>
         </div>
         <div>
           <div className="text-[8px] md:text-[9px] text-zinc-600 uppercase font-bold mb-1">Version</div>
-          <div className={`font-mono flex items-center gap-1 md:gap-2 ${isVersionSort ? 'text-cyan-400 animate-pulse' : 'text-zinc-300'}`}>
-            {node.version} {isLatest && <CheckCircle size={8} className="text-green-500" />}
+          {/* Version Sort: Underlined or White Border, no color pulse */}
+          <div className={`font-mono flex items-center gap-1 md:gap-2 ${isVersionSort ? 'text-white underline decoration-zinc-500 underline-offset-2' : 'text-zinc-400'}`}>
+            {node.version} {isLatest && <CheckCircle size={8} className="text-zinc-500" />}
           </div>
         </div>
         <div>
           <div className="text-[8px] md:text-[9px] text-zinc-600 uppercase font-bold mb-1">Health Rank</div>
-          <div className="font-mono text-yellow-600">#{node.health_rank || '-'}</div>
+          <div className="font-mono text-zinc-400">#{node.health_rank || '-'}</div>
         </div>
       </div>
     </div>
