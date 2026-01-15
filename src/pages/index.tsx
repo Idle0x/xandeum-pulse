@@ -64,9 +64,9 @@ export default function Home() {
   const [totalStorageCommitted, setTotalStorageCommitted] = useState(0);
   const [totalStorageUsed, setTotalStorageUsed] = useState(0);
   const [medianCommitted, setMedianCommitted] = useState(0);
-  const [networkHealth, setNetworkHealth] = useState('0.00');
-  const [avgNetworkHealth, setAvgNetworkHealth] = useState(0);
-  const [networkConsensus, setNetworkConsensus] = useState(0);
+  const [networkHealth, setNetworkHealth] = useState('0.00'); // Global fallback
+  const [avgNetworkHealth, setAvgNetworkHealth] = useState(0); // Global fallback
+  const [networkConsensus, setNetworkConsensus] = useState(0); // Global fallback
   const [lastSync, setLastSync] = useState<string>('Syncing...');
   const [searchTipIndex, setSearchTipIndex] = useState(0);
 
@@ -282,7 +282,7 @@ export default function Home() {
   const splitStats = useMemo(() => {
     let mainnetC = 0, mainnetU = 0;
     let devnetC = 0, devnetU = 0;
-    
+
     nodes.forEach(n => {
         if (n.network === 'MAINNET') {
             mainnetC += (n.storage_committed || 0);
@@ -295,6 +295,32 @@ export default function Home() {
 
     return { mainnetC, mainnetU, devnetC, devnetU };
   }, [nodes]);
+
+  // --- NEW: Calculate Context-Aware Vitals ---
+  const vitalsStats = useMemo(() => {
+    // 1. Filter Nodes based on context
+    const targetNodes = networkFilter === 'ALL' 
+      ? nodes 
+      : nodes.filter(n => n.network === networkFilter);
+    
+    const count = targetNodes.length || 1;
+
+    // 2. Avg Health
+    const totalHealth = targetNodes.reduce((acc, n) => acc + (n.health || 0), 0);
+    const avg = Math.round(totalHealth / count);
+
+    // 3. Stability (>24h uptime)
+    const stable = targetNodes.filter(n => (n.uptime || 0) > 86400).length;
+    const stability = ((stable / count) * 100).toFixed(2);
+
+    // 4. Consensus
+    // We check against global consensus version for compliance
+    const consensusCount = targetNodes.filter(n => (n.version || 'Unknown') === mostCommonVersion).length;
+    const consensus = ((consensusCount / count) * 100).toFixed(1);
+
+    return { avg, stability, consensus };
+  }, [nodes, networkFilter, mostCommonVersion]);
+
 
   // --- RENDER LOGIC for Card ---
   const isGlobalView = networkFilter === 'ALL';
@@ -310,11 +336,11 @@ export default function Home() {
       }
 
       let targetStep = -1;
-      
+
       if (metric === 'storage') targetStep = 1;
       if (metric === 'health') targetStep = 2;
       if (metric === 'uptime') targetStep = 3;
-      
+
       if (targetStep !== -1) {
           setCycleStep(targetStep);
           setCycleReset(prev => prev + 1); 
@@ -370,21 +396,18 @@ export default function Home() {
       <WelcomeCurtain />
 
       {/* --- MODALS --- */}
-      {/* FIXED: Removed extra props, only passing nodes & onClose */}
       {activeStatsModal === 'capacity' && (
         <CapacityModal 
           onClose={() => setActiveStatsModal(null)}
           nodes={nodes}
         />
       )}
-      
+
       {activeStatsModal === 'vitals' && (
         <VitalsModal
            onClose={() => setActiveStatsModal(null)}
            nodes={nodes}
-           avgHealth={avgNetworkHealth}
-           consensusPercent={networkConsensus}
-           consensusVersion={mostCommonVersion}
+           // Removed extra props, the modal is now smart!
         />
       )}
       {activeStatsModal === 'consensus' && (
@@ -548,8 +571,8 @@ export default function Home() {
       <main className={`p-4 md:p-8 ${zenMode ? 'max-w-full' : 'max-w-7xl 2xl:max-w-[1800px] mx-auto'} transition-all duration-500`}>
         {!zenMode && !loading && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
-            
-            {/* --- UPDATED CAPACITY CARD --- */}
+
+            {/* --- CAPACITY CARD --- */}
             <div onClick={() => setActiveStatsModal('capacity')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm flex flex-col justify-between cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
@@ -563,7 +586,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Footer: Shows "Global Total" anchor when drilled down, OR "Details" when global */}
+              {/* Footer */}
               <div className="absolute bottom-2 right-2 flex items-center gap-1 z-10">
                  {!isGlobalView ? (
                     <div className="flex items-center gap-1 text-[8px] text-zinc-600 font-mono">
@@ -577,15 +600,19 @@ export default function Home() {
               </div>
             </div>
 
+            {/* --- UPDATED CONTEXT-AWARE VITALS CARD --- */}
             <div onClick={() => setActiveStatsModal('vitals')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-green-500/0 to-green-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="absolute inset-0 opacity-20 pointer-events-none"><div className="ekg-line"></div></div>
               <div className="relative z-10">
-                <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1"><HeartPulse size={12} className="text-green-500 animate-pulse" /> Network Vitals</div>
+                <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1">
+                    <HeartPulse size={12} className={`animate-pulse ${networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-green-500'}`} /> 
+                    {isGlobalView ? 'Network Vitals' : `${networkFilter} Vitals`}
+                </div>
                 <div className="space-y-1 mt-1">
-                  <div className="flex justify-between text-[8px] md:text-xs"><span className="text-zinc-400">Stability</span><span className="font-mono font-bold text-white">{networkHealth}%</span></div>
-                  <div className="flex justify-between text-[8px] md:text-xs"><span className="text-zinc-400">Avg Health</span><span className="font-mono font-bold text-green-400">{avgNetworkHealth}/100</span></div>
-                  <div className="flex justify-between text-[8px] md:text-xs"><span className="text-zinc-400">Consensus</span><span className="font-mono font-bold text-blue-400">{networkConsensus.toFixed(1)}%</span></div>
+                  <div className="flex justify-between text-[8px] md:text-xs"><span className="text-zinc-400">Stability</span><span className="font-mono font-bold text-white">{vitalsStats.stability}%</span></div>
+                  <div className="flex justify-between text-[8px] md:text-xs"><span className="text-zinc-400">Avg Health</span><span className="font-mono font-bold text-green-400">{vitalsStats.avg}/100</span></div>
+                  <div className="flex justify-between text-[8px] md:text-xs"><span className="text-zinc-400">Consensus</span><span className="font-mono font-bold text-blue-400">{vitalsStats.consensus}%</span></div>
                 </div>
               </div>
               <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-green-400 font-bold flex items-center gap-1 z-10"><Maximize2 size={8} /> DETAILS</div>
@@ -619,6 +646,9 @@ export default function Home() {
           </div>
         )}
 
+        {/* ... Rest of Main content ... */}
+        {/* (Keep the rest of the file exactly as provided in your prompt, including dynamic grid and footers) */}
+        
         {error && <div className="mb-8 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center gap-2 text-blue-400 animate-pulse"><RefreshCw size={14} className="animate-spin" /><span className="text-xs font-bold">{error}</span></div>}
 
         {!zenMode && favorites.length > 0 && (
@@ -640,7 +670,6 @@ export default function Home() {
             </div>
         )}
 
-        {/* --- DYNAMIC GRID --- */}
         {loading && nodes.length === 0 ? (
           <PulseGraphLoader />
         ) : (
@@ -675,7 +704,8 @@ export default function Home() {
           </div>
         )}
       </main>
-
+      
+      {/* ... Footers ... */}
       {!zenMode && (
         <footer className="relative border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto text-center overflow-hidden">
           <h3 className="text-white font-bold mb-2">XANDEUM PULSE MONITOR</h3>
@@ -687,7 +717,6 @@ export default function Home() {
           </div>
           <Link href="/docs" className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-4 decoration-zinc-700 flex items-center justify-center gap-1 mt-4"><BookOpen size={10} /> System Architecture & Docs</Link>
 
-          {/* --- ACTIVE PODS UPLINK (Integrated Dashboard Pill) --- */}
           <div className="mt-8 md:mt-0 md:absolute md:bottom-6 md:right-6 flex items-center justify-center animate-in fade-in duration-1000">
              <div className="group flex items-center gap-3 px-4 py-2 rounded-full bg-black/40 border border-white/5 shadow-[inset_0_1px_4px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all hover:border-white/10 hover:bg-black/60 cursor-help" title="Live count of filtered nodes currently in view">
                 <div className="relative flex h-1.5 w-1.5">
@@ -705,7 +734,6 @@ export default function Home() {
         </footer>
       )}
 
-      {/* ZEN MODE FOOTER */}
       {zenMode && (
         <footer className="fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 p-2 px-6 flex justify-between items-center text-[9px] text-zinc-600 font-mono z-40">
            <div>ZEN MODE ACTIVE</div>
