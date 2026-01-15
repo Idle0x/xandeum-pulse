@@ -4,13 +4,20 @@ interface RadialProgressProps {
   score: number;
   size?: number;
   stroke?: number;
+  zenMode?: boolean; // Added Prop
 }
 
-export const RadialProgress = ({ score, size = 160, stroke = 12 }: RadialProgressProps) => {
+export const RadialProgress = ({ score, size = 160, stroke = 12, zenMode = false }: RadialProgressProps) => {
   const radius = (size - stroke) / 2;
   const circumference = radius * 2 * Math.PI;
   const offset = circumference - (score / 100) * circumference;
-  const color = score >= 80 ? '#22c55e' : score >= 50 ? '#eab308' : '#ef4444';
+  
+  // Zen Mode: White ring. Normal: Traffic light logic.
+  const color = zenMode 
+    ? '#ffffff' 
+    : score >= 80 ? '#22c55e' : score >= 50 ? '#eab308' : '#ef4444';
+
+  const trackColor = zenMode ? '#27272a' : '#18181b'; // Zinc-800 vs Zinc-950
 
   return (
     <div className="relative flex items-center justify-center group" style={{ width: size, height: size }}>
@@ -19,7 +26,7 @@ export const RadialProgress = ({ score, size = 160, stroke = 12 }: RadialProgres
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="#18181b"
+          stroke={trackColor}
           strokeWidth={stroke}
           fill="transparent"
         />
@@ -33,12 +40,13 @@ export const RadialProgress = ({ score, size = 160, stroke = 12 }: RadialProgres
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
-          className="transition-all duration-1000 ease-out"
+          className={zenMode ? "" : "transition-all duration-1000 ease-out"} // Kill animation in Zen
         />
       </svg>
-      {/* CHANGED: text-4xl -> text-2xl to reduce size by ~40% */}
       <div className="absolute flex flex-col items-center">
-        <span className="text-2xl font-extrabold text-white tracking-tighter">{score}</span>
+        <span className={`text-2xl font-extrabold tracking-tighter ${zenMode ? 'text-white' : 'text-white'}`}>
+            {score}
+        </span>
       </div>
     </div>
   );
