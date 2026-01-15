@@ -63,16 +63,31 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
   };
   const activeTheme = theme[activeTab];
 
-  // Tooltip Helper
-  const Tooltip = ({ text }: { text: string }) => (
-    <div className="group relative inline-block ml-1">
-      <HelpCircle size={8} className="text-zinc-600 hover:text-zinc-400 cursor-help" />
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-black border border-zinc-800 rounded-lg text-[9px] text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl">
-        {text}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-zinc-800"></div>
+  // --- 2. IMPROVED TOOLTIP COMPONENT ---
+  const Tooltip = ({ text, align = 'center' }: { text: string, align?: 'left' | 'center' | 'right' }) => {
+    // Dynamic Positioning Logic
+    const positionClasses = {
+      left: 'left-0 translate-x-0',
+      center: 'left-1/2 -translate-x-1/2',
+      right: 'right-0 translate-x-0',
+    };
+    const arrowClasses = {
+      left: 'left-2',
+      center: 'left-1/2 -translate-x-1/2',
+      right: 'right-2',
+    };
+
+    return (
+      <div className="group relative inline-block ml-1 cursor-help z-[50]">
+        <HelpCircle size={8} className="text-zinc-600 hover:text-zinc-400" />
+        <div className={`absolute bottom-full mb-2 w-40 p-2 bg-[#09090b] border border-zinc-700 rounded-lg text-[9px] text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-2xl z-[60] leading-snug ${positionClasses[align]}`}>
+          {text}
+          {/* Arrow */}
+          <div className={`absolute top-full w-0 h-0 border-4 border-transparent border-t-zinc-700 ${arrowClasses[align]}`}></div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] flex items-center justify-center p-4" onClick={onClose}>
@@ -114,13 +129,15 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
           
           {/* --- ROW 1: HERO METRICS --- */}
           <div className="grid grid-cols-2 gap-3">
-             {/* Consensus Target */}
-             <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative overflow-hidden">
-                <div className={`absolute top-0 left-0 w-1 h-full ${activeTheme.bg}`}></div>
+             {/* Consensus Target (Removed overflow-hidden to allow tooltip escape) */}
+             <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative">
+                {/* Status Bar styled manually with rounded corners to avoid clipping */}
+                <div className={`absolute top-0 bottom-0 left-0 w-1 rounded-l-xl ${activeTheme.bg}`}></div>
+                
                 <div className="flex justify-between items-start mb-1">
                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest flex items-center gap-1">
                       <GitBranch size={10} /> Consensus Target
-                      <Tooltip text="The software version that the majority of the network is currently running." />
+                      <Tooltip text="The software version that the majority of the network is currently running." align="left" />
                    </div>
                 </div>
                 <div className={`text-2xl font-black tracking-tight truncate ${activeTab === 'ALL' ? 'text-white' : activeTheme.text}`} title={data.consensusVer}>
@@ -132,12 +149,13 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
              </div>
 
              {/* Unity Score */}
-             <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative overflow-hidden">
-                <div className={`absolute top-0 left-0 w-1 h-full ${activeTheme.bg}`}></div>
+             <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative">
+                <div className={`absolute top-0 bottom-0 left-0 w-1 rounded-l-xl ${activeTheme.bg}`}></div>
+                
                 <div className="flex justify-between items-start mb-1">
                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest flex items-center gap-1">
                       <ShieldCheck size={10} /> Unity Score
-                      <Tooltip text="The percentage of nodes running the consensus version." />
+                      <Tooltip text="The percentage of nodes running the consensus version." align="right" />
                    </div>
                    <div className={`text-[8px] font-bold px-1.5 py-0.5 rounded border ${
                       parseFloat(data.agreementScore) > 66 ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
@@ -154,34 +172,37 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
 
           {/* --- ROW 2: LIFECYCLE BUCKETS --- */}
           <div className="grid grid-cols-3 gap-2">
+             {/* Lagging (Align tooltip Left) */}
              <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex flex-col items-center justify-center text-center relative group">
-                <div className="absolute top-2 right-2"><Tooltip text="Nodes running older versions than consensus." /></div>
+                <div className="absolute top-2 right-2"><Tooltip text="Nodes running older versions than consensus." align="left" /></div>
                 <div className="mb-1 p-1 rounded-full bg-red-500/10 text-red-500"><AlertCircle size={10} /></div>
                 <div className="text-lg font-black text-white leading-none mb-1">{data.buckets.lagging}</div>
                 <div className="text-[8px] font-bold text-red-400 uppercase tracking-wider">Lagging</div>
              </div>
 
+             {/* Target (Align tooltip Center) */}
              <div className={`bg-zinc-900/30 border rounded-xl p-3 flex flex-col items-center justify-center text-center ${activeTheme.border} bg-opacity-5 relative group`}>
-                <div className="absolute top-2 right-2"><Tooltip text="Nodes perfectly aligned with the target version." /></div>
+                <div className="absolute top-2 right-2"><Tooltip text="Nodes perfectly aligned with the target version." align="center" /></div>
                 <div className={`mb-1 p-1 rounded-full bg-opacity-10 ${activeTheme.bg} ${activeTheme.text}`}><CheckCircle size={10} /></div>
                 <div className="text-lg font-black text-white leading-none mb-1">{data.buckets.target}</div>
                 <div className={`text-[8px] font-bold uppercase tracking-wider ${activeTheme.text}`}>Synced</div>
              </div>
 
+             {/* Leading (Align tooltip Right to prevent off-screen) */}
              <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex flex-col items-center justify-center text-center relative group">
-                <div className="absolute top-2 right-2"><Tooltip text="Nodes testing newer, experimental versions." /></div>
+                <div className="absolute top-2 right-2"><Tooltip text="Nodes testing newer, experimental versions." align="right" /></div>
                 <div className="mb-1 p-1 rounded-full bg-cyan-500/10 text-cyan-500"><ArrowUpCircle size={10} /></div>
                 <div className="text-lg font-black text-white leading-none mb-1">{data.buckets.leading}</div>
                 <div className="text-[8px] font-bold text-cyan-400 uppercase tracking-wider">Leading</div>
              </div>
           </div>
 
-          {/* --- ROW 3: DETAILED LIST (Strict Grid) --- */}
+          {/* --- ROW 3: DETAILED LIST --- */}
           <div className={`border border-zinc-800 rounded-xl overflow-hidden flex flex-col max-h-60 ${activeTab === 'ALL' ? 'bg-purple-900/5' : activeTab === 'MAINNET' ? 'bg-green-900/5' : 'bg-blue-900/5'}`}>
              <div className="p-3 border-b border-zinc-800 flex justify-between items-center bg-black/20">
                 <span className="text-[9px] text-zinc-500 uppercase font-bold flex items-center gap-1.5">
                    <Activity size={10} /> Version Distribution
-                   <Tooltip text="Breakdown of all active software versions." />
+                   <Tooltip text="Breakdown of all active software versions." align="left" />
                 </span>
                 <span className="text-[8px] text-zinc-600 font-mono">{data.sortedVersions.length} Versions Active</span>
              </div>
@@ -194,7 +215,7 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                    return (
                       <div key={ver} className={`grid grid-cols-[1fr_auto_auto] items-center gap-4 p-2 rounded-lg text-[10px] ${isConsensus ? 'bg-zinc-800/50 border border-zinc-700' : 'hover:bg-zinc-800/30 border border-transparent'}`}>
                          
-                         {/* COL 1: Version Name (Truncated) */}
+                         {/* COL 1: Version Name */}
                          <div className="flex items-center gap-2 min-w-0">
                             <div 
                                className={`font-mono font-bold truncate cursor-pointer hover:text-white transition-colors relative ${isConsensus ? 'text-white' : 'text-zinc-400'}`}
