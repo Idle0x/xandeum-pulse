@@ -83,15 +83,66 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
           </div>
         </div>
 
+        {/* --- METRICS GRID (MOBILE) - RESTORED & ZEN-IFIED --- */}
+        <div className="grid grid-cols-2 gap-2 md:hidden">
+           {metrics.map((m) => {
+              const rawVal = m.rawVal || 0;
+              const weightedVal = (rawVal * m.weight).toFixed(1);
+              const weightedAvg = (m.avgRaw * m.weight).toFixed(1);
+              
+              // Zen Mode: White bar. Normal: Traffic light.
+              const barColor = zenMode 
+                ? 'bg-white'
+                : (rawVal >= 80 ? 'bg-green-500' : rawVal >= 50 ? 'bg-yellow-500' : 'bg-red-500');
+
+              const isInvalidRep = m.label === 'Reputation' && isReputationInvalid;
+              const baseVal = m.label === 'Storage' ? getStorageBase(rawVal, node) : rawVal;
+              const bonusText = m.label === 'Storage' ? getStorageBonusText(node, medianStorage) : '';
+
+              return (
+                <div 
+                  key={m.label} 
+                  className={`border rounded-xl p-3 flex flex-col justify-between h-full transition-all ${
+                    isInvalidRep 
+                      ? (zenMode ? 'bg-black border-zinc-700 border-dashed opacity-50' : 'bg-zinc-900/30 border-zinc-800/50 border-dashed opacity-60')
+                      : (zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900/40 border-zinc-800/60')
+                  }`}
+                >
+                   <div className="flex justify-between items-center mb-2">
+                      <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">{m.label}</span>
+                      <span className={`text-[10px] font-mono font-bold ${isInvalidRep ? 'text-zinc-500' : 'text-white'}`}>
+                        {isInvalidRep 
+                          ? (isUntracked ? 'NO CREDITS' : 'API OFF') 
+                          : `${weightedVal} pts`}
+                      </span>
+                   </div>
+
+                   <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-2">
+                      {!isInvalidRep && (
+                        <div className={`h-full ${barColor}`} style={{ width: `${Math.min(100, rawVal)}%` }}></div>
+                      )}
+                   </div>
+
+                   <div className="text-[8px] text-zinc-600 flex justify-between items-center mt-auto pt-1 border-t border-white/5">
+                      <div className="flex items-center gap-1">
+                          <span>Base: {isInvalidRep ? 'N/A' : baseVal}</span>
+                          {bonusText && <span className="text-zinc-500">{bonusText}</span>}
+                      </div>
+                      {!isInvalidRep && <span className="opacity-70">vs Avg: {weightedAvg}</span>}
+                   </div>
+                </div>
+              );
+           })}
+        </div>
+
         {/* --- DESKTOP STACK --- */}
-        <div className="flex flex-col gap-5">
+        <div className="hidden md:flex flex-col gap-5">
           {metrics.map((m) => {
             const rawVal = m.rawVal || 0; 
             const rawAvg = m.avgRaw || 0;
             const weightedVal = (rawVal * m.weight).toFixed(2);
             const weightedAvg = (rawAvg * m.weight).toFixed(2);
             
-            // Zen Mode Color: Always White bars. Normal: Traffic light.
             const barColor = zenMode 
                 ? 'bg-white' 
                 : rawVal >= 80 ? 'bg-green-500' : rawVal >= 50 ? 'bg-yellow-500' : 'bg-red-500';
