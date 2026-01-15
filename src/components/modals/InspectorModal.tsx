@@ -542,7 +542,15 @@ export const InspectorModal = ({
                       </div>
                       <div className="flex gap-2 md:gap-4">
                         <button onClick={() => setMode('COMPARE')} className={`flex-1 py-3 md:py-4 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border ${zenMode ? 'bg-black border-zinc-700 hover:bg-zinc-900' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700'}`}><Swords size={16} className={zenMode ? 'text-white' : 'text-red-400'} /> <span className="hidden md:inline">COMPARE NODES</span><span className="md:hidden">COMPARE</span></button>
-                        <button onClick={() => setMode('SHARE')} className={`flex-1 py-3 md:py-4 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 ${zenMode ? 'bg-white text-black border-transparent hover:bg-zinc-200' : 'bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20'}`}><Camera size={16} /> <span className="hidden md:inline">PROOF OF PULSE</span><span className="md:hidden">PROOF</span></button>
+                        <button 
+  onClick={() => setMode('SHARE')} 
+  // I removed 'text-white' from the start and added it to the second conditional block below
+  className={`flex-1 py-3 md:py-4 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 ${zenMode ? 'bg-white text-black border-transparent hover:bg-zinc-200' : 'text-white bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20'}`}
+>
+  <Camera size={16} /> 
+  <span className="hidden md:inline">PROOF OF PULSE</span>
+  <span className="md:hidden">PROOF</span>
+</button>
                       </div>
                     </div>
                  </div>
