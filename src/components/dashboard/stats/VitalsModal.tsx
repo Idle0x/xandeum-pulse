@@ -24,9 +24,10 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
     const stabilityPercent = ((stableNodes / count) * 100).toFixed(1);
 
     // B. Health Spectrum (Distribution)
+    // New Logic: Green (Exc), Blue (Good), Yellow (Fair)
     const excellent = filtered.filter(n => (n.health || 0) >= 90).length;
-    const fair = filtered.filter(n => (n.health || 0) >= 70 && (n.health || 0) < 90).length;
-    const critical = filtered.filter(n => (n.health || 0) < 70).length;
+    const good = filtered.filter(n => (n.health || 0) >= 70 && (n.health || 0) < 90).length;
+    const fair = filtered.filter(n => (n.health || 0) < 70).length;
 
     // C. Uptime Tiers
     const ironclad = filtered.filter(n => (n.uptime || 0) > 604800).length; // > 7 days
@@ -36,7 +37,7 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
       count,
       avgHealth,
       stabilityPercent,
-      spectrum: { excellent, fair, critical },
+      spectrum: { excellent, good, fair },
       tiers: { ironclad, stable: stableNodes, volatile }
     };
   }, [nodes, activeTab]);
@@ -122,18 +123,18 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
           {/* --- ROW 2: SPECTRUM & TIERS --- */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
              
-             {/* LEFT: HEALTH SPECTRUM */}
+             {/* LEFT: HEALTH SPECTRUM (Updated Colors/Labels) */}
              <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 flex flex-col justify-center">
                 <div className="flex justify-between items-end mb-3">
                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5"><HeartPulse size={10} /> Health Spectrum</div>
                    <div className="text-[8px] text-zinc-600 font-mono">{data.count} Nodes Analyzed</div>
                 </div>
 
-                {/* The Bar Chart */}
+                {/* The Bar Chart: Green -> Blue -> Yellow */}
                 <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden flex mb-3">
                    <div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${(data.spectrum.excellent / data.count) * 100}%` }}></div>
+                   <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${(data.spectrum.good / data.count) * 100}%` }}></div>
                    <div className="h-full bg-yellow-500 transition-all duration-500" style={{ width: `${(data.spectrum.fair / data.count) * 100}%` }}></div>
-                   <div className="h-full bg-red-500 transition-all duration-500" style={{ width: `${(data.spectrum.critical / data.count) * 100}%` }}></div>
                 </div>
 
                 {/* Legend */}
@@ -143,12 +144,12 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
                       <span className="text-zinc-300">Excellent <span className="text-zinc-500">({data.spectrum.excellent})</span></span>
                    </div>
                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
-                      <span className="text-zinc-300">Fair <span className="text-zinc-500">({data.spectrum.fair})</span></span>
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                      <span className="text-zinc-300">Good <span className="text-zinc-500">({data.spectrum.good})</span></span>
                    </div>
                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                      <span className="text-zinc-300">Crit <span className="text-zinc-500">({data.spectrum.critical})</span></span>
+                      <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
+                      <span className="text-zinc-300">Fair <span className="text-zinc-500">({data.spectrum.fair})</span></span>
                    </div>
                 </div>
              </div>
@@ -170,7 +171,8 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
                       <div className="text-[6px] text-zinc-600">&gt;24 Hours</div>
                    </div>
                    <div className="text-center p-1.5 rounded bg-zinc-900/50 border border-zinc-800/50">
-                      <div className="text-[10px] font-bold text-red-400 mb-0.5">{data.tiers.volatile}</div>
+                      {/* Changed Volatile color from Red to Yellow/Orange to match the "No Critical" vibe */}
+                      <div className="text-[10px] font-bold text-orange-400 mb-0.5">{data.tiers.volatile}</div>
                       <div className="text-[7px] text-zinc-500 uppercase font-bold">Volatile</div>
                       <div className="text-[6px] text-zinc-600">&lt;24 Hours</div>
                    </div>
@@ -178,7 +180,7 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
              </div>
           </div>
 
-          {/* --- ROW 3: FOOTER (How It's Calculated) --- */}
+          {/* --- ROW 3: FOOTER (Logic Ref) --- */}
           <div className="bg-black/40 border border-zinc-800 rounded-xl p-3 flex items-center justify-between gap-4">
              <div className="text-[9px] text-zinc-500 uppercase font-bold flex items-center gap-1.5 shrink-0">
                <Info size={10} /> Logic
@@ -187,15 +189,15 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
              <div className="flex items-center gap-4 text-[9px] text-zinc-400 overflow-x-auto scrollbar-hide">
                 <div className="flex items-center gap-1.5 shrink-0">
                    <div className="w-1 h-1 rounded-full bg-green-500"></div>
-                   <span><span className="text-white font-bold">Stability:</span> Uptime &gt; 24h</span>
+                   <span><span className="text-white font-bold">Excellent:</span> Score &gt; 90</span>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                    <div className="w-1 h-1 rounded-full bg-blue-500"></div>
-                   <span><span className="text-white font-bold">Avg Health:</span> Mean score (Active)</span>
+                   <span><span className="text-white font-bold">Good:</span> Score 70-89</span>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                    <div className="w-1 h-1 rounded-full bg-yellow-500"></div>
-                   <span><span className="text-white font-bold">Fair:</span> Score 70-89</span>
+                   <span><span className="text-white font-bold">Fair:</span> Score &lt; 70</span>
                 </div>
              </div>
           </div>
