@@ -28,13 +28,16 @@ export const NodesContainer = ({
     <div className="border border-zinc-800 rounded-2xl bg-black/20 overflow-hidden mb-20 animate-in fade-in slide-in-from-top-4 duration-700">
       
       {/* --- HEADER BAR --- */}
-      {/* Layout: Row on both Mobile and Desktop for compact alignment */}
       <div className="flex flex-row justify-between items-center p-3 md:p-5 border-b border-zinc-800/50 gap-2">
         
         {/* LEFT: Title Block */}
         <div className="flex items-center gap-2 md:gap-3 overflow-hidden">
           <div className="shrink-0">
-             <Activity className={networkFilter === 'MAINNET' ? "text-green-500" : networkFilter === 'DEVNET' ? "text-blue-500" : "text-white"} size={16} className="md:w-5 md:h-5" />
+             {/* FIXED: Merged duplicate className attributes */}
+             <Activity 
+               className={`${networkFilter === 'MAINNET' ? "text-green-500" : networkFilter === 'DEVNET' ? "text-blue-500" : "text-white"} md:w-5 md:h-5`} 
+               size={16} 
+             />
           </div>
           <div className="flex flex-col min-w-0">
              <h3 className="text-xs md:text-lg font-bold text-white tracking-widest uppercase leading-tight flex items-center gap-2 truncate">
