@@ -65,7 +65,7 @@ export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: No
           const statusColor = node.credits !== null ? 'bg-green-500' : 'bg-red-500';
           const countryCode = node.location?.countryCode;
           
-          // STRICT FLAG CHECK: Exclude 'XX' (Private/Unknown) to match NodeCard logic
+          // STRICT FLAG CHECK: Exclude 'XX' (Private/Unknown)
           const showFlag = countryCode && countryCode !== 'XX';
           
           const health = node.health || 0;
@@ -127,7 +127,7 @@ export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: No
                    {node.version}
                 </div>
 
-                {/* 5. Health (Strict Off-White) */}
+                {/* 5. Health (Off-White Only) */}
                 <div className="font-mono text-xs font-bold text-zinc-400">
                    {health}%
                 </div>
@@ -195,8 +195,8 @@ export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: No
                      </div>
                      
                      {/* Row B: Tiny Stats (Under PubKey) */}
-                     {/* No Color, Just Numbers, Tiny Font */}
-                     <div className="flex items-center gap-2 text-[7px] font-mono text-zinc-600 leading-none -mt-0.5">
+                     {/* UPDATE: Increased to 9px for readability */}
+                     <div className="flex items-center gap-2 text-[9px] font-mono text-zinc-600 leading-none -mt-0.5">
                         <span>{formatUptime(node.uptime || 0)}</span>
                         <span className="text-zinc-800">|</span>
                         <span>{formatLastSeen(node.last_seen_timestamp || 0).replace(' ago', '')}</span>
