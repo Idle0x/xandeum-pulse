@@ -39,7 +39,7 @@ export default function Home() {
     networkConsensus, refetch 
   } = useNetworkData();
 
-  // 2. STATE (Centralized here for snappy updates)
+  // 2. STATE (Centralized)
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [networkFilter, setNetworkFilter] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
@@ -48,8 +48,8 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // 3. CYCLE & TIMER STATE
-  const [cycleStep, setCycleStep] = useState(1); // Default to Committed (Index 1)
-  const [cycleReset, setCycleReset] = useState(0); // The "Trigger" to restart timer
+  const [cycleStep, setCycleStep] = useState(1); 
+  const [cycleReset, setCycleReset] = useState(0); 
 
   // 4. UI STATE
   const [zenMode, setZenMode] = useState(false);
@@ -62,13 +62,12 @@ export default function Home() {
   
   const toastTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // 5. USE FILTER HOOK (Now Pure Calculation)
+  // 5. USE FILTER HOOK (Using the Pure Calculation version from previous step)
   const filteredNodes = useNodeFilter(nodes, searchQuery, networkFilter, sortBy, sortOrder);
   const stats = useDashboardStats(nodes, networkFilter, totalStorageCommitted, totalStorageUsed);
 
   // --- EFFECTS ---
 
-  // Restore Preferences
   useEffect(() => {
     const savedZen = localStorage.getItem('xandeum_zen_mode');
     if (savedZen === 'true') setZenMode(true);
@@ -78,22 +77,18 @@ export default function Home() {
     if (savedView === 'list') setViewMode('list');
   }, []);
 
-  // MASTER TIMER LOGIC (Mirrors Old Code)
+  // MASTER TIMER LOGIC
   useEffect(() => {
     const cycleInterval = setInterval(() => {
       setCycleStep((prev) => prev + 1);
     }, 13000); 
 
-    // This effect re-runs whenever `cycleReset` changes, 
-    // killing the old interval and starting a fresh 13s one.
     return () => clearInterval(cycleInterval);
   }, [cycleReset]); 
 
   // --- ACTIONS ---
 
-  // THE SNAPPY SORT HANDLER
   const handleSortChange = (metric: 'uptime' | 'version' | 'storage' | 'health') => {
-    // 1. Update Sort State
     if (sortBy === metric) {
         setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
@@ -101,16 +96,14 @@ export default function Home() {
         setSortOrder('desc'); 
     }
 
-    // 2. Calculate Snap Target
-    let targetStep = cycleStep; // Default: don't change if generic
-    if (metric === 'storage') targetStep = 1; // Map to Committed
+    let targetStep = cycleStep; 
+    if (metric === 'storage') targetStep = 1; 
     if (metric === 'health') targetStep = 2;
     if (metric === 'uptime') targetStep = 3;
 
-    // 3. Snap & Reset Timer Immediately
     if (metric !== 'version') {
       setCycleStep(targetStep);
-      setCycleReset(prev => prev + 1); // Triggers the useEffect above to restart timer
+      setCycleReset(prev => prev + 1); 
     }
   };
 
@@ -227,6 +220,8 @@ export default function Home() {
              <PulseGraphLoader />
           ) : viewMode === 'grid' ? (
              <NodeGrid 
+               // FORCE REBUILD ON SORT: This is the magic key you requested.
+               key={`grid-${sortBy}-${sortOrder}-${filteredNodes.length}`} 
                loading={loading}
                nodes={filteredNodes}
                zenMode={zenMode}
@@ -239,6 +234,8 @@ export default function Home() {
              />
           ) : (
              <NodeList
+               // FORCE REBUILD ON SORT
+               key={`list-${sortBy}-${sortOrder}-${filteredNodes.length}`}
                nodes={filteredNodes}
                onNodeClick={setSelectedNode}
                onToggleFavorite={toggleFavorite}
@@ -249,7 +246,6 @@ export default function Home() {
              />
           )}
           
-          {/* Active Node Counter */}
           {!loading && nodes.length > 0 && (
             <div className="flex items-center justify-center py-6 border-t border-zinc-800/50 bg-black/20">
                <div className="group flex items-center gap-3 px-4 py-2 rounded-full bg-black/40 border border-white/5 shadow-[inset_0_1px_4px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all hover:border-white/10 hover:bg-black/60 cursor-help" title="Live count of filtered nodes currently in view">
