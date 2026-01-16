@@ -58,7 +58,7 @@ export default function Home() {
   const [cycleStep, setCycleStep] = useState(1);
   const [toast, setToast] = useState<{visible: boolean, msg: string} | null>(null);
   const toastTimer = useRef<NodeJS.Timeout | null>(null);
-  
+
   // NEW: View Mode State
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
@@ -67,7 +67,7 @@ export default function Home() {
     // Restore Preferences
     const savedZen = localStorage.getItem('xandeum_zen_mode');
     if (savedZen === 'true') setZenMode(true);
-    
+
     const savedFavs = localStorage.getItem('xandeum_favorites');
     if (savedFavs) setFavorites(JSON.parse(savedFavs));
 
@@ -145,7 +145,7 @@ export default function Home() {
   return (
     <Layout zenMode={zenMode} onClick={() => isMenuOpen && setIsMenuOpen(false)}>
       <WelcomeCurtain />
-      
+
       {loading && <div className="fixed top-0 left-0 right-0 z-50"><LiveWireLoader /></div>}
 
       <Sidebar 
@@ -220,6 +220,8 @@ export default function Home() {
              <PulseGraphLoader />
           ) : viewMode === 'grid' ? (
              <NodeGrid 
+               // FIX: Unique Key forces full re-render on sort/filter change
+               key={`grid-${sortBy}-${sortOrder}-${networkFilter}`} 
                loading={loading}
                nodes={filteredNodes}
                zenMode={zenMode}
@@ -232,6 +234,8 @@ export default function Home() {
              />
           ) : (
              <NodeList
+               // FIX: Unique Key forces full re-render on sort/filter change
+               key={`list-${sortBy}-${sortOrder}-${networkFilter}`}
                nodes={filteredNodes}
                onNodeClick={setSelectedNode}
                onToggleFavorite={toggleFavorite}
@@ -265,7 +269,7 @@ export default function Home() {
       {activeStatsModal === 'capacity' && <CapacityModal onClose={() => setActiveStatsModal(null)} nodes={nodes} medianCommitted={medianCommitted} totalCommitted={totalStorageCommitted} totalUsed={totalStorageUsed} />}
       {activeStatsModal === 'vitals' && <VitalsModal onClose={() => setActiveStatsModal(null)} nodes={nodes} avgHealth={avgNetworkHealth} consensusPercent={networkConsensus} consensusVersion={mostCommonVersion} />}
       {activeStatsModal === 'consensus' && <ConsensusModal onClose={() => setActiveStatsModal(null)} nodes={nodes} mostCommonVersion={mostCommonVersion} />}
-      
+
       {selectedNode && (
         <InspectorModal 
           selectedNode={selectedNode}
