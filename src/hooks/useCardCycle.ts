@@ -4,38 +4,12 @@ import { formatBytes, formatUptime, formatLastSeen } from '../utils/formatters';
 
 export const useCardCycle = (node: Node, step: number, zenMode: boolean, sortBy: string = '') => {
 
-  // --- OVERRIDE LOGIC: If sorting, show that metric continuously ---
-  
-  if (sortBy === 'storage') {
-    // FIX: Now displays 'Committed' (Capacity) when sorted by Storage
-    return {
-      label: 'Committed', 
-      value: formatBytes(node.storage_committed || 0),
-      color: zenMode ? 'text-zinc-300' : 'text-purple-400', // Purple for Capacity
-      icon: HardDrive
-    };
-  }
+  // --- FIX: REMOVED HARD OVERRIDES ---
+  // Previously, checking (sortBy === 'storage') here locked the card 
+  // to that metric forever, ignoring the timer. 
+  // We now trust the 'step' prop, which Home.tsx automatically 
+  // snaps to the correct starting point when you sort.
 
-  if (sortBy === 'health') {
-    const score = node.health || 0;
-    return {
-      label: 'Health Score',
-      value: `${score}/100`,
-      color: score > 80 ? 'text-green-400' : 'text-yellow-400',
-      icon: Activity
-    };
-  }
-
-  if (sortBy === 'uptime') {
-    return {
-      label: 'Continuous Uptime',
-      value: formatUptime(node.uptime),
-      color: 'text-orange-400',
-      icon: Zap
-    };
-  }
-
-  // --- STANDARD CYCLE (Default Behavior) ---
   const currentStep = step % 5;
 
   if (currentStep === 0) {
@@ -75,6 +49,7 @@ export const useCardCycle = (node: Node, step: number, zenMode: boolean, sortBy:
     };
   }
 
+  // Default / Step 4
   return {
     label: 'Last Seen',
     value: formatLastSeen(node.last_seen_timestamp),
