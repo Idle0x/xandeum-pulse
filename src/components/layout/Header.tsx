@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { 
   Menu, Activity, Search, Monitor, RefreshCw, Repeat, 
   Clock, Database, Server, HeartPulse, ArrowUp, ArrowDown, Info, X 
@@ -12,7 +13,6 @@ interface HeaderProps {
   setSearchQuery: (val: string) => void;
   isSearchFocused: boolean;
   setIsSearchFocused: (val: boolean) => void;
-  searchTip: string;
   loading: boolean;
   isBackgroundSyncing: boolean;
   onRefetch: () => void;
@@ -25,11 +25,32 @@ interface HeaderProps {
 
 export const Header = ({
   onToggleMenu, zenMode, onToggleZen, lastSync,
-  searchQuery, setSearchQuery, isSearchFocused, setIsSearchFocused, searchTip,
+  searchQuery, setSearchQuery, isSearchFocused, setIsSearchFocused,
   loading, isBackgroundSyncing, onRefetch,
   networkFilter, onCycleNetwork,
   sortBy, sortOrder, onSortChange
 }: HeaderProps) => {
+  
+  // --- ROTATING TIPS LOGIC ---
+  const [tipIndex, setTipIndex] = useState(0);
+  const searchTips = [
+    "You can search by node IP, public key, version or country",
+    "Click on any node for detailed insights & history",
+    "Use the map view to visualize network topology",
+    "Compare your node metrics against the network leaders",
+    "Copy a node URL to share a direct deep-link"
+  ];
+
+  useEffect(() => {
+    // Only rotate if user isn't typing
+    if (!isSearchFocused) {
+      const interval = setInterval(() => {
+        setTipIndex((prev) => (prev + 1) % searchTips.length);
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [isSearchFocused]);
+
   return (
     <header className={`sticky top-0 z-[50] border-b px-4 py-1 md:py-3 flex flex-col gap-1 md:gap-4 transition-all duration-500 overflow-visible ${zenMode ? 'bg-black border-zinc-800' : 'bg-[#09090b]/90 backdrop-blur-md border-zinc-800'}`}>
       <div className="flex justify-between items-center w-full">
@@ -68,11 +89,13 @@ export const Header = ({
             />
             {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-2.5 text-zinc-500 hover:text-white transition z-20 p-0.5 bg-black/20 rounded-full hover:bg-zinc-700"><X size={14} /></button>}
           </div>
+          
+          {/* Rotating Tooltips (Visible on Mobile now, text-[8px]) */}
           {!zenMode && (
-            <div className="mt-1 md:mt-2 w-full text-center pointer-events-none min-h-[16px] md:min-h-[20px] transition-all duration-300 hidden md:block">
-              <p className="text-[9px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 whitespace-normal text-center leading-tight">
+            <div className="mt-1 md:mt-2 w-full text-center pointer-events-none min-h-[16px] md:min-h-[20px] transition-all duration-300">
+              <p className="text-[8px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 whitespace-nowrap md:whitespace-normal text-center leading-tight">
                 <Info size={10} className="text-blue-500 shrink-0 md:w-3 md:h-3" />
-                <span>{isSearchFocused ? 'Type to filter nodes instantly' : searchTip}</span>
+                <span>{isSearchFocused ? 'Type to filter nodes instantly' : searchTips[tipIndex]}</span>
               </p>
             </div>
           )}
