@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { 
-  ChevronDown, ChevronRight, Server, HardDrive, Star, Activity, Circle 
+  ChevronDown, ChevronRight, HardDrive, Star, Activity, Coins 
 } from 'lucide-react';
 import { Node } from '../../types';
 import { formatBytes } from '../../utils/formatters';
@@ -77,11 +77,12 @@ export const WatchlistSection = ({ nodes, onNodeClick, onToggleFavorite }: Watch
                   
                   {/* Info */}
                   <div className="min-w-0">
+                    {/* TOP ROW: Pubkey (Prominent) + Badge */}
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-zinc-300 truncate font-mono tracking-tight group-hover:text-white transition-colors">
-                        {getSafeIp(node)}
+                      <span className="text-xs font-bold text-zinc-300 truncate font-mono tracking-tight group-hover:text-white transition-colors" title={node.pubkey}>
+                        {node.pubkey ? `${node.pubkey.slice(0, 16)}...` : 'Unknown Key'}
                       </span>
-                      {/* Tiny Network Badge */}
+                      {/* Network Badge */}
                       <span className={`text-[7px] px-1 rounded border uppercase font-bold tracking-wider ${
                         isMainnet 
                           ? 'text-green-900 bg-green-500/20 border-green-500/30' 
@@ -90,22 +91,30 @@ export const WatchlistSection = ({ nodes, onNodeClick, onToggleFavorite }: Watch
                         {isMainnet ? 'MN' : 'DN'}
                       </span>
                     </div>
+                    {/* BOTTOM ROW: IP Address (Subtitle) */}
                     <div className="text-[9px] text-zinc-600 font-mono truncate">
-                      {node.pubkey?.slice(0, 24)}...
+                      {getSafeIp(node)}
                     </div>
                   </div>
                 </div>
 
-                {/* RIGHT: Storage & Actions */}
+                {/* RIGHT: Storage, Credits & Actions */}
                 <div className="flex items-center gap-4 md:gap-6 pl-4 shrink-0">
-                  {/* Storage Metric */}
+                  {/* Metrics Cluster */}
                   <div className="text-right">
                     <div className="flex items-center justify-end gap-1.5 text-[9px] text-zinc-500 uppercase font-bold mb-0.5">
-                      <HardDrive size={10} className={isMainnet ? "text-purple-500" : "text-blue-500"} /> 
+                      <HardDrive size={10} className="text-purple-500" /> 
                       <span className="hidden md:inline">Committed</span>
                     </div>
-                    <div className={`font-mono text-xs md:text-sm font-bold ${isMainnet ? "text-purple-400" : "text-blue-400"}`}>
-                      {formatBytes(node.storage_committed)}
+                    <div className="flex items-baseline justify-end gap-2">
+                        {/* Storage (Always Purple) */}
+                        <div className="font-mono text-xs md:text-sm font-bold text-purple-400">
+                          {formatBytes(node.storage_committed)}
+                        </div>
+                        {/* Credits (Tiny, Subtle) */}
+                        <div className="font-mono text-[8px] text-zinc-500 flex items-center gap-0.5">
+                           {node.credits?.toLocaleString() ?? 0} Cr
+                        </div>
                     </div>
                   </div>
 
