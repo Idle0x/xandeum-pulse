@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { 
   Shield, Star, Maximize2, CheckCircle, 
   AlertTriangle, Medal, Wallet, AlertOctagon, 
@@ -23,6 +24,8 @@ export const NodeCard = ({
   zenMode, mostCommonVersion, sortBy 
 }: NodeCardProps) => {
 
+  const [isHovered, setIsHovered] = useState(false);
+
   // Helpers
   const cleanVer = (node.version || '').replace(/[^0-9.]/g, '');
   const cleanConsensus = mostCommonVersion.replace(/[^0-9.]/g, '');
@@ -32,34 +35,27 @@ export const NodeCard = ({
 
   // --- 1. LOCAL CYCLE LOGIC (INTELLIGENT ZEN) ---
   const getCycleContent = () => {
-    const zenTextMain = 'text-white font-mono'; // High contrast for values
+    const zenTextMain = 'text-white font-mono'; 
     const zenTextDim = 'text-zinc-400';
 
-    // CHANGED: We removed the "Explicit Sort Overrides". 
-    // The card now strictly obeys 'cycleStep' passed from the parent.
+    let effectiveStep = cycleStep;
+    if (isHovered) {
+      if (sortBy === 'storage') effectiveStep = 1; 
+      else if (sortBy === 'health') effectiveStep = 2; 
+      else if (sortBy === 'uptime') effectiveStep = 3; 
+    }
 
-    // B. DEFAULT CYCLE LOOP
-    const step = cycleStep % 5;
+    const step = effectiveStep % 5;
 
-    // Step 0: Storage Used
     if (step === 0) return { label: 'Storage Used', value: formatBytes(node.storage_used), color: zenMode ? zenTextMain : 'text-blue-400', icon: Database };
-
-    // Step 1: Committed (This aligns with Sort: Storage)
     if (step === 1) return { label: 'Committed', value: formatBytes(node.storage_committed || 0), color: zenMode ? zenTextMain : 'text-purple-400', icon: HardDrive };
-
-    // Step 2: Health (Aligns with Sort: Health)
     if (step === 2) { const score = node.health || 0; return { label: 'Health Score', value: `${score}/100`, color: zenMode ? zenTextMain : (score > 80 ? 'text-green-400' : 'text-yellow-400'), icon: Activity }; }
-
-    // Step 3: Uptime (Aligns with Sort: Uptime)
     if (step === 3) return { label: 'Continuous Uptime', value: formatUptime(node.uptime), color: zenMode ? zenTextMain : 'text-orange-400', icon: Zap };
-
-    // Step 4: Last Seen (Default fallback)
     return { label: 'Last Seen', value: formatLastSeen(node.last_seen_timestamp), color: zenMode ? zenTextDim : 'text-zinc-400', icon: Clock };
   };
 
   const cycleData = getCycleContent();
 
-  // --- ZEN STYLES ---
   const containerStyle = zenMode 
     ? 'bg-black border-zinc-800' 
     : isFav 
@@ -69,6 +65,8 @@ export const NodeCard = ({
   return (
     <div
       onClick={() => onClick(node)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       className={`group relative border rounded-xl p-3 md:p-5 cursor-pointer ${containerStyle}`}
     >
       {!zenMode && (
@@ -116,17 +114,19 @@ export const NodeCard = ({
         </button>
       </div>
 
-      {/* Body: Version */}
+      {/* Body: Version (UPDATED) */}
       <div className="space-y-1.5 md:space-y-3">
         <div className="flex justify-between items-center text-[9px] md:text-xs">
-          <span className="text-zinc-500">Version</span>
-          <span className={`px-1.5 py-0.5 md:px-2 rounded ${
+          <span className="text-zinc-500 shrink-0 mr-2">Version</span>
+          {/* Constrained Box Container */}
+          <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 md:px-2 rounded max-w-[60%] md:max-w-[50%] ${
             isVersionSort 
               ? (zenMode ? 'text-white border border-white bg-black' : 'text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.4)] border-cyan-500/50 bg-zinc-900 border transition-all duration-500') 
               : 'text-zinc-300 bg-zinc-800/50'
           }`}>
-            {node.version || 'Unknown'} {isLatest && <CheckCircle size={10} className={`inline ml-0.5 md:ml-1 ${zenMode ? 'text-zinc-400' : 'text-green-500'}`}/>}
-          </span>
+            <span className="truncate">{node.version || 'Unknown'}</span>
+            {isLatest && <CheckCircle size={10} className={`shrink-0 ${zenMode ? 'text-zinc-400' : 'text-green-500'}`}/>}
+          </div>
         </div>
 
         <div className="pt-1 md:pt-2">
