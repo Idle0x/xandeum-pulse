@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import axios from 'axios';
@@ -6,8 +6,6 @@ import Link from 'next/link';
 
 // --- COMPONENTS ---
 import { WelcomeCurtain } from '../components/WelcomeCurtain'; 
-
-// --- REFACTORED COMPONENTS ---
 import { NetworkSwitcher } from '../components/common/NetworkSwitcher';
 import { LiveWireLoader, PulseGraphLoader } from '../components/common/Loaders';
 import { NodeCard } from '../components/dashboard/cards/NodeCard';
@@ -24,12 +22,59 @@ import { getSafeIp, compareVersions } from '../utils/nodeHelpers';
 
 // --- ICONS ---
 import {
-  Search, Download, Activity, Database, X,
+  Search, Activity, Database, X,
   Clock, Trophy, Star, ArrowUp, ArrowDown,
   Info, ExternalLink, Maximize2, Map as MapIcon,
   BookOpen, Menu, LayoutDashboard, HeartPulse,
-  Swords, Monitor, AlertTriangle, RefreshCw, Twitter, Server, ChevronDown, ChevronUp
+  Swords, Monitor, AlertTriangle, RefreshCw, Twitter, Server, Globe, ShieldCheck, GitBranch, ChevronDown
 } from 'lucide-react';
+
+// --- SUB-COMPONENTS ---
+
+// New Mini Dropdown for Header
+const MiniNetworkDropdown = ({ current, onChange, zenMode }: { current: string, onChange: (val: any) => void, zenMode: boolean }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const getLabel = () => current === 'ALL' ? 'NET: ALL' : current === 'MAINNET' ? 'NET: MAIN' : 'NET: DEV';
+  const getColor = () => current === 'ALL' ? 'text-zinc-400' : current === 'MAINNET' ? 'text-green-500' : 'text-blue-500';
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center gap-1 h-6 md:h-9 px-2 md:px-3 rounded-lg border transition-all font-bold tracking-tight uppercase ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700' : 'bg-black/40 border-zinc-800 hover:bg-zinc-800'} ${getColor()}`}
+      >
+        <span className="text-[8px] md:text-[10px] whitespace-nowrap">{getLabel()}</span>
+        <ChevronDown size={10} className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full mt-1 left-0 bg-[#09090b] border border-zinc-800 rounded-lg shadow-xl overflow-hidden z-50 flex flex-col min-w-[80px] animate-in fade-in zoom-in-95 duration-200">
+          {['ALL', 'MAINNET', 'DEVNET'].map(net => (
+            <button
+              key={net}
+              onClick={() => { onChange(net); setIsOpen(false); }}
+              className={`px-3 py-2 text-[9px] font-bold text-left hover:bg-zinc-800 transition-colors ${current === net ? 'text-white bg-zinc-800/50' : 'text-zinc-500'}`}
+            >
+              {net}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function Home() {
   const router = useRouter();
@@ -45,7 +90,7 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Cycle & UX
-  const [cycleStep, setCycleStep] = useState(1);
+  const [cycleStep, setCycleStep] = useState(1); 
   const [cycleReset, setCycleReset] = useState(0); 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [zenMode, setZenMode] = useState(false);
@@ -74,7 +119,6 @@ export default function Home() {
 
   // Filters & Selection
   const [networkFilter, setNetworkFilter] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
-  const [isNetDropdownOpen, setIsNetDropdownOpen] = useState(false); // NEW STATE FOR HEADER DROPDOWN
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [activeStatsModal, setActiveStatsModal] = useState<'capacity' | 'vitals' | 'consensus' | null>(null);
 
@@ -116,22 +160,25 @@ export default function Home() {
 
   const handleGlobalClick = () => {
     if (activeTooltip) setActiveTooltip(null);
-    if (isNetDropdownOpen) setIsNetDropdownOpen(false); // Close dropdown on global click
   };
 
-  const handleDropdownClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsNetDropdownOpen(!isNetDropdownOpen);
-  };
-
-  // PERSISTENCE: Toggle Zen Mode & Save to LocalStorage
   const toggleZenMode = () => {
     const newState = !zenMode;
     setZenMode(newState);
     localStorage.setItem('xandeum_zen_mode', String(newState));
   };
 
+  // NEW: Search with Auto Scroll
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    // If typing and scrolled down, shoot to top
+    if (window.scrollY > 50 && e.target.value.length > 0) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   // --- DATA FETCHING ---
+
   const fetchData = async (mode: 'fast' | 'swarm' = 'fast') => {
     if (mode === 'fast') setLoading(true);
     else setIsBackgroundSyncing(true);
@@ -229,10 +276,6 @@ export default function Home() {
     const savedZen = localStorage.getItem('xandeum_zen_mode');
     if (savedZen === 'true') setZenMode(true);
 
-    const cycleInterval = setInterval(() => {
-        setCycleStep((prev) => prev + 1);
-    }, 9000); 
-
     // RESTORE FAVORITES
     const savedFavs = localStorage.getItem('xandeum_favorites');
     if (savedFavs) setFavorites(JSON.parse(savedFavs));
@@ -243,11 +286,19 @@ export default function Home() {
     window.addEventListener('scroll', handleScroll);
 
     return () => {
-      clearInterval(cycleInterval);
       clearInterval(dataInterval);
       window.removeEventListener('scroll', handleScroll);
     };
   }, []); 
+
+  useEffect(() => {
+    // 13 seconds per cycle as requested
+    const cycleInterval = setInterval(() => {
+        setCycleStep((prev) => prev + 1);
+    }, 13000); 
+
+    return () => clearInterval(cycleInterval);
+  }, [cycleReset]); 
 
   useEffect(() => {
     const tipInterval = setInterval(() => {
@@ -255,13 +306,6 @@ export default function Home() {
     }, 9000);
     return () => clearInterval(tipInterval);
   }, [isSearchFocused]);
-
-  // --- NEW: SEARCH AUTO-SCROLL EFFECT ---
-  useEffect(() => {
-    if (searchQuery.length > 0) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, [searchQuery]);
 
   useEffect(() => {
     if (!loading && nodes.length > 0 && router.query.open) {
@@ -290,7 +334,71 @@ export default function Home() {
     }
   }, [loading, nodes, router.query]);
 
-  // --- FILTER & SORT LOGIC ---
+  // --- 1. FILTER LOGIC (Capacity Split) ---
+  const splitStats = useMemo(() => {
+    let mainnetC = 0, mainnetU = 0;
+    let devnetC = 0, devnetU = 0;
+
+    nodes.forEach(n => {
+        if (n.network === 'MAINNET') {
+            mainnetC += (n.storage_committed || 0);
+            mainnetU += (n.storage_used || 0);
+        } else if (n.network === 'DEVNET') {
+            devnetC += (n.storage_committed || 0);
+            devnetU += (n.storage_used || 0);
+        }
+    });
+
+    return { mainnetC, mainnetU, devnetC, devnetU };
+  }, [nodes]);
+
+  // --- 2. VITALS LOGIC (Context Aware) ---
+  const vitalsStats = useMemo(() => {
+    const targetNodes = networkFilter === 'ALL' 
+      ? nodes 
+      : nodes.filter(n => n.network === networkFilter);
+    const count = targetNodes.length || 1;
+
+    // Avg Health
+    const totalHealth = targetNodes.reduce((acc, n) => acc + (n.health || 0), 0);
+    const avg = Math.round(totalHealth / count);
+
+    // Stability
+    const stable = targetNodes.filter(n => (n.uptime || 0) > 86400).length;
+    const stability = ((stable / count) * 100).toFixed(2);
+
+    return { avg, stability };
+  }, [nodes, networkFilter]);
+
+  // --- 3. CONSENSUS LOGIC (Context Aware) ---
+  const consensusStats = useMemo(() => {
+    const targetNodes = networkFilter === 'ALL' 
+      ? nodes 
+      : nodes.filter(n => n.network === networkFilter);
+    const count = targetNodes.length || 1;
+
+    // Determine common version in this context
+    const versionMap: Record<string, number> = {};
+    targetNodes.forEach(n => {
+       const v = n.version || 'Unknown';
+       versionMap[v] = (versionMap[v] || 0) + 1;
+    });
+    
+    // Sort descending by count
+    const sorted = Object.entries(versionMap).sort((a, b) => b[1] - a[1]);
+    const winnerVer = sorted[0]?.[0] || 'N/A';
+    const winnerCount = sorted[0]?.[1] || 0;
+    
+    const score = ((winnerCount / count) * 100).toFixed(1);
+    
+    return { version: winnerVer, score };
+  }, [nodes, networkFilter]);
+
+
+  // --- RENDER HELPERS ---
+  const isGlobalView = networkFilter === 'ALL';
+  const displayCommitted = isGlobalView ? totalStorageCommitted : (networkFilter === 'MAINNET' ? splitStats.mainnetC : splitStats.devnetC);
+  const displayUsed = isGlobalView ? totalStorageUsed : (networkFilter === 'MAINNET' ? splitStats.mainnetU : splitStats.devnetU);
 
   const handleSortChange = (metric: 'uptime' | 'version' | 'storage' | 'health') => {
       if (sortBy === metric) {
@@ -307,7 +415,7 @@ export default function Home() {
 
       if (targetStep !== -1) {
           setCycleStep(targetStep);
-          setCycleReset(prev => prev + 1);
+          setCycleReset(prev => prev + 1); 
       }
   };
 
@@ -345,8 +453,6 @@ export default function Home() {
 
   const watchListNodes = nodes.filter(node => favorites.includes(node.address || ''));
 
-  // --- RENDER ---
-
   return (
     <div
       className={`min-h-screen font-sans transition-colors duration-500 ${
@@ -361,22 +467,10 @@ export default function Home() {
 
       {/* --- MODALS --- */}
       {activeStatsModal === 'capacity' && (
-        <CapacityModal 
-          onClose={() => setActiveStatsModal(null)}
-          totalCommitted={totalStorageCommitted}
-          totalUsed={totalStorageUsed}
-          nodes={nodes}
-          medianCommitted={medianCommitted}
-        />
+        <CapacityModal onClose={() => setActiveStatsModal(null)} nodes={nodes} />
       )}
       {activeStatsModal === 'vitals' && (
-        <VitalsModal
-           onClose={() => setActiveStatsModal(null)}
-           nodes={nodes}
-           avgHealth={avgNetworkHealth}
-           consensusPercent={networkConsensus}
-           consensusVersion={mostCommonVersion}
-        />
+        <VitalsModal onClose={() => setActiveStatsModal(null)} nodes={nodes} />
       )}
       {activeStatsModal === 'consensus' && (
         <ConsensusModal
@@ -409,11 +503,8 @@ export default function Home() {
       )}
 
       {/* --- SIDE NAVIGATION --- */}
-      <div
-        className={`fixed inset-y-0 left-0 w-72 bg-black border-r border-zinc-800 z-[200] transform transition-transform duration-300 ease-in-out ${
-          isMenuOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
+      <div className={`fixed inset-y-0 left-0 w-72 bg-black border-r border-zinc-800 z-[200] transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        {/* ... (Nav Content remains unchanged) ... */}
         <div className="p-6 flex flex-col h-full relative overflow-hidden">
           <div className="flex justify-between items-center mb-8 shrink-0 relative z-10">
             <h2 className="font-bold text-white tracking-widest uppercase flex items-center gap-2">
@@ -456,13 +547,11 @@ export default function Home() {
       {isMenuOpen && <div className="fixed inset-0 bg-black/50 z-[190] backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* --- HEADER --- */}
-      {/* HEADER TWEAK: Reduced vertical padding (py-1 on mobile) and gap */}
-      <header className={`sticky top-0 z-[50] border-b px-4 py-1 md:py-3 flex flex-col gap-1 md:gap-4 transition-all duration-500 ${zenMode ? 'bg-black border-zinc-800' : 'bg-[#09090b]/90 backdrop-blur-md border-zinc-800'}`}>
+      <header className={`sticky top-0 z-[50] border-b px-4 py-1.5 md:px-6 md:py-3 flex flex-col gap-2 md:gap-4 transition-all duration-500 ${zenMode ? 'bg-black border-zinc-800' : 'bg-[#09090b]/90 backdrop-blur-md border-zinc-800'}`}>
         <div className="flex justify-between items-center w-full">
           <div className="flex items-center gap-4">
-            {/* HEADER TWEAK: Reduced menu button size slightly */}
-            <button onClick={() => setIsMenuOpen(true)} className={`p-2 md:p-3.5 rounded-xl transition ${zenMode ? 'text-zinc-400 border border-zinc-800 hover:text-white' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white hover:bg-zinc-800'}`}>
-              <Menu size={20} className="md:w-7 md:h-7" />
+            <button onClick={() => setIsMenuOpen(true)} className={`p-2.5 md:p-3.5 rounded-xl transition ${zenMode ? 'text-zinc-400 border border-zinc-800 hover:text-white' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white hover:bg-zinc-800'}`}>
+              <Menu size={24} className="md:w-7 md:h-7" />
             </button>
             <div className="flex flex-col">
               <h1 className="text-lg md:text-xl font-extrabold tracking-tight flex items-center gap-2 text-white">
@@ -482,7 +571,8 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              <input type="text" placeholder={zenMode ? "Search..." : ""} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full rounded-lg py-2 pl-10 pr-8 md:pr-4 text-sm outline-none transition-all relative z-10 bg-transparent ${zenMode ? 'border border-zinc-800 text-zinc-300 focus:border-zinc-600 placeholder:text-zinc-700' : 'border border-zinc-800 text-white focus:border-blue-500 shadow-inner'}`} onFocus={() => setIsSearchFocused(true)} onBlur={() => setIsSearchFocused(false)} />
+              {/* UPDATED: Search Input with Auto Scroll */}
+              <input type="text" placeholder={zenMode ? "Search..." : ""} value={searchQuery} onChange={handleSearchChange} className={`w-full rounded-lg py-2 pl-10 pr-8 md:pr-4 text-sm outline-none transition-all relative z-10 bg-transparent ${zenMode ? 'border border-zinc-800 text-zinc-300 focus:border-zinc-600 placeholder:text-zinc-700' : 'border border-zinc-800 text-white focus:border-blue-500 shadow-inner'}`} onFocus={() => setIsSearchFocused(true)} onBlur={() => setIsSearchFocused(false)} />
               {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-2.5 text-zinc-500 hover:text-white transition z-20 p-0.5 bg-black/20 rounded-full hover:bg-zinc-700"><X size={14} /></button>}
             </div>
             {!zenMode && (
@@ -502,50 +592,31 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="flex items-center justify-between gap-2 md:gap-4 overflow-x-auto pb-1 md:pb-2 scrollbar-hide w-full mt-1 md:mt-6 border-t border-zinc-800/50 pt-2">
-          {/* HEADER TWEAK: Aggressive Mobile Size Reduction (h-6, px-3, text-[9px]) */}
-          <button onClick={() => fetchData('fast')} disabled={loading} className={`flex items-center gap-1 md:gap-2 px-3 h-6 md:px-6 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs shrink-0 ${loading ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'}`}>
-            <RefreshCw size={10} className={`md:w-[14px] md:h-[14px] ${loading || isBackgroundSyncing ? 'animate-spin' : ''}`} /> {loading ? 'SYNC...' : 'REFRESH'}
-          </button>
-
-          {/* --- NEW: MINI NETWORK DROPDOWN (Between Refresh & Filters) --- */}
-          <div className="relative shrink-0">
-             <button 
-                onClick={handleDropdownClick}
-                className={`flex items-center gap-1 px-2 h-6 md:px-4 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs border ${zenMode ? 'bg-black border-zinc-800 text-zinc-400' : 'bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}
-             >
-                {/* Status Dot */}
-                <div className={`w-1.5 h-1.5 rounded-full ${networkFilter === 'MAINNET' ? 'bg-green-500' : networkFilter === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
-                <span>{networkFilter === 'ALL' ? 'ALL' : networkFilter === 'MAINNET' ? 'MAIN' : 'DEV'}</span>
-                {isNetDropdownOpen ? <ChevronUp size={10} className="md:w-3 md:h-3"/> : <ChevronDown size={10} className="md:w-3 md:h-3"/>}
+        {/* --- HEADER BOTTOM CONTROLS --- */}
+        <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-hide w-full mt-0 md:mt-4 border-t border-zinc-800/50 pt-1 md:pt-2">
+          {/* LEFT GROUP: Refresh + NEW NETWORK DROPDOWN */}
+          <div className="flex items-center gap-2 md:gap-4 shrink-0">
+             {/* COMPACT REFRESH BUTTON */}
+             <button onClick={() => fetchData('fast')} disabled={loading} className={`flex items-center gap-1 md:gap-2 px-2 md:px-6 h-6 md:h-12 rounded-lg md:rounded-xl transition font-bold text-[8px] md:text-xs uppercase tracking-wider ${loading ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'}`}>
+               <RefreshCw size={10} className={`md:w-3.5 md:h-3.5 ${loading || isBackgroundSyncing ? 'animate-spin' : ''}`} /> 
+               {loading ? 'SYNC...' : 'REFRESH'}
              </button>
 
-             {/* Dropdown Content */}
-             {isNetDropdownOpen && (
-               <div className="absolute top-full left-0 mt-1 md:mt-2 w-20 md:w-28 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[60] flex flex-col animate-in fade-in zoom-in-95 duration-200">
-                  {['ALL', 'MAINNET', 'DEVNET'].map((net) => (
-                    <button
-                      key={net}
-                      onClick={() => { setNetworkFilter(net as any); setIsNetDropdownOpen(false); showToast(`View switched to ${net}`); }}
-                      className={`px-3 py-2 text-[9px] md:text-xs font-bold text-left hover:bg-zinc-900 flex items-center gap-2 ${networkFilter === net ? 'text-white bg-zinc-900' : 'text-zinc-500'}`}
-                    >
-                       <div className={`w-1.5 h-1.5 rounded-full ${net === 'MAINNET' ? 'bg-green-500' : net === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
-                       {net === 'ALL' ? 'ALL' : net === 'MAINNET' ? 'MAIN' : 'DEV'}
-                    </button>
-                  ))}
-               </div>
-             )}
+             {/* NEW MINI DROPDOWN */}
+             <MiniNetworkDropdown current={networkFilter} onChange={setNetworkFilter} zenMode={zenMode} />
           </div>
 
+          {/* RIGHT GROUP: SORT BUTTONS */}
           <div className="flex gap-1 md:gap-2 relative ml-auto">
             {['uptime', 'storage', 'version', 'health'].map((opt) => (
-              /* HEADER TWEAK: Aggressive Mobile Size Reduction (px-1.5, h-6, text-[8px]/[9px]) */
-              <button key={opt} onClick={() => handleSortChange(opt as any)} className={`flex items-center gap-1 px-1.5 h-6 md:px-3 md:py-2 md:h-auto rounded-lg text-[8px] md:text-xs font-bold transition border whitespace-nowrap ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-black border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
+              // COMPACT SORT BUTTONS
+              <button key={opt} onClick={() => handleSortChange(opt as any)} className={`flex items-center gap-1 md:gap-1.5 px-2 py-0 md:px-3 md:py-2 rounded-lg text-[8px] md:text-xs font-bold transition border whitespace-nowrap h-6 md:h-auto uppercase ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-black border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
                 {opt === 'uptime' && <Clock size={10} className="md:w-3 md:h-3" />}{opt === 'storage' && <Database size={10} className="md:w-3 md:h-3" />}{opt === 'version' && <Server size={10} className="md:w-3 md:h-3" />}{opt === 'health' && <HeartPulse size={10} className="md:w-3 md:h-3" />}
-                {opt.toUpperCase()}
-                {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={8} className="ml-0.5 md:ml-1 md:w-[10px] md:h-[10px]" /> : <ArrowDown size={8} className="ml-0.5 md:ml-1 md:w-[10px] md:h-[10px]" />)}
+                {opt}
+                {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={8} className="ml-0.5 md:ml-1 md:w-2.5 md:h-2.5" /> : <ArrowDown size={8} className="ml-0.5 md:ml-1 md:w-2.5 md:h-2.5" />)}
               </button>
             ))}
+            {!zenMode && <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-[#09090b] to-transparent pointer-events-none md:hidden"></div>}
           </div>
         </div>
       </header>
@@ -553,7 +624,7 @@ export default function Home() {
       {!zenMode && <div className={`sticky top-0 z-[80] w-full h-1 bg-gradient-to-b from-black/50 to-transparent pointer-events-none transition-opacity duration-300 ${scrolled ? 'opacity-100' : 'opacity-0'}`}></div>}
 
       {searchQuery && !zenMode && (
-        <div className="sticky top-[110px] md:top-[140px] z-[85] w-full bg-blue-900/90 border-b border-blue-500/30 py-2 px-6 text-center backdrop-blur-md animate-in slide-in-from-top-1">
+        <div className="sticky top-[100px] md:top-[140px] z-[85] w-full bg-blue-900/90 border-b border-blue-500/30 py-2 px-6 text-center backdrop-blur-md animate-in slide-in-from-top-1">
             <div className="text-xs font-mono text-blue-100">Found <span className="font-bold text-white">{filteredNodes.length}</span> matches for <span className="italic">"{searchQuery}"</span></div>
         </div>
       )}
@@ -572,42 +643,68 @@ export default function Home() {
       <main className={`p-4 md:p-8 ${zenMode ? 'max-w-full' : 'max-w-7xl 2xl:max-w-[1800px] mx-auto'} transition-all duration-500`}>
         {!zenMode && !loading && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
+
+            {/* --- 1. CAPACITY CARD --- */}
             <div onClick={() => setActiveStatsModal('capacity')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm flex flex-col justify-between cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
-                <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Network Capacity</div>
+                <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1 flex items-center gap-1">
+                   <Database size={10} className={isGlobalView ? 'text-zinc-500' : networkFilter === 'MAINNET' ? 'text-green-500' : 'text-blue-500'} /> 
+                   {isGlobalView ? 'Network Capacity' : `${networkFilter} Capacity`}
+                </div>
                 <div>
-                  <div className="text-lg md:text-3xl font-bold text-purple-400">{formatBytes(totalStorageCommitted)}</div>
-                  <div className="text-[9px] md:text-xs font-bold text-blue-400 mt-0.5 md:mt-1 flex items-center gap-1">{formatBytes(totalStorageUsed)} <span className="text-zinc-600 font-normal">Used</span></div>
+                  <div className={`text-lg md:text-3xl font-bold ${isGlobalView ? 'text-purple-400' : 'text-white'}`}>{formatBytes(displayCommitted)}</div>
+                  <div className="text-[9px] md:text-xs font-bold text-blue-400 mt-0.5 md:mt-1 flex items-center gap-1">{formatBytes(displayUsed)} <span className="text-zinc-600 font-normal">Used</span></div>
                 </div>
               </div>
-              <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-purple-400 font-bold flex items-center gap-1 z-10"><Maximize2 size={8} /> DETAILS</div>
+              <div className="absolute bottom-2 right-2 flex items-center gap-1 z-10">
+                 {!isGlobalView ? (
+                    <div className="flex items-center gap-1 text-[8px] text-zinc-600 font-mono"><Globe size={8} /> Global: <span className="text-zinc-500">{formatBytes(totalStorageCommitted)}</span></div>
+                 ) : (
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-purple-400 font-bold flex items-center gap-1"><Maximize2 size={8} /> DETAILS</div>
+                 )}
+              </div>
             </div>
 
+            {/* --- 2. VITALS CARD (Smart) --- */}
             <div onClick={() => setActiveStatsModal('vitals')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-green-500/0 to-green-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="absolute inset-0 opacity-20 pointer-events-none"><div className="ekg-line"></div></div>
               <div className="relative z-10">
-                <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1"><HeartPulse size={12} className="text-green-500 animate-pulse" /> Network Vitals</div>
+                <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1">
+                    <HeartPulse size={12} className={`animate-pulse ${networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-green-500'}`} /> 
+                    {isGlobalView ? 'Network Vitals' : `${networkFilter} Vitals`}
+                </div>
                 <div className="space-y-1 mt-1">
-                  <div className="flex justify-between text-[8px] md:text-xs"><span className="text-zinc-400">Stability</span><span className="font-mono font-bold text-white">{networkHealth}%</span></div>
-                  <div className="flex justify-between text-[8px] md:text-xs"><span className="text-zinc-400">Avg Health</span><span className="font-mono font-bold text-green-400">{avgNetworkHealth}/100</span></div>
-                  <div className="flex justify-between text-[8px] md:text-xs"><span className="text-zinc-400">Consensus</span><span className="font-mono font-bold text-blue-400">{networkConsensus.toFixed(1)}%</span></div>
+                  <div className="flex justify-between text-[8px] md:text-xs"><span className="text-zinc-400">Stability</span><span className="font-mono font-bold text-white">{vitalsStats.stability}%</span></div>
+                  <div className="flex justify-between text-[8px] md:text-xs"><span className="text-zinc-400">Avg Health</span><span className="font-mono font-bold text-green-400">{vitalsStats.avg}/100</span></div>
+                  <div className="flex justify-between text-[8px] md:text-xs"><span className="text-zinc-400">Consensus</span><span className="font-mono font-bold text-blue-400">{consensusStats.score}%</span></div>
                 </div>
               </div>
               <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-green-400 font-bold flex items-center gap-1 z-10"><Maximize2 size={8} /> DETAILS</div>
               <style jsx>{` @keyframes ekg { 0% { left: -100%; opacity: 0; } 50% { opacity: 1; } 100% { left: 100%; opacity: 0; } } .ekg-line { position: absolute; top: 0; bottom: 0; width: 50%; background: linear-gradient( 90deg, transparent 0%, rgba(34, 197, 94, 0.5) 50%, transparent 100% ); animation: ekg 2s linear infinite; } `}</style>
             </div>
 
+            {/* --- 3. CONSENSUS CARD (Smart) --- */}
             <div onClick={() => setActiveStatsModal('consensus')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
-                <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Consensus Ver</div>
-                <div className="text-lg md:text-3xl font-bold text-blue-400 mt-1">{mostCommonVersion}</div>
+                <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                   <GitBranch size={10} className="text-blue-500"/>
+                   {isGlobalView ? 'Global Consensus' : `${networkFilter} Target`}
+                </div>
+                <div className="text-lg md:text-3xl font-bold text-white mt-1">{consensusStats.version}</div>
+                <div className="flex items-center gap-1.5 mt-1">
+                   <div className={`w-1.5 h-1.5 rounded-full ${parseFloat(consensusStats.score) > 66 ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]'}`}></div>
+                   <span className={`text-[9px] md:text-xs font-mono font-bold ${parseFloat(consensusStats.score) > 66 ? 'text-green-400' : 'text-yellow-400'}`}>
+                      {consensusStats.score}% Agreement
+                   </span>
+                </div>
               </div>
               <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-blue-400 font-bold flex items-center gap-1 z-10"><Maximize2 size={8} /> DETAILS</div>
             </div>
 
+            {/* --- 4. FILTER CARD --- */}
             <div onClick={() => { const nextFilter = networkFilter === 'ALL' ? 'MAINNET' : networkFilter === 'MAINNET' ? 'DEVNET' : 'ALL'; setNetworkFilter(nextFilter); }} className="bg-zinc-900/50 border border-zinc-800 p-3 rounded-xl backdrop-blur-sm flex flex-col justify-between group relative overflow-hidden transition-all duration-300 hover:border-zinc-700 cursor-pointer select-none active:scale-[0.98] h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="flex justify-between items-center relative z-10 mb-2">
@@ -622,9 +719,12 @@ export default function Home() {
                 </div>
               </div>
             </div>
+
           </div>
         )}
 
+        {/* ... Rest of Main content ... */}
+        
         {error && <div className="mb-8 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center gap-2 text-blue-400 animate-pulse"><RefreshCw size={14} className="animate-spin" /><span className="text-xs font-bold">{error}</span></div>}
 
         {!zenMode && favorites.length > 0 && (
@@ -638,25 +738,22 @@ export default function Home() {
           </div>
         )}
 
+        {/* UPDATED: Nodes Heading Layout */}
         {!loading && nodes.length > 0 && (
-             <div className="flex items-start gap-3 mb-4 mt-8">
-                <div className="mt-1">
-                   <Activity className={zenMode ? 'text-zinc-500' : (networkFilter === 'MAINNET' ? "text-green-500" : networkFilter === 'DEVNET' ? "text-blue-500" : "text-white")} size={20} />
+             <div className="flex flex-col items-start gap-1 mb-4 mt-8">
+                <div className="flex items-center gap-2">
+                    <Activity className={zenMode ? 'text-zinc-500' : (networkFilter === 'MAINNET' ? "text-green-500" : networkFilter === 'DEVNET' ? "text-blue-500" : "text-white")} size={20} />
+                    <h3 className="text-base md:text-lg font-bold text-white tracking-widest uppercase">
+                        {networkFilter === 'ALL' ? 'Nodes across all networks' : networkFilter === 'MAINNET' ? <span className={zenMode ? 'text-white' : "text-green-500"}>Nodes on Mainnet</span> : <span className={zenMode ? 'text-white' : "text-blue-500"}>Nodes on Devnet</span>} 
+                        <span className="text-zinc-600 ml-2 text-sm">({filteredNodes.length})</span>
+                    </h3>
                 </div>
-                {/* HEADING TWEAK: Reduced font size, Flex Column, Distributed by on new line */}
-                <div className="flex flex-col">
-                   <h3 className="text-sm md:text-lg font-bold text-white tracking-widest uppercase leading-tight">
-                     {networkFilter === 'ALL' ? 'Nodes across all networks' : networkFilter === 'MAINNET' ? <span className={zenMode ? 'text-white' : "text-green-500"}>Nodes on Mainnet</span> : <span className={zenMode ? 'text-white' : "text-blue-500"}>Nodes on Devnet</span>} 
-                     <span className="text-zinc-600 ml-2 text-xs md:text-sm">({filteredNodes.length})</span>
-                   </h3>
-                   <div className="text-[9px] font-mono text-zinc-500 uppercase mt-1">
-                     Distributed by <span className="text-zinc-300">{sortBy}</span> ({sortOrder === 'asc' ? 'Lowest to Highest' : 'Highest to Lowest'})
-                   </div>
+                <div className="flex items-center gap-1 leading-none text-[8px] md:text-[9px] font-mono text-zinc-500 uppercase ml-0.5">
+                    (Distributed by <span className="text-zinc-300 mx-1">{sortBy}</span> {sortOrder === 'asc' ? 'Lowest to Highest' : 'Highest to Lowest'})
                 </div>
             </div>
         )}
 
-        {/* --- DYNAMIC GRID --- */}
         {loading && nodes.length === 0 ? (
           <PulseGraphLoader />
         ) : (
@@ -691,7 +788,7 @@ export default function Home() {
           </div>
         )}
       </main>
-
+      
       {!zenMode && (
         <footer className="relative border-t border-zinc-800 bg-zinc-900/50 p-6 mt-auto text-center overflow-hidden">
           <h3 className="text-white font-bold mb-2">XANDEUM PULSE MONITOR</h3>
@@ -703,7 +800,6 @@ export default function Home() {
           </div>
           <Link href="/docs" className="text-xs text-zinc-500 hover:text-zinc-300 underline underline-offset-4 decoration-zinc-700 flex items-center justify-center gap-1 mt-4"><BookOpen size={10} /> System Architecture & Docs</Link>
 
-          {/* --- ACTIVE PODS UPLINK (Integrated Dashboard Pill) --- */}
           <div className="mt-8 md:mt-0 md:absolute md:bottom-6 md:right-6 flex items-center justify-center animate-in fade-in duration-1000">
              <div className="group flex items-center gap-3 px-4 py-2 rounded-full bg-black/40 border border-white/5 shadow-[inset_0_1px_4px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all hover:border-white/10 hover:bg-black/60 cursor-help" title="Live count of filtered nodes currently in view">
                 <div className="relative flex h-1.5 w-1.5">
@@ -721,7 +817,6 @@ export default function Home() {
         </footer>
       )}
 
-      {/* ZEN MODE FOOTER */}
       {zenMode && (
         <footer className="fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-800 p-2 px-6 flex justify-between items-center text-[9px] text-zinc-600 font-mono z-40">
            <div>ZEN MODE ACTIVE</div>
