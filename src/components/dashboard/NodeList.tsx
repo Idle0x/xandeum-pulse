@@ -64,6 +64,10 @@ export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: No
           const isFav = favorites.includes(node.address || '');
           const statusColor = node.credits !== null ? 'bg-green-500' : 'bg-red-500';
           const countryCode = node.location?.countryCode;
+          
+          // STRICT FLAG CHECK: Exclude 'XX' (Private/Unknown) to match NodeCard logic
+          const showFlag = countryCode && countryCode !== 'XX';
+          
           const health = node.health || 0;
           const isMainnet = node.network === 'MAINNET';
 
@@ -99,7 +103,7 @@ export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: No
                    </div>
                    {/* Hover: Flag + IP */}
                    <div className="absolute inset-0 flex items-center gap-2 translate-y-full transition-transform duration-300 group-hover:translate-y-0">
-                      {countryCode && (
+                      {showFlag && (
                         <img 
                           src={`https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`} 
                           alt={countryCode}
@@ -123,7 +127,7 @@ export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: No
                    {node.version}
                 </div>
 
-                {/* 5. Health (Off-White Only) */}
+                {/* 5. Health (Strict Off-White) */}
                 <div className="font-mono text-xs font-bold text-zinc-400">
                    {health}%
                 </div>
@@ -159,32 +163,43 @@ export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: No
 
 
               {/* --- MOBILE LAYOUT (STRICT GRID) --- */}
-              {/* Columns: Status | Identity | Version | Health | Storage | Star */}
+              {/* Columns: Status | Identity (Stacked) | Version | Health | Storage | Star */}
               <div className="grid md:hidden grid-cols-[auto_1.5fr_0.8fr_0.5fr_1fr_auto] gap-3 px-4 py-3 items-center border-b border-zinc-800/20">
 
                  {/* 1. Status Dot */}
                  <div className={`w-1.5 h-1.5 rounded-full ${statusColor} shrink-0`}></div>
 
-                 {/* 2. Identity (With Swap Logic) */}
-                 <div className="relative h-5 overflow-hidden w-full">
-                     {/* Default View */}
-                     <div className="absolute inset-0 flex items-center gap-2 transition-transform duration-300 group-hover:-translate-y-full">
-                        <span className="font-mono text-xs font-bold text-white truncate w-full">
-                          {node.pubkey ? `${node.pubkey.slice(0, 8)}...` : 'Unknown'}
-                        </span>
+                 {/* 2. Identity (Complex Stack with Metrics) */}
+                 <div className="flex flex-col min-w-0">
+                     {/* Row A: Interactive Swap (PubKey <-> IP) */}
+                     <div className="relative h-5 overflow-hidden w-full">
+                         {/* Default View: PubKey */}
+                         <div className="absolute inset-0 flex items-center gap-2 transition-transform duration-300 group-hover:-translate-y-full">
+                            <span className="font-mono text-xs font-bold text-white truncate w-full">
+                              {node.pubkey ? `${node.pubkey.slice(0, 8)}...` : 'Unknown'}
+                            </span>
+                         </div>
+                         {/* Swapped View: IP + Flag */}
+                         <div className="absolute inset-0 flex items-center gap-2 translate-y-full transition-transform duration-300 group-hover:translate-y-0">
+                            {showFlag && (
+                              <img 
+                                src={`https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`} 
+                                alt={countryCode}
+                                className="w-3 h-auto opacity-90 rounded-[2px]"
+                              />
+                            )}
+                            <span className="font-mono text-[10px] text-zinc-300 font-bold truncate">
+                              {getSafeIp(node)}
+                            </span>
+                         </div>
                      </div>
-                     {/* Swapped View (IP + Flag) */}
-                     <div className="absolute inset-0 flex items-center gap-2 translate-y-full transition-transform duration-300 group-hover:translate-y-0">
-                        {countryCode && (
-                          <img 
-                            src={`https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`} 
-                            alt={countryCode}
-                            className="w-3 h-auto opacity-90 rounded-[2px]"
-                          />
-                        )}
-                        <span className="font-mono text-[10px] text-zinc-300 font-bold truncate">
-                          {getSafeIp(node)}
-                        </span>
+                     
+                     {/* Row B: Tiny Stats (Under PubKey) */}
+                     {/* No Color, Just Numbers, Tiny Font */}
+                     <div className="flex items-center gap-2 text-[7px] font-mono text-zinc-600 leading-none -mt-0.5">
+                        <span>{formatUptime(node.uptime || 0)}</span>
+                        <span className="text-zinc-800">|</span>
+                        <span>{formatLastSeen(node.last_seen_timestamp || 0).replace(' ago', '')}</span>
                      </div>
                  </div>
 
