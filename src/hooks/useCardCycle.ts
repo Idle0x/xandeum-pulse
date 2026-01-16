@@ -2,16 +2,17 @@ import { Database, HardDrive, Activity, Zap, Clock } from 'lucide-react';
 import { Node } from '../types';
 import { formatBytes, formatUptime, formatLastSeen } from '../utils/formatters';
 
-// Added sortBy parameter
 export const useCardCycle = (node: Node, step: number, zenMode: boolean, sortBy: string = '') => {
-  
+
   // --- OVERRIDE LOGIC: If sorting, show that metric continuously ---
+  
   if (sortBy === 'storage') {
+    // FIX: Now displays 'Committed' (Capacity) when sorted by Storage
     return {
-      label: 'Storage Used',
-      value: formatBytes(node.storage_used),
-      color: zenMode ? 'text-zinc-300' : 'text-blue-400',
-      icon: Database
+      label: 'Committed', 
+      value: formatBytes(node.storage_committed || 0),
+      color: zenMode ? 'text-zinc-300' : 'text-purple-400', // Purple for Capacity
+      icon: HardDrive
     };
   }
 
