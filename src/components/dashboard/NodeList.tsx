@@ -60,7 +60,7 @@ export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: No
 
       {/* DATA ROWS */}
       <div className="divide-y divide-zinc-800/30">
-        {nodes.map((node) => {
+        {nodes.map((node, index) => { // Added index here
           const isFav = favorites.includes(node.address || '');
           const statusColor = node.credits !== null ? 'bg-green-500' : 'bg-red-500';
           const countryCode = node.location?.countryCode;
@@ -71,9 +71,12 @@ export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: No
           const health = node.health || 0;
           const isMainnet = node.network === 'MAINNET';
 
+          // FIX: Unique Composite Key to force React to re-sort correctly
+          const uniqueKey = node.pubkey ? `${node.pubkey}-${node.network}` : `fallback-${index}`;
+
           return (
             <div 
-              key={node.pubkey || node.address}
+              key={uniqueKey} // Use the fixed unique key
               onClick={() => onNodeClick(node)}
               className="group relative cursor-pointer hover:bg-white/[0.03] transition-colors"
             >
@@ -127,7 +130,7 @@ export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: No
                    {node.version}
                 </div>
 
-                {/* 5. Health (Off-White Only) */}
+                {/* 5. Health (Strict Off-White) */}
                 <div className="font-mono text-xs font-bold text-zinc-400">
                    {health}%
                 </div>
@@ -195,7 +198,6 @@ export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: No
                      </div>
                      
                      {/* Row B: Tiny Stats (Under PubKey) */}
-                     {/* UPDATE: Increased to 9px for readability */}
                      <div className="flex items-center gap-2 text-[9px] font-mono text-zinc-600 leading-none -mt-0.5">
                         <span>{formatUptime(node.uptime || 0)}</span>
                         <span className="text-zinc-800">|</span>
