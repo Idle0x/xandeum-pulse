@@ -62,9 +62,15 @@ export default function Home() {
   
   const toastTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // 5. USE FILTER HOOK (Using the Pure Calculation version from previous step)
+  // 5. USE FILTER HOOK
   const filteredNodes = useNodeFilter(nodes, searchQuery, networkFilter, sortBy, sortOrder);
   const stats = useDashboardStats(nodes, networkFilter, totalStorageCommitted, totalStorageUsed);
+
+  // 6. CALCULATE DISPLAY COUNT (The Fix for the Header Card)
+  // This calculates the count based purely on the Network Filter, ignoring the Search Bar
+  const networkCount = networkFilter === 'ALL' 
+    ? nodes.length 
+    : nodes.filter(n => n.network === networkFilter).length;
 
   // --- EFFECTS ---
 
@@ -185,7 +191,8 @@ export default function Home() {
         <StatsOverview 
           stats={stats}
           totalStorageCommitted={totalStorageCommitted}
-          totalNodes={nodes.length}
+          totalNodes={nodes.length}     // Always show Global count for context
+          displayedCount={networkCount} // Show Filtered count for main number
           networkFilter={networkFilter}
           onNetworkChange={setNetworkFilter}
           loading={loading}
@@ -220,7 +227,7 @@ export default function Home() {
              <PulseGraphLoader />
           ) : viewMode === 'grid' ? (
              <NodeGrid 
-               // FORCE REBUILD ON SORT: This is the magic key you requested.
+               // FORCE REBUILD ON SORT: Guarantees visual update
                key={`grid-${sortBy}-${sortOrder}-${filteredNodes.length}`} 
                loading={loading}
                nodes={filteredNodes}
