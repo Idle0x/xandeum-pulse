@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   Shield, Star, Maximize2, CheckCircle, 
   AlertTriangle, Medal, Wallet, AlertOctagon, 
@@ -24,8 +24,8 @@ export const NodeCard = ({
   zenMode, mostCommonVersion, sortBy 
 }: NodeCardProps) => {
 
-  // New: Local state to "Freeze" the cycle on hover
-  const [frozenStep, setFrozenStep] = useState<number | null>(null);
+  // Local state to detect hover
+  const [isHovered, setIsHovered] = useState(false);
 
   // Helpers
   const cleanVer = (node.version || '').replace(/[^0-9.]/g, '');
@@ -34,23 +34,26 @@ export const NodeCard = ({
   const isVersionSort = sortBy === 'version';
   const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
 
-  // --- 1. LOCAL CYCLE LOGIC (INTELLIGENT ZEN) ---
+  // --- INTELLIGENT CYCLE LOGIC ---
   const getCycleContent = () => {
     const zenTextMain = 'text-white font-mono'; 
     const zenTextDim = 'text-zinc-400';
 
-    // LOGIC: Use frozen step if hovering, otherwise use global cycle
-    let currentBaseStep = frozenStep !== null ? frozenStep : cycleStep;
+    // 1. DETERMINE CURRENT STEP
+    // Default: use global cycle
+    let currentStep = cycleStep;
 
-    // OVERRIDE: If hovering AND we have a specific sort active, force that metric
-    // This satisfies "Move to Front" on hover
-    if (frozenStep !== null) {
-      if (sortBy === 'storage') currentBaseStep = 1; 
-      else if (sortBy === 'health') currentBaseStep = 2; 
-      else if (sortBy === 'uptime') currentBaseStep = 3; 
+    // HOVER OVERRIDE LOGIC:
+    if (isHovered) {
+      // If we are sorted by a specific metric, FORCE that metric to show
+      if (sortBy === 'storage') currentStep = 0; // Storage Used
+      else if (sortBy === 'health') currentStep = 2; // Health
+      else if (sortBy === 'uptime') currentStep = 3; // Uptime
+      // If we are sorted by "Generic" (Version/Rank), we just freeze the CURRENT step 
+      // (we do nothing to currentStep, effectively pausing the visual change because cycleStep only updates every 13s)
     }
 
-    const step = currentBaseStep % 5;
+    const step = currentStep % 5;
 
     if (step === 0) return { label: 'Storage Used', value: formatBytes(node.storage_used), color: zenMode ? zenTextMain : 'text-blue-400', icon: Database };
     if (step === 1) return { label: 'Committed', value: formatBytes(node.storage_committed || 0), color: zenMode ? zenTextMain : 'text-purple-400', icon: HardDrive };
@@ -70,8 +73,8 @@ export const NodeCard = ({
   return (
     <div
       onClick={() => onClick(node)}
-      onMouseEnter={() => setFrozenStep(cycleStep)} // FREEZE TIME
-      onMouseLeave={() => setFrozenStep(null)}      // RESUME TIME
+      onMouseEnter={() => setIsHovered(true)} 
+      onMouseLeave={() => setIsHovered(false)}
       className={`group relative border rounded-xl p-3 md:p-5 cursor-pointer ${containerStyle}`}
     >
       {!zenMode && (
