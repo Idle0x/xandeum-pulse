@@ -6,14 +6,14 @@ import { compareVersions } from '../../../utils/nodeHelpers';
 interface ConsensusModalProps {
   onClose: () => void;
   nodes: Node[];
-  mostCommonVersion: string;
+  mostCommonVersion: string; // Added to satisfy index.tsx
 }
 
-export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
+export const ConsensusModal = ({ onClose, nodes, mostCommonVersion }: ConsensusModalProps) => {
   const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
 
-  // --- 1. DATA ENGINE ---
+  // --- 1. DATA ENGINE (Preserved) ---
   const data = useMemo(() => {
     const filteredNodes = nodes.filter(n => 
       activeTab === 'ALL' ? true : n.network === activeTab
@@ -65,7 +65,6 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
 
   // --- 2. IMPROVED TOOLTIP COMPONENT ---
   const Tooltip = ({ text, align = 'center' }: { text: string, align?: 'left' | 'center' | 'right' }) => {
-    // Dynamic Positioning Logic
     const positionClasses = {
       left: 'left-0 translate-x-0',
       center: 'left-1/2 -translate-x-1/2',
@@ -82,7 +81,6 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
         <HelpCircle size={8} className="text-zinc-600 hover:text-zinc-400" />
         <div className={`absolute bottom-full mb-2 w-40 p-2 bg-[#09090b] border border-zinc-700 rounded-lg text-[9px] text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-2xl z-[60] leading-snug ${positionClasses[align]}`}>
           {text}
-          {/* Arrow */}
           <div className={`absolute top-full w-0 h-0 border-4 border-transparent border-t-zinc-700 ${arrowClasses[align]}`}></div>
         </div>
       </div>
@@ -92,7 +90,7 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#09090b] border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 fade-in duration-200" onClick={(e) => e.stopPropagation()}>
-        
+
         {/* --- HEADER --- */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div className="flex items-center gap-3">
@@ -104,7 +102,7 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
               <p className="text-xs text-zinc-500">Network alignment & version control</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2 bg-black/40 p-1 rounded-full border border-zinc-800">
              {(['ALL', 'MAINNET', 'DEVNET'] as const).map((tab) => (
                 <button
@@ -126,14 +124,11 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
         </div>
 
         <div className="space-y-3">
-          
+
           {/* --- ROW 1: HERO METRICS --- */}
           <div className="grid grid-cols-2 gap-3">
-             {/* Consensus Target (Removed overflow-hidden to allow tooltip escape) */}
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative">
-                {/* Status Bar styled manually with rounded corners to avoid clipping */}
                 <div className={`absolute top-0 bottom-0 left-0 w-1 rounded-l-xl ${activeTheme.bg}`}></div>
-                
                 <div className="flex justify-between items-start mb-1">
                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest flex items-center gap-1">
                       <GitBranch size={10} /> Consensus Target
@@ -148,10 +143,8 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                 </div>
              </div>
 
-             {/* Unity Score */}
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative">
                 <div className={`absolute top-0 bottom-0 left-0 w-1 rounded-l-xl ${activeTheme.bg}`}></div>
-                
                 <div className="flex justify-between items-start mb-1">
                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest flex items-center gap-1">
                       <ShieldCheck size={10} /> Unity Score
@@ -172,7 +165,6 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
 
           {/* --- ROW 2: LIFECYCLE BUCKETS --- */}
           <div className="grid grid-cols-3 gap-2">
-             {/* Lagging (Align tooltip Left) */}
              <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex flex-col items-center justify-center text-center relative group">
                 <div className="absolute top-2 right-2"><Tooltip text="Nodes running older versions than consensus." align="left" /></div>
                 <div className="mb-1 p-1 rounded-full bg-red-500/10 text-red-500"><AlertCircle size={10} /></div>
@@ -180,7 +172,6 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                 <div className="text-[8px] font-bold text-red-400 uppercase tracking-wider">Lagging</div>
              </div>
 
-             {/* Target (Align tooltip Center) */}
              <div className={`bg-zinc-900/30 border rounded-xl p-3 flex flex-col items-center justify-center text-center ${activeTheme.border} bg-opacity-5 relative group`}>
                 <div className="absolute top-2 right-2"><Tooltip text="Nodes perfectly aligned with the target version." align="center" /></div>
                 <div className={`mb-1 p-1 rounded-full bg-opacity-10 ${activeTheme.bg} ${activeTheme.text}`}><CheckCircle size={10} /></div>
@@ -188,7 +179,6 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                 <div className={`text-[8px] font-bold uppercase tracking-wider ${activeTheme.text}`}>Synced</div>
              </div>
 
-             {/* Leading (Align tooltip Right to prevent off-screen) */}
              <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex flex-col items-center justify-center text-center relative group">
                 <div className="absolute top-2 right-2"><Tooltip text="Nodes testing newer, experimental versions." align="right" /></div>
                 <div className="mb-1 p-1 rounded-full bg-cyan-500/10 text-cyan-500"><ArrowUpCircle size={10} /></div>
@@ -211,18 +201,15 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                    const isConsensus = ver === data.consensusVer;
                    const percent = ((count / data.count) * 100).toFixed(1);
                    const isExpanded = expandedVersion === ver;
-                   
+
                    return (
                       <div key={ver} className={`grid grid-cols-[1fr_auto_auto] items-center gap-4 p-2 rounded-lg text-[10px] ${isConsensus ? 'bg-zinc-800/50 border border-zinc-700' : 'hover:bg-zinc-800/30 border border-transparent'}`}>
-                         
-                         {/* COL 1: Version Name */}
                          <div className="flex items-center gap-2 min-w-0">
                             <div 
                                className={`font-mono font-bold truncate cursor-pointer hover:text-white transition-colors relative ${isConsensus ? 'text-white' : 'text-zinc-400'}`}
                                onClick={() => setExpandedVersion(isExpanded ? null : ver)}
                             >
                                {ver}
-                               {/* Popover for Full Name */}
                                {isExpanded && (
                                   <div className="absolute bottom-full left-0 mb-1 px-2 py-1 bg-black border border-zinc-700 rounded text-[9px] text-white whitespace-nowrap z-50 shadow-xl">
                                      {ver}
@@ -231,13 +218,9 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                             </div>
                             {isConsensus && <span className={`text-[7px] px-1 rounded font-bold uppercase ${activeTheme.bg} bg-opacity-20 ${activeTheme.text}`}>Consensus</span>}
                          </div>
-
-                         {/* COL 2: Progress Bar */}
                          <div className="w-16 h-1 bg-zinc-800 rounded-full overflow-hidden">
                             <div className={`h-full ${isConsensus ? activeTheme.bg : 'bg-zinc-600'}`} style={{ width: `${percent}%` }}></div>
                          </div>
-
-                         {/* COL 3: Stats */}
                          <div className="text-right font-mono text-zinc-500 w-16">
                             <span className="mr-2 text-zinc-400">{count}</span>
                             <span>{percent}%</span>
