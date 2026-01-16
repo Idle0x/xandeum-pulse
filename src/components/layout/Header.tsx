@@ -55,7 +55,7 @@ export const Header = ({
     <header className={`sticky top-0 z-[50] border-b px-4 py-1 md:py-3 flex flex-col gap-1 md:gap-4 transition-all duration-500 overflow-visible ${zenMode ? 'bg-black border-zinc-800' : 'bg-[#09090b]/90 backdrop-blur-md border-zinc-800'}`}>
       <div className="flex justify-between items-center w-full">
         {/* Left: Menu & Logo */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 shrink-0">
           <button onClick={onToggleMenu} className={`p-2 md:p-3.5 rounded-xl transition ${zenMode ? 'text-zinc-400 border border-zinc-800 hover:text-white' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white hover:bg-zinc-800'}`}>
             <Menu size={20} className="md:w-7 md:h-7" />
           </button>
@@ -67,8 +67,8 @@ export const Header = ({
           </div>
         </div>
 
-        {/* Center: Search Bar */}
-        <div className="flex-1 max-w-xl mx-4 relative group flex flex-col items-center">
+        {/* Center: Search Bar & Tips (Constrained Width) */}
+        <div className="flex-1 max-w-xl mx-4 relative group flex flex-col items-center min-w-0">
           <div className="relative w-full overflow-hidden rounded-lg">
             <Search className={`absolute left-3 top-2.5 size-4 z-10 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
             {!zenMode && !searchQuery && !isSearchFocused && (
@@ -90,20 +90,28 @@ export const Header = ({
             {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-2.5 text-zinc-500 hover:text-white transition z-20 p-0.5 bg-black/20 rounded-full hover:bg-zinc-700"><X size={14} /></button>}
           </div>
           
-          {/* Rotating Tooltips (Visible on Mobile now, text-[8px]) */}
+          {/* Rotating Tooltips (Strictly Constrained + Marquee) */}
           {!zenMode && (
-            <div className="mt-1 md:mt-2 w-full text-center pointer-events-none min-h-[16px] md:min-h-[20px] transition-all duration-300">
-              <p className="text-[8px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase flex items-center justify-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-500 whitespace-nowrap md:whitespace-normal text-center leading-tight">
-                <Info size={10} className="text-blue-500 shrink-0 md:w-3 md:h-3" />
-                <span>{isSearchFocused ? 'Type to filter nodes instantly' : searchTips[tipIndex]}</span>
-              </p>
+            <div className="mt-1 md:mt-2 w-full max-w-full overflow-hidden relative h-[16px] md:h-[20px] transition-all duration-300">
+               {/* Container uses overflow-hidden to clip long text */}
+               <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="whitespace-nowrap animate-marquee-slow flex items-center gap-1.5 text-[8px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase">
+                    <Info size={10} className="text-blue-500 shrink-0 md:w-3 md:h-3" />
+                    <span>{isSearchFocused ? 'Type to filter nodes instantly' : searchTips[tipIndex]}</span>
+                  </div>
+               </div>
             </div>
           )}
-          {!zenMode && <style jsx>{` @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } } .animate-marquee { animation: marquee 15s linear infinite; } `}</style>}
+          {!zenMode && <style jsx>{` 
+            @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } } 
+            .animate-marquee { animation: marquee 15s linear infinite; } 
+            /* Slower animation for tips so they are readable while scrolling */
+            .animate-marquee-slow { animation: marquee 20s linear infinite; }
+          `}</style>}
         </div>
 
         {/* Right: Zen Toggle */}
-        <button onClick={onToggleZen} className={`p-2 rounded-lg transition flex items-center gap-2 group ${zenMode ? 'bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white' : 'bg-red-900/10 border border-red-500/20 text-red-500 hover:bg-red-900/30'}`} title={zenMode ? 'Exit Zen Mode' : 'Enter Zen Mode'}>
+        <button onClick={onToggleZen} className={`p-2 rounded-lg transition flex items-center gap-2 group shrink-0 ${zenMode ? 'bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white' : 'bg-red-900/10 border border-red-500/20 text-red-500 hover:bg-red-900/30'}`} title={zenMode ? 'Exit Zen Mode' : 'Enter Zen Mode'}>
           <Monitor size={18} />
           <span className="hidden md:inline text-xs font-bold">{zenMode ? 'EXIT ZEN' : 'ZEN MODE'}</span>
         </button>
