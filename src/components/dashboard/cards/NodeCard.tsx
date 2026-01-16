@@ -1,12 +1,10 @@
-import { useState } from 'react';
 import { 
   Shield, Star, Maximize2, CheckCircle, 
-  AlertTriangle, Medal, Wallet, AlertOctagon, 
-  Database, HardDrive, Activity, Zap, Clock 
+  AlertTriangle, Medal, Wallet, AlertOctagon 
 } from 'lucide-react';
 import { Node } from '../../../types';
 import { getSafeIp, compareVersions } from '../../../utils/nodeHelpers';
-import { formatBytes, formatUptime, formatLastSeen } from '../../../utils/formatters';
+import { useCardCycle } from '../../../hooks/useCardCycle';
 
 interface NodeCardProps {
   node: Node;
@@ -24,7 +22,8 @@ export const NodeCard = ({
   zenMode, mostCommonVersion, sortBy 
 }: NodeCardProps) => {
 
-  const [isHovered, setIsHovered] = useState(false);
+  // USE THE HOOK YOU PROVIDED (Overrides logic handled internally)
+  const cycleData = useCardCycle(node, cycleStep, zenMode, sortBy);
 
   // Helpers
   const cleanVer = (node.version || '').replace(/[^0-9.]/g, '');
@@ -32,31 +31,6 @@ export const NodeCard = ({
   const isLatest = cleanVer === cleanConsensus || compareVersions(cleanVer, cleanConsensus) > 0;
   const isVersionSort = sortBy === 'version';
   const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
-
-  // --- INTELLIGENT CYCLE LOGIC ---
-  const getCycleContent = () => {
-    const zenTextMain = 'text-white font-mono'; 
-    const zenTextDim = 'text-zinc-400';
-
-    let currentStep = cycleStep;
-
-    if (isHovered) {
-      // HOVER FIX: 'storage' now maps to 1 (Committed), matching the Home.tsx SNAP_MAP
-      if (sortBy === 'storage') currentStep = 1; 
-      else if (sortBy === 'health') currentStep = 2;
-      else if (sortBy === 'uptime') currentStep = 3;
-    }
-
-    const step = currentStep % 5;
-
-    if (step === 0) return { label: 'Storage Used', value: formatBytes(node.storage_used), color: zenMode ? zenTextMain : 'text-blue-400', icon: Database };
-    if (step === 1) return { label: 'Committed', value: formatBytes(node.storage_committed || 0), color: zenMode ? zenTextMain : 'text-purple-400', icon: HardDrive };
-    if (step === 2) { const score = node.health || 0; return { label: 'Health Score', value: `${score}/100`, color: zenMode ? zenTextMain : (score > 80 ? 'text-green-400' : 'text-yellow-400'), icon: Activity }; }
-    if (step === 3) return { label: 'Continuous Uptime', value: formatUptime(node.uptime), color: zenMode ? zenTextMain : 'text-orange-400', icon: Zap };
-    return { label: 'Last Seen', value: formatLastSeen(node.last_seen_timestamp), color: zenMode ? zenTextDim : 'text-zinc-400', icon: Clock };
-  };
-
-  const cycleData = getCycleContent();
 
   const containerStyle = zenMode 
     ? 'bg-black border-zinc-800' 
@@ -67,8 +41,6 @@ export const NodeCard = ({
   return (
     <div
       onClick={() => onClick(node)}
-      onMouseEnter={() => setIsHovered(true)} 
-      onMouseLeave={() => setIsHovered(false)}
       className={`group relative border rounded-xl p-3 md:p-5 cursor-pointer ${containerStyle}`}
     >
       {!zenMode && (
@@ -116,7 +88,7 @@ export const NodeCard = ({
         </button>
       </div>
 
-      {/* Body */}
+      {/* Body: Version */}
       <div className="space-y-1.5 md:space-y-3">
         <div className="flex justify-between items-center text-[9px] md:text-xs">
           <span className="text-zinc-500 shrink-0 mr-2">Version</span>
