@@ -79,6 +79,16 @@ export default function Home() {
     return () => clearInterval(cycleInterval);
   }, []);
 
+  // NEW: Sync Cycling Metrics with Active Sort
+  // This ensures if you sort by Health in List View, then switch to Grid, 
+  // the cards immediately show Health before continuing the cycle.
+  useEffect(() => {
+    if (sortBy === 'storage') setCycleStep(1);      // Snap to Committed
+    else if (sortBy === 'health') setCycleStep(2);  // Snap to Health
+    else if (sortBy === 'uptime') setCycleStep(3);  // Snap to Uptime
+    else setCycleStep(0);                           // Reset to Start (Storage Used) for Version/Default
+  }, [sortBy]);
+
   // Handle URL Deep Linking
   useEffect(() => {
     if (!loading && nodes.length > 0 && router.query.open) {
@@ -175,7 +185,7 @@ export default function Home() {
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSortChange={handleSortChange}
-        viewMode={viewMode} // PASSED TO HEADER TO HIDE BUTTONS
+        viewMode={viewMode} 
       />
 
       <main className={`p-4 md:p-8 ${zenMode ? 'max-w-full' : 'max-w-7xl 2xl:max-w-[1800px] mx-auto'} transition-all duration-500`}>
@@ -221,7 +231,7 @@ export default function Home() {
              <PulseGraphLoader />
           ) : viewMode === 'grid' ? (
              <NodeGrid 
-               // Key forces full re-render on sort/filter change to prevent stale display
+               // Key forces full re-render on sort/filter change
                key={`grid-${sortBy}-${sortOrder}-${networkFilter}`} 
                loading={loading}
                nodes={filteredNodes}
@@ -235,13 +245,12 @@ export default function Home() {
              />
           ) : (
              <NodeList
-               // Key forces full re-render on sort/filter change to prevent stale display
+               // Key forces full re-render on sort/filter change
                key={`list-${sortBy}-${sortOrder}-${networkFilter}`}
                nodes={filteredNodes}
                onNodeClick={setSelectedNode}
                onToggleFavorite={toggleFavorite}
                favorites={favorites}
-               // Sorting Props passed to NodeList
                sortBy={sortBy}
                sortOrder={sortOrder}
                onSortChange={handleSortChange}
