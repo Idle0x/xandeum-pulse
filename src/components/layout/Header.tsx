@@ -21,6 +21,7 @@ interface HeaderProps {
   sortBy: string;
   sortOrder: 'asc' | 'desc';
   onSortChange: (metric: 'uptime' | 'version' | 'storage' | 'health') => void;
+  viewMode: 'grid' | 'list'; // NEW PROP
 }
 
 export const Header = ({
@@ -28,10 +29,10 @@ export const Header = ({
   searchQuery, setSearchQuery, isSearchFocused, setIsSearchFocused,
   loading, isBackgroundSyncing, onRefetch,
   networkFilter, onCycleNetwork,
-  sortBy, sortOrder, onSortChange
+  sortBy, sortOrder, onSortChange,
+  viewMode // Destructure
 }: HeaderProps) => {
-  
-  // Static Tips List
+
   const searchTips = [
     "Search by node IP, public key, version or country",
     "Click on any node for detailed insights & history",
@@ -56,7 +57,7 @@ export const Header = ({
           </div>
         </div>
 
-        {/* Center: Search Bar & Continuous Ticker */}
+        {/* Center: Search Bar */}
         <div className="flex-1 max-w-xl mx-4 relative group flex flex-col items-center min-w-0">
           <div className="relative w-full overflow-hidden rounded-lg">
             <Search className={`absolute left-3 top-2.5 size-4 z-10 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
@@ -78,8 +79,7 @@ export const Header = ({
             />
             {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-2.5 text-zinc-500 hover:text-white transition z-20 p-0.5 bg-black/20 rounded-full hover:bg-zinc-700"><X size={14} /></button>}
           </div>
-          
-          {/* Continuous Ticker (Visible on Mobile) */}
+
           {!zenMode && (
             <div className="mt-1 md:mt-2 w-full max-w-full overflow-hidden relative h-[16px] md:h-[20px] transition-all duration-300 mask-linear-fade">
                {isSearchFocused ? (
@@ -88,9 +88,8 @@ export const Header = ({
                  </div>
                ) : (
                  <div className="flex items-center whitespace-nowrap animate-ticker">
-                    {/* Render sequence twice for seamless loop */}
                     {[...searchTips, ...searchTips].map((tip, i) => (
-                      <div key={i} className="flex items-center mx-8"> {/* mx-8 creates the "Delay" gap */}
+                      <div key={i} className="flex items-center mx-8">
                          <div className="w-1 h-1 rounded-full bg-blue-500/50 mr-3"></div>
                          <span className="text-[8px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase">{tip}</span>
                       </div>
@@ -99,33 +98,7 @@ export const Header = ({
                )}
             </div>
           )}
-          
-          {!zenMode && (
-            <style>{`
-              @keyframes marquee { 
-                0% { transform: translateX(100%); } 
-                100% { transform: translateX(-100%); } 
-              }
-              .animate-marquee { animation: marquee 15s linear infinite; }
-
-              /* Ticker Animation: Moves from 0 to -50% (halfway) to create infinite illusion */
-              @keyframes ticker {
-                0% { transform: translateX(0); }
-                100% { transform: translateX(-50%); }
-              }
-              .animate-ticker {
-                display: flex;
-                width: max-content; /* Ensure container fits all text */
-                animation: ticker 60s linear infinite; /* Slow, readable speed */
-              }
-              
-              /* Optional: Fade edges for professional look */
-              .mask-linear-fade {
-                mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
-                -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
-              }
-            `}</style>
-          )}
+          {!zenMode && <style>{` @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } } .animate-marquee { animation: marquee 15s linear infinite; } @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } } .animate-ticker { display: flex; width: max-content; animation: ticker 60s linear infinite; } .mask-linear-fade { mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); } `}</style>}
         </div>
 
         {/* Right: Zen Toggle */}
@@ -154,8 +127,9 @@ export const Header = ({
            </button>
         </div>
 
-        {/* Sort Toggles */}
-        <div className="flex gap-1 md:gap-2 relative ml-auto">
+        {/* Sort Toggles - CONDITIONAL VISIBILITY */}
+        {/* Visible if: Mobile OR (Desktop AND GridView) OR ZenMode */}
+        <div className={`flex gap-1 md:gap-2 relative ml-auto ${viewMode === 'list' && !zenMode ? 'md:hidden' : ''}`}>
           {['uptime', 'storage', 'version', 'health'].map((opt) => (
             <button key={opt} onClick={() => onSortChange(opt as any)} className={`flex items-center gap-1 px-1.5 h-6 md:px-3 md:py-2 md:h-auto rounded-lg text-[8px] md:text-xs font-bold transition border whitespace-nowrap ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-black border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
               {opt === 'uptime' && <Clock size={10} className="md:w-3 md:h-3" />}{opt === 'storage' && <Database size={10} className="md:w-3 md:h-3" />}{opt === 'version' && <Server size={10} className="md:w-3 md:h-3" />}{opt === 'health' && <HeartPulse size={10} className="md:w-3 md:h-3" />}
