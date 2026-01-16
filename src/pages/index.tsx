@@ -85,7 +85,7 @@ export default function Home() {
     // 2. Define which sorts trigger a "Snap"
     // (Using index mapping: 0=StorageUsed, 1=Committed, 2=Health, 3=Uptime)
     const SNAP_MAP: Record<string, number> = {
-      'storage': 0, // Maps to 'Storage Used' in Card logic
+      'storage': 1, // CORRECTED: Now maps to 'Committed' (Index 1)
       'health': 2,
       'uptime': 3
     };
@@ -95,15 +95,12 @@ export default function Home() {
 
     // 3. LOGIC BRANCHING
     if (!isGenericSort) {
-      // CASE A: User clicked a cycling metric (Storage, Health, Uptime)
-      // ACTION: Snap immediately, reset timer to 0.
+      // CASE A: User clicked a cycling metric -> Snap immediately & reset timer
       setCycleStep(targetStep);
     } 
-    // CASE B: User clicked Generic (Version, Rank) -> We DO NOT touch setCycleStep. 
-    // The cycle continues exactly where it was.
+    // CASE B: Generic Sort -> Do nothing (cycle continues undisturbed)
 
     // 4. START THE TIMER
-    // We always need a timer running.
     cycleTimerRef.current = setInterval(() => {
       setCycleStep(prev => prev + 1);
     }, 13000);
@@ -255,7 +252,7 @@ export default function Home() {
              <PulseGraphLoader />
           ) : viewMode === 'grid' ? (
              <NodeGrid 
-               key={`grid-${sortBy}-${sortOrder}-${networkFilter}`} 
+               // FIX: Key removed to prevent full re-render (Lag Fix)
                loading={loading}
                nodes={filteredNodes}
                zenMode={zenMode}
@@ -268,7 +265,7 @@ export default function Home() {
              />
           ) : (
              <NodeList
-               key={`list-${sortBy}-${sortOrder}-${networkFilter}`}
+               // FIX: Key removed to prevent full re-render (Lag Fix)
                nodes={filteredNodes}
                onNodeClick={setSelectedNode}
                onToggleFavorite={toggleFavorite}
