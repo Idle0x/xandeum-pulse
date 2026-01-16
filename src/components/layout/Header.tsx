@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   Menu, Activity, Search, Monitor, RefreshCw, Repeat, 
   Clock, Database, Server, HeartPulse, ArrowUp, ArrowDown, Info, X 
@@ -31,26 +31,14 @@ export const Header = ({
   sortBy, sortOrder, onSortChange
 }: HeaderProps) => {
   
-  // --- ROTATING TIPS LOGIC ---
-  const [tipIndex, setTipIndex] = useState(0);
+  // Static Tips List
   const searchTips = [
-    "You can search by node IP, public key, version or country",
+    "Search by node IP, public key, version or country",
     "Click on any node for detailed insights & history",
     "Use the map view to visualize network topology",
     "Compare your node metrics against the network leaders",
     "Copy a node URL to share a direct deep-link"
   ];
-
-  useEffect(() => {
-    // Only rotate if user isn't typing
-    if (!isSearchFocused) {
-      // Changed to 15 seconds (15000ms) as requested
-      const interval = setInterval(() => {
-        setTipIndex((prev) => (prev + 1) % searchTips.length);
-      }, 15000); 
-      return () => clearInterval(interval);
-    }
-  }, [isSearchFocused]);
 
   return (
     <header className={`sticky top-0 z-[50] border-b px-4 py-1 md:py-3 flex flex-col gap-1 md:gap-4 transition-all duration-500 overflow-visible ${zenMode ? 'bg-black border-zinc-800' : 'bg-[#09090b]/90 backdrop-blur-md border-zinc-800'}`}>
@@ -68,14 +56,13 @@ export const Header = ({
           </div>
         </div>
 
-        {/* Center: Search Bar & Tips (Constrained Width) */}
+        {/* Center: Search Bar & Continuous Ticker */}
         <div className="flex-1 max-w-xl mx-4 relative group flex flex-col items-center min-w-0">
           <div className="relative w-full overflow-hidden rounded-lg">
             <Search className={`absolute left-3 top-2.5 size-4 z-10 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
             {!zenMode && !searchQuery && !isSearchFocused && (
               <div className="absolute inset-0 flex items-center pointer-events-none pl-10 pr-4 overflow-hidden z-0">
-                {/* Changed to x-marquee to avoid class conflicts */}
-                <div className="whitespace-nowrap animate-x-marquee text-sm text-zinc-600 font-mono opacity-80">
+                <div className="whitespace-nowrap animate-marquee text-sm text-zinc-600 font-mono opacity-80">
                   Search nodes by Version, IP Address, Country, or Public Key...
                 </div>
               </div>
@@ -92,33 +79,50 @@ export const Header = ({
             {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-2.5 text-zinc-500 hover:text-white transition z-20 p-0.5 bg-black/20 rounded-full hover:bg-zinc-700"><X size={14} /></button>}
           </div>
           
-          {/* Rotating Tooltips (Strictly Constrained + Marquee) */}
+          {/* Continuous Ticker (Visible on Mobile) */}
           {!zenMode && (
-            <div className="mt-1 md:mt-2 w-full max-w-full overflow-hidden relative h-[16px] md:h-[20px] transition-all duration-300">
-               <div className="absolute inset-0 flex items-center justify-center">
-                  {/* Changed to animate-x-marquee-slow */}
-                  <div className="whitespace-nowrap animate-x-marquee-slow flex items-center gap-1.5 text-[8px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase">
-                    <Info size={10} className="text-blue-500 shrink-0 md:w-3 md:h-3" />
-                    <span>{isSearchFocused ? 'Type to filter nodes instantly' : searchTips[tipIndex]}</span>
-                  </div>
-               </div>
+            <div className="mt-1 md:mt-2 w-full max-w-full overflow-hidden relative h-[16px] md:h-[20px] transition-all duration-300 mask-linear-fade">
+               {isSearchFocused ? (
+                 <div className="flex items-center justify-center h-full text-[8px] md:text-xs text-blue-400 font-mono tracking-wide uppercase animate-in fade-in">
+                    <Info size={10} className="mr-1.5" /> Type to filter nodes instantly
+                 </div>
+               ) : (
+                 <div className="flex items-center whitespace-nowrap animate-ticker">
+                    {/* Render sequence twice for seamless loop */}
+                    {[...searchTips, ...searchTips].map((tip, i) => (
+                      <div key={i} className="flex items-center mx-8"> {/* mx-8 creates the "Delay" gap */}
+                         <div className="w-1 h-1 rounded-full bg-blue-500/50 mr-3"></div>
+                         <span className="text-[8px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase">{tip}</span>
+                      </div>
+                    ))}
+                 </div>
+               )}
             </div>
           )}
           
-          {/* Global Style Injection for Animation */}
           {!zenMode && (
             <style>{`
-              @keyframes x-marquee {
-                0% { transform: translateX(100%); }
-                100% { transform: translateX(-100%); }
+              @keyframes marquee { 
+                0% { transform: translateX(100%); } 
+                100% { transform: translateX(-100%); } 
               }
-              .animate-x-marquee {
-                display: inline-block;
-                animation: x-marquee 15s linear infinite;
+              .animate-marquee { animation: marquee 15s linear infinite; }
+
+              /* Ticker Animation: Moves from 0 to -50% (halfway) to create infinite illusion */
+              @keyframes ticker {
+                0% { transform: translateX(0); }
+                100% { transform: translateX(-50%); }
               }
-              .animate-x-marquee-slow {
-                display: inline-block;
-                animation: x-marquee 25s linear infinite;
+              .animate-ticker {
+                display: flex;
+                width: max-content; /* Ensure container fits all text */
+                animation: ticker 60s linear infinite; /* Slow, readable speed */
+              }
+              
+              /* Optional: Fade edges for professional look */
+              .mask-linear-fade {
+                mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+                -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
               }
             `}</style>
           )}
