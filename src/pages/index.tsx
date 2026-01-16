@@ -26,7 +26,7 @@ import {
   Clock, Trophy, Star, ArrowUp, ArrowDown,
   Info, ExternalLink, Maximize2, Map as MapIcon,
   BookOpen, Menu, LayoutDashboard, HeartPulse,
-  Swords, Monitor, AlertTriangle, RefreshCw, Twitter, Server, Globe, ShieldCheck, GitBranch, ChevronDown, ChevronUp
+  Swords, Monitor, AlertTriangle, RefreshCw, Twitter, Server, Globe, ShieldCheck, GitBranch, ChevronDown, ChevronUp, Download
 } from 'lucide-react';
 
 export default function Home() {
@@ -72,7 +72,7 @@ export default function Home() {
 
   // Filters & Selection
   const [networkFilter, setNetworkFilter] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
-  const [isNetDropdownOpen, setIsNetDropdownOpen] = useState(false); // NEW STATE FOR HEADER
+  const [isNetDropdownOpen, setIsNetDropdownOpen] = useState(false); 
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [activeStatsModal, setActiveStatsModal] = useState<'capacity' | 'vitals' | 'consensus' | null>(null);
 
@@ -114,7 +114,7 @@ export default function Home() {
 
   const handleGlobalClick = () => {
     if (activeTooltip) setActiveTooltip(null);
-    if (isNetDropdownOpen) setIsNetDropdownOpen(false); // Close dropdown logic
+    if (isNetDropdownOpen) setIsNetDropdownOpen(false); 
   };
 
   const handleDropdownClick = (e: React.MouseEvent) => {
@@ -258,7 +258,7 @@ export default function Home() {
     return () => clearInterval(tipInterval);
   }, [isSearchFocused]);
 
-  // --- NEW: SEARCH AUTO-SCROLL EFFECT ---
+  // --- SEARCH AUTO-SCROLL EFFECT ---
   useEffect(() => {
     if (searchQuery.length > 0) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -411,6 +411,21 @@ export default function Home() {
 
   const watchListNodes = nodes.filter(node => favorites.includes(node.address || ''));
 
+  // --- CSV EXPORT LOGIC ---
+  const exportCSV = () => {
+    const headers = 'Node_IP,Public_Key,Rank,Reputation_Credits,Version,Uptime_Seconds,Capacity_Bytes,Used_Bytes,Health_Score,Country,Last_Seen_ISO,Is_Favorite\n';
+    const rows = filteredNodes.map(n => {
+      const creditVal = n.credits !== null ? n.credits : 'NULL';
+      return `${getSafeIp(n)},${n.pubkey || 'Unknown'},${n.rank},${creditVal},${n.version},${n.uptime},${n.storage_committed},${n.storage_used},${n.health},${n.location?.countryName},${new Date(n.last_seen_timestamp || 0).toISOString()},${favorites.includes(n.address || '')}`;
+    });
+    const blob = new Blob([headers + rows.join('\n')], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `xandeum_pulse_export_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  };
+
   return (
     <div
       className={`min-h-screen font-sans transition-colors duration-500 ${
@@ -498,17 +513,36 @@ export default function Home() {
             <button onClick={() => { router.push('/compare'); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800"><Swords size={18} /><span className="text-sm font-bold">Compare Nodes</span></button>
             <Link href="/docs" onClick={() => setIsMenuOpen(false)}><div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800"><BookOpen size={18} /><span className="text-sm font-bold">Documentation</span></div></Link>
           </nav>
+
+          {/* --- NEW: SIDEBAR EXPORT BUTTON --- */}
+          <div className="mt-auto mb-6 pt-4 border-t border-zinc-800/50">
+              <button 
+                onClick={exportCSV} 
+                className="w-full group relative overflow-hidden rounded-xl bg-gradient-to-br from-zinc-900 to-zinc-950 border border-zinc-800 p-4 text-left transition-all hover:border-zinc-700 active:scale-[0.98] shadow-lg"
+              >
+                  <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="relative z-10 flex items-center justify-between">
+                    <div>
+                        <div className="text-sm font-bold text-white tracking-tight">Export Network Data</div>
+                        <div className="text-[10px] text-zinc-500 font-mono mt-1 flex items-center gap-1">CSV Format • {filteredNodes.length} Rows</div>
+                    </div>
+                    <div className="h-8 w-8 rounded-lg bg-zinc-800/50 flex items-center justify-center border border-white/5 group-hover:bg-zinc-800 transition-colors">
+                        <Download size={16} className="text-zinc-400 group-hover:text-white"/>
+                    </div>
+                  </div>
+              </button>
+          </div>
+
         </div>
       </div>
 
       {isMenuOpen && <div className="fixed inset-0 bg-black/50 z-[190] backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* --- HEADER --- */}
-      {/* HEADER TWEAK: Reduced vertical padding (py-1 on mobile) and gap */}
-      <header className={`sticky top-0 z-[50] border-b px-4 py-1 md:py-3 flex flex-col gap-1 md:gap-4 transition-all duration-500 ${zenMode ? 'bg-black border-zinc-800' : 'bg-[#09090b]/90 backdrop-blur-md border-zinc-800'}`}>
+      {/* ADDED: visible overflow to header so dropdown can appear */}
+      <header className={`sticky top-0 z-[50] border-b px-4 py-1 md:py-3 flex flex-col gap-1 md:gap-4 transition-all duration-500 overflow-visible ${zenMode ? 'bg-black border-zinc-800' : 'bg-[#09090b]/90 backdrop-blur-md border-zinc-800'}`}>
         <div className="flex justify-between items-center w-full">
           <div className="flex items-center gap-4">
-            {/* HEADER TWEAK: Reduced menu button size slightly */}
             <button onClick={() => setIsMenuOpen(true)} className={`p-2 md:p-3.5 rounded-xl transition ${zenMode ? 'text-zinc-400 border border-zinc-800 hover:text-white' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white hover:bg-zinc-800'}`}>
               <Menu size={20} className="md:w-7 md:h-7" />
             </button>
@@ -520,8 +554,8 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="flex-1 max-w-xl mx-4 relative overflow-hidden group flex flex-col items-center">
-            <div className="relative w-full">
+          <div className="flex-1 max-w-xl mx-4 relative group flex flex-col items-center">
+            <div className="relative w-full overflow-hidden rounded-lg">
               <Search className={`absolute left-3 top-2.5 size-4 z-10 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
               {!zenMode && !searchQuery && !isSearchFocused && (
                 <div className="absolute inset-0 flex items-center pointer-events-none pl-10 pr-4 overflow-hidden z-0">
@@ -550,7 +584,7 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="flex items-center justify-between gap-2 md:gap-4 overflow-x-auto pb-1 md:pb-2 scrollbar-hide w-full mt-1 md:mt-6 border-t border-zinc-800/50 pt-2">
+        <div className="flex items-center justify-between gap-2 md:gap-4 overflow-x-auto pb-1 md:pb-2 scrollbar-hide w-full mt-1 md:mt-6 border-t border-zinc-800/50 pt-2 overflow-visible">
            {/* HEADER TWEAK: Aggressive Mobile Size Reduction (h-6, px-3, text-[9px]) */}
           <button onClick={() => fetchData('fast')} disabled={loading} className={`flex items-center gap-1 md:gap-2 px-3 h-6 md:px-6 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs shrink-0 ${loading ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'}`}>
             <RefreshCw size={10} className={`md:w-[14px] md:h-[14px] ${loading || isBackgroundSyncing ? 'animate-spin' : ''}`} /> {loading ? 'SYNC...' : 'REFRESH'}
@@ -568,9 +602,9 @@ export default function Home() {
                 {isNetDropdownOpen ? <ChevronUp size={10} className="md:w-3 md:h-3"/> : <ChevronDown size={10} className="md:w-3 md:h-3"/>}
              </button>
 
-             {/* Dropdown Content */}
+             {/* Dropdown Content - Added high z-index and guaranteed overflow visibility */}
              {isNetDropdownOpen && (
-               <div className="absolute top-full left-0 mt-1 md:mt-2 w-20 md:w-28 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[60] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+               <div className="absolute top-full left-0 mt-1 md:mt-2 w-20 md:w-28 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[100] flex flex-col animate-in fade-in zoom-in-95 duration-200">
                   {['ALL', 'MAINNET', 'DEVNET'].map((net) => (
                     <button
                       key={net}
@@ -663,7 +697,7 @@ export default function Home() {
               <style jsx>{` @keyframes ekg { 0% { left: -100%; opacity: 0; } 50% { opacity: 1; } 100% { left: 100%; opacity: 0; } } .ekg-line { position: absolute; top: 0; bottom: 0; width: 50%; background: linear-gradient( 90deg, transparent 0%, rgba(34, 197, 94, 0.5) 50%, transparent 100% ); animation: ekg 2s linear infinite; } `}</style>
             </div>
 
-            {/* --- 3. CONSENSUS CARD (Smart) --- */}
+            {/* --- 3. CONSENSUS CARD (Updated Text & Version Label) --- */}
             <div onClick={() => setActiveStatsModal('consensus')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden h-24 md:h-auto">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
@@ -671,11 +705,16 @@ export default function Home() {
                    <GitBranch size={10} className="text-blue-500"/>
                    {isGlobalView ? 'Global Consensus' : `${networkFilter} Target`}
                 </div>
-                <div className="text-lg md:text-3xl font-bold text-white mt-1">{consensusStats.version}</div>
+                {/* NEW: Version label + Number */}
+                <div className="text-lg md:text-3xl font-bold text-white mt-1 flex items-baseline gap-1.5">
+                    <span className="text-[10px] md:text-xs text-zinc-500 font-mono uppercase tracking-tight">Version</span>
+                    {consensusStats.version}
+                </div>
                 <div className="flex items-center gap-1.5 mt-1">
                    <div className={`w-1.5 h-1.5 rounded-full ${parseFloat(consensusStats.score) > 66 ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]'}`}></div>
+                   {/* NEW: Changed "Agreement" to "of network" */}
                    <span className={`text-[9px] md:text-xs font-mono font-bold ${parseFloat(consensusStats.score) > 66 ? 'text-green-400' : 'text-yellow-400'}`}>
-                      {consensusStats.score}% Agreement
+                      {consensusStats.score}% of network
                    </span>
                 </div>
               </div>
@@ -693,7 +732,17 @@ export default function Home() {
                 <div className="flex items-baseline gap-1.5"><div className="text-3xl font-black text-white tracking-tighter leading-none" key={filteredNodes.length}>{filteredNodes.length}</div><div className="text-[8px] font-mono text-zinc-600 font-bold uppercase tracking-tight">Nodes</div></div>
                 <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between">
                   <div className="flex flex-col"><div className={`text-[9px] font-black uppercase flex items-center gap-1 ${networkFilter === 'MAINNET' ? 'text-green-500' : networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-zinc-400'}`}>{networkFilter === 'ALL' ? 'GLOBAL VIEW' : `${networkFilter} READY`}</div></div>
-                  <div className="p-1.5 rounded-lg bg-black/40 border border-white/5"><RefreshCw size={10} className={`text-zinc-600 group-hover:text-zinc-400 transition-all duration-700 ${loading ? 'animate-spin' : ''}`} /></div>
+                  
+                  {/* --- NEW: Filter Card Bottom Right Logic --- */}
+                  <div className="flex items-center">
+                      {!isGlobalView && (
+                         <div className="flex items-center gap-1 text-[8px] text-zinc-500 font-mono">
+                            <Globe size={8} /> Global: {nodes.length}
+                         </div>
+                      )}
+                      {isGlobalView && <div className="p-1.5 rounded-lg bg-black/40 border border-white/5"><RefreshCw size={10} className={`text-zinc-600 group-hover:text-zinc-400 transition-all duration-700 ${loading ? 'animate-spin' : ''}`} /></div>}
+                  </div>
+
                 </div>
               </div>
             </div>
@@ -719,7 +768,6 @@ export default function Home() {
                 <div className="mt-1">
                    <Activity className={zenMode ? 'text-zinc-500' : (networkFilter === 'MAINNET' ? "text-green-500" : networkFilter === 'DEVNET' ? "text-blue-500" : "text-white")} size={20} />
                 </div>
-                {/* HEADING TWEAK: Reduced font size, Flex Column, Distributed by on new line */}
                 <div className="flex flex-col">
                    <h3 className="text-sm md:text-lg font-bold text-white tracking-widest uppercase leading-tight">
                      {networkFilter === 'ALL' ? 'Nodes across all networks' : networkFilter === 'MAINNET' ? <span className={zenMode ? 'text-white' : "text-green-500"}>Nodes on Mainnet</span> : <span className={zenMode ? 'text-white' : "text-blue-500"}>Nodes on Devnet</span>} 
