@@ -1,21 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 
-// --- CUSTOM HOOKS ---
+// --- CUSTOM HOOKS (The Brain) ---
 import { useNetworkData } from '../hooks/useNetworkData';
 import { useNodeFilter } from '../hooks/useNodeFilter';
 import { useDashboardStats } from '../hooks/useDashboardStats';
 
-// --- LAYOUT COMPONENTS ---
+// --- LAYOUT COMPONENTS (The Skeleton) ---
 import { Layout } from '../components/layout/Layout';
 import { Header } from '../components/layout/Header';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Footer } from '../components/layout/Footer';
 
-// --- DASHBOARD WIDGETS ---
+// --- DASHBOARD WIDGETS (The Widgets) ---
 import { StatsOverview } from '../components/dashboard/StatsOverview';
+import { WatchlistSection } from '../components/dashboard/WatchlistSection';
 import { NodeGrid } from '../components/dashboard/NodeGrid';
-import { NodeCard } from '../components/dashboard/cards/NodeCard'; // Re-imported for Watchlist
 
 // --- MODALS & EXTRAS ---
 import { WelcomeCurtain } from '../components/WelcomeCurtain';
@@ -26,7 +26,7 @@ import { InspectorModal } from '../components/modals/InspectorModal';
 import { LiveWireLoader } from '../components/common/Loaders';
 import { Node } from '../types';
 import { getSafeIp } from '../utils/nodeHelpers';
-import { AlertTriangle, Star, Activity, X } from 'lucide-react';
+import { AlertTriangle, Activity, X } from 'lucide-react';
 
 export default function Home() {
   const router = useRouter();
@@ -184,32 +184,16 @@ export default function Home() {
           </div>
         )}
 
-        {/* RESTORED: Watchlist Section */}
+        {/* WATCHLIST SECTION (Server Rack Style) */}
         {!zenMode && favorites.length > 0 && (
-          <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
-            <div className="flex items-center gap-2 mb-4">
-                <Star className="text-yellow-500" fill="currentColor" size={20} />
-                <h3 className="text-lg font-bold text-white tracking-widest uppercase">Your Watchlist</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 border-b border-zinc-800 pb-10">
-              {watchListNodes.map((node) => (
-                <NodeCard 
-                    key={`fav-${node.pubkey}`} 
-                    node={node} 
-                    onClick={setSelectedNode} 
-                    onToggleFavorite={toggleFavorite} 
-                    isFav={true} 
-                    cycleStep={cycleStep} 
-                    zenMode={zenMode} 
-                    mostCommonVersion={mostCommonVersion} 
-                    sortBy={sortBy} 
-                />
-              ))}
-            </div>
-          </div>
+          <WatchlistSection 
+            nodes={watchListNodes} 
+            onNodeClick={setSelectedNode} 
+            onToggleFavorite={toggleFavorite} 
+          />
         )}
 
-        {/* RESTORED: Nodes Header (Stacked for mobile visibility) */}
+        {/* NODES HEADER */}
         {!loading && nodes.length > 0 && (
              <div className="flex items-start gap-3 mb-4 mt-1 md:mt-8">
                 <div className="mt-1">
@@ -227,7 +211,7 @@ export default function Home() {
             </div>
         )}
 
-        {/* Node Grid */}
+        {/* MAIN GRID */}
         <NodeGrid 
           loading={loading}
           nodes={filteredNodes}
