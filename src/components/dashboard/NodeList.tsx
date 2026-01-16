@@ -9,7 +9,7 @@ const formatUptime = (seconds: number) => {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const d = Math.floor(h / 24);
-  
+
   if (d > 0) return `${d}d ${h % 24}h`;
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
@@ -18,14 +18,13 @@ const formatUptime = (seconds: number) => {
 // Fixed Last Seen Helper
 const formatLastSeen = (timestamp: number) => {
   if (!timestamp || timestamp === 0) return 'Never';
-  
+
   // Detect if timestamp is seconds (10 digits) or ms (13 digits)
-  // Most blockchain timestamps are seconds, JS requires ms
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
-  
+
   const diff = Date.now() - time;
   const sec = Math.floor(diff / 1000);
-  
+
   if (sec < 0) return 'Just now'; // Clock skew protection
   if (sec < 60) return `${sec}s ago`;
   if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
@@ -45,7 +44,7 @@ export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: No
 
   return (
     <div className="flex flex-col min-w-full bg-[#09090b]/40">
-      
+
       {/* DESKTOP HEADER */}
       <div className="hidden md:grid grid-cols-[auto_2fr_1.2fr_1.2fr_0.8fr_0.8fr_1.2fr_0.8fr_auto] gap-4 px-5 py-2 border-b border-zinc-800/50 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
         <div className="w-2"></div>
@@ -68,19 +67,16 @@ export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: No
           const health = node.health || 0;
           const isMainnet = node.network === 'MAINNET';
 
-          // Color for Health text only
-          const healthColor = health > 90 ? 'text-green-500' : health > 70 ? 'text-blue-500' : 'text-yellow-500';
-
           return (
             <div 
               key={node.pubkey || node.address}
               onClick={() => onNodeClick(node)}
               className="group relative cursor-pointer hover:bg-white/[0.03] transition-colors"
             >
-              
+
               {/* --- DESKTOP LAYOUT --- */}
               <div className="hidden md:grid grid-cols-[auto_2fr_1.2fr_1.2fr_0.8fr_0.8fr_1.2fr_0.8fr_auto] gap-4 px-5 py-3 items-center">
-                
+
                 {/* 1. Status */}
                 <div className="flex items-center justify-center">
                    <div className={`w-1.5 h-1.5 rounded-full ${statusColor} shadow-[0_0_6px_rgba(255,255,255,0.2)]`}></div>
@@ -127,8 +123,8 @@ export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: No
                    {node.version}
                 </div>
 
-                {/* 5. Health (Text Only) */}
-                <div className={`font-mono text-xs font-bold ${healthColor}`}>
+                {/* 5. Health (Off-White Only) */}
+                <div className="font-mono text-xs font-bold text-zinc-400">
                    {health}%
                 </div>
 
@@ -162,65 +158,57 @@ export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: No
               </div>
 
 
-              {/* --- MOBILE LAYOUT (2-DECK STACK) --- */}
-              <div className="flex md:hidden flex-col gap-2 p-3">
-                 
-                 {/* DECK 1: Identity & Storage (Primary) */}
-                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                       <div className={`w-1.5 h-1.5 shrink-0 rounded-full ${statusColor}`}></div>
-                       {/* Pubkey */}
-                       <span className="font-mono text-xs font-bold text-white truncate w-32">
-                          {node.pubkey ? `${node.pubkey.slice(0, 16)}...` : 'Unknown'}
-                       </span>
-                       {/* Badge */}
-                       <span className={`text-[7px] px-1 rounded border uppercase font-bold tracking-wider shrink-0 ${
-                          isMainnet 
-                            ? 'text-green-900 bg-green-500/20 border-green-500/30' 
-                            : 'text-blue-500 bg-blue-500/10 border-blue-500/20'
-                        }`}>
-                          {isMainnet ? 'MN' : 'DN'}
-                       </span>
-                    </div>
+              {/* --- MOBILE LAYOUT (STRICT GRID) --- */}
+              {/* Columns: Status | Identity | Version | Health | Storage | Star */}
+              <div className="grid md:hidden grid-cols-[auto_1.5fr_0.8fr_0.5fr_1fr_auto] gap-3 px-4 py-3 items-center border-b border-zinc-800/20">
 
-                    {/* Storage Stack */}
-                    <div className="flex flex-col items-end leading-none shrink-0 pl-2">
-                       <span className="font-bold text-xs text-purple-400 font-mono">{formatBytes(node.storage_committed)}</span>
-                       <span className="text-[8px] text-blue-500 font-mono mt-0.5">{formatBytes(node.storage_used)}</span>
-                    </div>
+                 {/* 1. Status Dot */}
+                 <div className={`w-1.5 h-1.5 rounded-full ${statusColor} shrink-0`}></div>
+
+                 {/* 2. Identity (With Swap Logic) */}
+                 <div className="relative h-5 overflow-hidden w-full">
+                     {/* Default View */}
+                     <div className="absolute inset-0 flex items-center gap-2 transition-transform duration-300 group-hover:-translate-y-full">
+                        <span className="font-mono text-xs font-bold text-white truncate w-full">
+                          {node.pubkey ? `${node.pubkey.slice(0, 8)}...` : 'Unknown'}
+                        </span>
+                     </div>
+                     {/* Swapped View (IP + Flag) */}
+                     <div className="absolute inset-0 flex items-center gap-2 translate-y-full transition-transform duration-300 group-hover:translate-y-0">
+                        {countryCode && (
+                          <img 
+                            src={`https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`} 
+                            alt={countryCode}
+                            className="w-3 h-auto opacity-90 rounded-[2px]"
+                          />
+                        )}
+                        <span className="font-mono text-[10px] text-zinc-300 font-bold truncate">
+                          {getSafeIp(node)}
+                        </span>
+                     </div>
                  </div>
 
-                 {/* DECK 2: Context Metrics (Secondary) */}
-                 <div className="flex items-center justify-between pl-4.5">
-                    
-                    <div className="flex items-center gap-3 text-[9px] text-zinc-500 font-mono overflow-hidden">
-                       {/* Last Seen */}
-                       <span className="flex items-center gap-1 shrink-0 text-zinc-400">
-                          <Clock size={8} /> {formatLastSeen(node.last_seen_timestamp || 0)}
-                       </span>
-                       <span className="w-0.5 h-2 bg-zinc-800 shrink-0"></span>
-                       
-                       {/* Version */}
-                       <span className="truncate max-w-[60px]">{node.version}</span>
-                       <span className="w-0.5 h-2 bg-zinc-800 shrink-0"></span>
-                       
-                       {/* Uptime */}
-                       <span>{formatUptime(node.uptime || 0)}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                       {/* Health */}
-                       <span className={`text-[9px] font-bold ${healthColor}`}>{health}%</span>
-                       
-                       {/* Credits */}
-                       <span className="text-[9px] text-zinc-600 font-mono">{node.credits?.toLocaleString() ?? 0} Cr</span>
-                       
-                       {/* Action */}
-                       <button onClick={(e) => onToggleFavorite(e, node.address || '')} className="ml-1">
-                          <Star size={12} className={isFav ? "text-yellow-500" : "text-zinc-700"} fill={isFav ? "currentColor" : "none"} />
-                       </button>
-                    </div>
+                 {/* 3. Version (Truncated) */}
+                 <div className="font-mono text-[9px] text-zinc-500 truncate text-center">
+                    {node.version}
                  </div>
+
+                 {/* 4. Health (Off-White) */}
+                 <div className="font-mono text-[10px] font-bold text-zinc-400 text-center">
+                    {health}%
+                 </div>
+
+                 {/* 5. Storage (Stacked) */}
+                 <div className="flex flex-col items-end leading-none">
+                     <span className="font-bold text-[10px] text-purple-400 font-mono">{formatBytes(node.storage_committed)}</span>
+                     <span className="text-[8px] text-blue-500 font-mono mt-0.5">{formatBytes(node.storage_used)}</span>
+                 </div>
+
+                 {/* 6. Star */}
+                 <button onClick={(e) => onToggleFavorite(e, node.address || '')} className="pl-1">
+                    <Star size={12} className={isFav ? "text-yellow-500" : "text-zinc-700"} fill={isFav ? "currentColor" : "none"} />
+                 </button>
+
               </div>
 
             </div>
