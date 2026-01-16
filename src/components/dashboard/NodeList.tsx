@@ -1,4 +1,4 @@
-import { Star, HardDrive, Server, Coins, Clock, Activity, Globe } from 'lucide-react';
+import { Star, HardDrive, Server, Coins, Clock, Activity, Globe, ArrowUp, ArrowDown } from 'lucide-react';
 import { Node } from '../../types';
 import { formatBytes } from '../../utils/formatters';
 import { getSafeIp } from '../../utils/nodeHelpers';
@@ -18,14 +18,10 @@ const formatUptime = (seconds: number) => {
 // Fixed Last Seen Helper
 const formatLastSeen = (timestamp: number) => {
   if (!timestamp || timestamp === 0) return 'Never';
-
-  // Detect if timestamp is seconds (10 digits) or ms (13 digits)
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
-
   const diff = Date.now() - time;
   const sec = Math.floor(diff / 1000);
-
-  if (sec < 0) return 'Just now'; // Clock skew protection
+  if (sec < 0) return 'Just now';
   if (sec < 60) return `${sec}s ago`;
   if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
   if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
@@ -37,191 +33,182 @@ interface NodeListProps {
   onNodeClick: (node: Node) => void;
   onToggleFavorite: (e: React.MouseEvent, address: string) => void;
   favorites: string[];
+  sortBy: string;
+  sortOrder: 'asc' | 'desc';
+  onSortChange: (metric: 'uptime' | 'version' | 'storage' | 'health') => void;
 }
 
-export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: NodeListProps) => {
+export const NodeList = ({ 
+  nodes, onNodeClick, onToggleFavorite, favorites, 
+  sortBy, sortOrder, onSortChange 
+}: NodeListProps) => {
   if (nodes.length === 0) return null;
+
+  // --- HELPER: Header Cell Component ---
+  const HeaderCell = ({ label, metric, alignRight = false }: { label: string, metric?: 'uptime' | 'version' | 'storage' | 'health', alignRight?: boolean }) => (
+    <div 
+      onClick={() => metric && onSortChange(metric)}
+      className={`flex items-center gap-1 cursor-pointer transition-colors group select-none ${alignRight ? 'justify-end' : ''} ${sortBy === metric ? 'text-white' : 'hover:text-zinc-300'}`}
+    >
+      {label}
+      {metric && sortBy === metric && (
+        sortOrder === 'asc' ? <ArrowUp size={10} className="text-blue-500" /> : <ArrowDown size={10} className="text-blue-500" />
+      )}
+    </div>
+  );
 
   return (
     <div className="flex flex-col min-w-full bg-[#09090b]/40">
 
-      {/* DESKTOP HEADER */}
-      <div className="hidden md:grid grid-cols-[auto_2fr_1.2fr_1.2fr_0.8fr_0.8fr_1.2fr_0.8fr_auto] gap-4 px-5 py-2 border-b border-zinc-800/50 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
+      {/* --- DESKTOP HEADER (Interactive) --- */}
+      <div className="hidden md:grid grid-cols-[auto_2fr_1.2fr_1.2fr_0.8fr_0.8fr_1.2fr_0.8fr_auto] gap-4 px-5 py-3 border-b border-zinc-800/50 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
         <div className="w-2"></div>
         <div>Identity</div>
-        <div>Last Seen</div>
-        <div>Version</div>
-        <div>Health</div>
-        <div className="text-right">Uptime</div>
-        <div className="text-right">Storage</div>
-        <div className="text-right">Credits</div>
+        <div className="cursor-default">Last Seen</div> {/* Last Seen is not sorted in current logic, optional to add later */}
+        <HeaderCell label="Version" metric="version" />
+        <HeaderCell label="Health" metric="health" />
+        <HeaderCell label="Uptime" metric="uptime" alignRight />
+        <HeaderCell label="Storage" metric="storage" alignRight />
+        <div className="text-right cursor-default">Credits</div>
         <div className="w-6"></div>
       </div>
 
-      {/* DATA ROWS */}
+      {/* --- DATA ROWS --- */}
       <div className="divide-y divide-zinc-800/30">
-        {nodes.map((node, index) => { // Added index here
+        {nodes.map((node, index) => {
           const isFav = favorites.includes(node.address || '');
           const statusColor = node.credits !== null ? 'bg-green-500' : 'bg-red-500';
           const countryCode = node.location?.countryCode;
-          
-          // STRICT FLAG CHECK: Exclude 'XX' (Private/Unknown)
           const showFlag = countryCode && countryCode !== 'XX';
-          
           const health = node.health || 0;
           const isMainnet = node.network === 'MAINNET';
-
-          // FIX: Unique Composite Key to force React to re-sort correctly
           const uniqueKey = node.pubkey ? `${node.pubkey}-${node.network}` : `fallback-${index}`;
+
+          // --- SPOTLIGHT COLOR LOGIC ---
+          // 1. Storage
+          const storageColorMain = sortBy === 'storage' ? 'text-purple-400' : 'text-zinc-500';
+          const storageColorSub  = sortBy === 'storage' ? 'text-blue-400'   : 'text-zinc-600';
+          
+          // 2. Uptime
+          const uptimeColor = sortBy === 'uptime' ? 'text-orange-400' : 'text-zinc-400';
+
+          // 3. Health
+          const healthColor = sortBy === 'health' ? 'text-green-400' : 'text-zinc-400';
+
+          // 4. Version
+          const versionColor = sortBy === 'version' ? 'text-cyan-400' : 'text-zinc-400';
 
           return (
             <div 
-              key={uniqueKey} // Use the fixed unique key
+              key={uniqueKey}
               onClick={() => onNodeClick(node)}
               className="group relative cursor-pointer hover:bg-white/[0.03] transition-colors"
             >
 
-              {/* --- DESKTOP LAYOUT --- */}
+              {/* === DESKTOP ROW === */}
               <div className="hidden md:grid grid-cols-[auto_2fr_1.2fr_1.2fr_0.8fr_0.8fr_1.2fr_0.8fr_auto] gap-4 px-5 py-3 items-center">
 
-                {/* 1. Status */}
+                {/* Status */}
                 <div className="flex items-center justify-center">
                    <div className={`w-1.5 h-1.5 rounded-full ${statusColor} shadow-[0_0_6px_rgba(255,255,255,0.2)]`}></div>
                 </div>
 
-                {/* 2. Identity (Swap Logic) */}
+                {/* Identity */}
                 <div className="relative h-5 overflow-hidden">
-                   {/* Default: Pubkey + Badge */}
                    <div className="absolute inset-0 flex items-center gap-2 transition-transform duration-300 group-hover:-translate-y-full">
-                      <span className="font-mono text-xs text-zinc-300 font-bold truncate" title={node.pubkey}>
-                        {node.pubkey || 'Unknown'}
-                      </span>
-                      <span className={`text-[7px] px-1 rounded border uppercase font-bold tracking-wider ${
-                        isMainnet 
-                          ? 'text-green-900 bg-green-500/20 border-green-500/30' 
-                          : 'text-blue-500 bg-blue-500/10 border-blue-500/20'
-                      }`}>
-                        {isMainnet ? 'MN' : 'DN'}
-                      </span>
+                      <span className="font-mono text-xs text-zinc-300 font-bold truncate" title={node.pubkey}>{node.pubkey || 'Unknown'}</span>
+                      <span className={`text-[7px] px-1 rounded border uppercase font-bold tracking-wider ${isMainnet ? 'text-green-900 bg-green-500/20 border-green-500/30' : 'text-blue-500 bg-blue-500/10 border-blue-500/20'}`}>{isMainnet ? 'MN' : 'DN'}</span>
                    </div>
-                   {/* Hover: Flag + IP */}
                    <div className="absolute inset-0 flex items-center gap-2 translate-y-full transition-transform duration-300 group-hover:translate-y-0">
-                      {showFlag && (
-                        <img 
-                          src={`https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`} 
-                          alt={countryCode}
-                          className="w-4 h-auto opacity-90 rounded-[2px]"
-                        />
-                      )}
-                      <span className="font-mono text-xs text-white font-bold tracking-tight">
-                        {getSafeIp(node)}
-                      </span>
+                      {showFlag && <img src={`https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`} alt={countryCode} className="w-4 h-auto opacity-90 rounded-[2px]" />}
+                      <span className="font-mono text-xs text-white font-bold tracking-tight">{getSafeIp(node)}</span>
                    </div>
                 </div>
 
-                {/* 3. Last Seen */}
+                {/* Last Seen */}
                 <div className="flex items-center gap-1.5 text-zinc-500 text-[10px] font-mono">
-                   <Clock size={10} />
-                   <span>{formatLastSeen(node.last_seen_timestamp || 0)}</span>
+                   <Clock size={10} /> <span>{formatLastSeen(node.last_seen_timestamp || 0)}</span>
                 </div>
 
-                {/* 4. Version (Truncated) */}
-                <div className="font-mono text-[10px] text-zinc-400 truncate" title={node.version}>
+                {/* Version (Dynamic Color) */}
+                <div className={`font-mono text-[10px] truncate transition-colors duration-300 ${versionColor}`} title={node.version}>
                    {node.version}
                 </div>
 
-                {/* 5. Health (Strict Off-White) */}
-                <div className="font-mono text-xs font-bold text-zinc-400">
+                {/* Health (Dynamic Color) */}
+                <div className={`font-mono text-xs font-bold transition-colors duration-300 ${healthColor}`}>
                    {health}%
                 </div>
 
-                {/* 6. Uptime */}
-                <div className="text-right font-mono text-[10px] text-zinc-400">
+                {/* Uptime (Dynamic Color) */}
+                <div className={`text-right font-mono text-[10px] transition-colors duration-300 ${uptimeColor}`}>
                    {formatUptime(node.uptime || 0)}
                 </div>
 
-                {/* 7. Storage (Stacked) */}
+                {/* Storage (Dynamic Color Stack) */}
                 <div className="flex flex-col items-end leading-none">
-                   <div className="font-bold text-xs text-purple-400 font-mono mb-0.5">
+                   <div className={`font-bold text-xs font-mono mb-0.5 transition-colors duration-300 ${storageColorMain}`}>
                       {formatBytes(node.storage_committed)}
                    </div>
-                   <div className="text-[9px] text-blue-500 font-mono">
+                   <div className={`text-[9px] font-mono transition-colors duration-300 ${storageColorSub}`}>
                       {formatBytes(node.storage_used)}
                    </div>
                 </div>
 
-                {/* 8. Credits */}
+                {/* Credits */}
                 <div className="text-right font-mono text-[10px] text-zinc-500">
                    {node.credits?.toLocaleString() ?? 0}
                 </div>
 
-                {/* 9. Action */}
-                <button 
-                  onClick={(e) => onToggleFavorite(e, node.address || '')}
-                  className={`p-1.5 rounded-md hover:bg-white/10 transition-colors ${isFav ? 'text-yellow-500' : 'text-zinc-600 hover:text-yellow-500'}`}
-                >
+                {/* Star */}
+                <button onClick={(e) => onToggleFavorite(e, node.address || '')} className={`p-1.5 rounded-md hover:bg-white/10 transition-colors ${isFav ? 'text-yellow-500' : 'text-zinc-600 hover:text-yellow-500'}`}>
                   <Star size={14} fill={isFav ? "currentColor" : "none"} />
                 </button>
               </div>
 
 
-              {/* --- MOBILE LAYOUT (STRICT GRID) --- */}
-              {/* Columns: Status | Identity (Stacked) | Version | Health | Storage | Star */}
+              {/* === MOBILE ROW === */}
               <div className="grid md:hidden grid-cols-[auto_1.5fr_0.8fr_0.5fr_1fr_auto] gap-3 px-4 py-3 items-center border-b border-zinc-800/20">
 
-                 {/* 1. Status Dot */}
+                 {/* Status */}
                  <div className={`w-1.5 h-1.5 rounded-full ${statusColor} shrink-0`}></div>
 
-                 {/* 2. Identity (Complex Stack with Metrics) */}
+                 {/* Identity Stack */}
                  <div className="flex flex-col min-w-0">
-                     {/* Row A: Interactive Swap (PubKey <-> IP) */}
                      <div className="relative h-5 overflow-hidden w-full">
-                         {/* Default View: PubKey */}
                          <div className="absolute inset-0 flex items-center gap-2 transition-transform duration-300 group-hover:-translate-y-full">
-                            <span className="font-mono text-xs font-bold text-white truncate w-full">
-                              {node.pubkey ? `${node.pubkey.slice(0, 8)}...` : 'Unknown'}
-                            </span>
+                            <span className="font-mono text-xs font-bold text-white truncate w-full">{node.pubkey ? `${node.pubkey.slice(0, 8)}...` : 'Unknown'}</span>
                          </div>
-                         {/* Swapped View: IP + Flag */}
                          <div className="absolute inset-0 flex items-center gap-2 translate-y-full transition-transform duration-300 group-hover:translate-y-0">
-                            {showFlag && (
-                              <img 
-                                src={`https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`} 
-                                alt={countryCode}
-                                className="w-3 h-auto opacity-90 rounded-[2px]"
-                              />
-                            )}
-                            <span className="font-mono text-[10px] text-zinc-300 font-bold truncate">
-                              {getSafeIp(node)}
-                            </span>
+                            {showFlag && <img src={`https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`} alt={countryCode} className="w-3 h-auto opacity-90 rounded-[2px]" />}
+                            <span className="font-mono text-[10px] text-zinc-300 font-bold truncate">{getSafeIp(node)}</span>
                          </div>
                      </div>
-                     
-                     {/* Row B: Tiny Stats (Under PubKey) */}
-                     <div className="flex items-center gap-2 text-[9px] font-mono text-zinc-600 leading-none -mt-0.5">
-                        <span>{formatUptime(node.uptime || 0)}</span>
+                     {/* Mobile Sub-row: Uptime (Dynamic) & Last Seen */}
+                     <div className="flex items-center gap-2 text-[9px] font-mono leading-none -mt-0.5">
+                        <span className={`transition-colors duration-300 ${uptimeColor}`}>{formatUptime(node.uptime || 0)}</span>
                         <span className="text-zinc-800">|</span>
-                        <span>{formatLastSeen(node.last_seen_timestamp || 0).replace(' ago', '')}</span>
+                        <span className="text-zinc-600">{formatLastSeen(node.last_seen_timestamp || 0).replace(' ago', '')}</span>
                      </div>
                  </div>
 
-                 {/* 3. Version (Truncated) */}
-                 <div className="font-mono text-[9px] text-zinc-500 truncate text-center">
+                 {/* Version (Dynamic) */}
+                 <div className={`font-mono text-[9px] truncate text-center transition-colors duration-300 ${versionColor}`}>
                     {node.version}
                  </div>
 
-                 {/* 4. Health (Off-White) */}
-                 <div className="font-mono text-[10px] font-bold text-zinc-400 text-center">
+                 {/* Health (Dynamic) */}
+                 <div className={`font-mono text-[10px] font-bold text-center transition-colors duration-300 ${healthColor}`}>
                     {health}%
                  </div>
 
-                 {/* 5. Storage (Stacked) */}
+                 {/* Storage (Dynamic) */}
                  <div className="flex flex-col items-end leading-none">
-                     <span className="font-bold text-[10px] text-purple-400 font-mono">{formatBytes(node.storage_committed)}</span>
-                     <span className="text-[8px] text-blue-500 font-mono mt-0.5">{formatBytes(node.storage_used)}</span>
+                     <span className={`font-bold text-[10px] font-mono transition-colors duration-300 ${storageColorMain}`}>{formatBytes(node.storage_committed)}</span>
+                     <span className={`text-[8px] font-mono mt-0.5 transition-colors duration-300 ${storageColorSub}`}>{formatBytes(node.storage_used)}</span>
                  </div>
 
-                 {/* 6. Star */}
+                 {/* Star */}
                  <button onClick={(e) => onToggleFavorite(e, node.address || '')} className="pl-1">
                     <Star size={12} className={isFav ? "text-yellow-500" : "text-zinc-700"} fill={isFav ? "currentColor" : "none"} />
                  </button>
