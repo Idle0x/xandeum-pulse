@@ -125,7 +125,7 @@ export default function Home() {
     else if (networkFilter === 'DEVNET') next = 'ALL';
     
     setNetworkFilter(next);
-    // showToast removed as requested
+    // Toast removed
   };
 
   const toggleZenMode = () => {
@@ -501,7 +501,8 @@ export default function Home() {
                 <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">Protocol Context</span>
               </div>
               <div className="relative z-20">
-                <NetworkSwitcher current={networkFilter} onChange={(val) => { setNetworkFilter(val); showToast(`Switched to ${val} View`); }} />
+                {/* TOAST REMOVED FROM SIDEBAR SWITCHER */}
+                <NetworkSwitcher current={networkFilter} onChange={(val) => { setNetworkFilter(val); }} />
               </div>
               <div className="mt-4 flex items-center justify-between relative z-10">
                 <span className="text-[9px] text-zinc-600 font-mono font-bold uppercase tracking-tight">Active Stream</span>
@@ -720,12 +721,14 @@ export default function Home() {
               </div>
               <div className="relative z-10">
                 <div className="flex items-baseline gap-1.5"><div className="text-3xl font-black text-white tracking-tighter leading-none" key={filteredNodes.length}>{filteredNodes.length}</div><div className="text-[8px] font-mono text-zinc-600 font-bold uppercase tracking-tight">Nodes</div></div>
+                {/* TWEAKED: Reduced margin/padding (mt-1 pt-1) for better mobile fit */}
                 <div className="mt-1 pt-1 border-t border-white/5 flex items-center justify-between">
                   <div className="flex flex-col"><div className={`text-[8px] font-black uppercase flex items-center gap-1 ${networkFilter === 'MAINNET' ? 'text-green-500' : networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-zinc-400'}`}>{networkFilter === 'ALL' ? 'GLOBAL VIEW' : `${networkFilter} READY`}</div></div>
                   
                   {/* --- NEW: Filter Card Bottom Right Logic --- */}
                   <div className="flex items-center">
                       {!isGlobalView && (
+                         // TWEAKED: Reduced text size to [7px]
                          <div className="flex items-center gap-1 text-[7px] text-zinc-500 font-mono">
                             <Globe size={8} /> Global: {nodes.length}
                          </div>
