@@ -15,7 +15,9 @@ import { Footer } from '../components/layout/Footer';
 // --- DASHBOARD WIDGETS (The Widgets) ---
 import { StatsOverview } from '../components/dashboard/StatsOverview';
 import { WatchlistSection } from '../components/dashboard/WatchlistSection';
+import { NodesContainer } from '../components/dashboard/NodesContainer'; // New Wrapper
 import { NodeGrid } from '../components/dashboard/NodeGrid';
+import { NodeList } from '../components/dashboard/NodeList'; // New List View
 
 // --- MODALS & EXTRAS ---
 import { WelcomeCurtain } from '../components/WelcomeCurtain';
@@ -23,10 +25,10 @@ import { CapacityModal } from '../components/dashboard/stats/CapacityModal';
 import { VitalsModal } from '../components/dashboard/stats/VitalsModal';
 import { ConsensusModal } from '../components/dashboard/stats/ConsensusModal';
 import { InspectorModal } from '../components/modals/InspectorModal';
-import { LiveWireLoader } from '../components/common/Loaders';
+import { LiveWireLoader, PulseGraphLoader } from '../components/common/Loaders';
 import { Node } from '../types';
 import { getSafeIp } from '../utils/nodeHelpers';
-import { AlertTriangle, Activity, X } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 
 export default function Home() {
   const router = useRouter();
@@ -56,6 +58,9 @@ export default function Home() {
   const [cycleStep, setCycleStep] = useState(1);
   const [toast, setToast] = useState<{visible: boolean, msg: string} | null>(null);
   const toastTimer = useRef<NodeJS.Timeout | null>(null);
+  
+  // NEW: View Mode State
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   // --- 3. EFFECTS & PERSISTENCE ---
   useEffect(() => {
@@ -65,6 +70,9 @@ export default function Home() {
     
     const savedFavs = localStorage.getItem('xandeum_favorites');
     if (savedFavs) setFavorites(JSON.parse(savedFavs));
+
+    const savedView = localStorage.getItem('xandeum_view_mode');
+    if (savedView === 'list') setViewMode('list');
 
     // Global Card Cycle Timer (13s)
     const cycleInterval = setInterval(() => setCycleStep(prev => prev + 1), 13000);
@@ -88,6 +96,11 @@ export default function Home() {
     const newState = !zenMode;
     setZenMode(newState);
     localStorage.setItem('xandeum_zen_mode', String(newState));
+  };
+
+  const handleViewChange = (mode: 'grid' | 'list') => {
+    setViewMode(mode);
+    localStorage.setItem('xandeum_view_mode', mode);
   };
 
   const toggleFavorite = (e: React.MouseEvent, address: string) => {
@@ -184,7 +197,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* WATCHLIST SECTION (Server Rack Style) */}
+        {/* Watchlist Section (Server Rack Style) */}
         {!zenMode && favorites.length > 0 && (
           <WatchlistSection 
             nodes={watchListNodes} 
@@ -193,36 +206,57 @@ export default function Home() {
           />
         )}
 
-        {/* NODES HEADER */}
-        {!loading && nodes.length > 0 && (
-             <div className="flex items-start gap-3 mb-4 mt-1 md:mt-8">
-                <div className="mt-1">
-                   <Activity className={zenMode ? 'text-zinc-500' : (networkFilter === 'MAINNET' ? "text-green-500" : networkFilter === 'DEVNET' ? "text-blue-500" : "text-white")} size={20} />
-                </div>
-                <div className="flex flex-col">
-                   <h3 className="text-xs md:text-lg font-bold text-white tracking-widest uppercase leading-tight">
-                     {networkFilter === 'ALL' ? 'Nodes across all networks' : networkFilter === 'MAINNET' ? <span className={zenMode ? 'text-white' : "text-green-500"}>Nodes on Mainnet</span> : <span className={zenMode ? 'text-white' : "text-blue-500"}>Nodes on Devnet</span>} 
-                     <span className="text-zinc-600 ml-2 text-xs md:text-sm">({filteredNodes.length})</span>
-                   </h3>
-                   <div className="text-[9px] font-mono text-zinc-500 uppercase mt-0.5 md:mt-1">
-                     Distributed by <span className="text-zinc-300">{sortBy}</span> ({sortOrder === 'asc' ? 'Lowest to Highest' : 'Highest to Lowest'})
-                   </div>
-                </div>
-            </div>
-        )}
-
-        {/* MAIN GRID */}
-        <NodeGrid 
-          loading={loading}
-          nodes={filteredNodes}
-          zenMode={zenMode}
-          cycleStep={cycleStep}
-          mostCommonVersion={mostCommonVersion}
+        {/* NEW: Nodes Container (Console Wrapper) */}
+        <NodesContainer
+          viewMode={viewMode}
+          setViewMode={handleViewChange}
+          count={filteredNodes.length}
+          networkFilter={networkFilter}
           sortBy={sortBy}
-          onNodeClick={setSelectedNode}
-          onToggleFavorite={toggleFavorite}
-          favorites={favorites}
-        />
+          sortOrder={sortOrder}
+          zenMode={zenMode}
+        >
+          {loading && nodes.length === 0 ? (
+             <PulseGraphLoader />
+          ) : viewMode === 'grid' ? (
+             <NodeGrid 
+               loading={loading}
+               nodes={filteredNodes}
+               zenMode={zenMode}
+               cycleStep={cycleStep}
+               mostCommonVersion={mostCommonVersion}
+               sortBy={sortBy}
+               onNodeClick={setSelectedNode}
+               onToggleFavorite={toggleFavorite}
+               favorites={favorites}
+             />
+          ) : (
+             <NodeList
+               nodes={filteredNodes}
+               onNodeClick={setSelectedNode}
+               onToggleFavorite={toggleFavorite}
+               favorites={favorites}
+             />
+          )}
+
+          {/* Bottom Separator (Inside Container) */}
+          {!loading && nodes.length > 0 && (
+            <div className="flex items-center justify-center py-6 border-t border-zinc-800/50 bg-black/20">
+               <div className="group flex items-center gap-3 px-4 py-2 rounded-full bg-black/40 border border-white/5 shadow-[inset_0_1px_4px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all hover:border-white/10 hover:bg-black/60 cursor-help" title="Live count of filtered nodes currently in view">
+                  <div className="relative flex h-1.5 w-1.5">
+                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75 duration-1000"></span>
+                     <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[9px] font-mono font-bold tracking-widest uppercase text-zinc-500 group-hover:text-zinc-400 transition-colors">
+                     <span>Active Pods Uplink</span>
+                     <span className="text-zinc-700">|</span>
+                     <span className="text-zinc-300 font-black text-[10px]">{filteredNodes.length}</span>
+                  </div>
+               </div>
+            </div>
+          )}
+        </NodesContainer>
+
       </main>
 
       <Footer zenMode={zenMode} nodeCount={filteredNodes.length} />
