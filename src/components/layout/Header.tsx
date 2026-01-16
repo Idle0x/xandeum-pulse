@@ -44,9 +44,10 @@ export const Header = ({
   useEffect(() => {
     // Only rotate if user isn't typing
     if (!isSearchFocused) {
+      // Changed to 15 seconds (15000ms) as requested
       const interval = setInterval(() => {
         setTipIndex((prev) => (prev + 1) % searchTips.length);
-      }, 5000);
+      }, 15000); 
       return () => clearInterval(interval);
     }
   }, [isSearchFocused]);
@@ -73,7 +74,8 @@ export const Header = ({
             <Search className={`absolute left-3 top-2.5 size-4 z-10 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
             {!zenMode && !searchQuery && !isSearchFocused && (
               <div className="absolute inset-0 flex items-center pointer-events-none pl-10 pr-4 overflow-hidden z-0">
-                <div className="whitespace-nowrap animate-marquee text-sm text-zinc-600 font-mono opacity-80">
+                {/* Changed to x-marquee to avoid class conflicts */}
+                <div className="whitespace-nowrap animate-x-marquee text-sm text-zinc-600 font-mono opacity-80">
                   Search nodes by Version, IP Address, Country, or Public Key...
                 </div>
               </div>
@@ -93,21 +95,33 @@ export const Header = ({
           {/* Rotating Tooltips (Strictly Constrained + Marquee) */}
           {!zenMode && (
             <div className="mt-1 md:mt-2 w-full max-w-full overflow-hidden relative h-[16px] md:h-[20px] transition-all duration-300">
-               {/* Container uses overflow-hidden to clip long text */}
                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="whitespace-nowrap animate-marquee-slow flex items-center gap-1.5 text-[8px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase">
+                  {/* Changed to animate-x-marquee-slow */}
+                  <div className="whitespace-nowrap animate-x-marquee-slow flex items-center gap-1.5 text-[8px] md:text-xs text-zinc-500 font-mono tracking-wide uppercase">
                     <Info size={10} className="text-blue-500 shrink-0 md:w-3 md:h-3" />
                     <span>{isSearchFocused ? 'Type to filter nodes instantly' : searchTips[tipIndex]}</span>
                   </div>
                </div>
             </div>
           )}
-          {!zenMode && <style jsx>{` 
-            @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } } 
-            .animate-marquee { animation: marquee 15s linear infinite; } 
-            /* Slower animation for tips so they are readable while scrolling */
-            .animate-marquee-slow { animation: marquee 20s linear infinite; }
-          `}</style>}
+          
+          {/* Global Style Injection for Animation */}
+          {!zenMode && (
+            <style>{`
+              @keyframes x-marquee {
+                0% { transform: translateX(100%); }
+                100% { transform: translateX(-100%); }
+              }
+              .animate-x-marquee {
+                display: inline-block;
+                animation: x-marquee 15s linear infinite;
+              }
+              .animate-x-marquee-slow {
+                display: inline-block;
+                animation: x-marquee 25s linear infinite;
+              }
+            `}</style>
+          )}
         </div>
 
         {/* Right: Zen Toggle */}
