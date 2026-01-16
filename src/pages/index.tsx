@@ -1,23 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 
-// --- CUSTOM HOOKS (The Brain) ---
+// --- CUSTOM HOOKS ---
 import { useNetworkData } from '../hooks/useNetworkData';
 import { useNodeFilter } from '../hooks/useNodeFilter';
 import { useDashboardStats } from '../hooks/useDashboardStats';
 
-// --- LAYOUT COMPONENTS (The Skeleton) ---
+// --- LAYOUT COMPONENTS ---
 import { Layout } from '../components/layout/Layout';
 import { Header } from '../components/layout/Header';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Footer } from '../components/layout/Footer';
 
-// --- DASHBOARD WIDGETS (The Widgets) ---
+// --- DASHBOARD WIDGETS ---
 import { StatsOverview } from '../components/dashboard/StatsOverview';
 import { WatchlistSection } from '../components/dashboard/WatchlistSection';
-import { NodesContainer } from '../components/dashboard/NodesContainer'; // New Wrapper
+import { NodesContainer } from '../components/dashboard/NodesContainer';
 import { NodeGrid } from '../components/dashboard/NodeGrid';
-import { NodeList } from '../components/dashboard/NodeList'; // New List View
+import { NodeList } from '../components/dashboard/NodeList';
 
 // --- MODALS & EXTRAS ---
 import { WelcomeCurtain } from '../components/WelcomeCurtain';
@@ -55,16 +55,18 @@ export default function Home() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [activeStatsModal, setActiveStatsModal] = useState<'capacity' | 'vitals' | 'consensus' | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [cycleStep, setCycleStep] = useState(1);
   const [toast, setToast] = useState<{visible: boolean, msg: string} | null>(null);
-  const toastTimer = useRef<NodeJS.Timeout | null>(null);
-
-  // NEW: View Mode State
+  
+  // View Mode State
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  // Cycle State & Refs
+  const [cycleStep, setCycleStep] = useState(0); 
+  const cycleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const toastTimer = useRef<NodeJS.Timeout | null>(null);
 
   // --- 3. EFFECTS & PERSISTENCE ---
   useEffect(() => {
-    // Restore Preferences
     const savedZen = localStorage.getItem('xandeum_zen_mode');
     if (savedZen === 'true') setZenMode(true);
 
@@ -75,25 +77,42 @@ export default function Home() {
     if (savedView === 'list') setViewMode('list');
   }, []);
 
-  // FIXED: Unified Cycle Timer & Sort Sync
-  // This single effect handles both the "Snap" to the active metric
-  // AND the timer reset, ensuring they are always perfectly synced.
+  // --- THE FIXED CYCLE LOGIC ---
   useEffect(() => {
-    // 1. Immediate Snap: Set the starting step based on the sort
-    if (sortBy === 'storage') setCycleStep(1);      
-    else if (sortBy === 'health') setCycleStep(2);  
-    else if (sortBy === 'uptime') setCycleStep(3);  
-    else setCycleStep(0); // Reset to default (Storage Used) for Version/Others                           
+    // 1. Clear any existing timer immediately to prevent "Flicker" or double-timing
+    if (cycleTimerRef.current) clearInterval(cycleTimerRef.current);
 
-    // 2. Start a FRESH timer
-    // This clears any old timer that might be mid-cycle
-    const cycleInterval = setInterval(() => {
-        setCycleStep(prev => prev + 1);
+    // 2. Define which sorts trigger a "Snap"
+    // (Using index mapping: 0=StorageUsed, 1=Committed, 2=Health, 3=Uptime)
+    const SNAP_MAP: Record<string, number> = {
+      'storage': 0, // Maps to 'Storage Used' in Card logic
+      'health': 2,
+      'uptime': 3
+    };
+
+    const targetStep = SNAP_MAP[sortBy];
+    const isGenericSort = targetStep === undefined;
+
+    // 3. LOGIC BRANCHING
+    if (!isGenericSort) {
+      // CASE A: User clicked a cycling metric (Storage, Health, Uptime)
+      // ACTION: Snap immediately, reset timer to 0.
+      setCycleStep(targetStep);
+    } 
+    // CASE B: User clicked Generic (Version, Rank) -> We DO NOT touch setCycleStep. 
+    // The cycle continues exactly where it was.
+
+    // 4. START THE TIMER
+    // We always need a timer running.
+    cycleTimerRef.current = setInterval(() => {
+      setCycleStep(prev => prev + 1);
     }, 13000);
 
-    // 3. Cleanup: Kills the old timer whenever sortBy changes
-    return () => clearInterval(cycleInterval);
-  }, [sortBy]); 
+    // Cleanup
+    return () => {
+      if (cycleTimerRef.current) clearInterval(cycleTimerRef.current);
+    };
+  }, [sortBy, sortOrder, viewMode]); // Dependency on sortOrder ensures clicking the same header resets the timer
 
   // Handle URL Deep Linking
   useEffect(() => {
@@ -214,7 +233,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* Watchlist Section (Server Rack Style) */}
+        {/* Watchlist Section */}
         {!zenMode && favorites.length > 0 && (
           <WatchlistSection 
             nodes={watchListNodes} 
@@ -223,7 +242,6 @@ export default function Home() {
           />
         )}
 
-        {/* NEW: Nodes Container (Console Wrapper) */}
         <NodesContainer
           viewMode={viewMode}
           setViewMode={handleViewChange}
@@ -237,7 +255,6 @@ export default function Home() {
              <PulseGraphLoader />
           ) : viewMode === 'grid' ? (
              <NodeGrid 
-               // Key forces full re-render on sort/filter change
                key={`grid-${sortBy}-${sortOrder}-${networkFilter}`} 
                loading={loading}
                nodes={filteredNodes}
@@ -251,7 +268,6 @@ export default function Home() {
              />
           ) : (
              <NodeList
-               // Key forces full re-render on sort/filter change
                key={`list-${sortBy}-${sortOrder}-${networkFilter}`}
                nodes={filteredNodes}
                onNodeClick={setSelectedNode}
@@ -263,7 +279,6 @@ export default function Home() {
              />
           )}
 
-          {/* Bottom Separator (Inside Container) */}
           {!loading && nodes.length > 0 && (
             <div className="flex items-center justify-center py-6 border-t border-zinc-800/50 bg-black/20">
                <div className="group flex items-center gap-3 px-4 py-2 rounded-full bg-black/40 border border-white/5 shadow-[inset_0_1px_4px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all hover:border-white/10 hover:bg-black/60 cursor-help" title="Live count of filtered nodes currently in view">
@@ -285,7 +300,6 @@ export default function Home() {
 
       <Footer zenMode={zenMode} nodeCount={filteredNodes.length} />
 
-      {/* --- MODALS --- */}
       {activeStatsModal === 'capacity' && <CapacityModal onClose={() => setActiveStatsModal(null)} nodes={nodes} medianCommitted={medianCommitted} totalCommitted={totalStorageCommitted} totalUsed={totalStorageUsed} />}
       {activeStatsModal === 'vitals' && <VitalsModal onClose={() => setActiveStatsModal(null)} nodes={nodes} avgHealth={avgNetworkHealth} consensusPercent={networkConsensus} consensusVersion={mostCommonVersion} />}
       {activeStatsModal === 'consensus' && <ConsensusModal onClose={() => setActiveStatsModal(null)} nodes={nodes} mostCommonVersion={mostCommonVersion} />}
@@ -306,7 +320,6 @@ export default function Home() {
         />
       )}
 
-      {/* Toast Notification */}
       {toast && toast.visible && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-top-4 duration-300 w-full max-w-md px-4 pointer-events-none">
             <div className={`border px-4 py-3 rounded-xl shadow-2xl flex items-start gap-3 pointer-events-auto ${zenMode ? 'bg-black border-zinc-700 text-white' : 'bg-zinc-900 border-yellow-500/30 text-zinc-200'}`}>
