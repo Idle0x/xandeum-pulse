@@ -26,7 +26,7 @@ import {
   Clock, Trophy, Star, ArrowUp, ArrowDown,
   Info, ExternalLink, Maximize2, Map as MapIcon,
   BookOpen, Menu, LayoutDashboard, HeartPulse,
-  Swords, Monitor, AlertTriangle, RefreshCw, Twitter, Server, Globe, ShieldCheck, GitBranch, ChevronDown, ChevronUp, Download
+  Swords, Monitor, AlertTriangle, RefreshCw, Twitter, Server, Globe, ShieldCheck, GitBranch, Repeat, Download
 } from 'lucide-react';
 
 export default function Home() {
@@ -72,7 +72,6 @@ export default function Home() {
 
   // Filters & Selection
   const [networkFilter, setNetworkFilter] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
-  const [isNetDropdownOpen, setIsNetDropdownOpen] = useState(false); 
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [activeStatsModal, setActiveStatsModal] = useState<'capacity' | 'vitals' | 'consensus' | null>(null);
 
@@ -114,12 +113,19 @@ export default function Home() {
 
   const handleGlobalClick = () => {
     if (activeTooltip) setActiveTooltip(null);
-    if (isNetDropdownOpen) setIsNetDropdownOpen(false); 
   };
 
-  const handleDropdownClick = (e: React.MouseEvent) => {
+  // --- NEW: CYCLE NETWORK LOGIC ---
+  const handleNetworkCycle = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsNetDropdownOpen(!isNetDropdownOpen);
+    let next: 'ALL' | 'MAINNET' | 'DEVNET' = 'ALL';
+    
+    if (networkFilter === 'ALL') next = 'MAINNET';
+    else if (networkFilter === 'MAINNET') next = 'DEVNET';
+    else if (networkFilter === 'DEVNET') next = 'ALL';
+    
+    setNetworkFilter(next);
+    showToast(`Switched view to ${next}`);
   };
 
   const toggleZenMode = () => {
@@ -539,7 +545,6 @@ export default function Home() {
       {isMenuOpen && <div className="fixed inset-0 bg-black/50 z-[190] backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* --- HEADER --- */}
-      {/* ADDED: visible overflow to header so dropdown can appear */}
       <header className={`sticky top-0 z-[50] border-b px-4 py-1 md:py-3 flex flex-col gap-1 md:gap-4 transition-all duration-500 overflow-visible ${zenMode ? 'bg-black border-zinc-800' : 'bg-[#09090b]/90 backdrop-blur-md border-zinc-800'}`}>
         <div className="flex justify-between items-center w-full">
           <div className="flex items-center gap-4">
@@ -590,33 +595,17 @@ export default function Home() {
             <RefreshCw size={10} className={`md:w-[14px] md:h-[14px] ${loading || isBackgroundSyncing ? 'animate-spin' : ''}`} /> {loading ? 'SYNC...' : 'REFRESH'}
           </button>
 
-          {/* --- NEW: MINI NETWORK DROPDOWN (Between Refresh & Filters) --- */}
+          {/* --- NEW: CYCLE NETWORK SWITCH (Button w/ Repeat Icon) --- */}
           <div className="relative shrink-0">
              <button 
-                onClick={handleDropdownClick}
-                className={`flex items-center gap-1 px-2 h-6 md:px-4 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs border ${zenMode ? 'bg-black border-zinc-800 text-zinc-400' : 'bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}
+                onClick={handleNetworkCycle}
+                className={`flex items-center gap-1 px-2 h-6 md:px-4 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs border active:scale-95 ${zenMode ? 'bg-black border-zinc-800 text-zinc-400' : 'bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}
              >
                 {/* Status Dot */}
                 <div className={`w-1.5 h-1.5 rounded-full ${networkFilter === 'MAINNET' ? 'bg-green-500' : networkFilter === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
                 <span>{networkFilter === 'ALL' ? 'ALL' : networkFilter === 'MAINNET' ? 'MAIN' : 'DEV'}</span>
-                {isNetDropdownOpen ? <ChevronUp size={10} className="md:w-3 md:h-3"/> : <ChevronDown size={10} className="md:w-3 md:h-3"/>}
+                <Repeat size={10} className="md:w-3 md:h-3 opacity-50"/>
              </button>
-
-             {/* Dropdown Content - Added high z-index and guaranteed overflow visibility */}
-             {isNetDropdownOpen && (
-               <div className="absolute top-full left-0 mt-1 md:mt-2 w-20 md:w-28 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[100] flex flex-col animate-in fade-in zoom-in-95 duration-200">
-                  {['ALL', 'MAINNET', 'DEVNET'].map((net) => (
-                    <button
-                      key={net}
-                      onClick={() => { setNetworkFilter(net as any); setIsNetDropdownOpen(false); showToast(`View switched to ${net}`); }}
-                      className={`px-3 py-2 text-[9px] md:text-xs font-bold text-left hover:bg-zinc-900 flex items-center gap-2 ${networkFilter === net ? 'text-white bg-zinc-900' : 'text-zinc-500'}`}
-                    >
-                       <div className={`w-1.5 h-1.5 rounded-full ${net === 'MAINNET' ? 'bg-green-500' : net === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
-                       {net === 'ALL' ? 'ALL' : net === 'MAINNET' ? 'MAIN' : 'DEV'}
-                    </button>
-                  ))}
-               </div>
-             )}
           </div>
 
           <div className="flex gap-1 md:gap-2 relative ml-auto">
@@ -726,6 +715,7 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="flex justify-between items-center relative z-10 mb-2">
                 <div className="text-[8px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1"><Activity size={10} className={networkFilter === 'MAINNET' ? 'text-green-500' : networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-white'} /> Filter</div>
+                {/* Reusing Network Switcher for Filter Card mini-UI only */}
                 <NetworkSwitcher current={networkFilter} onChange={setNetworkFilter} size="sm" />
               </div>
               <div className="relative z-10">
@@ -764,16 +754,17 @@ export default function Home() {
         )}
 
         {!loading && nodes.length > 0 && (
-             <div className="flex items-start gap-3 mb-4 mt-8">
+             <div className="flex items-start gap-3 mb-4 mt-1 md:mt-8">
                 <div className="mt-1">
                    <Activity className={zenMode ? 'text-zinc-500' : (networkFilter === 'MAINNET' ? "text-green-500" : networkFilter === 'DEVNET' ? "text-blue-500" : "text-white")} size={20} />
                 </div>
                 <div className="flex flex-col">
-                   <h3 className="text-sm md:text-lg font-bold text-white tracking-widest uppercase leading-tight">
+                   {/* HEADING FIX: mt-0, text-xs on mobile to stay on screen */}
+                   <h3 className="text-xs md:text-lg font-bold text-white tracking-widest uppercase leading-tight">
                      {networkFilter === 'ALL' ? 'Nodes across all networks' : networkFilter === 'MAINNET' ? <span className={zenMode ? 'text-white' : "text-green-500"}>Nodes on Mainnet</span> : <span className={zenMode ? 'text-white' : "text-blue-500"}>Nodes on Devnet</span>} 
                      <span className="text-zinc-600 ml-2 text-xs md:text-sm">({filteredNodes.length})</span>
                    </h3>
-                   <div className="text-[9px] font-mono text-zinc-500 uppercase mt-1">
+                   <div className="text-[9px] font-mono text-zinc-500 uppercase mt-0.5 md:mt-1">
                      Distributed by <span className="text-zinc-300">{sortBy}</span> ({sortOrder === 'asc' ? 'Lowest to Highest' : 'Highest to Lowest'})
                    </div>
                 </div>
