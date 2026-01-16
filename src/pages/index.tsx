@@ -1,20 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 
-// --- CUSTOM HOOKS (The Brain) ---
+// --- CUSTOM HOOKS ---
 import { useNetworkData } from '../hooks/useNetworkData';
 import { useNodeFilter } from '../hooks/useNodeFilter';
 import { useDashboardStats } from '../hooks/useDashboardStats';
 
-// --- LAYOUT COMPONENTS (The Skeleton) ---
+// --- LAYOUT COMPONENTS ---
 import { Layout } from '../components/layout/Layout';
 import { Header } from '../components/layout/Header';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Footer } from '../components/layout/Footer';
 
-// --- DASHBOARD WIDGETS (The Widgets) ---
+// --- DASHBOARD WIDGETS ---
 import { StatsOverview } from '../components/dashboard/StatsOverview';
 import { NodeGrid } from '../components/dashboard/NodeGrid';
+import { NodeCard } from '../components/dashboard/cards/NodeCard'; // Re-imported for Watchlist
 
 // --- MODALS & EXTRAS ---
 import { WelcomeCurtain } from '../components/WelcomeCurtain';
@@ -25,7 +26,7 @@ import { InspectorModal } from '../components/modals/InspectorModal';
 import { LiveWireLoader } from '../components/common/Loaders';
 import { Node } from '../types';
 import { getSafeIp } from '../utils/nodeHelpers';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, Star, Activity, X } from 'lucide-react';
 
 export default function Home() {
   const router = useRouter();
@@ -46,7 +47,7 @@ export default function Home() {
 
   const stats = useDashboardStats(nodes, networkFilter, totalStorageCommitted, totalStorageUsed);
 
-  // --- 2. UI STATE (Modals, Zen, Favorites) ---
+  // --- 2. UI STATE ---
   const [zenMode, setZenMode] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
@@ -70,7 +71,7 @@ export default function Home() {
     return () => clearInterval(cycleInterval);
   }, []);
 
-  // Handle URL Deep Linking (e.g. ?open=PUBKEY)
+  // Handle URL Deep Linking
   useEffect(() => {
     if (!loading && nodes.length > 0 && router.query.open) {
       const pubkeyToOpen = router.query.open as string;
@@ -124,6 +125,9 @@ export default function Home() {
     a.click();
   };
 
+  // Derive Watchlist
+  const watchListNodes = nodes.filter(node => favorites.includes(node.address || ''));
+
   // --- 5. RENDER ---
   return (
     <Layout zenMode={zenMode} onClick={() => isMenuOpen && setIsMenuOpen(false)}>
@@ -150,7 +154,6 @@ export default function Home() {
         setSearchQuery={setSearchQuery}
         isSearchFocused={isSearchFocused}
         setIsSearchFocused={setIsSearchFocused}
-        searchTip="Type to filter nodes instantly"
         loading={loading}
         isBackgroundSyncing={isBackgroundSyncing}
         onRefetch={refetch}
@@ -162,7 +165,7 @@ export default function Home() {
       />
 
       <main className={`p-4 md:p-8 ${zenMode ? 'max-w-full' : 'max-w-7xl 2xl:max-w-[1800px] mx-auto'} transition-all duration-500`}>
-        {/* Statistics Grid (Hidden in Zen Mode) */}
+        {/* Statistics Grid */}
         <StatsOverview 
           stats={stats}
           totalStorageCommitted={totalStorageCommitted}
@@ -181,7 +184,50 @@ export default function Home() {
           </div>
         )}
 
-        {/* Node Grid & Watchlist Logic */}
+        {/* RESTORED: Watchlist Section */}
+        {!zenMode && favorites.length > 0 && (
+          <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="flex items-center gap-2 mb-4">
+                <Star className="text-yellow-500" fill="currentColor" size={20} />
+                <h3 className="text-lg font-bold text-white tracking-widest uppercase">Your Watchlist</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 border-b border-zinc-800 pb-10">
+              {watchListNodes.map((node) => (
+                <NodeCard 
+                    key={`fav-${node.pubkey}`} 
+                    node={node} 
+                    onClick={setSelectedNode} 
+                    onToggleFavorite={toggleFavorite} 
+                    isFav={true} 
+                    cycleStep={cycleStep} 
+                    zenMode={zenMode} 
+                    mostCommonVersion={mostCommonVersion} 
+                    sortBy={sortBy} 
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* RESTORED: Nodes Header (Stacked for mobile visibility) */}
+        {!loading && nodes.length > 0 && (
+             <div className="flex items-start gap-3 mb-4 mt-1 md:mt-8">
+                <div className="mt-1">
+                   <Activity className={zenMode ? 'text-zinc-500' : (networkFilter === 'MAINNET' ? "text-green-500" : networkFilter === 'DEVNET' ? "text-blue-500" : "text-white")} size={20} />
+                </div>
+                <div className="flex flex-col">
+                   <h3 className="text-xs md:text-lg font-bold text-white tracking-widest uppercase leading-tight">
+                     {networkFilter === 'ALL' ? 'Nodes across all networks' : networkFilter === 'MAINNET' ? <span className={zenMode ? 'text-white' : "text-green-500"}>Nodes on Mainnet</span> : <span className={zenMode ? 'text-white' : "text-blue-500"}>Nodes on Devnet</span>} 
+                     <span className="text-zinc-600 ml-2 text-xs md:text-sm">({filteredNodes.length})</span>
+                   </h3>
+                   <div className="text-[9px] font-mono text-zinc-500 uppercase mt-0.5 md:mt-1">
+                     Distributed by <span className="text-zinc-300">{sortBy}</span> ({sortOrder === 'asc' ? 'Lowest to Highest' : 'Highest to Lowest'})
+                   </div>
+                </div>
+            </div>
+        )}
+
+        {/* Node Grid */}
         <NodeGrid 
           loading={loading}
           nodes={filteredNodes}
