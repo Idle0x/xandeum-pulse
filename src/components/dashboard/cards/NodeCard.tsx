@@ -24,7 +24,6 @@ export const NodeCard = ({
   zenMode, mostCommonVersion, sortBy 
 }: NodeCardProps) => {
 
-  // Local state to detect hover
   const [isHovered, setIsHovered] = useState(false);
 
   // Helpers
@@ -39,18 +38,13 @@ export const NodeCard = ({
     const zenTextMain = 'text-white font-mono'; 
     const zenTextDim = 'text-zinc-400';
 
-    // 1. DETERMINE CURRENT STEP
-    // Default: use global cycle
     let currentStep = cycleStep;
 
-    // HOVER OVERRIDE LOGIC:
     if (isHovered) {
-      // If we are sorted by a specific metric, FORCE that metric to show
-      if (sortBy === 'storage') currentStep = 0; // Storage Used
-      else if (sortBy === 'health') currentStep = 2; // Health
-      else if (sortBy === 'uptime') currentStep = 3; // Uptime
-      // If we are sorted by "Generic" (Version/Rank), we just freeze the CURRENT step 
-      // (we do nothing to currentStep, effectively pausing the visual change because cycleStep only updates every 13s)
+      // HOVER FIX: 'storage' now maps to 1 (Committed), matching the Home.tsx SNAP_MAP
+      if (sortBy === 'storage') currentStep = 1; 
+      else if (sortBy === 'health') currentStep = 2;
+      else if (sortBy === 'uptime') currentStep = 3;
     }
 
     const step = currentStep % 5;
@@ -122,7 +116,7 @@ export const NodeCard = ({
         </button>
       </div>
 
-      {/* Body: Version */}
+      {/* Body */}
       <div className="space-y-1.5 md:space-y-3">
         <div className="flex justify-between items-center text-[9px] md:text-xs">
           <span className="text-zinc-500 shrink-0 mr-2">Version</span>
