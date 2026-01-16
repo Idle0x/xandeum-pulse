@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 
 // --- CUSTOM HOOKS ---
@@ -6,20 +6,18 @@ import { useNetworkData } from '../hooks/useNetworkData';
 import { useNodeFilter } from '../hooks/useNodeFilter';
 import { useDashboardStats } from '../hooks/useDashboardStats';
 
-// --- LAYOUT COMPONENTS ---
+// --- COMPONENTS ---
 import { Layout } from '../components/layout/Layout';
 import { Header } from '../components/layout/Header';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Footer } from '../components/layout/Footer';
-
-// --- DASHBOARD WIDGETS ---
 import { StatsOverview } from '../components/dashboard/StatsOverview';
 import { WatchlistSection } from '../components/dashboard/WatchlistSection';
 import { NodesContainer } from '../components/dashboard/NodesContainer';
 import { NodeGrid } from '../components/dashboard/NodeGrid';
 import { NodeList } from '../components/dashboard/NodeList';
 
-// --- MODALS & EXTRAS ---
+// --- EXTRAS ---
 import { WelcomeCurtain } from '../components/WelcomeCurtain';
 import { CapacityModal } from '../components/dashboard/stats/CapacityModal';
 import { VitalsModal } from '../components/dashboard/stats/VitalsModal';
@@ -33,109 +31,94 @@ import { AlertTriangle, X } from 'lucide-react';
 export default function Home() {
   const router = useRouter();
 
-  // --- 1. DATA & STATE MANAGEMENT ---
+  // 1. DATA LAYER
   const { 
     nodes, loading, isBackgroundSyncing, error, lastSync, 
-    networkStats, mostCommonVersion, totalStorageCommitted, 
+    mostCommonVersion, totalStorageCommitted, 
     totalStorageUsed, medianCommitted, avgNetworkHealth, 
     networkConsensus, refetch 
   } = useNetworkData();
 
-  const {
-    searchQuery, setSearchQuery, isSearchFocused, setIsSearchFocused,
-    networkFilter, setNetworkFilter, sortBy, sortOrder, handleSortChange,
-    filteredNodes
-  } = useNodeFilter(nodes);
+  // 2. STATE (Centralized here for snappy updates)
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [networkFilter, setNetworkFilter] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
+  
+  const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'health'>('storage');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  const stats = useDashboardStats(nodes, networkFilter, totalStorageCommitted, totalStorageUsed);
+  // 3. CYCLE & TIMER STATE
+  const [cycleStep, setCycleStep] = useState(1); // Default to Committed (Index 1)
+  const [cycleReset, setCycleReset] = useState(0); // The "Trigger" to restart timer
 
-  // --- 2. PERFORMANCE OPTIMIZATION (THE LAG FIX) ---
-  // Create a stable, fresh reference whenever sort changes.
-  // This forces React to diff the list immediately without needing a destructive 'key'.
-  const safeFilteredNodes = useMemo(() => {
-    return [...filteredNodes]; 
-  }, [filteredNodes, sortBy, sortOrder]);
-
-  // --- 3. UI STATE ---
+  // 4. UI STATE
   const [zenMode, setZenMode] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [activeStatsModal, setActiveStatsModal] = useState<'capacity' | 'vitals' | 'consensus' | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [toast, setToast] = useState<{visible: boolean, msg: string} | null>(null);
-  
-  // View Mode State
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-
-  // Cycle State & Refs
-  const [cycleStep, setCycleStep] = useState(0); 
-  const cycleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
   const toastTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // --- 4. EFFECTS & PERSISTENCE ---
+  // 5. USE FILTER HOOK (Now Pure Calculation)
+  const filteredNodes = useNodeFilter(nodes, searchQuery, networkFilter, sortBy, sortOrder);
+  const stats = useDashboardStats(nodes, networkFilter, totalStorageCommitted, totalStorageUsed);
+
+  // --- EFFECTS ---
+
+  // Restore Preferences
   useEffect(() => {
     const savedZen = localStorage.getItem('xandeum_zen_mode');
     if (savedZen === 'true') setZenMode(true);
-
     const savedFavs = localStorage.getItem('xandeum_favorites');
     if (savedFavs) setFavorites(JSON.parse(savedFavs));
-
     const savedView = localStorage.getItem('xandeum_view_mode');
     if (savedView === 'list') setViewMode('list');
   }, []);
 
-  // --- THE FIXED CYCLE LOGIC ---
+  // MASTER TIMER LOGIC (Mirrors Old Code)
   useEffect(() => {
-    // 1. Clear any existing timer immediately
-    if (cycleTimerRef.current) clearInterval(cycleTimerRef.current);
+    const cycleInterval = setInterval(() => {
+      setCycleStep((prev) => prev + 1);
+    }, 13000); 
 
-    // 2. Define Map (UPDATED: Storage -> Index 1 for Committed)
-    const SNAP_MAP: Record<string, number> = {
-      'storage': 1, // CORRECTED: Now maps to 'Committed'
-      'health': 2,
-      'uptime': 3
-    };
+    // This effect re-runs whenever `cycleReset` changes, 
+    // killing the old interval and starting a fresh 13s one.
+    return () => clearInterval(cycleInterval);
+  }, [cycleReset]); 
 
-    const targetStep = SNAP_MAP[sortBy];
-    const isGenericSort = targetStep === undefined;
+  // --- ACTIONS ---
 
-    // 3. Logic Branching
-    if (!isGenericSort) {
-      setCycleStep(targetStep); // Snap to the metric
-    } 
-    
-    // 4. Start fresh timer
-    cycleTimerRef.current = setInterval(() => {
-      setCycleStep(prev => prev + 1);
-    }, 13000);
-
-    return () => {
-      if (cycleTimerRef.current) clearInterval(cycleTimerRef.current);
-    };
-  }, [sortBy, sortOrder, viewMode]);
-
-  // Handle URL Deep Linking
-  useEffect(() => {
-    if (!loading && nodes.length > 0 && router.query.open) {
-      const pubkeyToOpen = router.query.open as string;
-      const target = nodes.find(n => n.pubkey === pubkeyToOpen);
-      if (target) {
-        setSelectedNode(target);
-        router.replace('/', undefined, { shallow: true });
-      }
+  // THE SNAPPY SORT HANDLER
+  const handleSortChange = (metric: 'uptime' | 'version' | 'storage' | 'health') => {
+    // 1. Update Sort State
+    if (sortBy === metric) {
+        setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+        setSortBy(metric);
+        setSortOrder('desc'); 
     }
-  }, [loading, nodes, router.query]);
 
-  // --- 5. ACTION HANDLERS ---
-  const toggleZenMode = () => {
-    const newState = !zenMode;
-    setZenMode(newState);
-    localStorage.setItem('xandeum_zen_mode', String(newState));
+    // 2. Calculate Snap Target
+    let targetStep = cycleStep; // Default: don't change if generic
+    if (metric === 'storage') targetStep = 1; // Map to Committed
+    if (metric === 'health') targetStep = 2;
+    if (metric === 'uptime') targetStep = 3;
+
+    // 3. Snap & Reset Timer Immediately
+    if (metric !== 'version') {
+      setCycleStep(targetStep);
+      setCycleReset(prev => prev + 1); // Triggers the useEffect above to restart timer
+    }
   };
 
-  const handleViewChange = (mode: 'grid' | 'list') => {
-    setViewMode(mode);
-    localStorage.setItem('xandeum_view_mode', mode);
+  const handleNetworkCycle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (networkFilter === 'ALL') setNetworkFilter('MAINNET');
+    else if (networkFilter === 'MAINNET') setNetworkFilter('DEVNET');
+    else setNetworkFilter('ALL');
   };
 
   const toggleFavorite = (e: React.MouseEvent, address: string) => {
@@ -145,13 +128,6 @@ export default function Home() {
       : [...favorites, address];
     setFavorites(newFavs);
     localStorage.setItem('xandeum_favorites', JSON.stringify(newFavs));
-  };
-
-  const handleNetworkCycle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (networkFilter === 'ALL') setNetworkFilter('MAINNET');
-    else if (networkFilter === 'MAINNET') setNetworkFilter('DEVNET');
-    else setNetworkFilter('ALL');
   };
 
   const showToast = (msg: string) => {
@@ -175,7 +151,7 @@ export default function Home() {
 
   const watchListNodes = nodes.filter(node => favorites.includes(node.address || ''));
 
-  // --- 6. RENDER ---
+  // --- RENDER ---
   return (
     <Layout zenMode={zenMode} onClick={() => isMenuOpen && setIsMenuOpen(false)}>
       <WelcomeCurtain />
@@ -195,7 +171,7 @@ export default function Home() {
       <Header 
         onToggleMenu={() => setIsMenuOpen(true)}
         zenMode={zenMode}
-        onToggleZen={toggleZenMode}
+        onToggleZen={() => { const v = !zenMode; setZenMode(v); localStorage.setItem('xandeum_zen_mode', String(v)); }}
         lastSync={lastSync}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
@@ -240,7 +216,7 @@ export default function Home() {
 
         <NodesContainer
           viewMode={viewMode}
-          setViewMode={handleViewChange}
+          setViewMode={(m) => { setViewMode(m); localStorage.setItem('xandeum_view_mode', m); }}
           count={filteredNodes.length}
           networkFilter={networkFilter}
           sortBy={sortBy}
@@ -251,9 +227,8 @@ export default function Home() {
              <PulseGraphLoader />
           ) : viewMode === 'grid' ? (
              <NodeGrid 
-               // FIX: Removed dynamic 'key' to prevent full DOM destruction (Lag Fix)
                loading={loading}
-               nodes={safeFilteredNodes} // FIX: Using memoized array
+               nodes={filteredNodes}
                zenMode={zenMode}
                cycleStep={cycleStep}
                mostCommonVersion={mostCommonVersion}
@@ -264,8 +239,7 @@ export default function Home() {
              />
           ) : (
              <NodeList
-               // FIX: Removed dynamic 'key' here too
-               nodes={safeFilteredNodes} // FIX: Using memoized array
+               nodes={filteredNodes}
                onNodeClick={setSelectedNode}
                onToggleFavorite={toggleFavorite}
                favorites={favorites}
@@ -274,7 +248,8 @@ export default function Home() {
                onSortChange={handleSortChange}
              />
           )}
-
+          
+          {/* Active Node Counter */}
           {!loading && nodes.length > 0 && (
             <div className="flex items-center justify-center py-6 border-t border-zinc-800/50 bg-black/20">
                <div className="group flex items-center gap-3 px-4 py-2 rounded-full bg-black/40 border border-white/5 shadow-[inset_0_1px_4px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all hover:border-white/10 hover:bg-black/60 cursor-help" title="Live count of filtered nodes currently in view">
@@ -307,7 +282,7 @@ export default function Home() {
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
           nodes={nodes}
-          networkStats={networkStats}
+          networkStats={nodes.length > 0 ? { avgBreakdown: {}, totalNodes: nodes.length, systemStatus: { credits: true, rpc: true }, consensusVersion: mostCommonVersion, medianStorage: medianCommitted } : undefined}
           medianCommitted={medianCommitted}
           totalStorageCommitted={totalStorageCommitted}
           mostCommonVersion={mostCommonVersion}
