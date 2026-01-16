@@ -5,36 +5,35 @@ import { Node } from '../../../types';
 interface VitalsModalProps {
   onClose: () => void;
   nodes: Node[];
+  avgHealth: number;       // Added
+  consensusPercent: number; // Added
+  consensusVersion: string; // Added
 }
 
-export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
+export const VitalsModal = ({ onClose, nodes, avgHealth, consensusPercent, consensusVersion }: VitalsModalProps) => {
   const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
 
-  // --- 1. DATA ENGINE ---
+  // --- 1. DATA ENGINE (Preserved) ---
   const data = useMemo(() => {
-    // Filter
     const filtered = nodes.filter(n => activeTab === 'ALL' ? true : n.network === activeTab);
     const count = filtered.length || 1;
 
-    // A. Hero Stats
     const totalHealth = filtered.reduce((acc, n) => acc + (n.health || 0), 0);
-    const avgHealth = (totalHealth / count).toFixed(1);
-    
-    const stableNodes = filtered.filter(n => (n.uptime || 0) > 86400).length; // > 24h
+    const avgHealthVal = (totalHealth / count).toFixed(1);
+
+    const stableNodes = filtered.filter(n => (n.uptime || 0) > 86400).length;
     const stabilityPercent = ((stableNodes / count) * 100).toFixed(1);
 
-    // B. Health Spectrum (Distribution)
     const excellent = filtered.filter(n => (n.health || 0) >= 90).length;
     const good = filtered.filter(n => (n.health || 0) >= 70 && (n.health || 0) < 90).length;
     const fair = filtered.filter(n => (n.health || 0) < 70).length;
 
-    // C. Uptime Tiers
-    const ironclad = filtered.filter(n => (n.uptime || 0) > 604800).length; // > 7 days
-    const volatile = count - stableNodes; // < 24h
+    const ironclad = filtered.filter(n => (n.uptime || 0) > 604800).length;
+    const volatile = count - stableNodes;
 
     return {
       count,
-      avgHealth,
+      avgHealth: avgHealthVal,
       stabilityPercent,
       spectrum: { excellent, good, fair },
       tiers: { ironclad, stable: stableNodes, volatile }
@@ -52,7 +51,7 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#09090b] border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 fade-in duration-200" onClick={(e) => e.stopPropagation()}>
-        
+
         {/* --- HEADER & TOGGLES --- */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div className="flex items-center gap-3">
@@ -64,7 +63,7 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
               <p className="text-xs text-zinc-500">Real-time health & stability metrics</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2 bg-black/40 p-1 rounded-full border border-zinc-800">
              {(['ALL', 'MAINNET', 'DEVNET'] as const).map((tab) => (
                 <button
@@ -89,7 +88,6 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
 
           {/* --- ROW 1: HERO STATS --- */}
           <div className="grid grid-cols-2 gap-4">
-             {/* Avg Health */}
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 md:p-5 relative overflow-hidden">
                 <div className={`absolute top-0 left-0 w-1 h-full ${activeTheme.bg}`}></div>
                 <div className="flex justify-between items-start mb-2">
@@ -104,7 +102,6 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
                 </div>
              </div>
 
-             {/* Stability */}
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 md:p-5 relative overflow-hidden">
                 <div className={`absolute top-0 left-0 w-1 h-full ${activeTheme.bg}`}></div>
                 <div className="flex justify-between items-start mb-2">
@@ -121,22 +118,16 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
 
           {/* --- ROW 2: SPECTRUM & TIERS --- */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-             
-             {/* LEFT: HEALTH SPECTRUM */}
              <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 flex flex-col justify-center">
                 <div className="flex justify-between items-end mb-3">
                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5"><HeartPulse size={10} /> Health Spectrum</div>
                    <div className="text-[8px] text-zinc-600 font-mono">{data.count} Nodes Analyzed</div>
                 </div>
-
-                {/* The Bar Chart */}
                 <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden flex mb-3">
                    <div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${(data.spectrum.excellent / data.count) * 100}%` }}></div>
                    <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${(data.spectrum.good / data.count) * 100}%` }}></div>
                    <div className="h-full bg-yellow-500 transition-all duration-500" style={{ width: `${(data.spectrum.fair / data.count) * 100}%` }}></div>
                 </div>
-
-                {/* Legend */}
                 <div className="flex justify-between items-center text-[9px] font-mono">
                    <div className="flex items-center gap-1.5">
                       <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
@@ -153,7 +144,6 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
                 </div>
              </div>
 
-             {/* RIGHT: UPTIME TIERS */}
              <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-4">
                 <div className="text-[9px] text-zinc-500 uppercase font-bold mb-3 tracking-wider flex items-center gap-1.5">
                    <Clock size={10} /> Uptime Tiers
@@ -178,12 +168,10 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
              </div>
           </div>
 
-          {/* --- ROW 3: FOOTER (Logic Ref - COMPACT) --- */}
           <div className="bg-black/40 border border-zinc-800 rounded-xl p-2 flex items-center justify-between gap-2 overflow-hidden">
              <div className="text-[9px] text-zinc-500 uppercase font-bold flex items-center gap-1.5 shrink-0">
                <Info size={10} /> Logic
              </div>
-             
              <div className="flex items-center gap-3 text-[8px] text-zinc-400">
                 <div className="flex items-center gap-1 shrink-0">
                    <div className="w-1 h-1 rounded-full bg-green-500"></div>
