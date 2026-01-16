@@ -26,55 +26,8 @@ import {
   Clock, Trophy, Star, ArrowUp, ArrowDown,
   Info, ExternalLink, Maximize2, Map as MapIcon,
   BookOpen, Menu, LayoutDashboard, HeartPulse,
-  Swords, Monitor, AlertTriangle, RefreshCw, Twitter, Server, Globe, ShieldCheck, GitBranch, ChevronDown
+  Swords, Monitor, AlertTriangle, RefreshCw, Twitter, Server, Globe, ShieldCheck, GitBranch, ChevronDown, ChevronUp
 } from 'lucide-react';
-
-// --- SUB-COMPONENTS ---
-
-// New Mini Dropdown for Header
-const MiniNetworkDropdown = ({ current, onChange, zenMode }: { current: string, onChange: (val: any) => void, zenMode: boolean }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const getLabel = () => current === 'ALL' ? 'NET: ALL' : current === 'MAINNET' ? 'NET: MAIN' : 'NET: DEV';
-  const getColor = () => current === 'ALL' ? 'text-zinc-400' : current === 'MAINNET' ? 'text-green-500' : 'text-blue-500';
-
-  return (
-    <div className="relative" ref={wrapperRef}>
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-1 h-6 md:h-9 px-2 md:px-3 rounded-lg border transition-all font-bold tracking-tight uppercase ${zenMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700' : 'bg-black/40 border-zinc-800 hover:bg-zinc-800'} ${getColor()}`}
-      >
-        <span className="text-[8px] md:text-[10px] whitespace-nowrap">{getLabel()}</span>
-        <ChevronDown size={10} className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-
-      {isOpen && (
-        <div className="absolute top-full mt-1 left-0 bg-[#09090b] border border-zinc-800 rounded-lg shadow-xl overflow-hidden z-50 flex flex-col min-w-[80px] animate-in fade-in zoom-in-95 duration-200">
-          {['ALL', 'MAINNET', 'DEVNET'].map(net => (
-            <button
-              key={net}
-              onClick={() => { onChange(net); setIsOpen(false); }}
-              className={`px-3 py-2 text-[9px] font-bold text-left hover:bg-zinc-800 transition-colors ${current === net ? 'text-white bg-zinc-800/50' : 'text-zinc-500'}`}
-            >
-              {net}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 
 export default function Home() {
   const router = useRouter();
@@ -119,6 +72,7 @@ export default function Home() {
 
   // Filters & Selection
   const [networkFilter, setNetworkFilter] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
+  const [isNetDropdownOpen, setIsNetDropdownOpen] = useState(false); // NEW STATE FOR HEADER
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [activeStatsModal, setActiveStatsModal] = useState<'capacity' | 'vitals' | 'consensus' | null>(null);
 
@@ -160,21 +114,18 @@ export default function Home() {
 
   const handleGlobalClick = () => {
     if (activeTooltip) setActiveTooltip(null);
+    if (isNetDropdownOpen) setIsNetDropdownOpen(false); // Close dropdown logic
+  };
+
+  const handleDropdownClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsNetDropdownOpen(!isNetDropdownOpen);
   };
 
   const toggleZenMode = () => {
     const newState = !zenMode;
     setZenMode(newState);
     localStorage.setItem('xandeum_zen_mode', String(newState));
-  };
-
-  // NEW: Search with Auto Scroll
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-    // If typing and scrolled down, shoot to top
-    if (window.scrollY > 50 && e.target.value.length > 0) {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
   };
 
   // --- DATA FETCHING ---
@@ -306,6 +257,13 @@ export default function Home() {
     }, 9000);
     return () => clearInterval(tipInterval);
   }, [isSearchFocused]);
+
+  // --- NEW: SEARCH AUTO-SCROLL EFFECT ---
+  useEffect(() => {
+    if (searchQuery.length > 0) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [searchQuery]);
 
   useEffect(() => {
     if (!loading && nodes.length > 0 && router.query.open) {
@@ -504,7 +462,6 @@ export default function Home() {
 
       {/* --- SIDE NAVIGATION --- */}
       <div className={`fixed inset-y-0 left-0 w-72 bg-black border-r border-zinc-800 z-[200] transform transition-transform duration-300 ease-in-out ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        {/* ... (Nav Content remains unchanged) ... */}
         <div className="p-6 flex flex-col h-full relative overflow-hidden">
           <div className="flex justify-between items-center mb-8 shrink-0 relative z-10">
             <h2 className="font-bold text-white tracking-widest uppercase flex items-center gap-2">
@@ -547,11 +504,13 @@ export default function Home() {
       {isMenuOpen && <div className="fixed inset-0 bg-black/50 z-[190] backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>}
 
       {/* --- HEADER --- */}
-      <header className={`sticky top-0 z-[50] border-b px-4 py-1.5 md:px-6 md:py-3 flex flex-col gap-2 md:gap-4 transition-all duration-500 ${zenMode ? 'bg-black border-zinc-800' : 'bg-[#09090b]/90 backdrop-blur-md border-zinc-800'}`}>
+      {/* HEADER TWEAK: Reduced vertical padding (py-1 on mobile) and gap */}
+      <header className={`sticky top-0 z-[50] border-b px-4 py-1 md:py-3 flex flex-col gap-1 md:gap-4 transition-all duration-500 ${zenMode ? 'bg-black border-zinc-800' : 'bg-[#09090b]/90 backdrop-blur-md border-zinc-800'}`}>
         <div className="flex justify-between items-center w-full">
           <div className="flex items-center gap-4">
-            <button onClick={() => setIsMenuOpen(true)} className={`p-2.5 md:p-3.5 rounded-xl transition ${zenMode ? 'text-zinc-400 border border-zinc-800 hover:text-white' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white hover:bg-zinc-800'}`}>
-              <Menu size={24} className="md:w-7 md:h-7" />
+            {/* HEADER TWEAK: Reduced menu button size slightly */}
+            <button onClick={() => setIsMenuOpen(true)} className={`p-2 md:p-3.5 rounded-xl transition ${zenMode ? 'text-zinc-400 border border-zinc-800 hover:text-white' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white hover:bg-zinc-800'}`}>
+              <Menu size={20} className="md:w-7 md:h-7" />
             </button>
             <div className="flex flex-col">
               <h1 className="text-lg md:text-xl font-extrabold tracking-tight flex items-center gap-2 text-white">
@@ -571,8 +530,7 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              {/* UPDATED: Search Input with Auto Scroll */}
-              <input type="text" placeholder={zenMode ? "Search..." : ""} value={searchQuery} onChange={handleSearchChange} className={`w-full rounded-lg py-2 pl-10 pr-8 md:pr-4 text-sm outline-none transition-all relative z-10 bg-transparent ${zenMode ? 'border border-zinc-800 text-zinc-300 focus:border-zinc-600 placeholder:text-zinc-700' : 'border border-zinc-800 text-white focus:border-blue-500 shadow-inner'}`} onFocus={() => setIsSearchFocused(true)} onBlur={() => setIsSearchFocused(false)} />
+              <input type="text" placeholder={zenMode ? "Search..." : ""} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full rounded-lg py-2 pl-10 pr-8 md:pr-4 text-sm outline-none transition-all relative z-10 bg-transparent ${zenMode ? 'border border-zinc-800 text-zinc-300 focus:border-zinc-600 placeholder:text-zinc-700' : 'border border-zinc-800 text-white focus:border-blue-500 shadow-inner'}`} onFocus={() => setIsSearchFocused(true)} onBlur={() => setIsSearchFocused(false)} />
               {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-2.5 text-zinc-500 hover:text-white transition z-20 p-0.5 bg-black/20 rounded-full hover:bg-zinc-700"><X size={14} /></button>}
             </div>
             {!zenMode && (
@@ -592,31 +550,51 @@ export default function Home() {
           </button>
         </div>
 
-        {/* --- HEADER BOTTOM CONTROLS --- */}
-        <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-hide w-full mt-0 md:mt-4 border-t border-zinc-800/50 pt-1 md:pt-2">
-          {/* LEFT GROUP: Refresh + NEW NETWORK DROPDOWN */}
-          <div className="flex items-center gap-2 md:gap-4 shrink-0">
-             {/* COMPACT REFRESH BUTTON */}
-             <button onClick={() => fetchData('fast')} disabled={loading} className={`flex items-center gap-1 md:gap-2 px-2 md:px-6 h-6 md:h-12 rounded-lg md:rounded-xl transition font-bold text-[8px] md:text-xs uppercase tracking-wider ${loading ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'}`}>
-               <RefreshCw size={10} className={`md:w-3.5 md:h-3.5 ${loading || isBackgroundSyncing ? 'animate-spin' : ''}`} /> 
-               {loading ? 'SYNC...' : 'REFRESH'}
+        <div className="flex items-center justify-between gap-2 md:gap-4 overflow-x-auto pb-1 md:pb-2 scrollbar-hide w-full mt-1 md:mt-6 border-t border-zinc-800/50 pt-2">
+           {/* HEADER TWEAK: Aggressive Mobile Size Reduction (h-6, px-3, text-[9px]) */}
+          <button onClick={() => fetchData('fast')} disabled={loading} className={`flex items-center gap-1 md:gap-2 px-3 h-6 md:px-6 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs shrink-0 ${loading ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'}`}>
+            <RefreshCw size={10} className={`md:w-[14px] md:h-[14px] ${loading || isBackgroundSyncing ? 'animate-spin' : ''}`} /> {loading ? 'SYNC...' : 'REFRESH'}
+          </button>
+
+          {/* --- NEW: MINI NETWORK DROPDOWN (Between Refresh & Filters) --- */}
+          <div className="relative shrink-0">
+             <button 
+                onClick={handleDropdownClick}
+                className={`flex items-center gap-1 px-2 h-6 md:px-4 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs border ${zenMode ? 'bg-black border-zinc-800 text-zinc-400' : 'bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}
+             >
+                {/* Status Dot */}
+                <div className={`w-1.5 h-1.5 rounded-full ${networkFilter === 'MAINNET' ? 'bg-green-500' : networkFilter === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
+                <span>{networkFilter === 'ALL' ? 'ALL' : networkFilter === 'MAINNET' ? 'MAIN' : 'DEV'}</span>
+                {isNetDropdownOpen ? <ChevronUp size={10} className="md:w-3 md:h-3"/> : <ChevronDown size={10} className="md:w-3 md:h-3"/>}
              </button>
 
-             {/* NEW MINI DROPDOWN */}
-             <MiniNetworkDropdown current={networkFilter} onChange={setNetworkFilter} zenMode={zenMode} />
+             {/* Dropdown Content */}
+             {isNetDropdownOpen && (
+               <div className="absolute top-full left-0 mt-1 md:mt-2 w-20 md:w-28 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[60] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+                  {['ALL', 'MAINNET', 'DEVNET'].map((net) => (
+                    <button
+                      key={net}
+                      onClick={() => { setNetworkFilter(net as any); setIsNetDropdownOpen(false); showToast(`View switched to ${net}`); }}
+                      className={`px-3 py-2 text-[9px] md:text-xs font-bold text-left hover:bg-zinc-900 flex items-center gap-2 ${networkFilter === net ? 'text-white bg-zinc-900' : 'text-zinc-500'}`}
+                    >
+                       <div className={`w-1.5 h-1.5 rounded-full ${net === 'MAINNET' ? 'bg-green-500' : net === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
+                       {net === 'ALL' ? 'ALL' : net === 'MAINNET' ? 'MAIN' : 'DEV'}
+                    </button>
+                  ))}
+               </div>
+             )}
           </div>
 
-          {/* RIGHT GROUP: SORT BUTTONS */}
           <div className="flex gap-1 md:gap-2 relative ml-auto">
             {['uptime', 'storage', 'version', 'health'].map((opt) => (
-              // COMPACT SORT BUTTONS
-              <button key={opt} onClick={() => handleSortChange(opt as any)} className={`flex items-center gap-1 md:gap-1.5 px-2 py-0 md:px-3 md:py-2 rounded-lg text-[8px] md:text-xs font-bold transition border whitespace-nowrap h-6 md:h-auto uppercase ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-black border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
+               /* HEADER TWEAK: Aggressive Mobile Size Reduction (px-1.5, h-6, text-[8px]/[9px]) */
+              <button key={opt} onClick={() => handleSortChange(opt as any)} className={`flex items-center gap-1 px-1.5 h-6 md:px-3 md:py-2 md:h-auto rounded-lg text-[8px] md:text-xs font-bold transition border whitespace-nowrap ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-black border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
                 {opt === 'uptime' && <Clock size={10} className="md:w-3 md:h-3" />}{opt === 'storage' && <Database size={10} className="md:w-3 md:h-3" />}{opt === 'version' && <Server size={10} className="md:w-3 md:h-3" />}{opt === 'health' && <HeartPulse size={10} className="md:w-3 md:h-3" />}
-                {opt}
-                {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={8} className="ml-0.5 md:ml-1 md:w-2.5 md:h-2.5" /> : <ArrowDown size={8} className="ml-0.5 md:ml-1 md:w-2.5 md:h-2.5" />)}
+                {opt.toUpperCase()}
+                {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={8} className="ml-0.5 md:ml-1 md:w-[10px] md:h-[10px]" /> : <ArrowDown size={8} className="ml-0.5 md:ml-1 md:w-[10px] md:h-[10px]" />)}
               </button>
             ))}
-            {!zenMode && <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-[#09090b] to-transparent pointer-events-none md:hidden"></div>}
+            {!zenMode && <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#09090b] to-transparent pointer-events-none md:hidden"></div>}
           </div>
         </div>
       </header>
@@ -624,7 +602,7 @@ export default function Home() {
       {!zenMode && <div className={`sticky top-0 z-[80] w-full h-1 bg-gradient-to-b from-black/50 to-transparent pointer-events-none transition-opacity duration-300 ${scrolled ? 'opacity-100' : 'opacity-0'}`}></div>}
 
       {searchQuery && !zenMode && (
-        <div className="sticky top-[100px] md:top-[140px] z-[85] w-full bg-blue-900/90 border-b border-blue-500/30 py-2 px-6 text-center backdrop-blur-md animate-in slide-in-from-top-1">
+        <div className="sticky top-[110px] md:top-[140px] z-[85] w-full bg-blue-900/90 border-b border-blue-500/30 py-2 px-6 text-center backdrop-blur-md animate-in slide-in-from-top-1">
             <div className="text-xs font-mono text-blue-100">Found <span className="font-bold text-white">{filteredNodes.length}</span> matches for <span className="italic">"{searchQuery}"</span></div>
         </div>
       )}
@@ -723,8 +701,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* ... Rest of Main content ... */}
-        
         {error && <div className="mb-8 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center gap-2 text-blue-400 animate-pulse"><RefreshCw size={14} className="animate-spin" /><span className="text-xs font-bold">{error}</span></div>}
 
         {!zenMode && favorites.length > 0 && (
@@ -738,18 +714,20 @@ export default function Home() {
           </div>
         )}
 
-        {/* UPDATED: Nodes Heading Layout */}
         {!loading && nodes.length > 0 && (
-             <div className="flex flex-col items-start gap-1 mb-4 mt-8">
-                <div className="flex items-center gap-2">
-                    <Activity className={zenMode ? 'text-zinc-500' : (networkFilter === 'MAINNET' ? "text-green-500" : networkFilter === 'DEVNET' ? "text-blue-500" : "text-white")} size={20} />
-                    <h3 className="text-base md:text-lg font-bold text-white tracking-widest uppercase">
-                        {networkFilter === 'ALL' ? 'Nodes across all networks' : networkFilter === 'MAINNET' ? <span className={zenMode ? 'text-white' : "text-green-500"}>Nodes on Mainnet</span> : <span className={zenMode ? 'text-white' : "text-blue-500"}>Nodes on Devnet</span>} 
-                        <span className="text-zinc-600 ml-2 text-sm">({filteredNodes.length})</span>
-                    </h3>
+             <div className="flex items-start gap-3 mb-4 mt-8">
+                <div className="mt-1">
+                   <Activity className={zenMode ? 'text-zinc-500' : (networkFilter === 'MAINNET' ? "text-green-500" : networkFilter === 'DEVNET' ? "text-blue-500" : "text-white")} size={20} />
                 </div>
-                <div className="flex items-center gap-1 leading-none text-[8px] md:text-[9px] font-mono text-zinc-500 uppercase ml-0.5">
-                    (Distributed by <span className="text-zinc-300 mx-1">{sortBy}</span> {sortOrder === 'asc' ? 'Lowest to Highest' : 'Highest to Lowest'})
+                {/* HEADING TWEAK: Reduced font size, Flex Column, Distributed by on new line */}
+                <div className="flex flex-col">
+                   <h3 className="text-sm md:text-lg font-bold text-white tracking-widest uppercase leading-tight">
+                     {networkFilter === 'ALL' ? 'Nodes across all networks' : networkFilter === 'MAINNET' ? <span className={zenMode ? 'text-white' : "text-green-500"}>Nodes on Mainnet</span> : <span className={zenMode ? 'text-white' : "text-blue-500"}>Nodes on Devnet</span>} 
+                     <span className="text-zinc-600 ml-2 text-xs md:text-sm">({filteredNodes.length})</span>
+                   </h3>
+                   <div className="text-[9px] font-mono text-zinc-500 uppercase mt-1">
+                     Distributed by <span className="text-zinc-300">{sortBy}</span> ({sortOrder === 'asc' ? 'Lowest to Highest' : 'Highest to Lowest'})
+                   </div>
                 </div>
             </div>
         )}
