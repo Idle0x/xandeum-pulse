@@ -1,234 +1,167 @@
-import { Star, HardDrive, Server, Coins, Clock, Activity, Globe } from 'lucide-react';
-import { Node } from '../../types';
-import { formatBytes } from '../../utils/formatters';
-import { getSafeIp } from '../../utils/nodeHelpers';
+import { 
+  Shield, Star, Maximize2, CheckCircle, 
+  AlertTriangle, Medal, Wallet, AlertOctagon, 
+  Database, HardDrive, Activity, Zap, Clock 
+} from 'lucide-react';
+import { Node } from '../../../types';
+import { getSafeIp, compareVersions } from '../../../utils/nodeHelpers';
+import { formatBytes, formatUptime, formatLastSeen } from '../../../utils/formatters';
 
-// Fixed Uptime Helper
-const formatUptime = (seconds: number) => {
-  if (!seconds) return '0m';
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const d = Math.floor(h / 24);
-
-  if (d > 0) return `${d}d ${h % 24}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-};
-
-// Fixed Last Seen Helper
-const formatLastSeen = (timestamp: number) => {
-  if (!timestamp || timestamp === 0) return 'Never';
-
-  // Detect if timestamp is seconds (10 digits) or ms (13 digits)
-  const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
-
-  const diff = Date.now() - time;
-  const sec = Math.floor(diff / 1000);
-
-  if (sec < 0) return 'Just now'; // Clock skew protection
-  if (sec < 60) return `${sec}s ago`;
-  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
-  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
-  return `${Math.floor(sec / 86400)}d ago`;
-};
-
-interface NodeListProps {
-  nodes: Node[];
-  onNodeClick: (node: Node) => void;
+interface NodeCardProps {
+  node: Node;
+  onClick: (node: Node) => void;
   onToggleFavorite: (e: React.MouseEvent, address: string) => void;
-  favorites: string[];
+  isFav: boolean;
+  cycleStep: number;
+  zenMode: boolean;
+  mostCommonVersion: string;
+  sortBy: string;
 }
 
-export const NodeList = ({ nodes, onNodeClick, onToggleFavorite, favorites }: NodeListProps) => {
-  if (nodes.length === 0) return null;
+export const NodeCard = ({ 
+  node, onClick, onToggleFavorite, isFav, cycleStep, 
+  zenMode, mostCommonVersion, sortBy 
+}: NodeCardProps) => {
+
+  // Helpers
+  const cleanVer = (node.version || '').replace(/[^0-9.]/g, '');
+  const cleanConsensus = mostCommonVersion.replace(/[^0-9.]/g, '');
+  const isLatest = cleanVer === cleanConsensus || compareVersions(cleanVer, cleanConsensus) > 0;
+  const isVersionSort = sortBy === 'version';
+  const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
+
+  // --- 1. LOCAL CYCLE LOGIC (INTELLIGENT ZEN) ---
+  const getCycleContent = () => {
+    const zenTextMain = 'text-white font-mono'; // High contrast for values
+    const zenTextDim = 'text-zinc-400';
+
+    // CHANGED: We removed the "Explicit Sort Overrides". 
+    // The card now strictly obeys 'cycleStep' passed from the parent.
+
+    // B. DEFAULT CYCLE LOOP
+    const step = cycleStep % 5;
+
+    // Step 0: Storage Used
+    if (step === 0) return { label: 'Storage Used', value: formatBytes(node.storage_used), color: zenMode ? zenTextMain : 'text-blue-400', icon: Database };
+
+    // Step 1: Committed (This aligns with Sort: Storage)
+    if (step === 1) return { label: 'Committed', value: formatBytes(node.storage_committed || 0), color: zenMode ? zenTextMain : 'text-purple-400', icon: HardDrive };
+
+    // Step 2: Health (Aligns with Sort: Health)
+    if (step === 2) { const score = node.health || 0; return { label: 'Health Score', value: `${score}/100`, color: zenMode ? zenTextMain : (score > 80 ? 'text-green-400' : 'text-yellow-400'), icon: Activity }; }
+
+    // Step 3: Uptime (Aligns with Sort: Uptime)
+    if (step === 3) return { label: 'Continuous Uptime', value: formatUptime(node.uptime), color: zenMode ? zenTextMain : 'text-orange-400', icon: Zap };
+
+    // Step 4: Last Seen (Default fallback)
+    return { label: 'Last Seen', value: formatLastSeen(node.last_seen_timestamp), color: zenMode ? zenTextDim : 'text-zinc-400', icon: Clock };
+  };
+
+  const cycleData = getCycleContent();
+
+  // --- ZEN STYLES ---
+  const containerStyle = zenMode 
+    ? 'bg-black border-zinc-800' 
+    : isFav 
+      ? 'bg-gradient-to-b from-zinc-900 to-black border-yellow-500/40 shadow-[0_0_15px_rgba(234,179,8,0.1)] transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl' 
+      : 'bg-gradient-to-b from-zinc-900 to-black border-zinc-800 hover:border-blue-500/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl';
 
   return (
-    <div className="flex flex-col min-w-full bg-[#09090b]/40">
+    <div
+      onClick={() => onClick(node)}
+      className={`group relative border rounded-xl p-3 md:p-5 cursor-pointer ${containerStyle}`}
+    >
+      {!zenMode && (
+        <div className="absolute top-1 right-1 md:top-2 md:right-2 opacity-0 group-hover:opacity-100 transition duration-300 text-[8px] md:text-[9px] text-blue-400 font-bold uppercase tracking-widest flex items-center gap-1 bg-black/80 md:bg-black/50 px-1.5 py-0.5 md:px-2 md:py-1 rounded-full border border-blue-500/20 z-10">
+          <span className="hidden md:inline">View Details</span> <Maximize2 size={8} />
+        </div>
+      )}
 
-      {/* DESKTOP HEADER */}
-      <div className="hidden md:grid grid-cols-[auto_2fr_1.2fr_1.2fr_0.8fr_0.8fr_1.2fr_0.8fr_auto] gap-4 px-5 py-2 border-b border-zinc-800/50 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
-        <div className="w-2"></div>
-        <div>Identity</div>
-        <div>Last Seen</div>
-        <div>Version</div>
-        <div>Health</div>
-        <div className="text-right">Uptime</div>
-        <div className="text-right">Storage</div>
-        <div className="text-right">Credits</div>
-        <div className="w-6"></div>
+      {/* Header */}
+      <div className="mb-2 md:mb-4 flex justify-between items-start">
+        <div className="overflow-hidden pr-2 w-full">
+          <div className="flex items-center gap-1.5 md:gap-2 mb-1">
+             <div className="hidden md:block text-[10px] text-zinc-500 uppercase font-bold">NODE IDENTITY</div>
+             <div className="flex gap-1">
+                {node.network === 'MAINNET' && (
+                  <span className={`text-[7px] md:text-[8px] px-1 rounded font-bold uppercase ${zenMode ? 'bg-zinc-200 text-black' : 'bg-green-500 text-black'}`}>
+                    {window.innerWidth < 768 ? 'MN' : 'MAINNET'}
+                  </span>
+                )}
+                {node.network === 'DEVNET' && (
+                  <span className={`text-[7px] md:text-[8px] px-1 rounded font-bold uppercase ${zenMode ? 'border border-zinc-600 text-zinc-400' : 'bg-blue-500 text-white'}`}>
+                    {window.innerWidth < 768 ? 'DN' : 'DEVNET'}
+                  </span>
+                )}
+                {node.network === 'UNKNOWN' && (
+                  <span className="text-[7px] md:text-[8px] bg-zinc-800 text-zinc-500 px-1 rounded font-bold uppercase">UNK</span>
+                )}
+             </div>
+             {!node.is_public && <Shield size={10} className="text-zinc-600" />}
+          </div>
+
+          <div className="relative h-4 md:h-6 w-full">
+             <div className={`absolute inset-0 flex items-center ${zenMode ? 'opacity-100 group-hover:opacity-0' : 'transition-opacity duration-300 group-hover:opacity-0'}`}>
+                <span className="font-mono text-[10px] md:text-sm text-zinc-300 truncate w-full">{node.pubkey?.slice(0, 16)}...</span>
+             </div>
+             <div className={`absolute inset-0 flex items-center gap-1.5 md:gap-2 ${zenMode ? 'opacity-0 group-hover:opacity-100' : 'transition-opacity duration-300 opacity-0 group-hover:opacity-100'}`}>
+                 {flagUrl && <img src={flagUrl} className={`w-3 md:w-4 h-auto rounded-sm shrink-0 ${zenMode ? 'grayscale contrast-125' : ''}`} alt="flag" />}
+                 <span className={`font-mono text-[10px] md:text-sm truncate ${zenMode ? 'text-white' : 'text-blue-400'}`}>{getSafeIp(node)}</span>
+             </div>
+          </div>
+        </div>
+
+        <button onClick={(e) => onToggleFavorite(e, node.address || '')} className={`p-1.5 md:p-3 rounded-full shrink-0 ${zenMode ? '' : 'transition-all duration-200 active:scale-90'} ${isFav ? (zenMode ? 'text-white' : 'text-yellow-500 bg-yellow-500/10') : 'text-zinc-600 hover:text-white'}`}>
+          <Star size={14} className="md:w-6 md:h-6" strokeWidth={isFav ? 2.5 : 2} fill={isFav ? "currentColor" : "none"} />
+        </button>
       </div>
 
-      {/* DATA ROWS */}
-      <div className="divide-y divide-zinc-800/30">
-        {nodes.map((node) => {
-          const isFav = favorites.includes(node.address || '');
-          const statusColor = node.credits !== null ? 'bg-green-500' : 'bg-red-500';
-          const countryCode = node.location?.countryCode;
-          
-          // STRICT FLAG CHECK: Exclude 'XX' (Private/Unknown) to match NodeCard logic
-          const showFlag = countryCode && countryCode !== 'XX';
-          
-          const health = node.health || 0;
-          const isMainnet = node.network === 'MAINNET';
+      {/* Body: Version */}
+      <div className="space-y-1.5 md:space-y-3">
+        <div className="flex justify-between items-center text-[9px] md:text-xs">
+          <span className="text-zinc-500">Version</span>
+          <span className={`px-1.5 py-0.5 md:px-2 rounded ${
+            isVersionSort 
+              ? (zenMode ? 'text-white border border-white bg-black' : 'text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.4)] border-cyan-500/50 bg-zinc-900 border transition-all duration-500') 
+              : 'text-zinc-300 bg-zinc-800/50'
+          }`}>
+            {node.version || 'Unknown'} {isLatest && <CheckCircle size={10} className={`inline ml-0.5 md:ml-1 ${zenMode ? 'text-zinc-400' : 'text-green-500'}`}/>}
+          </span>
+        </div>
 
-          return (
-            <div 
-              key={node.pubkey || node.address}
-              onClick={() => onNodeClick(node)}
-              className="group relative cursor-pointer hover:bg-white/[0.03] transition-colors"
-            >
+        <div className="pt-1 md:pt-2">
+          <div className="hidden md:block text-[10px] text-zinc-600 uppercase font-bold mb-1">Network Rewards</div>
+          <div className={`flex justify-between items-center text-[9px] md:text-xs p-1 md:p-2 rounded-lg border ${
+            (node as any).isUntracked 
+              ? (zenMode ? 'bg-black border-zinc-700 border-dashed opacity-50' : 'bg-zinc-900/50 border-zinc-800') 
+              : node.credits !== null 
+                ? (zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-black/40 border-zinc-800/50') 
+                : (zenMode ? 'bg-black border-zinc-500 border-dashed' : 'bg-red-900/10 border-red-500/20')
+          }`}>
+            {(node as any).isUntracked ? (
+              <div className="flex items-center gap-1 md:gap-2 text-zinc-500 w-full justify-center font-bold tracking-wide"><AlertTriangle size={8} className="md:w-[10px] md:h-[10px]"/> NO CREDITS</div>
+            ) : node.credits !== null ? (
+              <>
+                <div className="flex items-center gap-1 md:gap-1.5"><Medal size={8} className={`md:w-[10px] md:h-[10px] ${zenMode ? 'text-zinc-500' : (node.rank===1?'text-yellow-400':'text-zinc-500')}`} /><span className="text-zinc-400 font-bold">#{node.rank}</span></div>
+                <div className="flex items-center gap-1 md:gap-1.5"><span className="text-zinc-300 font-mono">{node.credits.toLocaleString()}</span><Wallet size={8} className={`md:w-[10px] md:h-[10px] ${zenMode ? 'text-zinc-600' : 'text-yellow-600'}`}/></div>
+              </>
+            ) : (
+              <div className={`flex items-center gap-1 md:gap-2 w-full justify-center font-bold italic ${zenMode ? 'text-zinc-400' : 'text-red-400'}`}><AlertOctagon size={8} className="md:w-[10px] md:h-[10px]"/> OFFLINE</div>
+            )}
+          </div>
+        </div>
 
-              {/* --- DESKTOP LAYOUT --- */}
-              <div className="hidden md:grid grid-cols-[auto_2fr_1.2fr_1.2fr_0.8fr_0.8fr_1.2fr_0.8fr_auto] gap-4 px-5 py-3 items-center">
-
-                {/* 1. Status */}
-                <div className="flex items-center justify-center">
-                   <div className={`w-1.5 h-1.5 rounded-full ${statusColor} shadow-[0_0_6px_rgba(255,255,255,0.2)]`}></div>
-                </div>
-
-                {/* 2. Identity (Swap Logic) */}
-                <div className="relative h-5 overflow-hidden">
-                   {/* Default: Pubkey + Badge */}
-                   <div className="absolute inset-0 flex items-center gap-2 transition-transform duration-300 group-hover:-translate-y-full">
-                      <span className="font-mono text-xs text-zinc-300 font-bold truncate" title={node.pubkey}>
-                        {node.pubkey || 'Unknown'}
-                      </span>
-                      <span className={`text-[7px] px-1 rounded border uppercase font-bold tracking-wider ${
-                        isMainnet 
-                          ? 'text-green-900 bg-green-500/20 border-green-500/30' 
-                          : 'text-blue-500 bg-blue-500/10 border-blue-500/20'
-                      }`}>
-                        {isMainnet ? 'MN' : 'DN'}
-                      </span>
-                   </div>
-                   {/* Hover: Flag + IP */}
-                   <div className="absolute inset-0 flex items-center gap-2 translate-y-full transition-transform duration-300 group-hover:translate-y-0">
-                      {showFlag && (
-                        <img 
-                          src={`https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`} 
-                          alt={countryCode}
-                          className="w-4 h-auto opacity-90 rounded-[2px]"
-                        />
-                      )}
-                      <span className="font-mono text-xs text-white font-bold tracking-tight">
-                        {getSafeIp(node)}
-                      </span>
-                   </div>
-                </div>
-
-                {/* 3. Last Seen */}
-                <div className="flex items-center gap-1.5 text-zinc-500 text-[10px] font-mono">
-                   <Clock size={10} />
-                   <span>{formatLastSeen(node.last_seen_timestamp || 0)}</span>
-                </div>
-
-                {/* 4. Version (Truncated) */}
-                <div className="font-mono text-[10px] text-zinc-400 truncate" title={node.version}>
-                   {node.version}
-                </div>
-
-                {/* 5. Health (Strict Off-White) */}
-                <div className="font-mono text-xs font-bold text-zinc-400">
-                   {health}%
-                </div>
-
-                {/* 6. Uptime */}
-                <div className="text-right font-mono text-[10px] text-zinc-400">
-                   {formatUptime(node.uptime || 0)}
-                </div>
-
-                {/* 7. Storage (Stacked) */}
-                <div className="flex flex-col items-end leading-none">
-                   <div className="font-bold text-xs text-purple-400 font-mono mb-0.5">
-                      {formatBytes(node.storage_committed)}
-                   </div>
-                   <div className="text-[9px] text-blue-500 font-mono">
-                      {formatBytes(node.storage_used)}
-                   </div>
-                </div>
-
-                {/* 8. Credits */}
-                <div className="text-right font-mono text-[10px] text-zinc-500">
-                   {node.credits?.toLocaleString() ?? 0}
-                </div>
-
-                {/* 9. Action */}
-                <button 
-                  onClick={(e) => onToggleFavorite(e, node.address || '')}
-                  className={`p-1.5 rounded-md hover:bg-white/10 transition-colors ${isFav ? 'text-yellow-500' : 'text-zinc-600 hover:text-yellow-500'}`}
-                >
-                  <Star size={14} fill={isFav ? "currentColor" : "none"} />
-                </button>
-              </div>
-
-
-              {/* --- MOBILE LAYOUT (STRICT GRID) --- */}
-              {/* Columns: Status | Identity (Stacked) | Version | Health | Storage | Star */}
-              <div className="grid md:hidden grid-cols-[auto_1.5fr_0.8fr_0.5fr_1fr_auto] gap-3 px-4 py-3 items-center border-b border-zinc-800/20">
-
-                 {/* 1. Status Dot */}
-                 <div className={`w-1.5 h-1.5 rounded-full ${statusColor} shrink-0`}></div>
-
-                 {/* 2. Identity (Complex Stack with Metrics) */}
-                 <div className="flex flex-col min-w-0">
-                     {/* Row A: Interactive Swap (PubKey <-> IP) */}
-                     <div className="relative h-5 overflow-hidden w-full">
-                         {/* Default View: PubKey */}
-                         <div className="absolute inset-0 flex items-center gap-2 transition-transform duration-300 group-hover:-translate-y-full">
-                            <span className="font-mono text-xs font-bold text-white truncate w-full">
-                              {node.pubkey ? `${node.pubkey.slice(0, 8)}...` : 'Unknown'}
-                            </span>
-                         </div>
-                         {/* Swapped View: IP + Flag */}
-                         <div className="absolute inset-0 flex items-center gap-2 translate-y-full transition-transform duration-300 group-hover:translate-y-0">
-                            {showFlag && (
-                              <img 
-                                src={`https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`} 
-                                alt={countryCode}
-                                className="w-3 h-auto opacity-90 rounded-[2px]"
-                              />
-                            )}
-                            <span className="font-mono text-[10px] text-zinc-300 font-bold truncate">
-                              {getSafeIp(node)}
-                            </span>
-                         </div>
-                     </div>
-                     
-                     {/* Row B: Tiny Stats (Under PubKey) */}
-                     {/* No Color, Just Numbers, Tiny Font */}
-                     <div className="flex items-center gap-2 text-[7px] font-mono text-zinc-600 leading-none -mt-0.5">
-                        <span>{formatUptime(node.uptime || 0)}</span>
-                        <span className="text-zinc-800">|</span>
-                        <span>{formatLastSeen(node.last_seen_timestamp || 0).replace(' ago', '')}</span>
-                     </div>
-                 </div>
-
-                 {/* 3. Version (Truncated) */}
-                 <div className="font-mono text-[9px] text-zinc-500 truncate text-center">
-                    {node.version}
-                 </div>
-
-                 {/* 4. Health (Off-White) */}
-                 <div className="font-mono text-[10px] font-bold text-zinc-400 text-center">
-                    {health}%
-                 </div>
-
-                 {/* 5. Storage (Stacked) */}
-                 <div className="flex flex-col items-end leading-none">
-                     <span className="font-bold text-[10px] text-purple-400 font-mono">{formatBytes(node.storage_committed)}</span>
-                     <span className="text-[8px] text-blue-500 font-mono mt-0.5">{formatBytes(node.storage_used)}</span>
-                 </div>
-
-                 {/* 6. Star */}
-                 <button onClick={(e) => onToggleFavorite(e, node.address || '')} className="pl-1">
-                    <Star size={12} className={isFav ? "text-yellow-500" : "text-zinc-700"} fill={isFav ? "currentColor" : "none"} />
-                 </button>
-
-              </div>
-
-            </div>
-          );
-        })}
+        {/* Footer: Cycling Metric */}
+        <div className="pt-1 md:pt-3 mt-1 md:mt-3 border-t border-zinc-800 flex justify-between items-end">
+          <div>
+            <span className="text-[8px] md:text-[10px] text-zinc-500 uppercase font-bold block mb-0.5 flex items-center gap-1">
+              <cycleData.icon size={8} className={`md:w-[10px] md:h-[10px] ${zenMode ? 'text-zinc-500' : ''}`} /> {cycleData.label}
+            </span>
+            <span className={`text-xs md:text-lg font-bold font-mono tracking-tight ${cycleData.color}`}>
+              {cycleData.value}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );
