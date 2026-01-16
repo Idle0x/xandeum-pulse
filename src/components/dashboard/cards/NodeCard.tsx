@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Shield, Star, Maximize2, CheckCircle, 
   AlertTriangle, Medal, Wallet, AlertOctagon, 
@@ -24,7 +24,8 @@ export const NodeCard = ({
   zenMode, mostCommonVersion, sortBy 
 }: NodeCardProps) => {
 
-  const [isHovered, setIsHovered] = useState(false);
+  // New: Local state to "Freeze" the cycle on hover
+  const [frozenStep, setFrozenStep] = useState<number | null>(null);
 
   // Helpers
   const cleanVer = (node.version || '').replace(/[^0-9.]/g, '');
@@ -38,14 +39,18 @@ export const NodeCard = ({
     const zenTextMain = 'text-white font-mono'; 
     const zenTextDim = 'text-zinc-400';
 
-    let effectiveStep = cycleStep;
-    if (isHovered) {
-      if (sortBy === 'storage') effectiveStep = 1; 
-      else if (sortBy === 'health') effectiveStep = 2; 
-      else if (sortBy === 'uptime') effectiveStep = 3; 
+    // LOGIC: Use frozen step if hovering, otherwise use global cycle
+    let currentBaseStep = frozenStep !== null ? frozenStep : cycleStep;
+
+    // OVERRIDE: If hovering AND we have a specific sort active, force that metric
+    // This satisfies "Move to Front" on hover
+    if (frozenStep !== null) {
+      if (sortBy === 'storage') currentBaseStep = 1; 
+      else if (sortBy === 'health') currentBaseStep = 2; 
+      else if (sortBy === 'uptime') currentBaseStep = 3; 
     }
 
-    const step = effectiveStep % 5;
+    const step = currentBaseStep % 5;
 
     if (step === 0) return { label: 'Storage Used', value: formatBytes(node.storage_used), color: zenMode ? zenTextMain : 'text-blue-400', icon: Database };
     if (step === 1) return { label: 'Committed', value: formatBytes(node.storage_committed || 0), color: zenMode ? zenTextMain : 'text-purple-400', icon: HardDrive };
@@ -65,8 +70,8 @@ export const NodeCard = ({
   return (
     <div
       onClick={() => onClick(node)}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => setFrozenStep(cycleStep)} // FREEZE TIME
+      onMouseLeave={() => setFrozenStep(null)}      // RESUME TIME
       className={`group relative border rounded-xl p-3 md:p-5 cursor-pointer ${containerStyle}`}
     >
       {!zenMode && (
@@ -114,11 +119,10 @@ export const NodeCard = ({
         </button>
       </div>
 
-      {/* Body: Version (UPDATED) */}
+      {/* Body: Version */}
       <div className="space-y-1.5 md:space-y-3">
         <div className="flex justify-between items-center text-[9px] md:text-xs">
           <span className="text-zinc-500 shrink-0 mr-2">Version</span>
-          {/* Constrained Box Container */}
           <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 md:px-2 rounded max-w-[60%] md:max-w-[50%] ${
             isVersionSort 
               ? (zenMode ? 'text-white border border-white bg-black' : 'text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.4)] border-cyan-500/50 bg-zinc-900 border transition-all duration-500') 
