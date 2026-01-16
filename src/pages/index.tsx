@@ -125,7 +125,7 @@ export default function Home() {
     else if (networkFilter === 'DEVNET') next = 'ALL';
     
     setNetworkFilter(next);
-    showToast(`Switched view to ${next}`);
+    // showToast removed as requested
   };
 
   const toggleZenMode = () => {
@@ -720,13 +720,13 @@ export default function Home() {
               </div>
               <div className="relative z-10">
                 <div className="flex items-baseline gap-1.5"><div className="text-3xl font-black text-white tracking-tighter leading-none" key={filteredNodes.length}>{filteredNodes.length}</div><div className="text-[8px] font-mono text-zinc-600 font-bold uppercase tracking-tight">Nodes</div></div>
-                <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between">
-                  <div className="flex flex-col"><div className={`text-[9px] font-black uppercase flex items-center gap-1 ${networkFilter === 'MAINNET' ? 'text-green-500' : networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-zinc-400'}`}>{networkFilter === 'ALL' ? 'GLOBAL VIEW' : `${networkFilter} READY`}</div></div>
+                <div className="mt-1 pt-1 border-t border-white/5 flex items-center justify-between">
+                  <div className="flex flex-col"><div className={`text-[8px] font-black uppercase flex items-center gap-1 ${networkFilter === 'MAINNET' ? 'text-green-500' : networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-zinc-400'}`}>{networkFilter === 'ALL' ? 'GLOBAL VIEW' : `${networkFilter} READY`}</div></div>
                   
                   {/* --- NEW: Filter Card Bottom Right Logic --- */}
                   <div className="flex items-center">
                       {!isGlobalView && (
-                         <div className="flex items-center gap-1 text-[8px] text-zinc-500 font-mono">
+                         <div className="flex items-center gap-1 text-[7px] text-zinc-500 font-mono">
                             <Globe size={8} /> Global: {nodes.length}
                          </div>
                       )}
