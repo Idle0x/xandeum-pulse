@@ -18,7 +18,6 @@ export const useNodeFilter = (
   const getSortValue = (node: Node, metric: SortOption): number | string => {
     switch (metric) {
       case 'storage':
-        // Map 'storage' to committed (capacity), as requested
         return node.storage_committed ?? -1; 
       case 'uptime':
         return node.uptime ?? -1;
@@ -31,18 +30,14 @@ export const useNodeFilter = (
     }
   };
 
-  // MAIN LOGIC: Filter & Sort
   const filteredNodes = useMemo(() => {
-    // A. Filter Stage
+    // 1. FILTER STAGE
     let result = nodes.filter(node => {
-      // Network Filter
-      if (networkFilter !== 'ALL' && node.network !== networkFilter) {
-        return false;
-      }
+      // Network Check
+      if (networkFilter !== 'ALL' && node.network !== networkFilter) return false;
 
-      // Search Query
+      // Search Check
       if (!searchQuery) return true;
-
       const q = searchQuery.toLowerCase();
       const addr = (getSafeIp(node) || '').toLowerCase();
       const pub = (node.pubkey || '').toLowerCase();
@@ -52,24 +47,32 @@ export const useNodeFilter = (
       return addr.includes(q) || pub.includes(q) || ver.includes(q) || country.includes(q);
     });
 
-    // B. Sort Stage
+    // 2. SORT STAGE (With Tie-Breakers)
     result.sort((a, b) => {
       const valA = getSortValue(a, sortBy);
       const valB = getSortValue(b, sortBy);
 
-      // Special Handling for Version Strings
+      // A. Version Sorting
       if (sortBy === 'version') {
         const res = compareVersions(valA as string, valB as string);
         return sortOrder === 'asc' ? res : -res;
       }
 
-      // Standard Numeric Sort
+      // B. Numeric Sorting
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
+
+      // C. TIE-BREAKER (CRITICAL FOR VISUAL UPDATES)
+      // If values are equal (e.g. both have 0 storage), sort by Pubkey.
+      // This ensures they don't just "sit there" looking stuck.
+      return (a.pubkey || '').localeCompare(b.pubkey || '');
     });
 
-    return result;
+    // 3. RETURN SHALLOW COPY
+    // Spreading [...result] creates a new array reference.
+    // This forces React to acknowledge the change immediately without a 'key' prop.
+    return [...result]; 
+
   }, [nodes, searchQuery, networkFilter, sortBy, sortOrder]);
 
   return filteredNodes;
