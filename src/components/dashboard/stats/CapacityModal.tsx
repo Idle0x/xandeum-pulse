@@ -1,45 +1,43 @@
 import { useState, useMemo } from 'react';
-import { X, Database, TrendingUp, Users, PieChart, Globe, Activity, Server } from 'lucide-react';
+import { X, Database, TrendingUp, Users, PieChart, Globe, Activity, Server, Trophy } from 'lucide-react';
 import { Node } from '../../../types';
 import { formatBytes } from '../../../utils/formatters';
 
 interface CapacityModalProps {
   onClose: () => void;
   nodes: Node[];
+  medianCommitted: number; // Added
+  totalCommitted: number;  // Added
+  totalUsed: number;       // Added
 }
 
-export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
+export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted, totalUsed }: CapacityModalProps) => {
   const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
 
-  // --- 1. DATA ENGINE ---
+  // --- 1. DATA ENGINE (Preserved) ---
   const dashboardData = useMemo(() => {
-    // Global Context (for share calculation)
     const globalCommitted = nodes.reduce((acc, n) => acc + (n.storage_committed || 0), 0);
 
-    // Filter Logic
     const filteredNodes = nodes.filter(n => 
       activeTab === 'ALL' ? true : n.network === activeTab
     );
 
-    const totalCommitted = filteredNodes.reduce((acc, n) => acc + (n.storage_committed || 0), 0);
-    const totalUsed = filteredNodes.reduce((acc, n) => acc + (n.storage_used || 0), 0);
+    const tCommitted = filteredNodes.reduce((acc, n) => acc + (n.storage_committed || 0), 0);
+    const tUsed = filteredNodes.reduce((acc, n) => acc + (n.storage_used || 0), 0);
     const count = filteredNodes.length || 1;
-    const average = totalCommitted / count;
+    const average = tCommitted / count;
 
-    // Median
     const sortedByStorage = [...filteredNodes].sort((a, b) => (a.storage_committed || 0) - (b.storage_committed || 0));
     const mid = Math.floor(sortedByStorage.length / 2);
     const median = sortedByStorage.length > 0 ? (sortedByStorage[mid].storage_committed || 0) : 0;
 
-    // Whale Watcher
     const descNodes = [...filteredNodes].sort((a, b) => (b.storage_committed || 0) - (a.storage_committed || 0));
     const top10 = descNodes.slice(0, 10);
     const top10Sum = top10.reduce((acc, n) => acc + (n.storage_committed || 0), 0);
     const midTier = descNodes.slice(10, 100);
     const midTierSum = midTier.reduce((acc, n) => acc + (n.storage_committed || 0), 0);
-    const restSum = totalCommitted > (top10Sum + midTierSum) ? totalCommitted - (top10Sum + midTierSum) : 0;
+    const restSum = tCommitted > (top10Sum + midTierSum) ? tCommitted - (top10Sum + midTierSum) : 0;
 
-    // Split Stats (for ALL tab)
     let mainnetSum = 0;
     let devnetSum = 0;
     nodes.forEach(n => {
@@ -48,11 +46,14 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
     });
 
     return {
-      totalCommitted, totalUsed, median, average,
+      totalCommitted: tCommitted, 
+      totalUsed: tUsed, 
+      median, 
+      average,
       top10Sum, midTierSum, restSum,
       mainnetSum, devnetSum,
       nodeCount: filteredNodes.length,
-      globalShare: globalCommitted > 0 ? (totalCommitted / globalCommitted) * 100 : 0
+      globalShare: globalCommitted > 0 ? (tCommitted / globalCommitted) * 100 : 0
     };
   }, [nodes, activeTab]);
 
@@ -82,22 +83,19 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
     );
   };
 
-  // --- 3. GRAMMAR HELPER ---
   const getWhaleText = () => {
      if (activeTab === 'ALL') return <>The top 10 nodes <span className="text-zinc-300 font-bold">across all networks</span> control</>;
      if (activeTab === 'MAINNET') return <>The top 10 nodes <span className="text-green-500 font-bold">on Mainnet</span> control</>;
      return <>The top 10 nodes <span className="text-blue-500 font-bold">on Devnet</span> control</>;
   };
 
-  // Color logic for specific tabs
   const themeColor = activeTab === 'MAINNET' ? 'text-green-500' : 'text-blue-500';
   const themeBg = activeTab === 'MAINNET' ? 'bg-green-500' : 'bg-blue-500';
 
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#09090b] border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 fade-in duration-200 overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-        
-        {/* --- HEADER --- */}
+
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div className="flex items-center gap-3">
             <div className={`p-3 rounded-xl border bg-opacity-10 ${activeTab === 'ALL' ? 'bg-purple-500 border-purple-500/20' : activeTab === 'MAINNET' ? 'bg-green-500 border-green-500/20' : 'bg-blue-500 border-blue-500/20'}`}>
@@ -108,7 +106,7 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
               <p className="text-xs text-zinc-500">Storage analytics & distribution</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2 bg-black/40 p-1 rounded-full border border-zinc-800">
              {(['ALL', 'MAINNET', 'DEVNET'] as const).map((tab) => (
                 <button
@@ -130,8 +128,6 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
         </div>
 
         <div className="space-y-3 md:space-y-4">
-          
-          {/* --- ROW 1: HERO SECTION --- */}
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 md:p-5 relative overflow-hidden">
              <div className={`absolute top-0 left-0 w-1 h-full ${activeTab === 'ALL' ? 'bg-purple-500' : themeBg}`}></div>
              <div className="grid grid-cols-2 gap-8 divide-x divide-zinc-800">
@@ -153,12 +149,8 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
              </div>
           </div>
 
-          {/* --- ROW 2: CONTEXT & BENCHMARK --- */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-             
-             {/* LEFT CARD: Logic split based on Tab */}
              {activeTab === 'ALL' ? (
-                 // --- ALL: Split Chart (Horizontal) ---
                  <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex items-center gap-4">
                     <div className="relative w-14 h-14 shrink-0">
                        {renderPie([
@@ -167,7 +159,6 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
                        ])}
                        <div className="absolute inset-0 flex items-center justify-center text-zinc-600"><PieChart size={12} /></div>
                     </div>
-                    {/* Horizontal Spread */}
                     <div className="flex-1 grid grid-cols-2 gap-4">
                        <div>
                           <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-green-500"></div><span className="text-[9px] font-bold text-zinc-400 uppercase">Mainnet</span></div>
@@ -180,29 +171,21 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
                     </div>
                  </div>
              ) : (
-                // --- SPECIFIC: Network Footprint ---
                 <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 flex flex-col justify-between">
                     <div className="flex justify-between items-start mb-2">
                         <div className="text-[9px] text-zinc-500 uppercase font-bold flex items-center gap-1.5"><Globe size={10} /> Network Footprint</div>
                         <span className={`text-[9px] font-mono font-bold ${themeColor}`}>{dashboardData.globalShare.toFixed(1)}% Share</span>
                     </div>
-                    
                     <div className="flex items-baseline gap-2 mb-2">
                         <span className="text-xl font-bold text-white tracking-tight">{dashboardData.nodeCount.toLocaleString()}</span>
                         <span className="text-[10px] text-zinc-500 font-bold uppercase">Active Nodes</span>
                     </div>
-
-                    {/* Progress Bar for Share */}
                     <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
-                        <div 
-                            className={`h-full ${themeBg}`} 
-                            style={{ width: `${dashboardData.globalShare}%` }}
-                        ></div>
+                        <div className={`h-full ${themeBg}`} style={{ width: `${dashboardData.globalShare}%` }}></div>
                     </div>
                 </div>
              )}
 
-             {/* RIGHT CARD: Benchmark */}
              <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 flex flex-col justify-center">
                 <div className="text-[9px] text-zinc-500 uppercase font-bold mb-3 tracking-wider flex items-center gap-1.5">
                    <TrendingUp size={10} /> Network Benchmark
@@ -220,11 +203,8 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
              </div>
           </div>
 
-          {/* --- ROW 3: WHALE WATCHER (REVERTED TO SNIPPET LAYOUT) --- */}
           <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-xl p-4 md:p-5 relative">
              <div className="flex justify-between items-start mb-4">
-                
-                {/* LEFT: Text Info */}
                 <div className="max-w-[65%] pr-4">
                    <div className="flex items-center gap-2 mb-2">
                       <h4 className="text-xs font-bold text-white uppercase tracking-wider">Top 10 Dominance</h4>
@@ -236,19 +216,15 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
                       {getWhaleText()} <span className="text-white font-mono font-bold">{formatBytes(dashboardData.top10Sum)}</span> combined.
                    </p>
                 </div>
-
-                {/* RIGHT: Chart */}
                 <div className="w-16 h-16 shrink-0 relative">
                    {renderPie([
-                      { value: dashboardData.top10Sum, color: '#eab308' },  // Gold
-                      { value: dashboardData.midTierSum, color: '#06b6d4' }, // Cyan (11-100)
-                      { value: dashboardData.restSum, color: '#a1a1aa' }    // Ash (Rest)
+                      { value: dashboardData.top10Sum, color: '#eab308' }, 
+                      { value: dashboardData.midTierSum, color: '#06b6d4' },
+                      { value: dashboardData.restSum, color: '#a1a1aa' }   
                    ])}
                    <div className="absolute inset-0 flex items-center justify-center text-yellow-500"><Users size={12} /></div>
                 </div>
              </div>
-
-             {/* BOTTOM: Legend */}
              <div className="grid grid-cols-3 gap-2 border-t border-yellow-500/10 pt-3">
                 <div>
                    <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div><span className="text-[8px] font-bold text-zinc-500 uppercase">Top 10</span></div>
