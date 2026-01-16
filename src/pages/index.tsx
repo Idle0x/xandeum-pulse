@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/router';
 
 // --- CUSTOM HOOKS ---
@@ -49,7 +49,14 @@ export default function Home() {
 
   const stats = useDashboardStats(nodes, networkFilter, totalStorageCommitted, totalStorageUsed);
 
-  // --- 2. UI STATE ---
+  // --- 2. PERFORMANCE OPTIMIZATION (THE LAG FIX) ---
+  // Create a stable, fresh reference whenever sort changes.
+  // This forces React to diff the list immediately without needing a destructive 'key'.
+  const safeFilteredNodes = useMemo(() => {
+    return [...filteredNodes]; 
+  }, [filteredNodes, sortBy, sortOrder]);
+
+  // --- 3. UI STATE ---
   const [zenMode, setZenMode] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
@@ -65,7 +72,7 @@ export default function Home() {
   const cycleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const toastTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // --- 3. EFFECTS & PERSISTENCE ---
+  // --- 4. EFFECTS & PERSISTENCE ---
   useEffect(() => {
     const savedZen = localStorage.getItem('xandeum_zen_mode');
     if (savedZen === 'true') setZenMode(true);
@@ -79,13 +86,12 @@ export default function Home() {
 
   // --- THE FIXED CYCLE LOGIC ---
   useEffect(() => {
-    // 1. Clear any existing timer immediately to prevent "Flicker" or double-timing
+    // 1. Clear any existing timer immediately
     if (cycleTimerRef.current) clearInterval(cycleTimerRef.current);
 
-    // 2. Define which sorts trigger a "Snap"
-    // (Using index mapping: 0=StorageUsed, 1=Committed, 2=Health, 3=Uptime)
+    // 2. Define Map (UPDATED: Storage -> Index 1 for Committed)
     const SNAP_MAP: Record<string, number> = {
-      'storage': 1, // CORRECTED: Now maps to 'Committed' (Index 1)
+      'storage': 1, // CORRECTED: Now maps to 'Committed'
       'health': 2,
       'uptime': 3
     };
@@ -93,23 +99,20 @@ export default function Home() {
     const targetStep = SNAP_MAP[sortBy];
     const isGenericSort = targetStep === undefined;
 
-    // 3. LOGIC BRANCHING
+    // 3. Logic Branching
     if (!isGenericSort) {
-      // CASE A: User clicked a cycling metric -> Snap immediately & reset timer
-      setCycleStep(targetStep);
+      setCycleStep(targetStep); // Snap to the metric
     } 
-    // CASE B: Generic Sort -> Do nothing (cycle continues undisturbed)
-
-    // 4. START THE TIMER
+    
+    // 4. Start fresh timer
     cycleTimerRef.current = setInterval(() => {
       setCycleStep(prev => prev + 1);
     }, 13000);
 
-    // Cleanup
     return () => {
       if (cycleTimerRef.current) clearInterval(cycleTimerRef.current);
     };
-  }, [sortBy, sortOrder, viewMode]); // Dependency on sortOrder ensures clicking the same header resets the timer
+  }, [sortBy, sortOrder, viewMode]);
 
   // Handle URL Deep Linking
   useEffect(() => {
@@ -123,7 +126,7 @@ export default function Home() {
     }
   }, [loading, nodes, router.query]);
 
-  // --- 4. ACTION HANDLERS ---
+  // --- 5. ACTION HANDLERS ---
   const toggleZenMode = () => {
     const newState = !zenMode;
     setZenMode(newState);
@@ -170,10 +173,9 @@ export default function Home() {
     a.click();
   };
 
-  // Derive Watchlist
   const watchListNodes = nodes.filter(node => favorites.includes(node.address || ''));
 
-  // --- 5. RENDER ---
+  // --- 6. RENDER ---
   return (
     <Layout zenMode={zenMode} onClick={() => isMenuOpen && setIsMenuOpen(false)}>
       <WelcomeCurtain />
@@ -211,7 +213,6 @@ export default function Home() {
       />
 
       <main className={`p-4 md:p-8 ${zenMode ? 'max-w-full' : 'max-w-7xl 2xl:max-w-[1800px] mx-auto'} transition-all duration-500`}>
-        {/* Statistics Grid */}
         <StatsOverview 
           stats={stats}
           totalStorageCommitted={totalStorageCommitted}
@@ -223,14 +224,12 @@ export default function Home() {
           zenMode={zenMode}
         />
 
-        {/* Error State */}
         {error && (
           <div className="mb-8 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center gap-2 text-blue-400 animate-pulse">
             <AlertTriangle size={14} /> <span className="text-xs font-bold">{error}</span>
           </div>
         )}
 
-        {/* Watchlist Section */}
         {!zenMode && favorites.length > 0 && (
           <WatchlistSection 
             nodes={watchListNodes} 
@@ -252,9 +251,9 @@ export default function Home() {
              <PulseGraphLoader />
           ) : viewMode === 'grid' ? (
              <NodeGrid 
-               // FIX: Key removed to prevent full re-render (Lag Fix)
+               // FIX: Removed dynamic 'key' to prevent full DOM destruction (Lag Fix)
                loading={loading}
-               nodes={filteredNodes}
+               nodes={safeFilteredNodes} // FIX: Using memoized array
                zenMode={zenMode}
                cycleStep={cycleStep}
                mostCommonVersion={mostCommonVersion}
@@ -265,8 +264,8 @@ export default function Home() {
              />
           ) : (
              <NodeList
-               // FIX: Key removed to prevent full re-render (Lag Fix)
-               nodes={filteredNodes}
+               // FIX: Removed dynamic 'key' here too
+               nodes={safeFilteredNodes} // FIX: Using memoized array
                onNodeClick={setSelectedNode}
                onToggleFavorite={toggleFavorite}
                favorites={favorites}
@@ -292,7 +291,6 @@ export default function Home() {
             </div>
           )}
         </NodesContainer>
-
       </main>
 
       <Footer zenMode={zenMode} nodeCount={filteredNodes.length} />
