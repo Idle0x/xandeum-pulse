@@ -73,21 +73,27 @@ export default function Home() {
 
     const savedView = localStorage.getItem('xandeum_view_mode');
     if (savedView === 'list') setViewMode('list');
-
-    // Global Card Cycle Timer (13s)
-    const cycleInterval = setInterval(() => setCycleStep(prev => prev + 1), 13000);
-    return () => clearInterval(cycleInterval);
   }, []);
 
-  // NEW: Sync Cycling Metrics with Active Sort
-  // This ensures if you sort by Health in List View, then switch to Grid, 
-  // the cards immediately show Health before continuing the cycle.
+  // FIXED: Unified Cycle Timer & Sort Sync
+  // This single effect handles both the "Snap" to the active metric
+  // AND the timer reset, ensuring they are always perfectly synced.
   useEffect(() => {
-    if (sortBy === 'storage') setCycleStep(1);      // Snap to Committed
-    else if (sortBy === 'health') setCycleStep(2);  // Snap to Health
-    else if (sortBy === 'uptime') setCycleStep(3);  // Snap to Uptime
-    else setCycleStep(0);                           // Reset to Start (Storage Used) for Version/Default
-  }, [sortBy]);
+    // 1. Immediate Snap: Set the starting step based on the sort
+    if (sortBy === 'storage') setCycleStep(1);      
+    else if (sortBy === 'health') setCycleStep(2);  
+    else if (sortBy === 'uptime') setCycleStep(3);  
+    else setCycleStep(0); // Reset to default (Storage Used) for Version/Others                           
+
+    // 2. Start a FRESH timer
+    // This clears any old timer that might be mid-cycle
+    const cycleInterval = setInterval(() => {
+        setCycleStep(prev => prev + 1);
+    }, 13000);
+
+    // 3. Cleanup: Kills the old timer whenever sortBy changes
+    return () => clearInterval(cycleInterval);
+  }, [sortBy]); 
 
   // Handle URL Deep Linking
   useEffect(() => {
@@ -185,7 +191,7 @@ export default function Home() {
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSortChange={handleSortChange}
-        viewMode={viewMode} 
+        viewMode={viewMode}
       />
 
       <main className={`p-4 md:p-8 ${zenMode ? 'max-w-full' : 'max-w-7xl 2xl:max-w-[1800px] mx-auto'} transition-all duration-500`}>
