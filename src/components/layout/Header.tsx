@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Menu, Activity, Search, Monitor, RefreshCw, Repeat, 
-  Clock, Database, Server, HeartPulse, ArrowUp, ArrowDown, Info, X 
+  Clock, Database, Server, HeartPulse, ArrowUp, ArrowDown, Info, X, 
+  LayoutGrid, List, Coins 
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -20,8 +21,9 @@ interface HeaderProps {
   onCycleNetwork: (e: React.MouseEvent) => void;
   sortBy: string;
   sortOrder: 'asc' | 'desc';
-  onSortChange: (metric: 'uptime' | 'version' | 'storage' | 'health') => void;
-  viewMode: 'grid' | 'list'; // NEW PROP
+  onSortChange: (metric: 'uptime' | 'version' | 'storage' | 'health' | 'credits') => void;
+  viewMode: 'grid' | 'list';
+  setViewMode: (mode: 'grid' | 'list') => void;
 }
 
 export const Header = ({
@@ -30,8 +32,18 @@ export const Header = ({
   loading, isBackgroundSyncing, onRefetch,
   networkFilter, onCycleNetwork,
   sortBy, sortOrder, onSortChange,
-  viewMode // Destructure
+  viewMode, setViewMode
 }: HeaderProps) => {
+
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const searchTips = [
     "Search by node IP, public key, version or country",
@@ -40,6 +52,19 @@ export const Header = ({
     "Compare your node metrics against the network leaders",
     "Copy a node URL to share a direct deep-link"
   ];
+
+  // Helper for Desktop List Headers
+  const ListHeaderCell = ({ label, metric, alignRight = false }: { label: string, metric: any, alignRight?: boolean }) => (
+    <div 
+      onClick={() => onSortChange(metric)}
+      className={`flex items-center gap-1 cursor-pointer transition-colors group select-none ${alignRight ? 'justify-end' : ''} ${sortBy === metric ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+    >
+      {label}
+      <div className={`transition-transform duration-300 ${sortBy === metric && sortOrder === 'asc' ? 'rotate-180' : ''}`}>
+        <ArrowDown size={10} className={sortBy === metric ? 'text-blue-500' : 'text-zinc-700'} />
+      </div>
+    </div>
+  );
 
   return (
     <header className={`sticky top-0 z-[50] border-b px-4 py-1 md:py-3 flex flex-col gap-1 md:gap-4 transition-all duration-500 overflow-visible ${zenMode ? 'bg-black border-zinc-800' : 'bg-[#09090b]/90 backdrop-blur-md border-zinc-800'}`}>
@@ -81,7 +106,7 @@ export const Header = ({
           </div>
 
           {!zenMode && (
-            <div className="mt-1 md:mt-2 w-full max-w-full overflow-hidden relative h-[16px] md:h-[20px] transition-all duration-300 mask-linear-fade">
+             <div className="mt-1 md:mt-2 w-full max-w-full overflow-hidden relative h-[16px] md:h-[20px] transition-all duration-300 mask-linear-fade">
                {isSearchFocused ? (
                  <div className="flex items-center justify-center h-full text-[8px] md:text-xs text-blue-400 font-mono tracking-wide uppercase animate-in fade-in">
                     <Info size={10} className="mr-1.5" /> Type to filter nodes instantly
@@ -98,47 +123,101 @@ export const Header = ({
                )}
             </div>
           )}
-          {!zenMode && <style>{` @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } } .animate-marquee { animation: marquee 15s linear infinite; } @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } } .animate-ticker { display: flex; width: max-content; animation: ticker 60s linear infinite; } .mask-linear-fade { mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); } `}</style>}
+           {!zenMode && <style>{` @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } } .animate-marquee { animation: marquee 15s linear infinite; } @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } } .animate-ticker { display: flex; width: max-content; animation: ticker 60s linear infinite; } .mask-linear-fade { mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); } `}</style>}
         </div>
 
-        {/* Right: Zen Toggle */}
-        <button onClick={onToggleZen} className={`p-2 rounded-lg transition flex items-center gap-2 group shrink-0 ${zenMode ? 'bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white' : 'bg-red-900/10 border border-red-500/20 text-red-500 hover:bg-red-900/30'}`} title={zenMode ? 'Exit Zen Mode' : 'Enter Zen Mode'}>
-          <Monitor size={18} />
-          <span className="hidden md:inline text-xs font-bold">{zenMode ? 'EXIT ZEN' : 'ZEN MODE'}</span>
-        </button>
+        {/* Right: Zen Toggle OR Grid/List Toggle (Mobile) */}
+        <div className="shrink-0 relative w-10 md:w-auto h-10 md:h-auto flex items-center justify-end">
+             {/* 1. Zen Button: Visible if NOT scrolled (Mobile) or Always (Desktop) */}
+            <div className={`transition-all duration-300 absolute md:static inset-0 flex items-center justify-end ${isScrolled ? 'opacity-0 scale-75 pointer-events-none md:opacity-100 md:scale-100 md:pointer-events-auto' : 'opacity-100 scale-100'}`}>
+                <button onClick={onToggleZen} className={`p-2 rounded-lg transition flex items-center gap-2 group ${zenMode ? 'bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white' : 'bg-red-900/10 border border-red-500/20 text-red-500 hover:bg-red-900/30'}`} title={zenMode ? 'Exit Zen Mode' : 'Enter Zen Mode'}>
+                <Monitor size={18} />
+                <span className="hidden md:inline text-xs font-bold">{zenMode ? 'EXIT ZEN' : 'ZEN MODE'}</span>
+                </button>
+            </div>
+
+            {/* 2. Grid/List Toggle: Visible if SCROLLED (Mobile) */}
+            <div className={`transition-all duration-300 absolute inset-0 flex items-center justify-end md:hidden ${isScrolled ? 'opacity-100 scale-100' : 'opacity-0 scale-75 pointer-events-none'}`}>
+                 <div className="flex items-center gap-1 p-1 rounded-lg bg-zinc-900 border border-zinc-800">
+                    <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-zinc-700 text-white' : 'text-zinc-500'}`}><LayoutGrid size={16}/></button>
+                    <button onClick={() => setViewMode('list')} className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-zinc-700 text-white' : 'text-zinc-500'}`}><List size={16}/></button>
+                 </div>
+            </div>
+        </div>
       </div>
 
-      {/* Bottom Row: Controls */}
-      <div className="flex items-center justify-between gap-2 md:gap-4 overflow-x-auto pb-1 md:pb-2 scrollbar-hide w-full mt-1 md:mt-6 border-t border-zinc-800/50 pt-2 overflow-visible">
-        {/* Refresh */}
+      {/* Bottom Row: Controls OR List Headers */}
+      <div className="flex items-center gap-2 md:gap-4 overflow-x-auto pb-1 md:pb-2 scrollbar-hide w-full mt-1 md:mt-6 border-t border-zinc-800/50 pt-2 overflow-visible">
+        
+        {/* REFRESH (Always Left) */}
         <button onClick={onRefetch} disabled={loading} className={`flex items-center gap-1 md:gap-2 px-3 h-6 md:px-6 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs shrink-0 ${loading ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'}`}>
           <RefreshCw size={10} className={`md:w-[14px] md:h-[14px] ${loading || isBackgroundSyncing ? 'animate-spin' : ''}`} /> {loading ? 'SYNC...' : 'REFRESH'}
         </button>
 
-        {/* Network Cycle Switch */}
-        <div className="relative shrink-0">
-           <button 
-              onClick={onCycleNetwork}
-              className={`flex items-center gap-1 px-2 h-6 md:px-4 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs border active:scale-95 ${zenMode ? 'bg-black border-zinc-800 text-zinc-400' : 'bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}
-           >
-              <div className={`w-1.5 h-1.5 rounded-full ${networkFilter === 'MAINNET' ? 'bg-green-500' : networkFilter === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
-              <span>{networkFilter === 'ALL' ? 'ALL' : networkFilter === 'MAINNET' ? 'MAIN' : 'DEV'}</span>
-              <Repeat size={10} className="md:w-3 md:h-3 opacity-50"/>
-           </button>
-        </div>
+        {/* Logic: 
+           If Desktop AND ListView: Show Network Switcher on LEFT, then render Column Headers.
+           Else: Show normal sorting buttons and Network Switcher.
+        */}
 
-        {/* Sort Toggles - CONDITIONAL VISIBILITY */}
-        {/* Visible if: Mobile OR (Desktop AND GridView) OR ZenMode */}
-        <div className={`flex gap-1 md:gap-2 relative ml-auto ${viewMode === 'list' && !zenMode ? 'md:hidden' : ''}`}>
-          {['uptime', 'storage', 'version', 'health'].map((opt) => (
-            <button key={opt} onClick={() => onSortChange(opt as any)} className={`flex items-center gap-1 px-1.5 h-6 md:px-3 md:py-2 md:h-auto rounded-lg text-[8px] md:text-xs font-bold transition border whitespace-nowrap ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-black border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
-              {opt === 'uptime' && <Clock size={10} className="md:w-3 md:h-3" />}{opt === 'storage' && <Database size={10} className="md:w-3 md:h-3" />}{opt === 'version' && <Server size={10} className="md:w-3 md:h-3" />}{opt === 'health' && <HeartPulse size={10} className="md:w-3 md:h-3" />}
-              {opt.toUpperCase()}
-              {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={8} className="ml-0.5 md:ml-1 md:w-[10px] md:h-[10px]" /> : <ArrowDown size={8} className="ml-0.5 md:ml-1 md:w-[10px] md:h-[10px]" />)}
-            </button>
-          ))}
-          {!zenMode && <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#09090b] to-transparent pointer-events-none md:hidden"></div>}
-        </div>
+        {viewMode === 'list' && !zenMode ? (
+          // === DESKTOP LIST VIEW HEADER ===
+          <>
+             {/* Network Toggle moved left */}
+             <div className="hidden md:block relative shrink-0">
+                <button 
+                    onClick={onCycleNetwork}
+                    className="flex items-center gap-1 px-4 h-12 rounded-xl transition font-bold text-xs border active:scale-95 bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                >
+                    <div className={`w-1.5 h-1.5 rounded-full ${networkFilter === 'MAINNET' ? 'bg-green-500' : networkFilter === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
+                    <span>{networkFilter === 'ALL' ? 'ALL' : networkFilter === 'MAINNET' ? 'MAIN' : 'DEV'}</span>
+                    <Repeat size={10} className="md:w-3 md:h-3 opacity-50"/>
+                </button>
+             </div>
+
+             {/* The "Replica" Grid Headers */}
+             <div className="hidden md:grid flex-1 grid-cols-[auto_2fr_1.2fr_1.2fr_0.8fr_0.8fr_1.2fr_0.8fr_auto] gap-4 px-2 items-center text-[9px] font-bold uppercase tracking-wider">
+                <div className="w-2"></div>
+                <div>Identity</div>
+                <div>Last Seen</div>
+                <ListHeaderCell label="Version" metric="version" />
+                <ListHeaderCell label="Health" metric="health" />
+                <ListHeaderCell label="Uptime" metric="uptime" alignRight />
+                <ListHeaderCell label="Storage" metric="storage" alignRight />
+                <ListHeaderCell label="Credits" metric="credits" alignRight />
+                <div className="w-6"></div>
+             </div>
+          </>
+        ) : (
+          // === STANDARD / MOBILE CONTROLS ===
+          <>
+             {/* Network Toggle (Standard Position) */}
+             <div className="relative shrink-0">
+                <button 
+                    onClick={onCycleNetwork}
+                    className={`flex items-center gap-1 px-2 h-6 md:px-4 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs border active:scale-95 ${zenMode ? 'bg-black border-zinc-800 text-zinc-400' : 'bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}
+                >
+                    <div className={`w-1.5 h-1.5 rounded-full ${networkFilter === 'MAINNET' ? 'bg-green-500' : networkFilter === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
+                    <span>{networkFilter === 'ALL' ? 'ALL' : networkFilter === 'MAINNET' ? 'MAIN' : 'DEV'}</span>
+                    <Repeat size={10} className="md:w-3 md:h-3 opacity-50"/>
+                </button>
+             </div>
+
+             {/* Standard Sort Buttons */}
+             <div className={`flex gap-1 md:gap-2 relative ml-auto`}>
+                {['uptime', 'storage', 'version', 'health', 'credits'].map((opt) => (
+                    <button key={opt} onClick={() => onSortChange(opt as any)} className={`flex items-center gap-1 px-1.5 h-6 md:px-3 md:py-2 md:h-auto rounded-lg text-[8px] md:text-xs font-bold transition border whitespace-nowrap ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-black border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
+                    {opt === 'uptime' && <Clock size={10} className="md:w-3 md:h-3" />}
+                    {opt === 'storage' && <Database size={10} className="md:w-3 md:h-3" />}
+                    {opt === 'version' && <Server size={10} className="md:w-3 md:h-3" />}
+                    {opt === 'health' && <HeartPulse size={10} className="md:w-3 md:h-3" />}
+                    {opt === 'credits' && <Coins size={10} className="md:w-3 md:h-3" />}
+                    {opt.toUpperCase()}
+                    {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={8} className="ml-0.5 md:ml-1 md:w-[10px] md:h-[10px]" /> : <ArrowDown size={8} className="ml-0.5 md:ml-1 md:w-[10px] md:h-[10px]" />)}
+                    </button>
+                ))}
+            </div>
+          </>
+        )}
       </div>
     </header>
   );
