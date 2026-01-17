@@ -15,29 +15,39 @@ import {
 // Hooks & Utils
 import { useNetworkData } from '../hooks/useNetworkData';
 import { getSafeIp, compareVersions } from '../utils/nodeHelpers';
-import { formatBytes, formatUptime } from '../utils/formatters';
+import { formatBytes } from '../utils/formatters';
 import { Node } from '../types';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
 // --- THEME ENGINE ---
 const PLAYER_THEMES = [
-  { name: 'cyan', hex: '#22d3ee', headerBg: 'bg-cyan-900/60', bodyBg: 'bg-cyan-900/5', text: 'text-cyan-400', border: 'border-cyan-500/20' },
-  { name: 'violet', hex: '#a78bfa', headerBg: 'bg-violet-900/60', bodyBg: 'bg-violet-900/5', text: 'text-violet-400', border: 'border-violet-500/20' },
-  { name: 'emerald', hex: '#34d399', headerBg: 'bg-emerald-900/60', bodyBg: 'bg-emerald-900/5', text: 'text-emerald-400', border: 'border-emerald-500/20' },
-  { name: 'amber', hex: '#fbbf24', headerBg: 'bg-amber-900/60', bodyBg: 'bg-amber-900/5', text: 'text-amber-400', border: 'border-amber-500/20' },
-  { name: 'rose', hex: '#fb7185', headerBg: 'bg-rose-900/60', bodyBg: 'bg-rose-900/5', text: 'text-rose-400', border: 'border-rose-500/20' }
+  { name: 'cyan', hex: '#22d3ee', headerBg: 'bg-cyan-900/40', bodyBg: 'bg-cyan-900/5', text: 'text-cyan-400', border: 'border-cyan-500/20' },
+  { name: 'violet', hex: '#a78bfa', headerBg: 'bg-violet-900/40', bodyBg: 'bg-violet-900/5', text: 'text-violet-400', border: 'border-violet-500/20' },
+  { name: 'emerald', hex: '#34d399', headerBg: 'bg-emerald-900/40', bodyBg: 'bg-emerald-900/5', text: 'text-emerald-400', border: 'border-emerald-500/20' },
+  { name: 'amber', hex: '#fbbf24', headerBg: 'bg-amber-900/40', bodyBg: 'bg-amber-900/5', text: 'text-amber-400', border: 'border-amber-500/20' },
+  { name: 'rose', hex: '#fb7185', headerBg: 'bg-rose-900/40', bodyBg: 'bg-rose-900/5', text: 'text-rose-400', border: 'border-rose-500/20' }
 ];
 
 // --- MICRO COMPONENTS ---
+
+const formatUptimePrecise = (seconds: number) => {
+  if (!seconds) return '0m';
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+};
 
 const DeltaTag = ({ val, base, type = 'number', reverse = false, contextLabel }: { val: number; base: number; type?: 'number' | 'bytes' | 'percent'; reverse?: boolean; contextLabel: string }) => {
   if (val === base || !base) return null;
   const diff = val - base;
   const isGood = reverse ? diff < 0 : diff > 0;
   return (
-    <div className="group relative cursor-help">
-        <span className={`text-[6px] font-bold ml-1 ${isGood ? 'text-green-400' : 'text-red-400'}`}>
+    <div className="group relative cursor-help ml-1">
+        <span className={`text-[6px] font-bold ${isGood ? 'text-green-500' : 'text-red-500'}`}>
         {diff > 0 ? '↑' : '↓'}
         </span>
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 bg-black border border-zinc-700 rounded text-[6px] text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none shadow-xl">
@@ -48,15 +58,15 @@ const DeltaTag = ({ val, base, type = 'number', reverse = false, contextLabel }:
 };
 
 const MicroBar = ({ val, max, color }: { val: number, max: number, color: string }) => (
-  <div className="w-12 h-0.5 bg-zinc-800/50 rounded-full overflow-hidden ml-auto">
+  <div className="w-10 h-0.5 bg-zinc-800 rounded-full overflow-hidden ml-auto">
     <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min((val/max)*100, 100)}%`, backgroundColor: color }}></div>
   </div>
 );
 
 const SectionHeader = ({ label, icon: Icon }: { label: string, icon: any }) => (
-  <div className="h-5 bg-black/80 backdrop-blur-md border-y border-white/5 flex items-center px-2 gap-1 sticky left-0 z-10 w-full mt-1">
-    <Icon size={8} className="text-zinc-600" />
-    <span className="text-[6px] font-black text-zinc-500 uppercase tracking-[0.2em]">{label}</span>
+  <div className="h-5 bg-black/90 backdrop-blur-md border-y border-white/5 flex items-center px-2 gap-1 sticky left-0 z-10 w-full mt-1">
+    <Icon size={8} className="text-zinc-500" />
+    <span className="text-[6px] font-bold text-zinc-500 uppercase tracking-[0.1em]">{label}</span>
   </div>
 );
 
@@ -66,8 +76,8 @@ const ControlRail = ({ showNetwork, leaderMetric, benchmarks }: any) => {
   const Benchmark = ({ label, val, subVal }: { label: string, val: string, subVal?: string }) => (
     <div className="flex flex-col justify-center h-[36px] border-b border-white/5 px-2">
       <div className="flex justify-between items-center text-[6px] font-mono">
-        <span className="text-zinc-600 uppercase tracking-wide">{label}</span>
-        <span className="text-zinc-500">{showNetwork ? val : '-'}</span>
+        <span className="text-zinc-500 font-bold">{label}</span>
+        <span className="text-zinc-400">{showNetwork ? val : '-'}</span>
       </div>
       {leaderMetric && subVal && (
           <div className="flex justify-between items-center text-[6px] font-mono mt-0.5 text-yellow-600/80">
@@ -79,34 +89,36 @@ const ControlRail = ({ showNetwork, leaderMetric, benchmarks }: any) => {
   );
 
   return (
-    <div className="sticky left-0 z-40 bg-[#09090b] border-r border-white/10 w-[90px] shrink-0 flex flex-col shadow-[4px_0_24px_-4px_rgba(0,0,0,0.8)]">
-      <div className="h-20 border-b border-white/5 p-2 flex flex-col justify-end bg-black">
-        <div className="text-[6px] font-black text-zinc-700 uppercase tracking-widest flex items-center gap-1"><Settings2 size={8} /> KEYS</div>
+    <div className="sticky left-0 z-40 bg-[#09090b] border-r border-white/10 w-[100px] shrink-0 flex flex-col shadow-[4px_0_24px_-4px_rgba(0,0,0,0.8)]">
+      <div className="h-24 border-b border-white/5 p-2 flex flex-col justify-end bg-black">
+        <div className="text-[6px] font-black text-zinc-600 uppercase tracking-widest flex items-center gap-1"><Settings2 size={8} /> METRICS</div>
       </div>
       
       <div className="bg-transparent">
-        <SectionHeader label="ID" icon={Shield} />
+        <SectionHeader label="IDENTITY" icon={Shield} />
         <Benchmark label="Version" val={benchmarks.network.version} subVal={benchmarks.leader.version} />
-        <Benchmark label="Net" val="-" />
+        <Benchmark label="Network" val="-" />
         
-        <SectionHeader label="VITAL" icon={Activity} />
-        <Benchmark label="Health" val={benchmarks.network.health} subVal={benchmarks.leader.health} />
+        <SectionHeader label="VITALITY" icon={Activity} />
+        <Benchmark label="Health Score" val={benchmarks.network.health} subVal={benchmarks.leader.health} />
         <Benchmark label="Uptime" val={benchmarks.network.uptime} subVal={benchmarks.leader.uptime} />
 
-        <SectionHeader label="HD" icon={Database} />
-        <Benchmark label="Cap" val={benchmarks.network.storage} subVal={benchmarks.leader.storage} />
-        <Benchmark label="Used" val="-" />
+        <SectionHeader label="HARDWARE" icon={Database} />
+        <Benchmark label="Capacity" val={benchmarks.network.storage} subVal={benchmarks.leader.storage} />
+        <Benchmark label="Used Space" val="-" />
 
-        <SectionHeader label="ECO" icon={Zap} />
+        <SectionHeader label="ECONOMY" icon={Zap} />
         <Benchmark label="Credits" val={benchmarks.network.credits} subVal={benchmarks.leader.credits} />
-        <Benchmark label="Rank" val="-" />
+        <Benchmark label="Global Rank" val="-" />
+        
+        <div className="h-[28px] border-t border-white/5 bg-black/50"></div>
       </div>
     </div>
   );
 };
 
 const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner, benchmarks, leaderMetric, showNetwork }: any) => {
-  const Row = ({ children }: { children: React.ReactNode }) => (<div className={`h-[36px] flex flex-col justify-center px-3 min-w-[100px] md:min-w-[110px] relative`}>{children}</div>);
+  const Row = ({ children }: { children: React.ReactNode }) => (<div className={`h-[36px] flex flex-col justify-center px-3 min-w-[100px] md:min-w-[110px] relative border-b border-white/5`}>{children}</div>);
   const SectionSpacer = () => <div className="h-5 bg-transparent border-y border-transparent mt-1"></div>;
 
   const getContext = (metric: 'health' | 'storage' | 'credits') => {
@@ -117,46 +129,48 @@ const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner,
   };
 
   return (
-    <div className={`flex flex-col min-w-[100px] md:min-w-[110px] ${theme.bodyBg} relative`}>
-      <div className={`h-20 ${theme.headerBg} p-2 flex flex-col justify-between relative overflow-hidden group`}>
-        <div className="flex justify-between items-start">
-            {node.location?.countryCode && <img src={`https://flagcdn.com/w40/${node.location.countryCode.toLowerCase()}.png`} className="w-3 h-2 rounded-[1px] opacity-80" />}
-            <button onClick={onRemove} className="text-white/20 hover:text-white transition"><X size={8} /></button>
+    <div className={`flex flex-col min-w-[100px] md:min-w-[110px] ${theme.bodyBg} relative border-r border-white/5`}>
+      {/* Header */}
+      <div className={`h-24 ${theme.headerBg} p-2 flex flex-col items-center justify-center relative overflow-hidden group`}>
+        {overallWinner && <div className="absolute top-1.5 left-1.5 animate-in zoom-in duration-500"><Crown size={10} className="text-yellow-400 fill-yellow-400 drop-shadow-sm" /></div>}
+        
+        <div className="mb-2 scale-150">
+            {node.location?.countryCode && <img src={`https://flagcdn.com/w40/${node.location.countryCode.toLowerCase()}.png`} className="w-4 h-3 rounded-[1px] shadow-sm" />}
         </div>
-        <div>
-            {overallWinner && <div className="absolute top-2 right-1/2 translate-x-1/2 animate-in zoom-in duration-500"><Crown size={12} className="text-yellow-400 fill-yellow-400 drop-shadow-lg" /></div>}
-            <div className={`text-[9px] font-black truncate font-mono tracking-tight text-white/90`}>{node.pubkey?.slice(0, 8)}...</div>
-            <div className="text-[6px] text-white/50 font-mono truncate">{getSafeIp(node)}</div>
+        
+        <div className="text-center">
+            <div className={`text-[9px] font-bold font-mono text-white/90`}>{getSafeIp(node)}</div>
+            <div className="text-[6px] text-white/50 font-mono truncate max-w-[80px]">{node.pubkey?.slice(0, 10)}...</div>
         </div>
       </div>
 
       <div className="relative z-10">
         <SectionSpacer />
-        <Row><span className={`text-[9px] font-mono font-bold ${node.version === '0.0.0' ? 'text-zinc-600' : 'text-zinc-300'}`}>{node.version}</span></Row>
-        <Row><span className={`text-[6px] px-1 py-0.5 rounded border w-fit font-bold ${node.network === 'MAINNET' ? 'text-green-400 border-green-500/20 bg-green-500/5' : 'text-blue-400 border-blue-500/20 bg-blue-500/5'}`}>{node.network}</span></Row>
+        <Row><span className={`text-[9px] font-mono font-medium ${node.version === '0.0.0' ? 'text-zinc-600' : 'text-zinc-300'}`}>{node.version}</span></Row>
+        <Row><span className={`text-[6px] px-1.5 py-0.5 rounded border w-fit font-bold ${node.network === 'MAINNET' ? 'text-green-400 border-green-500/20 bg-green-500/5' : 'text-blue-400 border-blue-500/20 bg-blue-500/5'}`}>{node.network}</span></Row>
 
         <SectionSpacer />
         <Row>
             <div className="flex justify-between items-center w-full">
-                <span className={`text-[10px] font-mono font-bold ${node.health >= 90 ? 'text-green-400' : 'text-zinc-400'}`}>{node.health}</span>
+                <span className="text-[9px] font-mono text-zinc-300">{node.health}</span>
                 {winners.health && <CheckCircle size={8} className="text-green-500" />}
                 {(() => { const ctx = getContext('health'); return ctx.base > 0 && <DeltaTag val={node.health} base={ctx.base} contextLabel={ctx.label} />; })()}
             </div>
-            <MicroBar val={node.health} max={100} color={node.health >= 90 ? '#4ade80' : '#facc15'} />
+            <MicroBar val={node.health} max={100} color={node.health >= 90 ? '#22c55e' : '#eab308'} />
         </Row>
-        <Row><span className="text-[9px] font-mono text-zinc-400">{formatUptime(node.uptime).split(' ')[0]}<span className="text-[6px]">d</span></span></Row>
+        <Row><span className="text-[9px] font-mono text-zinc-300">{formatUptimePrecise(node.uptime)}</span></Row>
 
         <SectionSpacer />
         <Row>
             <div className="flex justify-between items-center w-full">
-                <span className="text-[9px] font-mono text-purple-300 font-bold">{formatBytes(node.storage_committed)}</span>
+                <span className="text-[9px] font-mono text-zinc-300">{formatBytes(node.storage_committed)}</span>
                 {winners.storage && <CheckCircle size={8} className="text-green-500" />}
                 {(() => { const ctx = getContext('storage'); return ctx.base > 0 && <DeltaTag val={node.storage_committed} base={ctx.base} type="bytes" contextLabel={ctx.label} />; })()}
             </div>
         </Row>
         <Row>
             <div className="flex justify-between items-center w-full">
-                <span className="text-[9px] font-mono text-blue-300 font-bold">{formatBytes(node.storage_used)}</span>
+                <span className="text-[9px] font-mono text-zinc-300">{formatBytes(node.storage_used)}</span>
                 <span className="text-[6px] text-zinc-500 font-mono">{node.storage_committed > 0 ? ((node.storage_used / node.storage_committed) * 100).toFixed(0) : 0}%</span>
             </div>
             <MicroBar val={node.storage_used} max={node.storage_committed} color="#60a5fa" />
@@ -165,12 +179,17 @@ const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner,
         <SectionSpacer />
         <Row>
             <div className="flex justify-between items-center w-full">
-                <span className="text-[9px] font-mono text-yellow-500 font-bold">{node.credits?.toLocaleString()}</span>
+                <span className="text-[9px] font-mono text-zinc-300">{node.credits?.toLocaleString()}</span>
                 {winners.credits && <CheckCircle size={8} className="text-green-500" />}
                 {(() => { const ctx = getContext('credits'); return ctx.base > 0 && <DeltaTag val={node.credits} base={ctx.base} contextLabel={ctx.label} />; })()}
             </div>
         </Row>
         <Row><span className="text-[9px] font-mono text-zinc-500">#{node.rank || '-'}</span></Row>
+
+        {/* TRASHCAN ROW */}
+        <div className="h-[28px] border-t border-white/5 flex items-center justify-center bg-black/20 hover:bg-red-500/10 transition-colors cursor-pointer group/trash" onClick={onRemove}>
+            <Trash2 size={10} className="text-zinc-700 group-hover/trash:text-red-500 transition-colors" />
+        </div>
       </div>
     </div>
   );
@@ -236,7 +255,6 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
             {tab === 'MARKET' && (
                 <>
                     <div className="flex-1 flex items-center justify-center gap-12 md:gap-24 animate-in fade-in duration-500">
-                        {/* Storage Donut */}
                         <div className="flex flex-col items-center gap-4">
                             <div className="w-32 h-32 rounded-full relative flex items-center justify-center shadow-2xl transition-all duration-500 hover:scale-105" style={{ background: getConicGradient('STORAGE') }}>
                                 <div className="w-24 h-24 bg-[#050505] rounded-full flex flex-col items-center justify-center z-10 shadow-inner border border-white/5">
@@ -246,8 +264,6 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
                             </div>
                             <div className="text-[10px] text-zinc-400 font-mono bg-zinc-900/50 px-3 py-1 rounded-full border border-zinc-800">{formatBytes(totalStorage)} Combined</div>
                         </div>
-
-                        {/* Credits Donut */}
                         <div className="flex flex-col items-center gap-4">
                             <div className="w-32 h-32 rounded-full relative flex items-center justify-center shadow-2xl transition-all duration-500 hover:scale-105" style={{ background: getConicGradient('CREDITS') }}>
                                 <div className="w-24 h-24 bg-[#050505] rounded-full flex flex-col items-center justify-center z-10 shadow-inner border border-white/5">
@@ -281,7 +297,7 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
 
 const EmptySlot = ({ onClick }: { onClick: () => void }) => (
   <div className="flex flex-col min-w-[100px] md:min-w-[110px] h-full bg-white/[0.01] group cursor-pointer hover:bg-white/[0.03] transition relative" onClick={onClick}>
-    <div className="h-20 p-2 flex flex-col items-center justify-center border-b border-white/5 bg-black/40">
+    <div className="h-24 p-2 flex flex-col items-center justify-center border-b border-white/5 bg-black/40">
       <Plus size={12} className="text-zinc-700 group-hover:text-zinc-400 transition" />
     </div>
     <div className="flex-1"></div>
@@ -343,8 +359,8 @@ export default function ComparePage() {
       const leaderRaw = leaderNode ? { health: leaderNode.health || 0, storage: leaderNode.storage_committed || 0, credits: leaderNode.credits || 0, uptime: leaderNode.uptime || 0, version: leaderNode.version || 'N/A' } : { health: 0, storage: 0, credits: 0, uptime: 0, version: 'N/A' };
 
       return {
-          network: { health: netHealthRaw.toString(), uptime: formatUptime(netUptimeRaw).split(' ')[0] + 'd', storage: formatBytes(netStorageRaw), credits: netCreditsRaw.toLocaleString(), version: netVersion },
-          leader: { health: leaderRaw.health.toString(), uptime: formatUptime(leaderRaw.uptime), storage: formatBytes(leaderRaw.storage), credits: leaderRaw.credits.toLocaleString(), version: leaderRaw.version },
+          network: { health: netHealthRaw.toString(), uptime: formatUptimePrecise(netUptimeRaw), storage: formatBytes(netStorageRaw), credits: netCreditsRaw.toLocaleString(), version: netVersion },
+          leader: { health: leaderRaw.health.toString(), uptime: formatUptimePrecise(leaderRaw.uptime), storage: formatBytes(leaderRaw.storage), credits: leaderRaw.credits.toLocaleString(), version: leaderRaw.version },
           networkRaw: { health: netHealthRaw, storage: netStorageRaw, credits: netCreditsRaw, uptime: netUptimeRaw },
           leaderRaw
       };
@@ -385,10 +401,11 @@ export default function ComparePage() {
 
       <header className="shrink-0 pt-4 pb-2 px-4 md:px-8 relative z-50 flex justify-center">
         {/* CENTERED GLASS HEADER */}
-        <div className="bg-zinc-900/40 backdrop-blur-md border border-white/5 rounded-full px-6 py-2 flex items-center gap-3 shadow-2xl">
-            <h1 className="text-xs font-black text-white uppercase tracking-[0.2em]">COMPARATIVE INTELLIGENCE</h1>
-            <div className="h-3 w-px bg-white/10"></div>
-            <div className="text-[9px] text-zinc-500 font-mono font-bold">Active Matrix: {selectedNodes.length}</div>
+        <div className="flex flex-col items-center gap-1">
+            <div className="bg-zinc-900/40 backdrop-blur-md border border-white/5 rounded-full px-6 py-2 shadow-2xl">
+                <h1 className="text-sm font-bold text-white uppercase tracking-widest">COMPARATIVE INTELLIGENCE</h1>
+            </div>
+            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Active Pods: {selectedNodes.length}</span>
         </div>
       </header>
 
