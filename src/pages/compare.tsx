@@ -3,18 +3,18 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { toPng } from 'html-to-image';
-import { ComposableMap, Geographies, Geography, Marker, Line, ZoomableGroup } from 'react-simple-maps';
+import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { 
   ArrowLeft, Search, Plus, X, Trash2, 
-  Download, Settings2, CheckCircle, ArrowRight,
-  TrendingUp, TrendingDown, Minus, Database, Shield, Zap, Globe, 
+  Download, Settings2, CheckCircle, 
+  Database, Shield, Zap, 
   Activity, Share2, Map as MapIcon, ChevronDown, Crown, 
-  BarChart3, PieChart, Grid, Star, LayoutGrid, Info
+  BarChart3, PieChart, Grid, Star, Clock
 } from 'lucide-react';
 
 // Hooks & Utils
 import { useNetworkData } from '../hooks/useNetworkData';
-import { getSafeIp, compareVersions } from '../utils/nodeHelpers';
+import { getSafeIp } from '../utils/nodeHelpers';
 import { formatBytes } from '../utils/formatters';
 import { Node } from '../types';
 
@@ -41,18 +41,23 @@ const formatUptimePrecise = (seconds: number) => {
   return `${m}m`;
 };
 
-const DeltaTag = ({ val, base, type = 'number', reverse = false, contextLabel }: { val: number; base: number; type?: 'number' | 'bytes' | 'percent'; reverse?: boolean; contextLabel: string }) => {
-  if (val === base || !base) return null;
+// New Delta Display Component
+const ComparativeDelta = ({ val, base, type = 'number', reverse = false }: { val: number; base: number; type?: 'number' | 'bytes' | 'percent'; reverse?: boolean }) => {
+  if (!base) return null;
   const diff = val - base;
+  if (diff === 0) return null;
+
   const isGood = reverse ? diff < 0 : diff > 0;
+  const sign = diff > 0 ? '+' : '';
+  
+  let formattedDiff = '';
+  if (type === 'bytes') formattedDiff = formatBytes(diff);
+  else if (type === 'percent') formattedDiff = `${diff.toFixed(1)}%`;
+  else formattedDiff = diff.toLocaleString();
+
   return (
-    <div className="group relative cursor-help ml-1">
-        <span className={`text-[6px] font-bold ${isGood ? 'text-green-500' : 'text-red-500'}`}>
-        {diff > 0 ? '↑' : '↓'}
-        </span>
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 bg-black border border-zinc-700 rounded text-[6px] text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none shadow-xl">
-            vs {contextLabel}
-        </div>
+    <div className={`text-[8px] font-mono mt-0.5 font-bold ${isGood ? 'text-cyan-400' : 'text-pink-500'}`}>
+      avg {sign}{formattedDiff}
     </div>
   );
 };
@@ -89,8 +94,8 @@ const ControlRail = ({ showNetwork, leaderMetric, benchmarks }: any) => {
   );
 
   return (
-    <div className="sticky left-0 z-40 bg-[#09090b] border-r border-white/10 w-[100px] shrink-0 flex flex-col shadow-[4px_0_24px_-4px_rgba(0,0,0,0.8)]">
-      <div className="h-24 border-b border-white/5 p-2 flex flex-col justify-end bg-black">
+    <div className="sticky left-0 z-40 bg-[#09090b] border-r border-white/10 w-[100px] shrink-0 flex flex-col shadow-[4px_0_24px_-4px_rgba(0,0,0,0.8)] rounded-tl-xl rounded-bl-xl">
+      <div className="h-24 border-b border-white/5 p-2 flex flex-col justify-end bg-black rounded-tl-xl">
         <div className="text-[6px] font-black text-zinc-600 uppercase tracking-widest flex items-center gap-1"><Settings2 size={8} /> METRICS</div>
       </div>
       
@@ -111,7 +116,7 @@ const ControlRail = ({ showNetwork, leaderMetric, benchmarks }: any) => {
         <Benchmark label="Credits" val={benchmarks.network.credits} subVal={benchmarks.leader.credits} />
         <Benchmark label="Global Rank" val="-" />
         
-        <div className="h-[28px] border-t border-white/5 bg-black/50"></div>
+        <div className="h-[28px] border-t border-white/5 bg-black/50 rounded-bl-xl"></div>
       </div>
     </div>
   );
@@ -122,16 +127,15 @@ const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner,
   const SectionSpacer = () => <div className="h-5 bg-transparent border-y border-transparent mt-1"></div>;
 
   const getContext = (metric: 'health' | 'storage' | 'credits') => {
-      if (leaderMetric) return { base: benchmarks.leaderRaw[metric], label: 'Leader' };
-      if (showNetwork) return { base: benchmarks.networkRaw[metric], label: 'Network' };
-      if (anchorNode && node.pubkey !== anchorNode.pubkey) return { base: anchorNode[metric === 'storage' ? 'storage_committed' : metric] || 0, label: 'Anchor' };
+      // Priority: Network Average
+      if (showNetwork) return { base: benchmarks.networkRaw[metric], label: 'Avg' };
       return { base: 0, label: '' };
   };
 
   return (
-    <div className={`flex flex-col min-w-[100px] md:min-w-[110px] ${theme.bodyBg} relative border-r border-white/5`}>
+    <div className={`flex flex-col min-w-[100px] md:min-w-[110px] ${theme.bodyBg} relative border-r border-white/5 last:rounded-tr-xl last:rounded-br-xl`}>
       {/* Header */}
-      <div className={`h-24 ${theme.headerBg} p-2 flex flex-col items-center justify-center relative overflow-hidden group`}>
+      <div className={`h-24 ${theme.headerBg} p-2 flex flex-col items-center justify-center relative overflow-hidden group first:rounded-tr-xl`}>
         {overallWinner && <div className="absolute top-1.5 left-1.5 animate-in zoom-in duration-500"><Crown size={10} className="text-yellow-400 fill-yellow-400 drop-shadow-sm" /></div>}
         
         <div className="mb-2 scale-150">
@@ -151,21 +155,25 @@ const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner,
 
         <SectionSpacer />
         <Row>
-            <div className="flex justify-between items-center w-full">
-                <span className="text-[9px] font-mono text-zinc-300">{node.health}</span>
-                {winners.health && <CheckCircle size={8} className="text-green-500" />}
-                {(() => { const ctx = getContext('health'); return ctx.base > 0 && <DeltaTag val={node.health} base={ctx.base} contextLabel={ctx.label} />; })()}
+            <div className="flex flex-col w-full">
+                <div className="flex justify-between items-center w-full">
+                    <span className="text-[9px] font-mono text-zinc-300">{node.health}</span>
+                    {winners.health && <CheckCircle size={8} className="text-green-500" />}
+                </div>
+                {(() => { const ctx = getContext('health'); return ctx.base > 0 && <ComparativeDelta val={node.health} base={ctx.base} />; })()}
             </div>
-            <MicroBar val={node.health} max={100} color={node.health >= 90 ? '#22c55e' : '#eab308'} />
+            <div className="absolute bottom-1 right-2"><MicroBar val={node.health} max={100} color={node.health >= 90 ? '#22c55e' : '#eab308'} /></div>
         </Row>
         <Row><span className="text-[9px] font-mono text-zinc-300">{formatUptimePrecise(node.uptime)}</span></Row>
 
         <SectionSpacer />
         <Row>
-            <div className="flex justify-between items-center w-full">
-                <span className="text-[9px] font-mono text-zinc-300">{formatBytes(node.storage_committed)}</span>
-                {winners.storage && <CheckCircle size={8} className="text-green-500" />}
-                {(() => { const ctx = getContext('storage'); return ctx.base > 0 && <DeltaTag val={node.storage_committed} base={ctx.base} type="bytes" contextLabel={ctx.label} />; })()}
+             <div className="flex flex-col w-full">
+                <div className="flex justify-between items-center w-full">
+                    <span className="text-[9px] font-mono text-zinc-300">{formatBytes(node.storage_committed)}</span>
+                    {winners.storage && <CheckCircle size={8} className="text-green-500" />}
+                </div>
+                {(() => { const ctx = getContext('storage'); return ctx.base > 0 && <ComparativeDelta val={node.storage_committed} base={ctx.base} type="bytes" />; })()}
             </div>
         </Row>
         <Row>
@@ -178,10 +186,12 @@ const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner,
 
         <SectionSpacer />
         <Row>
-            <div className="flex justify-between items-center w-full">
-                <span className="text-[9px] font-mono text-zinc-300">{node.credits?.toLocaleString()}</span>
-                {winners.credits && <CheckCircle size={8} className="text-green-500" />}
-                {(() => { const ctx = getContext('credits'); return ctx.base > 0 && <DeltaTag val={node.credits} base={ctx.base} contextLabel={ctx.label} />; })()}
+            <div className="flex flex-col w-full">
+                <div className="flex justify-between items-center w-full">
+                    <span className="text-[9px] font-mono text-zinc-300">{node.credits?.toLocaleString()}</span>
+                    {winners.credits && <CheckCircle size={8} className="text-green-500" />}
+                </div>
+                {(() => { const ctx = getContext('credits'); return ctx.base > 0 && <ComparativeDelta val={node.credits} base={ctx.base} />; })()}
             </div>
         </Row>
         <Row><span className="text-[9px] font-mono text-zinc-500">#{node.rank || '-'}</span></Row>
@@ -195,6 +205,41 @@ const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner,
   );
 };
 
+const MapLegend = ({ nodes, themes }: { nodes: Node[], themes: any[] }) => {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 p-4 mt-auto border-t border-white/5 bg-black/40">
+       {nodes.map((node, i) => (
+           <div key={node.pubkey} className="flex gap-3 items-start p-2 rounded hover:bg-white/5 transition">
+               <div className="w-2 h-2 rounded-full mt-1 shrink-0" style={{ backgroundColor: themes[i].hex }}></div>
+               <div className="flex flex-col gap-0.5 overflow-hidden">
+                   <div className="text-[8px] font-mono text-zinc-400 truncate w-full" title={node.pubkey}>{node.pubkey}</div>
+                   <div className="text-[9px] font-mono font-bold text-zinc-200">{getSafeIp(node)}</div>
+                   <div className="flex items-center gap-1.5 mt-0.5">
+                       {node.location?.countryCode && <img src={`https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png`} className="w-3 h-2 rounded-[1px]" />}
+                       <span className="text-[8px] text-zinc-500 uppercase tracking-wide truncate">{node.location?.countryName || 'Unknown Region'}</span>
+                   </div>
+               </div>
+           </div>
+       ))}
+    </div>
+  )
+}
+
+const MetricLegend = ({ nodes, themes, metric }: { nodes: Node[], themes: any[], metric: 'storage' | 'credits' }) => {
+    return (
+        <div className="flex flex-wrap items-center justify-center gap-6 p-4 mt-auto border-t border-white/5 bg-black/40">
+            {nodes.map((node, i) => (
+                <div key={node.pubkey} className="flex items-center gap-2">
+                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: themes[i].hex }}></div>
+                     <span className="text-[9px] font-mono text-zinc-300">
+                         {metric === 'storage' ? formatBytes(node.storage_committed || 0) : (node.credits || 0).toLocaleString()}
+                     </span>
+                </div>
+            ))}
+        </div>
+    )
+}
+
 const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], themes: typeof PLAYER_THEMES, networkScope: string }) => {
   const [tab, setTab] = useState<'OVERVIEW' | 'MARKET' | 'TOPOLOGY'>('OVERVIEW');
   const [pos, setPos] = useState({ coordinates: [0, 20], zoom: 1 });
@@ -203,6 +248,8 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
 
   const maxStorage = Math.max(...nodes.map(n => n.storage_committed || 0), 1);
   const maxCredits = Math.max(...nodes.map(n => n.credits || 0), 1);
+  const maxUptime = Math.max(...nodes.map(n => n.uptime || 0), 1);
+  
   const totalStorage = nodes.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
   const totalCredits = nodes.reduce((sum, n) => sum + (n.credits || 0), 0);
 
@@ -219,75 +266,119 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
     }).join(', ')})`;
   };
 
+  const ChartCell = ({ title, icon: Icon, children }: any) => (
+    <div className="bg-black/20 border border-white/5 rounded-xl p-4 flex flex-col items-center justify-end relative overflow-hidden group hover:border-white/10 transition-colors">
+        <div className="absolute top-3 left-3 flex items-center gap-2 text-zinc-500">
+            <Icon size={12} />
+            <span className="text-[8px] font-bold uppercase tracking-wider">{title}</span>
+        </div>
+        <div className="flex items-end justify-center gap-3 h-24 w-full px-2">
+            {children}
+        </div>
+    </div>
+  );
+
   return (
-    <div className="shrink-0 h-[400px] border-t border-white/5 bg-black/80 backdrop-blur-xl flex flex-col relative z-40">
+    <div className="shrink-0 h-[500px] border border-white/5 bg-[#09090b]/40 backdrop-blur-xl flex flex-col relative z-40 rounded-xl mt-4 shadow-xl overflow-hidden">
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50">
-            <div className="bg-zinc-900/80 backdrop-blur-md p-1 rounded-full flex gap-1 border border-white/10 shadow-2xl">
-                {[ { id: 'OVERVIEW', icon: BarChart3, label: 'Equalizer' }, { id: 'MARKET', icon: PieChart, label: 'Market Share' }, { id: 'TOPOLOGY', icon: MapIcon, label: 'Topology' } ].map((t) => (
-                    <button key={t.id} onClick={() => setTab(t.id as any)} className={`px-4 py-2 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-2 ${tab === t.id ? 'bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}`}>
+            <div className="bg-zinc-900/90 backdrop-blur-md p-1 rounded-full flex gap-1 border border-white/10 shadow-2xl">
+                {[ { id: 'OVERVIEW', icon: BarChart3, label: 'Overview' }, { id: 'MARKET', icon: PieChart, label: 'Market Share' }, { id: 'TOPOLOGY', icon: MapIcon, label: 'Topology' } ].map((t) => (
+                    <button key={t.id} onClick={() => setTab(t.id as any)} className={`px-4 py-1.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 flex items-center gap-2 ${tab === t.id ? 'bg-zinc-100 text-black shadow-[0_0_15px_rgba(255,255,255,0.2)]' : 'bg-white/5 text-zinc-500 hover:text-zinc-300 hover:bg-white/10'}`}>
                         <t.icon size={12} /> {t.label}
                     </button>
                 ))}
             </div>
         </div>
 
-        <div className="flex-1 overflow-hidden relative flex flex-col pt-16 pb-4">
+        <div className="flex-1 overflow-hidden relative flex flex-col pt-16">
             {tab === 'OVERVIEW' && (
-                <>
-                    <div className="flex-1 flex items-end justify-center gap-4 md:gap-8 px-8">
+                <div className="grid grid-cols-2 grid-rows-2 gap-4 p-4 h-full">
+                    
+                    {/* 1. Storage (Relative) */}
+                    <ChartCell title="Storage Capacity" icon={Database}>
                         {nodes.map((n, i) => (
-                            <div key={n.pubkey} className="flex flex-col items-center gap-3 h-full justify-end w-24 group">
-                                <div className="w-full flex gap-1.5 h-[70%] items-end justify-center">
-                                    <div className="w-3 rounded-t-sm transition-all duration-1000 relative group-hover:shadow-[0_0_15px_rgba(255,255,255,0.2)]" style={{ height: `${((n.storage_committed || 0) / maxStorage) * 100}%`, backgroundColor: themes[i].hex }}></div>
-                                    <div className="w-3 rounded-t-sm transition-all duration-1000 relative opacity-60 group-hover:opacity-100" style={{ height: `${((n.credits || 0) / maxCredits) * 100}%`, backgroundColor: themes[i].hex }}></div>
-                                </div>
-                                <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                                    {n.location?.countryCode && <img src={`https://flagcdn.com/w20/${n.location.countryCode.toLowerCase()}.png`} className="w-2.5 h-2 rounded-[1px]" />}
-                                    <div className={`text-[9px] font-mono truncate font-bold ${themes[i].text}`}>{getSafeIp(n)}</div>
-                                </div>
-                            </div>
+                             <div key={n.pubkey} className="w-full max-w-[20px] bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end">
+                                 <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${((n.storage_committed || 0) / maxStorage) * 100}%`, backgroundColor: themes[i].hex }}></div>
+                                 <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[6px] font-mono text-zinc-500 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap">{formatBytes(n.storage_committed || 0)}</div>
+                             </div>
                         ))}
-                    </div>
-                    <div className="text-center text-[9px] text-zinc-600 uppercase font-bold mt-auto pt-4 flex items-center justify-center gap-2"><Activity size={10}/> Comparative Signal Strength ({networkScope})</div>
-                </>
+                    </ChartCell>
+
+                    {/* 2. Credits (Relative) */}
+                    <ChartCell title="Credits Earned" icon={Zap}>
+                        {nodes.map((n, i) => (
+                             <div key={n.pubkey} className="w-full max-w-[20px] bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end">
+                                 <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${((n.credits || 0) / maxCredits) * 100}%`, backgroundColor: themes[i].hex }}></div>
+                                 <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[6px] font-mono text-zinc-500 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap">{n.credits?.toLocaleString()}</div>
+                             </div>
+                        ))}
+                    </ChartCell>
+
+                    {/* 3. Health (Absolute 100) */}
+                    <ChartCell title="Health Score" icon={Activity}>
+                        {nodes.map((n, i) => (
+                             <div key={n.pubkey} className="w-full max-w-[20px] bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end">
+                                 <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${Math.min(n.health || 0, 100)}%`, backgroundColor: themes[i].hex }}></div>
+                                 <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[6px] font-mono text-zinc-500 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap">{n.health}</div>
+                             </div>
+                        ))}
+                    </ChartCell>
+
+                     {/* 4. Uptime (Relative) */}
+                     <ChartCell title="Uptime Duration" icon={Clock}>
+                        {nodes.map((n, i) => (
+                             <div key={n.pubkey} className="w-full max-w-[20px] bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end">
+                                 <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${((n.uptime || 0) / maxUptime) * 100}%`, backgroundColor: themes[i].hex }}></div>
+                                 <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[6px] font-mono text-zinc-500 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap">{formatUptimePrecise(n.uptime || 0)}</div>
+                             </div>
+                        ))}
+                    </ChartCell>
+
+                </div>
             )}
             
             {tab === 'MARKET' && (
                 <>
                     <div className="flex-1 flex items-center justify-center gap-12 md:gap-24 animate-in fade-in duration-500">
                         <div className="flex flex-col items-center gap-4">
-                            <div className="w-32 h-32 rounded-full relative flex items-center justify-center shadow-2xl transition-all duration-500 hover:scale-105" style={{ background: getConicGradient('STORAGE') }}>
-                                <div className="w-24 h-24 bg-[#050505] rounded-full flex flex-col items-center justify-center z-10 shadow-inner border border-white/5">
-                                    <Database size={14} className="text-zinc-600 mb-1" />
-                                    <span className="text-[8px] font-bold text-zinc-500">STORAGE</span>
+                            <div className="w-40 h-40 rounded-full relative flex items-center justify-center shadow-2xl transition-all duration-500 hover:scale-105" style={{ background: getConicGradient('STORAGE') }}>
+                                <div className="w-28 h-28 bg-[#050505] rounded-full flex flex-col items-center justify-center z-10 shadow-inner border border-white/5">
+                                    <Database size={16} className="text-zinc-600 mb-1" />
+                                    <span className="text-[9px] font-bold text-zinc-500">STORAGE</span>
                                 </div>
                             </div>
                             <div className="text-[10px] text-zinc-400 font-mono bg-zinc-900/50 px-3 py-1 rounded-full border border-zinc-800">{formatBytes(totalStorage)} Combined</div>
                         </div>
                         <div className="flex flex-col items-center gap-4">
-                            <div className="w-32 h-32 rounded-full relative flex items-center justify-center shadow-2xl transition-all duration-500 hover:scale-105" style={{ background: getConicGradient('CREDITS') }}>
-                                <div className="w-24 h-24 bg-[#050505] rounded-full flex flex-col items-center justify-center z-10 shadow-inner border border-white/5">
-                                    <Zap size={14} className="text-zinc-600 mb-1" />
-                                    <span className="text-[8px] font-bold text-zinc-500">CREDITS</span>
+                            <div className="w-40 h-40 rounded-full relative flex items-center justify-center shadow-2xl transition-all duration-500 hover:scale-105" style={{ background: getConicGradient('CREDITS') }}>
+                                <div className="w-28 h-28 bg-[#050505] rounded-full flex flex-col items-center justify-center z-10 shadow-inner border border-white/5">
+                                    <Zap size={16} className="text-zinc-600 mb-1" />
+                                    <span className="text-[9px] font-bold text-zinc-500">CREDITS</span>
                                 </div>
                             </div>
                             <div className="text-[10px] text-zinc-400 font-mono bg-zinc-900/50 px-3 py-1 rounded-full border border-zinc-800">{(totalCredits / 1000000).toFixed(1)}M Combined</div>
                         </div>
                     </div>
-                    <div className="text-center text-[9px] text-zinc-600 uppercase font-bold mt-auto pt-2 flex items-center justify-center gap-2">
-                        <PieChart size={10}/> Market Dominance Visualization
-                    </div>
+                    <MetricLegend nodes={nodes} themes={themes} metric='storage' />
                 </>
             )}
 
             {tab === 'TOPOLOGY' && (
-                <div className="flex-1 rounded-2xl overflow-hidden border border-white/5 bg-[#050505] mx-4 md:mx-8 relative group shadow-inner">
-                    <ComposableMap projectionConfig={{ scale: 200 }} className="w-full h-full opacity-50 group-hover:opacity-100 transition-all duration-1000 grayscale group-hover:grayscale-0">
-                        <ZoomableGroup zoom={pos.zoom} center={pos.coordinates as [number, number]} maxZoom={10}>
-                            <Geographies geography={GEO_URL}>{({ geographies }: { geographies: any[] }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#18181b" stroke="#27272a" strokeWidth={0.5} />))}</Geographies>
-                            {nodes.map((n, i) => (n.location && (<Marker key={n.pubkey} coordinates={[n.location.lon, n.location.lat]}><circle r={12/pos.zoom} fill={themes[i].hex} fillOpacity={0.3} className="animate-ping" /><circle r={4/pos.zoom} fill="#fff" stroke={themes[i].hex} strokeWidth={2/pos.zoom} /></Marker>)))}
-                        </ZoomableGroup>
-                    </ComposableMap>
+                <div className="flex flex-col h-full">
+                    <div className="flex-1 rounded-xl overflow-hidden border border-white/5 bg-[#050505] mx-4 relative group shadow-inner">
+                        <ComposableMap projectionConfig={{ scale: 160 }} className="w-full h-full">
+                            <ZoomableGroup zoom={pos.zoom} center={pos.coordinates as [number, number]} maxZoom={10}>
+                                <Geographies geography={GEO_URL}>{({ geographies }: { geographies: any[] }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#18181b" stroke="#27272a" strokeWidth={0.5} />))}</Geographies>
+                                {nodes.map((n, i) => (n.location && (
+                                    <Marker key={n.pubkey} coordinates={[n.location.lon, n.location.lat]}>
+                                        <circle r={8/pos.zoom} fill={themes[i].hex} fillOpacity={0.4} className="animate-pulse" />
+                                        <circle r={4/pos.zoom} fill="#fff" stroke={themes[i].hex} strokeWidth={2/pos.zoom} />
+                                    </Marker>
+                                )))}
+                            </ZoomableGroup>
+                        </ComposableMap>
+                    </div>
+                    <MapLegend nodes={nodes} themes={themes} />
                 </div>
             )}
         </div>
@@ -296,8 +387,8 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
 };
 
 const EmptySlot = ({ onClick }: { onClick: () => void }) => (
-  <div className="flex flex-col min-w-[100px] md:min-w-[110px] h-full bg-white/[0.01] group cursor-pointer hover:bg-white/[0.03] transition relative" onClick={onClick}>
-    <div className="h-24 p-2 flex flex-col items-center justify-center border-b border-white/5 bg-black/40">
+  <div className="flex flex-col min-w-[100px] md:min-w-[110px] h-full bg-white/[0.01] group cursor-pointer hover:bg-white/[0.03] transition relative last:rounded-tr-xl last:rounded-br-xl" onClick={onClick}>
+    <div className="h-24 p-2 flex flex-col items-center justify-center border-b border-white/5 bg-black/40 first:rounded-tr-xl">
       <Plus size={12} className="text-zinc-700 group-hover:text-zinc-400 transition" />
     </div>
     <div className="flex-1"></div>
@@ -348,7 +439,6 @@ export default function ComparePage() {
       const uptimes = availableNodes.map(n => n.uptime || 0);
       
       const getMedian = (vals: number[]) => { if (vals.length === 0) return 0; const sorted = [...vals].sort((a, b) => a - b); const mid = Math.floor(sorted.length / 2); return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2; };
-      const getMode = (arr: string[]) => { if (arr.length === 0) return 'N/A'; const counts: Record<string, number> = {}; arr.forEach(val => counts[val] = (counts[val] || 0) + 1); return Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b); };
 
       const netHealthRaw = Math.round(healths.reduce((a, b) => a + b, 0) / healths.length) || 0;
       const netUptimeRaw = Math.round(uptimes.reduce((a, b) => a + b, 0) / uptimes.length) || 0;
@@ -412,30 +502,32 @@ export default function ComparePage() {
       {/* TOOLBAR */}
       <div className="px-4 md:px-8 pb-4 relative z-50 flex justify-center">
         <div className="flex flex-wrap items-center justify-center gap-2 max-w-4xl">
-            <button onClick={() => setShowNetwork(!showNetwork)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[9px] font-bold uppercase transition whitespace-nowrap border ${showNetwork ? 'bg-white text-black border-white' : 'bg-black/40 text-zinc-400 border-white/5 hover:border-white/20'}`}>{showNetwork ? <CheckCircle size={10} /> : <div className="w-2.5 h-2.5 rounded-full border border-zinc-500"></div>} VS NETWORK</button>
+            <button onClick={() => setShowNetwork(!showNetwork)} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[7px] font-bold uppercase transition whitespace-nowrap border ${showNetwork ? 'bg-white text-black border-white' : 'bg-black/40 text-zinc-400 border-white/5 hover:border-white/20'}`}>{showNetwork ? <CheckCircle size={10} /> : <div className="w-2.5 h-2.5 rounded-full border border-zinc-500"></div>} VS NETWORK</button>
             
             <div className="relative">
-                <button onClick={() => setIsLeaderDropdownOpen(!isLeaderDropdownOpen)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[9px] font-bold uppercase transition whitespace-nowrap border ${leaderMetric ? 'bg-white text-black border-white' : 'bg-black/40 text-zinc-400 border-white/5 hover:border-white/20'}`}>{leaderMetric ? `VS ${leaderMetric} LEADER` : 'VS LEADER'} <ChevronDown size={10} /></button>
-                {isLeaderDropdownOpen && <div className="absolute top-full left-0 mt-2 w-32 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col">{['STORAGE', 'CREDITS', 'HEALTH'].map(opt => (<button key={opt} onClick={() => { setLeaderMetric(leaderMetric === opt ? null : opt as any); setIsLeaderDropdownOpen(false); }} className="px-3 py-2 text-[9px] font-bold text-left text-zinc-400 hover:text-white hover:bg-zinc-800 transition uppercase">{opt}</button>))}</div>}
+                <button onClick={() => setIsLeaderDropdownOpen(!isLeaderDropdownOpen)} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[7px] font-bold uppercase transition whitespace-nowrap border ${leaderMetric ? 'bg-white text-black border-white' : 'bg-black/40 text-zinc-400 border-white/5 hover:border-white/20'}`}>{leaderMetric ? `VS ${leaderMetric} LEADER` : 'VS LEADER'} <ChevronDown size={10} /></button>
+                {isLeaderDropdownOpen && <div className="absolute top-full left-0 mt-2 w-32 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col">{['STORAGE', 'CREDITS', 'HEALTH'].map(opt => (<button key={opt} onClick={() => { setLeaderMetric(leaderMetric === opt ? null : opt as any); setIsLeaderDropdownOpen(false); }} className="px-3 py-2 text-[8px] font-bold text-left text-zinc-400 hover:text-white hover:bg-zinc-800 transition uppercase">{opt}</button>))}</div>}
             </div>
 
             <div className="relative">
-                <button onClick={() => setIsWatchlistOpen(!isWatchlistOpen)} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-black/40 text-zinc-400 border border-white/5 hover:border-white/20 hover:text-white text-[9px] font-bold uppercase transition whitespace-nowrap"><Star size={10} /> WATCHLIST <ChevronDown size={10} /></button>
+                <button onClick={() => setIsWatchlistOpen(!isWatchlistOpen)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/40 text-zinc-400 border border-white/5 hover:border-white/20 hover:text-white text-[7px] font-bold uppercase transition whitespace-nowrap"><Star size={10} /> WATCHLIST <ChevronDown size={10} /></button>
                 {isWatchlistOpen && <div className="absolute top-full left-0 mt-2 w-48 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col max-h-60 overflow-y-auto">{watchlistNodes.length > 0 ? watchlistNodes.map(n => (<button key={n.pubkey} onClick={() => addNode(n.pubkey!)} disabled={selectedKeys.includes(n.pubkey!)} className={`px-3 py-2 text-[9px] font-bold text-left flex justify-between items-center ${selectedKeys.includes(n.pubkey!) ? 'text-zinc-600 cursor-not-allowed' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'}`}><span>{getSafeIp(n)}</span>{selectedKeys.includes(n.pubkey!) && <CheckCircle size={10} />}</button>)) : <div className="p-3 text-[9px] text-zinc-600 text-center">No Favorites</div>}</div>}
             </div>
 
             <div className="relative">
-                <button onClick={() => setIsNetworkOpen(!isNetworkOpen)} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-[9px] font-bold uppercase transition whitespace-nowrap border border-zinc-600"><div className={`w-1.5 h-1.5 rounded-full ${networkScope === 'MAINNET' ? 'bg-green-500' : networkScope === 'DEVNET' ? 'bg-blue-500' : 'bg-white'}`}></div>{networkScope === 'ALL' ? 'ALL NETWORKS' : networkScope} <ChevronDown size={10} /></button>
-                {isNetworkOpen && <div className="absolute top-full left-0 mt-2 w-40 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col">{[{ id: 'ALL', label: 'All Networks', color: 'bg-white' }, { id: 'MAINNET', label: 'Mainnet', color: 'bg-green-500' }, { id: 'DEVNET', label: 'Devnet', color: 'bg-blue-500' }].map(opt => (<button key={opt.id} onClick={() => { setNetworkScope(opt.id as any); setIsNetworkOpen(false); }} className="px-3 py-2 text-[9px] font-bold text-left text-zinc-300 hover:text-white hover:bg-zinc-800 transition uppercase flex items-center gap-2"><div className={`w-1.5 h-1.5 rounded-full ${opt.color}`}></div> {opt.label}</button>))}</div>}
+                <button onClick={() => setIsNetworkOpen(!isNetworkOpen)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-[7px] font-bold uppercase transition whitespace-nowrap border border-zinc-600"><div className={`w-1.5 h-1.5 rounded-full ${networkScope === 'MAINNET' ? 'bg-green-500' : networkScope === 'DEVNET' ? 'bg-blue-500' : 'bg-white'}`}></div>{networkScope === 'ALL' ? 'ALL NETWORKS' : networkScope} <ChevronDown size={10} /></button>
+                {isNetworkOpen && <div className="absolute top-full left-0 mt-2 w-40 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col">{[{ id: 'ALL', label: 'All Networks', color: 'bg-white' }, { id: 'MAINNET', label: 'Mainnet', color: 'bg-green-500' }, { id: 'DEVNET', label: 'Devnet', color: 'bg-blue-500' }].map(opt => (<button key={opt.id} onClick={() => { setNetworkScope(opt.id as any); setIsNetworkOpen(false); }} className="px-3 py-2 text-[8px] font-bold text-left text-zinc-300 hover:text-white hover:bg-zinc-800 transition uppercase flex items-center gap-2"><div className={`w-1.5 h-1.5 rounded-full ${opt.color}`}></div> {opt.label}</button>))}</div>}
             </div>
 
-            <button onClick={handleShare} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-[9px] font-bold uppercase transition whitespace-nowrap border border-zinc-700"><Share2 size={10}/> SHARE</button>
-            <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-bold uppercase transition shadow-[0_0_15px_rgba(37,99,235,0.3)] whitespace-nowrap"><Download size={10}/> REPORT CARD</button>
+            <button onClick={handleShare} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-[7px] font-bold uppercase transition whitespace-nowrap border border-zinc-700"><Share2 size={10}/> SHARE</button>
+            <button onClick={handleExport} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[7px] font-bold uppercase transition shadow-[0_0_15px_rgba(37,99,235,0.3)] whitespace-nowrap"><Download size={10}/> REPORT CARD</button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden relative z-10 px-4 pb-4 md:px-8 md:pb-8 flex flex-col">
-         <div className="max-w-[1400px] mx-auto w-full h-full flex flex-col bg-[#09090b]/60 backdrop-blur-2xl rounded-[32px] border border-white/5 shadow-2xl overflow-hidden relative">
+      <div className="flex-1 overflow-hidden relative z-10 px-4 pb-4 md:px-8 md:pb-8 flex flex-col max-w-[1400px] mx-auto w-full">
+         
+         {/* MAIN DATA DECK */}
+         <div className="flex-initial min-h-[300px] flex flex-col bg-[#09090b]/60 backdrop-blur-2xl rounded-xl border border-white/5 shadow-2xl overflow-hidden relative mb-4">
              {selectedNodes.length === 0 ? (
                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
                     <div className="w-48 h-48 border border-zinc-800 rounded-full flex items-center justify-center relative mb-6 animate-[spin_60s_linear_infinite]">
@@ -475,8 +567,10 @@ export default function ComparePage() {
                     <div className="w-8 shrink-0"></div>
                 </main>
              )}
-             <SynthesisEngine nodes={selectedNodes} themes={PLAYER_THEMES} networkScope={networkScope} />
          </div>
+
+         {/* ANALYTICS DECK (Separated) */}
+         <SynthesisEngine nodes={selectedNodes} themes={PLAYER_THEMES} networkScope={networkScope} />
       </div>
 
       {isSearchOpen && (
