@@ -76,7 +76,7 @@ export default function Leaderboard() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const lastProcessedHighlight = useRef<string | null>(null);
-  
+
   // Ref to store the Step 1 configuration state for comparison
   const lastStep1Config = useRef<string>('');
 
@@ -163,32 +163,26 @@ export default function Leaderboard() {
 
   // --- 3. HELPER: RESET LOGIC ON STEP CHANGE ---
   const handleStepTransition = (nextStep: number) => {
-    // Only apply logic if moving from Step 1 (index 0) to Step 2 (index 1)
     if (simStep === 0 && nextStep === 1) {
-        // Create a unique signature for the current Step 1 Inputs
         const currentConfig = simMode === 'IMPORT' 
             ? `IMPORT_${importKey.trim()}`
             : `NEW_${simNodes}_${simStorageVal}_${simStorageUnit}_${simPerf}_${simStake}`;
-        
-        // If we have a previous history, and it doesn't match current, reset Step 2 data
+
         if (lastStep1Config.current && lastStep1Config.current !== currentConfig) {
             setBoostCounts({});
         }
 
-        // Save current as the new "last known" config
         lastStep1Config.current = currentConfig;
     }
-    
+
     setSimStep(nextStep);
   };
 
   useEffect(() => {
-    // If user navigates back to Step 1 (index 0), reset success/countdown 
     if (simStep === 0) {
       setImportSuccess(false);
       setAutoPilotCountdown(null);
     }
-    // Dismiss tooltips on step change
     setShowFeeHelp(false);
     setShowNetworkHelp(false);
   }, [simStep]);
@@ -197,7 +191,7 @@ export default function Leaderboard() {
   useEffect(() => {
     if (autoPilotCountdown === null) return;
     if (autoPilotCountdown <= 0) {
-      handleStepTransition(1); // Proceed to Step 2 using the transition helper
+      handleStepTransition(1);
       setAutoPilotCountdown(null);
       return;
     }
@@ -280,7 +274,9 @@ export default function Leaderboard() {
       const estimatedNetworkBoostedTotal = (currentNetworkTotal * networkAvgMult) + (simMode === 'NEW' ? boostedCredits : 0);
       const share = estimatedNetworkBoostedTotal > 0 ? boostedCredits / estimatedNetworkBoostedTotal : 0;
       const stoinc = simNetworkFees * 0.94 * share;
-      return { rawCredits, geoMean: result.geoMean, boostedCredits, share, stoinc };
+      
+      // Returning currentNetworkTotal here so UI can access it for the dynamic calculation
+      return { rawCredits, geoMean: result.geoMean, boostedCredits, share, stoinc, currentNetworkTotal };
   }, [simStorageVal, simStorageUnit, simNodes, simPerf, simStake, boostCounts, allNodes, networkAvgMult, simNetworkFees, simMode, importedBaseCredits]);
 
   const toggleBoostCount = (name: string, delta: number) => {
@@ -538,12 +534,12 @@ export default function Leaderboard() {
                         </div>
                         <div className="max-w-xl mx-auto space-y-6 md:space-y-8">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                
+
                                 {/* --- INPUT 1: NETWORK FEES --- */}
                                 <div className="relative">
                                     {/* CLICK-AWAY SHIELD FOR FEE HELP */}
                                     {showFeeHelp && <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowFeeHelp(false)}></div>}
-                                    
+
                                     <div className="flex justify-between items-end mb-2 relative z-50">
                                         <div className="flex items-center gap-2">
                                         <label className={`text-[10px] uppercase font-bold ${simNetworkFees <= 0 ? 'text-red-500' : 'text-zinc-400'}`}>Total Network Fees</label>
@@ -562,7 +558,6 @@ export default function Leaderboard() {
                                         <input type="number" min="0" value={simNetworkFees} onChange={(e) => setSimNetworkFees(Number(e.target.value))} className={`w-full bg-zinc-900 border rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none transition ${simNetworkFees <= 0 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-blue-500'}`}/>
                                         <span className="absolute right-4 top-3.5 text-[10px] font-bold text-zinc-600">SOL</span>
                                     </div>
-                                    {/* SUBTITLE ADDED HERE */}
                                     <p className="text-[10px] text-zinc-500 italic mt-2 ml-1">
                                         Enter the total SOL revenue generated from network traffic & usage.
                                     </p>
@@ -572,29 +567,31 @@ export default function Leaderboard() {
                                 <div className="relative">
                                     {/* CLICK-AWAY SHIELD FOR NETWORK HELP */}
                                     {showNetworkHelp && <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowNetworkHelp(false)}></div>}
-                                    
+
                                     <div className="flex justify-between items-end mb-2 relative z-50">
                                         <div className="flex items-center gap-2">
-                                        <label className={`text-[10px] uppercase font-bold ${networkAvgMult < 1 ? 'text-red-500' : 'text-zinc-400'}`}>Est. Total Boosted Credits</label>
-                                        <div className="relative">
-                                            <button onClick={() => setShowNetworkHelp(!showNetworkHelp)} className="text-zinc-500 hover:text-white transition"><Settings2 size={14} /></button>
-                                            {showNetworkHelp && (
-                                                <div className="absolute left-0 bottom-full mb-2 w-64 bg-zinc-800 border border-zinc-700 p-4 rounded-xl shadow-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-                                                    <p className="text-[10px] md:text-xs text-zinc-300 leading-relaxed"><strong className="text-white block mb-1">Estimation Multiplier</strong>Factor to estimate Total Network Boosted Credits. <span className="text-yellow-500 block mt-1">14x accounts for high-impact nodes.</span></p>
-                                                    <div className="absolute bottom-[-6px] left-1 w-3 h-3 bg-zinc-800 border-b border-r border-zinc-700 rotate-45"></div>
-                                                </div>
-                                            )}
+                                            <label className={`text-[10px] uppercase font-bold ${networkAvgMult < 1 ? 'text-red-500' : 'text-zinc-400'}`}>Est. Total Boosted Credits</label>
+                                            <div className="relative">
+                                                <button onClick={() => setShowNetworkHelp(!showNetworkHelp)} className="text-zinc-500 hover:text-white transition"><Settings2 size={14} /></button>
+                                                {showNetworkHelp && (
+                                                    <div className="absolute left-0 bottom-full mb-2 w-64 bg-zinc-800 border border-zinc-700 p-4 rounded-xl shadow-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+                                                        <p className="text-[10px] md:text-xs text-zinc-300 leading-relaxed"><strong className="text-white block mb-1">Estimation Multiplier</strong>Factor to estimate Total Network Boosted Credits. <span className="text-yellow-500 block mt-1">14x accounts for high-impact nodes.</span></p>
+                                                        <div className="absolute bottom-[-6px] left-1 w-3 h-3 bg-zinc-800 border-b border-r border-zinc-700 rotate-45"></div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
+                                        {/* --- DYNAMIC CALCULATION DISPLAY --- */}
+                                        <div className="text-[9px] md:text-[10px] font-mono text-zinc-500 text-right">
+                                            {metrics.currentNetworkTotal.toLocaleString(undefined, { notation: 'compact' })} x {networkAvgMult} = <span className="text-white font-bold">{(metrics.currentNetworkTotal * networkAvgMult).toLocaleString(undefined, { notation: 'compact' })}</span>
                                         </div>
                                     </div>
                                     <div className="relative">
                                         <input type="number" min="0" step="0.1" value={networkAvgMult} onChange={(e) => { const val = e.target.value === '' ? 0 : Number(e.target.value); setNetworkAvgMult(val); }} className={`w-full bg-zinc-900 border rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none transition ${networkAvgMult < 1 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-purple-500'}`}/>
                                         <span className="absolute right-4 top-3.5 text-[10px] font-bold text-zinc-600">AVG X</span>
                                     </div>
-                                    {/* SUBTITLE ADDED HERE */}
                                     <p className="text-[10px] text-zinc-500 italic mt-2 ml-1 leading-relaxed">
-                                        Enter multiplier to estimate global score. <br />
-                                        <span className="font-mono not-italic text-zinc-600">(Total Network Credits × Multiplier)</span>
+                                        Enter multiplier to estimate global score.
                                     </p>
                                 </div>
                             </div>
@@ -770,15 +767,6 @@ export default function Leaderboard() {
           </div>
         )}
       </div>
-
-      {!loading && !creditsOffline && (
-        <div className="max-w-5xl mx-auto mt-6 text-center text-sm md:text-base text-zinc-500 flex flex-col md:flex-row items-center justify-center gap-2 font-medium">
-            <div className="flex items-center gap-2">
-                <Eye size={16} />
-                <span>Showing <span className="text-zinc-300 font-bold">{Math.min(visibleCount, filteredAndRanked.length)}</span> of <span className="text-zinc-300 font-bold">{filteredAndRanked.length}</span> nodes.</span>
-            </div>
-        </div>
-      )}
 
       {!loading && !creditsOffline && (
         <footer className="max-w-5xl mx-auto mt-8 mb-12 pt-8 border-t border-zinc-900 px-4 text-center animate-in fade-in duration-700">
