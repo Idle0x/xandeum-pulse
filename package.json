@@ -13,6 +13,7 @@
   "dependencies": {
     "@types/d3-scale": "^4.0.9",
     "@types/react-simple-maps": "^3.0.6",
+    "@vercel/analytics": "^1.6.1",
     "axios": "^1.13.2",
     "d3-scale": "^4.0.2",
     "geoip-lite": "^1.4.10",
