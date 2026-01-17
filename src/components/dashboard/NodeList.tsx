@@ -59,7 +59,10 @@ export const NodeList = ({
   );
 
   // ALIGNMENT FIX: Synced with Header
-  const gridClass = "grid-cols-[auto_2fr_1.6fr_1.1fr_0.9fr_0.9fr_0.9fr_0.9fr_0.8fr_auto]";
+  // 3rd col (Last Seen) shrunk to 1.0fr.
+  // 4th, 5th, 6th, 7th, 8th cols increased to 1.1fr.
+  // 9th col (Credits) fixed at 0.8fr.
+  const gridClass = "grid-cols-[auto_2fr_1.0fr_1.1fr_1.1fr_1.1fr_1.0fr_1.0fr_0.8fr_auto]";
 
   return (
     <div className="flex flex-col min-w-full bg-[#09090b]/40">
@@ -139,7 +142,6 @@ export const NodeList = ({
                 <div className={`text-right font-mono text-[10px] transition-colors duration-300 ${uptimeColor}`}>
                    {formatUptime(node.uptime || 0)}
                 </div>
-                
                 {/* Committed */}
                 <div className={`text-right font-bold text-xs font-mono transition-colors duration-300 ${storageColorMain}`}>
                    {formatBytes(node.storage_committed)}
@@ -148,7 +150,6 @@ export const NodeList = ({
                 <div className={`text-right text-[9px] font-mono transition-colors duration-300 ${storageColorSub}`}>
                    {formatBytes(node.storage_used)}
                 </div>
-
                 {/* Credits */}
                 <div className={`text-right font-mono text-[10px] ${creditsColor}`}>
                    {node.credits !== null ? node.credits.toLocaleString() : <span className="text-zinc-700">-</span>}
