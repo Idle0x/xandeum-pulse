@@ -9,7 +9,7 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   zenMode: boolean;
-  onToggleZen: () => void; // Updated: Recieves toggle handler
+  onToggleZen: () => void; 
   networkFilter: 'ALL' | 'MAINNET' | 'DEVNET';
   onNetworkChange: (val: 'ALL' | 'MAINNET' | 'DEVNET') => void;
   filteredCount: number;
@@ -25,7 +25,7 @@ export const Sidebar = ({
     <>
       <div className={`fixed inset-y-0 left-0 w-72 bg-black border-r border-zinc-800 z-[200] transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 flex flex-col h-full relative overflow-hidden">
-          
+
           {/* Header */}
           <div className="flex justify-between items-center mb-8 shrink-0 relative z-10">
             <h2 className="font-bold text-white tracking-widest uppercase flex items-center gap-2">
@@ -58,11 +58,41 @@ export const Sidebar = ({
 
           {/* Navigation */}
           <nav className="flex-grow space-y-2 relative z-10 overflow-y-auto scrollbar-hide">
-            <Link href="/" onClick={onClose}><div className="flex items-center gap-3 p-3 bg-zinc-900/50 text-white rounded-lg border border-zinc-700 cursor-pointer hover:bg-zinc-800 transition-colors"><LayoutDashboard size={18} /><span className="text-sm font-bold">Dashboard</span></div></Link>
-            <Link href="/map" onClick={onClose}><div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800"><MapIcon size={18} /><span className="text-sm font-bold">Global Map</span></div></Link>
-            <Link href="/leaderboard" onClick={onClose}><div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800"><Trophy size={18} /><span className="text-sm font-bold">Leaderboard</span></div></Link>
-            <button onClick={() => { router.push('/compare'); onClose(); }} className="w-full text-left flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800"><Swords size={18} /><span className="text-sm font-bold">Compare Nodes</span></button>
-            <Link href="/docs" onClick={onClose}><div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800"><BookOpen size={18} /><span className="text-sm font-bold">Documentation</span></div></Link>
+            <Link href="/" onClick={onClose}>
+                <div className="flex items-center gap-3 p-3 bg-zinc-900/50 text-white rounded-lg border border-zinc-700 cursor-pointer hover:bg-zinc-800 transition-colors">
+                    <LayoutDashboard size={18} />
+                    <span className="text-sm font-bold">Dashboard</span>
+                </div>
+            </Link>
+            
+            <Link href="/map" onClick={onClose}>
+                <div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800">
+                    <MapIcon size={18} />
+                    <span className="text-sm font-bold">Global Map</span>
+                </div>
+            </Link>
+            
+            <Link href="/leaderboard" onClick={onClose}>
+                <div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800">
+                    <Trophy size={18} />
+                    <span className="text-sm font-bold">Leaderboard</span>
+                </div>
+            </Link>
+            
+            {/* UPDATED: Compare Link */}
+            <Link href="/compare" onClick={onClose}>
+                <div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800">
+                    <Swords size={18} />
+                    <span className="text-sm font-bold">Compare Nodes</span>
+                </div>
+            </Link>
+            
+            <Link href="/docs" onClick={onClose}>
+                <div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800">
+                    <BookOpen size={18} />
+                    <span className="text-sm font-bold">Documentation</span>
+                </div>
+            </Link>
           </nav>
 
           {/* Footer Actions */}
@@ -83,7 +113,6 @@ export const Sidebar = ({
                   </div>
               </button>
 
-              {/* Updated: Zen Mode Button added to Menu */}
               <button 
                 onClick={() => { onToggleZen(); onClose(); }}
                 className="w-full flex items-center gap-3 p-4 rounded-xl bg-zinc-900/30 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all"
