@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowUpCircle, AlertTriangle, X } from 'lucide-react'; // Updated: Added ArrowUpCircle
+import { ArrowUpCircle, AlertTriangle, X } from 'lucide-react'; 
 
 // --- CUSTOM HOOKS ---
 import { useNetworkData } from '../hooks/useNetworkData';
@@ -45,8 +45,8 @@ export default function Home() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [networkFilter, setNetworkFilter] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
 
-  // Updated: Include 'credits' in sortBy type
-  const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'health' | 'credits'>('storage');
+  // Updated: Include 'storage_used'
+  const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'storage_used' | 'health' | 'credits'>('storage');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // 3. CYCLE & TIMER STATE
@@ -95,7 +95,7 @@ export default function Home() {
 
   // --- ACTIONS ---
 
-  const handleSortChange = (metric: 'uptime' | 'version' | 'storage' | 'health' | 'credits') => {
+  const handleSortChange = (metric: 'uptime' | 'version' | 'storage' | 'storage_used' | 'health' | 'credits') => {
     if (sortBy === metric) {
         setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
@@ -104,7 +104,11 @@ export default function Home() {
     }
 
     let targetStep = cycleStep; 
-    if (metric === 'storage') targetStep = 1; 
+    // Logic: Map metric to Card Cycle Step
+    if (metric === 'storage') targetStep = 1;      // Commited
+    if (metric === 'storage_used') targetStep = 1; // Used (Share the same card type roughly, or Step 0? Let's use 1 for now or 0)
+    // Actually, Step 0 is Used, Step 1 is Committed in useCardCycle.
+    if (metric === 'storage_used') targetStep = 0; 
     if (metric === 'health') targetStep = 2;
     if (metric === 'uptime') targetStep = 3;
 
@@ -168,7 +172,7 @@ export default function Home() {
         isOpen={isMenuOpen} 
         onClose={() => setIsMenuOpen(false)} 
         zenMode={zenMode}
-        onToggleZen={handleToggleZen} // Updated: Passing toggle handler
+        onToggleZen={handleToggleZen} 
         networkFilter={networkFilter}
         onNetworkChange={setNetworkFilter}
         filteredCount={filteredNodes.length}
@@ -277,7 +281,7 @@ export default function Home() {
                   </div>
                </div>
 
-               {/* Updated: Back to Top Button */}
+               {/* Back to Top Button */}
                <button 
                   onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                   className="p-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all shadow-lg active:scale-95"
