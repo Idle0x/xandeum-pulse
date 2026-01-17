@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { 
-  X, Activity, LayoutDashboard, Map as MapIcon, Trophy, Swords, BookOpen, Download 
+  X, Activity, LayoutDashboard, Map as MapIcon, Trophy, Swords, BookOpen, Download, Monitor 
 } from 'lucide-react';
 import { NetworkSwitcher } from '../common/NetworkSwitcher';
 
@@ -9,6 +9,7 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   zenMode: boolean;
+  onToggleZen: () => void; // Updated: Recieves toggle handler
   networkFilter: 'ALL' | 'MAINNET' | 'DEVNET';
   onNetworkChange: (val: 'ALL' | 'MAINNET' | 'DEVNET') => void;
   filteredCount: number;
@@ -16,7 +17,7 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ 
-  isOpen, onClose, zenMode, networkFilter, onNetworkChange, filteredCount, onExport 
+  isOpen, onClose, zenMode, onToggleZen, networkFilter, onNetworkChange, filteredCount, onExport 
 }: SidebarProps) => {
   const router = useRouter();
 
@@ -24,6 +25,8 @@ export const Sidebar = ({
     <>
       <div className={`fixed inset-y-0 left-0 w-72 bg-black border-r border-zinc-800 z-[200] transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 flex flex-col h-full relative overflow-hidden">
+          
+          {/* Header */}
           <div className="flex justify-between items-center mb-8 shrink-0 relative z-10">
             <h2 className="font-bold text-white tracking-widest uppercase flex items-center gap-2">
               <Activity className={zenMode ? 'text-zinc-500' : 'text-blue-500'} size={18} /> Menu
@@ -33,6 +36,7 @@ export const Sidebar = ({
             </button>
           </div>
 
+          {/* Context Box */}
           <div className="mb-8 shrink-0 relative z-10">
             <div className={`border p-4 rounded-2xl relative overflow-hidden group ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900/80 border-white/5'}`}>
               {!zenMode && <div className="absolute top-0 right-0 p-8 bg-blue-500/5 blur-xl rounded-full group-hover:bg-blue-500/10 transition-all duration-700 pointer-events-none z-0"></div>}
@@ -52,6 +56,7 @@ export const Sidebar = ({
             </div>
           </div>
 
+          {/* Navigation */}
           <nav className="flex-grow space-y-2 relative z-10 overflow-y-auto scrollbar-hide">
             <Link href="/" onClick={onClose}><div className="flex items-center gap-3 p-3 bg-zinc-900/50 text-white rounded-lg border border-zinc-700 cursor-pointer hover:bg-zinc-800 transition-colors"><LayoutDashboard size={18} /><span className="text-sm font-bold">Dashboard</span></div></Link>
             <Link href="/map" onClick={onClose}><div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800"><MapIcon size={18} /><span className="text-sm font-bold">Global Map</span></div></Link>
@@ -60,7 +65,8 @@ export const Sidebar = ({
             <Link href="/docs" onClick={onClose}><div className="flex items-center gap-3 p-3 text-zinc-400 hover:bg-zinc-900 hover:text-white rounded-lg transition cursor-pointer border border-transparent hover:border-zinc-800"><BookOpen size={18} /><span className="text-sm font-bold">Documentation</span></div></Link>
           </nav>
 
-          <div className="mt-auto mb-6 pt-4 border-t border-zinc-800/50">
+          {/* Footer Actions */}
+          <div className="mt-auto mb-6 pt-4 border-t border-zinc-800/50 space-y-2">
               <button 
                 onClick={onExport} 
                 className="w-full group relative overflow-hidden rounded-xl bg-gradient-to-br from-zinc-900 to-zinc-950 border border-zinc-800 p-4 text-left transition-all hover:border-zinc-700 active:scale-[0.98] shadow-lg"
@@ -75,6 +81,15 @@ export const Sidebar = ({
                         <Download size={16} className="text-zinc-400 group-hover:text-white"/>
                     </div>
                   </div>
+              </button>
+
+              {/* Updated: Zen Mode Button added to Menu */}
+              <button 
+                onClick={() => { onToggleZen(); onClose(); }}
+                className="w-full flex items-center gap-3 p-4 rounded-xl bg-zinc-900/30 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all"
+              >
+                <Monitor size={18} />
+                <span className="text-sm font-bold">{zenMode ? 'Exit Zen Mode' : 'Enter Zen Mode'}</span>
               </button>
           </div>
         </div>
