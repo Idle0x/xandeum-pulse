@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Node } from '../types';
 import { getSafeIp, compareVersions } from '../utils/nodeHelpers';
 
-type SortOption = 'uptime' | 'version' | 'storage' | 'health' | 'credits'; // Added credits
+type SortOption = 'uptime' | 'version' | 'storage' | 'storage_used' | 'health' | 'credits';
 type SortOrder = 'asc' | 'desc';
 type NetworkOption = 'ALL' | 'MAINNET' | 'DEVNET';
 
@@ -14,11 +14,12 @@ export const useNodeFilter = (
   sortOrder: SortOrder
 ) => {
 
-  // Helper: Extract value for sorting
   const getSortValue = (node: Node, metric: SortOption): number | string => {
     switch (metric) {
       case 'storage':
         return node.storage_committed ?? -1; 
+      case 'storage_used':
+        return node.storage_used ?? -1;
       case 'uptime':
         return node.uptime ?? -1;
       case 'health':
@@ -26,7 +27,7 @@ export const useNodeFilter = (
       case 'version':
         return node.version || '0.0.0';
       case 'credits':
-        return node.credits ?? -1; // Added logic
+        return node.credits ?? -1;
       default:
         return 0;
     }
@@ -68,6 +69,7 @@ export const useNodeFilter = (
       return (a.pubkey || '').localeCompare(b.pubkey || '');
     });
 
+    // 3. RETURN SHALLOW COPY
     return [...result]; 
 
   }, [nodes, searchQuery, networkFilter, sortBy, sortOrder]);
