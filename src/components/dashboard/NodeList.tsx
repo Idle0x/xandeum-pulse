@@ -3,7 +3,7 @@ import { Node } from '../../types';
 import { formatBytes } from '../../utils/formatters';
 import { getSafeIp } from '../../utils/nodeHelpers';
 
-// ... (Helpers unchanged) ...
+// ... (Helpers formatUptime, formatLastSeen unchanged) ...
 const formatUptime = (seconds: number) => {
   if (!seconds) return '0m';
   const h = Math.floor(seconds / 3600);
@@ -76,6 +76,7 @@ export const NodeList = ({
         <HeaderCell label="Health" metric="health" />
         <HeaderCell label="Uptime" metric="uptime" alignRight />
         
+        {/* Split Storage Headers */}
         <HeaderCell label="Comm." metric="storage" alignRight />
         <HeaderCell label="Used" metric="storage_used" alignRight />
         
@@ -160,22 +161,41 @@ export const NodeList = ({
                 </button>
               </div>
 
-              {/* === MOBILE ROW (Unchanged) === */}
+              {/* === MOBILE ROW (RESTRUCTURED + HOVER RESTORED) === */}
               <div className="grid md:hidden grid-cols-[auto_1.5fr_0.8fr_0.5fr_1fr_auto] gap-3 px-4 py-3 items-center border-b border-zinc-800/20">
+                 
+                 {/* 1. Status Dot */}
                  <div className={`w-1.5 h-1.5 rounded-full ${statusColor} shrink-0`}></div>
+                 
+                 {/* 2. Identity Stack (RESTORED SLIDING ANIMATION) */}
                  <div className="flex flex-col min-w-0">
-                     <div className="flex items-center gap-1.5 mb-1">
-                        <span className="font-mono text-xs font-bold text-white truncate w-full">{node.pubkey ? `${node.pubkey.slice(0, 8)}...` : 'Unknown'}</span>
-                        <span className={`text-[6px] px-1 rounded border uppercase font-bold ${isMainnet ? 'text-green-500 border-green-900' : 'text-blue-500 border-blue-900'}`}>{isMainnet ? 'MN' : 'DN'}</span>
+                     {/* Row 1: The Swapper (Key <-> Flag/IP) */}
+                     <div className="relative h-5 overflow-hidden w-full mb-0.5">
+                        {/* Slide 1: Public Key + Badge */}
+                        <div className="absolute inset-0 flex items-center gap-1.5 transition-transform duration-300 group-hover:-translate-y-full">
+                           <span className="font-mono text-xs font-bold text-white truncate w-full">{node.pubkey ? `${node.pubkey.slice(0, 8)}...` : 'Unknown'}</span>
+                           <span className={`text-[6px] px-1 rounded border uppercase font-bold ${isMainnet ? 'text-green-500 border-green-900' : 'text-blue-500 border-blue-900'}`}>{isMainnet ? 'MN' : 'DN'}</span>
+                        </div>
+                        {/* Slide 2: Flag + IP */}
+                        <div className="absolute inset-0 flex items-center gap-2 translate-y-full transition-transform duration-300 group-hover:translate-y-0">
+                           {showFlag && <img src={`https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`} alt={countryCode} className="w-3 h-auto opacity-90 rounded-[2px]" />}
+                           <span className="font-mono text-[10px] text-zinc-300 font-bold truncate">{getSafeIp(node)}</span>
+                        </div>
                      </div>
+
+                     {/* Row 2: Version (Static) */}
                      <div className={`font-mono text-[9px] truncate transition-colors duration-300 ${versionColor}`}>
                         v{node.version || '0.0.0'}
                      </div>
                  </div>
+
+                 {/* 3. Time Stack */}
                  <div className="flex flex-col items-start leading-none gap-1">
                     <span className={`font-mono text-[9px] transition-colors duration-300 ${uptimeColor}`}>{formatUptime(node.uptime || 0)}</span>
                     <span className="font-mono text-[8px] text-zinc-600">{formatLastSeen(node.last_seen_timestamp || 0).replace(' ago', '')}</span>
                  </div>
+                 
+                 {/* 4. Health/Credits Stack */}
                  <div className="flex flex-col items-center leading-none gap-1">
                     <div className={`font-mono text-[10px] font-bold transition-colors duration-300 ${healthColor}`}>
                         {health}%
@@ -184,10 +204,14 @@ export const NodeList = ({
                         {node.credits !== null ? node.credits.toLocaleString() : '-'}
                     </div>
                  </div>
+                 
+                 {/* 5. Storage Stack */}
                  <div className="flex flex-col items-end leading-none">
                      <span className={`font-bold text-[10px] font-mono transition-colors duration-300 ${storageColorMain}`}>{formatBytes(node.storage_committed)}</span>
                      <span className={`text-[8px] font-mono mt-0.5 transition-colors duration-300 ${storageColorSub}`}>{formatBytes(node.storage_used)}</span>
                  </div>
+                 
+                 {/* 6. Star */}
                  <button onClick={(e) => onToggleFavorite(e, node.address || '')} className="pl-1">
                     <Star size={12} className={isFav ? "text-yellow-500" : "text-zinc-700"} fill={isFav ? "currentColor" : "none"} />
                  </button>
