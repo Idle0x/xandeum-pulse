@@ -45,7 +45,7 @@ export default function Home() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [networkFilter, setNetworkFilter] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
 
-  // Updated: Include 'storage_used'
+  // Sorting State
   const [sortBy, setSortBy] = useState<'uptime' | 'version' | 'storage' | 'storage_used' | 'health' | 'credits'>('storage');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -63,6 +63,7 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const toastTimer = useRef<NodeJS.Timeout | null>(null);
+  const lastProcessedDeepLink = useRef<string | null>(null); // Prevents loops
 
   // 5. USE FILTER HOOK
   const filteredNodes = useNodeFilter(nodes, searchQuery, networkFilter, sortBy, sortOrder);
@@ -93,6 +94,55 @@ export default function Home() {
     return () => clearInterval(cycleInterval);
   }, [cycleReset]); 
 
+  // --- ADVANCED DEEP LINKING LOGIC ---
+  useEffect(() => {
+    // 1. Guard Clauses: Wait for data & router
+    if (loading || !router.isReady || !router.query.open || nodes.length === 0) return;
+
+    // 2. Extract Params
+    const targetKey = router.query.open as string;
+    const targetNetwork = router.query.network as string; // Optional
+    const targetAddr = router.query.focusAddr as string;  // Optional (Tie Breaker)
+
+    // 3. Create Signature to prevent re-running
+    const requestSignature = `${targetKey}-${targetNetwork}-${targetAddr}`;
+    if (lastProcessedDeepLink.current === requestSignature) return;
+
+    // 4. Find Node (Tiered Matching)
+    // Priority 1: Exact Match (Key + Network + IP)
+    let match = nodes.find(n => 
+        n.pubkey === targetKey && 
+        (!targetNetwork || n.network === targetNetwork) &&
+        (!targetAddr || n.address === targetAddr)
+    );
+
+    // Priority 2: Fallback to Key + Network (if IP changed or missing)
+    if (!match && targetNetwork) {
+        match = nodes.find(n => n.pubkey === targetKey && n.network === targetNetwork);
+    }
+
+    // Priority 3: Fallback to Key only (First available)
+    if (!match) {
+        match = nodes.find(n => n.pubkey === targetKey);
+    }
+
+    // 5. Execute Action
+    if (match) {
+        lastProcessedDeepLink.current = requestSignature;
+        
+        // Auto-switch filter so the node is visible in the background list
+        if (match.network !== networkFilter && networkFilter !== 'ALL') {
+             setNetworkFilter('ALL'); 
+        }
+
+        setSelectedNode(match);
+        
+        // Optional: Clean URL (Remove params) - Uncomment if desired
+        // router.replace('/', undefined, { shallow: true });
+    }
+  }, [loading, router.isReady, router.query, nodes, networkFilter]);
+
+
   // --- ACTIONS ---
 
   const handleSortChange = (metric: 'uptime' | 'version' | 'storage' | 'storage_used' | 'health' | 'credits') => {
@@ -106,9 +156,7 @@ export default function Home() {
     let targetStep = cycleStep; 
     // Logic: Map metric to Card Cycle Step
     if (metric === 'storage') targetStep = 1;      // Commited
-    if (metric === 'storage_used') targetStep = 1; // Used (Share the same card type roughly, or Step 0? Let's use 1 for now or 0)
-    // Actually, Step 0 is Used, Step 1 is Committed in useCardCycle.
-    if (metric === 'storage_used') targetStep = 0; 
+    if (metric === 'storage_used') targetStep = 0; // Used
     if (metric === 'health') targetStep = 2;
     if (metric === 'uptime') targetStep = 3;
 
