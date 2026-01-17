@@ -485,15 +485,20 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
 
                     <div className="flex-1 rounded-xl overflow-hidden border border-white/5 bg-[#050505] mx-4 md:mx-6 relative group shadow-inner">
                         <ComposableMap projectionConfig={{ scale: 160 }} className="w-full h-full">
-                            <ZoomableGroup zoom={pos.zoom} center={pos.coordinates as [number, number]} maxZoom={10} onMoveEnd={(e) => setPos({ coordinates: e.coordinates as [number, number], zoom: e.zoom })}>
-                                <Geographies geography={GEO_URL}>{({ geographies }: { geographies: any[] }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#18181b" stroke="#27272a" strokeWidth={0.5} />))}</Geographies>
-                                {nodes.map((n, i) => (n.location && (
-                                    <Marker key={n.pubkey} coordinates={[n.location.lon, n.location.lat]}>
-                                        <circle r={8/pos.zoom} fill={themes[i].hex} fillOpacity={0.4} className="animate-pulse" />
-                                        <circle r={4/pos.zoom} fill="#fff" stroke={themes[i].hex} strokeWidth={2/pos.zoom} />
-                                    </Marker>
-                                )))}
-                            </ZoomableGroup>
+                            <ZoomableGroup 
+    zoom={pos.zoom} 
+    center={pos.coordinates as [number, number]} 
+    maxZoom={10} 
+    onMoveEnd={(e: any) => setPos({ coordinates: e.coordinates as [number, number], zoom: e.zoom })}
+>
+    <Geographies geography={GEO_URL}>{({ geographies }: { geographies: any[] }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#18181b" stroke="#27272a" strokeWidth={0.5} />))}</Geographies>
+    {nodes.map((n, i) => (n.location && (
+        <Marker key={n.pubkey} coordinates={[n.location.lon, n.location.lat]}>
+            <circle r={8/pos.zoom} fill={themes[i].hex} fillOpacity={0.4} className="animate-pulse" />
+            <circle r={4/pos.zoom} fill="#fff" stroke={themes[i].hex} strokeWidth={2/pos.zoom} />
+        </Marker>
+    )))}
+</ZoomableGroup>
                         </ComposableMap>
                     </div>
                     <UnifiedLegend nodes={nodes} themes={themes} metricMode="COUNTRY" />
