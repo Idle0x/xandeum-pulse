@@ -67,7 +67,6 @@ export const Header = ({
   // 1. Shrank 'Last Seen' (Col 3) to 1.0fr.
   // 2. Evenly spaced Middle Columns (1.1fr).
   // 3. Credits fixed at 0.8fr.
-  // This grid string MUST match NodeList.tsx exactly.
   const gridClass = "grid-cols-[auto_2fr_1.0fr_1.1fr_1.1fr_1.1fr_1.0fr_1.0fr_0.8fr_auto]";
 
   return (
@@ -147,8 +146,13 @@ export const Header = ({
             {isScrolled && !zenMode && (
               <div className="transition-all duration-300 flex items-center justify-end animate-in fade-in zoom-in">
                    <div className="flex items-center gap-1 p-1 rounded-lg bg-zinc-900 border border-zinc-800">
-                      <button onClick={() => setViewMode('grid')} className={`p-2 rounded ${viewMode === 'grid' ? 'bg-zinc-700 text-white' : 'text-zinc-500'}`}><LayoutGrid size={20}/></button>
-                      <button onClick={() => setViewMode('list')} className={`p-2 rounded ${viewMode === 'list' ? 'bg-zinc-700 text-white' : 'text-zinc-500'}`}><List size={20}/></button>
+                      {/* Responsive Size: p-1.5/size-16 on Mobile, p-2/size-20 on Desktop */}
+                      <button onClick={() => setViewMode('grid')} className={`p-1.5 md:p-2 rounded ${viewMode === 'grid' ? 'bg-zinc-700 text-white' : 'text-zinc-500'}`}>
+                        <LayoutGrid size={16} className="md:w-5 md:h-5"/> 
+                      </button>
+                      <button onClick={() => setViewMode('list')} className={`p-1.5 md:p-2 rounded ${viewMode === 'list' ? 'bg-zinc-700 text-white' : 'text-zinc-500'}`}>
+                        <List size={16} className="md:w-5 md:h-5"/>
+                      </button>
                    </div>
               </div>
             )}
@@ -158,11 +162,28 @@ export const Header = ({
       {/* Bottom Row: Controls OR List Headers */}
       <div className="flex items-center gap-2 md:gap-4 overflow-x-auto pb-1 md:pb-2 scrollbar-hide w-full mt-1 md:mt-6 border-t border-zinc-800/50 pt-2 overflow-visible">
         
-        {/* === SCENARIO 1: DESKTOP STICKY HEADER (THE FIX) === */}
+        {/* 1. REFRESH (Always First) */}
+        <button onClick={onRefetch} disabled={loading} className={`flex items-center gap-1 md:gap-2 px-3 h-6 md:px-6 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs shrink-0 ${loading ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'}`}>
+          <RefreshCw size={10} className={`md:w-[14px] md:h-[14px] ${loading || isBackgroundSyncing ? 'animate-spin' : ''}`} /> {loading ? 'SYNC...' : 'REFRESH'}
+        </button>
+
+        {/* 2. MOBILE NETWORK SWITCHER (2nd Slot, Always Visible on Mobile) */}
+        <div className="relative shrink-0 md:hidden ml-1">
+            <button 
+                onClick={onCycleNetwork}
+                className={`flex items-center gap-1 px-3 h-6 rounded-xl transition font-bold text-[9px] border active:scale-95 ${zenMode ? 'bg-black border-zinc-800 text-zinc-400' : 'bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}
+            >
+                <div className={`w-1.5 h-1.5 rounded-full ${networkFilter === 'MAINNET' ? 'bg-green-500' : networkFilter === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
+                <span>{networkFilter === 'ALL' ? 'ALL' : networkFilter === 'MAINNET' ? 'MAINNET' : 'DEVNET'}</span>
+            </button>
+        </div>
+
+
+        {/* === DESKTOP STICKY HEADER (Conditional) === */}
         {viewMode === 'list' && !zenMode && isScrolled ? (
              <div className={`hidden md:grid flex-1 ${gridClass} gap-4 px-2 items-center text-[9px] font-bold uppercase tracking-wider`}>
                 
-                {/* Col 1 (Auto): Empty Spacer */}
+                {/* Col 1: Empty Spacer */}
                 <div className="w-2"></div>
                 
                 {/* Col 2 (Identity space): INJECT BUTTONS HERE */}
@@ -183,10 +204,10 @@ export const Header = ({
                    </button>
                 </div>
 
-                {/* Col 3 (Last Seen): Empty Spacer */}
+                {/* Col 3: Empty Spacer */}
                 <div></div>
 
-                {/* Cols 4+: Sort Labels (Perfectly Aligned) */}
+                {/* Cols 4+: Sort Labels */}
                 <ListHeaderCell label="Version" metric="version" />
                 <ListHeaderCell label="Health" metric="health" />
                 <ListHeaderCell label="Uptime" metric="uptime" alignRight />
@@ -195,50 +216,28 @@ export const Header = ({
                 <ListHeaderCell label="Credits" metric="credits" alignRight />
                 <div className="w-6"></div>
              </div>
-        ) : (
-          // === SCENARIO 2: MOBILE OR INITIAL VIEW ===
-          <>
-            {/* 1. REFRESH (Standard) */}
-            <button onClick={onRefetch} disabled={loading} className={`flex items-center gap-1 md:gap-2 px-3 h-6 md:px-6 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs shrink-0 ${loading ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'}`}>
-              <RefreshCw size={10} className={`md:w-[14px] md:h-[14px] ${loading || isBackgroundSyncing ? 'animate-spin' : ''}`} /> {loading ? 'SYNC...' : 'REFRESH'}
-            </button>
+        ) : null}
 
-            {/* 2. NETWORK SWITCHER (Standard - Now 2nd Item) */}
-            <div className="relative shrink-0 ml-1">
-                <button 
-                    onClick={onCycleNetwork}
-                    className={`flex items-center gap-1 px-3 h-6 md:px-4 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs border active:scale-95 ${zenMode ? 'bg-black border-zinc-800 text-zinc-400' : 'bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}
-                >
-                    <div className={`w-1.5 h-1.5 rounded-full ${networkFilter === 'MAINNET' ? 'bg-green-500' : networkFilter === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
-                    <span>{networkFilter === 'ALL' ? 'ALL' : networkFilter === 'MAINNET' ? 'MAINNET' : 'DEVNET'}</span>
-                    {!zenMode && <Repeat size={10} className="md:w-3 md:h-3 opacity-50"/>}
+        {/* === SORT BUTTONS === */}
+        {/* MOBILE: Always Visible (md:hidden) */}
+        <div className="flex gap-1 relative ml-auto md:hidden">
+             {['uptime', 'storage', 'storage_used', 'version', 'health', 'credits'].map((opt) => (
+                <button key={opt} onClick={() => onSortChange(opt as any)} className={`flex items-center gap-1 px-1.5 h-6 rounded-lg text-[8px] font-bold transition border whitespace-nowrap ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-black border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
+                {opt === 'uptime' && <Clock size={10} />}
+                {opt === 'storage' && <Database size={10} />}
+                {opt === 'storage_used' && <HardDrive size={10} />}
+                {opt === 'version' && <Server size={10} />}
+                {opt === 'health' && <HeartPulse size={10} />}
+                {opt === 'credits' && <Coins size={10} />}
+                
+                {opt === 'storage' ? 'COMM.' : opt === 'storage_used' ? 'USED' : opt.toUpperCase()}
+                {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={8} className="ml-0.5" /> : <ArrowDown size={8} className="ml-0.5" />)}
                 </button>
-             </div>
-          </>
-        )}
+            ))}
+        </div>
 
-        {/* === SORT BUTTONS (Mobile Only) === */}
-        {/* Only show these if we are NOT in the Desktop Sticky Header view */}
-        {(!viewMode || viewMode !== 'list' || zenMode || !isScrolled) && (
-           <div className="flex gap-1 md:gap-2 relative ml-auto md:hidden">
-              {['uptime', 'storage', 'storage_used', 'version', 'health', 'credits'].map((opt) => (
-                    <button key={opt} onClick={() => onSortChange(opt as any)} className={`flex items-center gap-1 px-1.5 h-6 md:px-3 md:py-2 md:h-auto rounded-lg text-[8px] md:text-xs font-bold transition border whitespace-nowrap ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-black border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
-                    {opt === 'uptime' && <Clock size={10} className="md:w-3 md:h-3" />}
-                    {opt === 'storage' && <Database size={10} className="md:w-3 md:h-3" />}
-                    {opt === 'storage_used' && <HardDrive size={10} className="md:w-3 md:h-3" />}
-                    {opt === 'version' && <Server size={10} className="md:w-3 md:h-3" />}
-                    {opt === 'health' && <HeartPulse size={10} className="md:w-3 md:h-3" />}
-                    {opt === 'credits' && <Coins size={10} className="md:w-3 md:h-3" />}
-                    
-                    {opt === 'storage' ? 'COMM.' : opt === 'storage_used' ? 'USED' : opt.toUpperCase()}
-                    {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={8} className="ml-0.5 md:ml-1 md:w-[10px] md:h-[10px]" /> : <ArrowDown size={8} className="ml-0.5 md:ml-1 md:w-[10px] md:h-[10px]" />)}
-                    </button>
-                ))}
-           </div>
-        )}
-
-        {/* Desktop Standard Sort Buttons (Initial View) */}
-        {!isScrolled && !zenMode && (
+        {/* DESKTOP: Visible when Grid OR Not Scrolled (hidden md:flex) */}
+        {!zenMode && (!isScrolled || viewMode === 'grid') && (
              <div className="hidden md:flex gap-2 relative ml-auto">
                 {['uptime', 'storage', 'storage_used', 'version', 'health', 'credits'].map((opt) => (
                     <button key={opt} onClick={() => onSortChange(opt as any)} className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${sortBy === opt ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
@@ -248,6 +247,7 @@ export const Header = ({
                 ))}
              </div>
         )}
+
       </div>
     </header>
   );
