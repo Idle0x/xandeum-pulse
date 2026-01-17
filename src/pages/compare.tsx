@@ -4,8 +4,8 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { toPng } from 'html-to-image'; // Ensure this package is installed
-import { ComposableMap, Geographies, Geography, Marker } from 'react-simple-maps'; // Reuse from MapPage
+import { toPng } from 'html-to-image';
+import { ComposableMap, Geographies, Geography, Marker } from 'react-simple-maps';
 import { 
   ArrowLeft, Search, Plus, X, Trash2, 
   Download, Settings2, CheckCircle, ArrowRight,
@@ -19,7 +19,7 @@ import { getSafeIp } from '../utils/nodeHelpers';
 import { formatBytes, formatUptime } from '../utils/formatters';
 import { Node } from '../types';
 
-// GeoJSON URL (Same as MapPage)
+// GeoJSON URL
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
 // --- HELPER COMPONENTS ---
@@ -202,15 +202,12 @@ const Visualizer = ({ nodes, colors }: { nodes: Node[], colors: string[] }) => {
 
   if (nodes.length < 1) return null;
 
-  // Overview Data (Normalized Power Bar)
   const maxStorage = Math.max(...nodes.map(n => n.storage_committed || 0), 1);
   const maxCredits = Math.max(...nodes.map(n => n.credits || 0), 1);
 
-  // Market Share Data
   const totalStorage = nodes.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
   const totalCredits = nodes.reduce((sum, n) => sum + (n.credits || 0), 0);
 
-  // Donut Generator (CSS Conic Gradient)
   const getConicGradient = (type: 'STORAGE' | 'CREDITS') => {
     let currentDeg = 0;
     const total = type === 'STORAGE' ? totalStorage : totalCredits;
@@ -228,7 +225,6 @@ const Visualizer = ({ nodes, colors }: { nodes: Node[], colors: string[] }) => {
 
   return (
     <div className="shrink-0 h-[280px] border-t border-zinc-800 bg-[#09090b] flex flex-col relative z-40">
-        {/* TABS */}
         <div className="flex items-center justify-center gap-1 p-2 border-b border-zinc-800 bg-black/20">
             {['OVERVIEW', 'MARKET', 'MAP'].map(t => (
                 <button 
@@ -241,22 +237,16 @@ const Visualizer = ({ nodes, colors }: { nodes: Node[], colors: string[] }) => {
             ))}
         </div>
 
-        {/* CONTENT */}
         <div className="flex-1 p-4 overflow-hidden relative">
             {tab === 'OVERVIEW' && (
                 <div className="h-full flex items-end justify-center gap-4 md:gap-8 pb-4">
                     {nodes.map((n, i) => (
                         <div key={n.pubkey} className="flex flex-col items-center gap-2 h-full justify-end w-12 md:w-16 group">
-                            {/* Bars */}
                             <div className="w-full flex gap-0.5 h-[80%] items-end justify-center">
-                                {/* Storage Bar */}
                                 <div className="w-1.5 md:w-2 bg-purple-500/50 rounded-t-sm transition-all duration-500 relative group-hover:bg-purple-500" style={{ height: `${((n.storage_committed || 0) / maxStorage) * 100}%` }}></div>
-                                {/* Health Bar */}
                                 <div className="w-1.5 md:w-2 bg-green-500/50 rounded-t-sm transition-all duration-500 relative group-hover:bg-green-500" style={{ height: `${n.health || 0}%` }}></div>
-                                {/* Credits Bar */}
                                 <div className="w-1.5 md:w-2 bg-yellow-500/50 rounded-t-sm transition-all duration-500 relative group-hover:bg-yellow-500" style={{ height: `${((n.credits || 0) / maxCredits) * 100}%` }}></div>
                             </div>
-                            {/* Label */}
                             <div className="text-[8px] font-mono text-zinc-500 truncate w-full text-center" style={{ color: colors[i] }}>
                                 {getSafeIp(n)}
                             </div>
@@ -267,7 +257,6 @@ const Visualizer = ({ nodes, colors }: { nodes: Node[], colors: string[] }) => {
 
             {tab === 'MARKET' && (
                 <div className="h-full flex items-center justify-center gap-8 md:gap-16">
-                    {/* Storage Donut */}
                     <div className="flex flex-col items-center gap-3">
                         <div className="w-24 h-24 rounded-full relative flex items-center justify-center" style={{ background: getConicGradient('STORAGE') }}>
                             <div className="w-16 h-16 bg-[#09090b] rounded-full flex flex-col items-center justify-center z-10">
@@ -277,7 +266,6 @@ const Visualizer = ({ nodes, colors }: { nodes: Node[], colors: string[] }) => {
                         <div className="text-[9px] text-zinc-400 font-mono">{formatBytes(totalStorage)} Total</div>
                     </div>
 
-                    {/* Credits Donut */}
                     <div className="flex flex-col items-center gap-3">
                         <div className="w-24 h-24 rounded-full relative flex items-center justify-center" style={{ background: getConicGradient('CREDITS') }}>
                             <div className="w-16 h-16 bg-[#09090b] rounded-full flex flex-col items-center justify-center z-10">
@@ -293,7 +281,7 @@ const Visualizer = ({ nodes, colors }: { nodes: Node[], colors: string[] }) => {
                 <div className="w-full h-full rounded-xl overflow-hidden border border-zinc-800 bg-[#050505] relative">
                     <ComposableMap projectionConfig={{ scale: 160 }} className="w-full h-full opacity-60">
                         <Geographies geography={GEO_URL}>
-                            {({ geographies }) => geographies.map((geo) => (
+                            {({ geographies }: { geographies: any[] }) => geographies.map((geo: any) => (
                                 <Geography key={geo.rsmKey} geography={geo} fill="#1f1f1f" stroke="#262626" />
                             ))}
                         </Geographies>
@@ -332,27 +320,22 @@ export default function ComparePage() {
   const router = useRouter();
   const printRef = useRef<HTMLDivElement>(null);
   
-  // 1. Data Hooks
   const { nodes, loading, networkStats, mostCommonVersion, medianCommitted } = useNetworkData(); 
 
-  // 2. State
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [showAvg, setShowAvg] = useState(false);
-  const [leaderContext, setLeaderContext] = useState<string | null>(null); // 'STORAGE', 'CREDITS', 'HEALTH'
+  const [leaderContext, setLeaderContext] = useState<string | null>(null); 
   const [isLeaderDropdownOpen, setIsLeaderDropdownOpen] = useState(false);
   
-  // UI State
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // 3. Derived State
   const selectedNodes = useMemo(() => {
     return selectedKeys
       .map(key => nodes.find(n => n.pubkey === key))
       .filter((n): n is Node => !!n);
   }, [selectedKeys, nodes]);
 
-  // Leaders Calculation
   const leaderData = useMemo(() => {
       if (nodes.length === 0) return { storage: '0', credits: '0', health: '0' };
       const maxS = Math.max(...nodes.map(n => n.storage_committed || 0));
@@ -365,10 +348,8 @@ export default function ComparePage() {
       };
   }, [nodes]);
 
-  // Colors for Visualizer (Max 5)
   const NODE_COLORS = ['#3b82f6', '#a855f7', '#eab308', '#22c55e', '#ef4444'];
 
-  // 4. URL Sync
   useEffect(() => {
     if (!router.isReady || loading || nodes.length === 0) return;
     const urlNodes = router.query.nodes as string;
@@ -388,7 +369,6 @@ export default function ComparePage() {
     }
   }, [router.isReady, loading, nodes.length]);
 
-  // 5. Action Handlers
   const addNode = (pubkey: string) => {
     if (selectedKeys.includes(pubkey)) return;
     if (selectedKeys.length >= 5) return;
@@ -426,7 +406,6 @@ export default function ComparePage() {
     <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-blue-500/30 flex flex-col overflow-hidden">
       <Head><title>Pulse Comparative Analysis</title></Head>
 
-      {/* HEADER */}
       <header className="shrink-0 border-b border-zinc-800 bg-[#09090b] px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-4 sticky top-0 z-50">
         <div className="flex items-center gap-4 w-full md:w-auto">
             <Link href="/" className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 transition text-zinc-400 hover:text-white"><ArrowLeft size={16} /></Link>
@@ -441,7 +420,6 @@ export default function ComparePage() {
                 {showAvg ? <CheckCircle size={10} /> : <div className="w-2.5 h-2.5 rounded-full border border-zinc-500"></div>} VS Average
             </button>
 
-            {/* Leader Dropdown */}
             <div className="relative">
                 <button onClick={() => setIsLeaderDropdownOpen(!isLeaderDropdownOpen)} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[9px] font-bold uppercase transition whitespace-nowrap ${leaderContext ? 'bg-white text-black border-white' : 'bg-black text-zinc-500 border-zinc-800 hover:border-zinc-600'}`}>
                     {leaderContext ? `VS ${leaderContext}` : 'VS Leader'} <ChevronDown size={10} />
@@ -460,7 +438,6 @@ export default function ComparePage() {
         </div>
       </header>
 
-      {/* MATRIX */}
       <div className="flex-1 overflow-y-auto bg-[#050505] flex flex-col custom-scrollbar">
          <main ref={printRef} className="flex-1 overflow-x-auto bg-[#050505] relative flex">
             <StickyLegend showAvg={showAvg} leaderContext={leaderContext} networkStats={networkStats} mostCommonVersion={mostCommonVersion} medianStorage={medianCommitted} leaderData={leaderData} />
@@ -473,7 +450,6 @@ export default function ComparePage() {
          <Visualizer nodes={selectedNodes} colors={NODE_COLORS} />
       </div>
 
-      {/* SEARCH MODAL */}
       {isSearchOpen && (
           <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="w-full max-w-md bg-[#09090b] border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
