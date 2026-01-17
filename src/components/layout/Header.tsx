@@ -63,8 +63,10 @@ export const Header = ({
     </div>
   );
 
-  // MATCHING GRID DEFINITION (10 Cols)
-  const gridClass = "grid-cols-[auto_2fr_1.2fr_1.2fr_0.8fr_0.8fr_0.7fr_0.7fr_0.8fr_auto]";
+  // ALIGNMENT FIX: 
+  // 1. Widened 'Last Seen' (Col 3) to 1.6fr to push Version right.
+  // 2. Evenly spaced Health, Uptime, Comm, Used (0.9fr).
+  const gridClass = "grid-cols-[auto_2fr_1.6fr_1.1fr_0.9fr_0.9fr_0.9fr_0.9fr_0.8fr_auto]";
 
   return (
     <header className={`sticky top-0 z-[50] border-b px-4 py-1 md:py-3 flex flex-col gap-1 md:gap-4 transition-all duration-500 overflow-visible ${zenMode ? 'bg-black border-zinc-800' : 'bg-[#09090b]/90 backdrop-blur-md border-zinc-800'}`}>
@@ -126,20 +128,28 @@ export const Header = ({
            {!zenMode && <style>{` @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } } .animate-marquee { animation: marquee 15s linear infinite; } @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } } .animate-ticker { display: flex; width: max-content; animation: ticker 60s linear infinite; } .mask-linear-fade { mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); } `}</style>}
         </div>
 
-        {/* Right: Zen Toggle AND Grid/List Toggle */}
-        <div className="shrink-0 relative flex flex-col items-end gap-1">
-            <div className={`transition-all duration-300 flex items-center justify-end`}>
-                <button onClick={onToggleZen} className={`p-2 rounded-lg transition flex items-center gap-2 group ${zenMode ? 'bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white' : 'bg-red-900/10 border border-red-500/20 text-red-500 hover:bg-red-900/30'}`} title={zenMode ? 'Exit Zen Mode' : 'Enter Zen Mode'}>
-                <Monitor size={18} />
-                <span className="hidden md:inline text-xs font-bold">{zenMode ? 'EXIT ZEN' : 'ZEN MODE'}</span>
-                </button>
-            </div>
-            <div className={`transition-all duration-300 flex items-center justify-end ${isScrolled && !zenMode ? 'opacity-100 h-auto' : 'opacity-0 h-0 overflow-hidden pointer-events-none'}`}>
-                 <div className="flex items-center gap-1 p-1 rounded-lg bg-zinc-900 border border-zinc-800">
-                    <button onClick={() => setViewMode('grid')} className={`p-1 rounded ${viewMode === 'grid' ? 'bg-zinc-700 text-white' : 'text-zinc-500'}`}><LayoutGrid size={14}/></button>
-                    <button onClick={() => setViewMode('list')} className={`p-1 rounded ${viewMode === 'list' ? 'bg-zinc-700 text-white' : 'text-zinc-500'}`}><List size={14}/></button>
-                 </div>
-            </div>
+        {/* Right: STRICT SWAP between Zen Mode and Grid/List */}
+        <div className="shrink-0 relative flex flex-col items-end gap-1 w-10 md:w-auto h-10 md:h-auto justify-center">
+            
+            {/* 1. Zen Button: Only visible when NOT Scrolled (Top) */}
+            {!isScrolled && (
+              <div className="transition-all duration-300 flex items-center justify-end animate-in fade-in zoom-in">
+                  <button onClick={onToggleZen} className={`p-2 rounded-lg transition flex items-center gap-2 group ${zenMode ? 'bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white' : 'bg-red-900/10 border border-red-500/20 text-red-500 hover:bg-red-900/30'}`} title={zenMode ? 'Exit Zen Mode' : 'Enter Zen Mode'}>
+                  <Monitor size={18} />
+                  <span className="hidden md:inline text-xs font-bold">{zenMode ? 'EXIT ZEN' : 'ZEN MODE'}</span>
+                  </button>
+              </div>
+            )}
+
+            {/* 2. Grid/List Toggle: Only visible when SCROLLED */}
+            {isScrolled && !zenMode && (
+              <div className="transition-all duration-300 flex items-center justify-end animate-in fade-in zoom-in">
+                   <div className="flex items-center gap-1 p-1 rounded-lg bg-zinc-900 border border-zinc-800">
+                      <button onClick={() => setViewMode('grid')} className={`p-1 rounded ${viewMode === 'grid' ? 'bg-zinc-700 text-white' : 'text-zinc-500'}`}><LayoutGrid size={18}/></button>
+                      <button onClick={() => setViewMode('list')} className={`p-1 rounded ${viewMode === 'list' ? 'bg-zinc-700 text-white' : 'text-zinc-500'}`}><List size={18}/></button>
+                   </div>
+              </div>
+            )}
         </div>
       </div>
 
@@ -179,9 +189,8 @@ export const Header = ({
           </>
         ) : null}
 
-        {/* === STANDARD SORT BUTTONS === */}
+        {/* === SORT BUTTONS (Mobile OR Initial Desktop) === */}
         <div className={`flex gap-1 md:gap-2 relative ml-auto ${viewMode === 'list' && !zenMode && isScrolled ? 'md:hidden' : ''}`}>
-           {/* Added: "USED" button to the list */}
            {['uptime', 'storage', 'storage_used', 'version', 'health', 'credits'].map((opt) => (
                 <button key={opt} onClick={() => onSortChange(opt as any)} className={`flex items-center gap-1 px-1.5 h-6 md:px-3 md:py-2 md:h-auto rounded-lg text-[8px] md:text-xs font-bold transition border whitespace-nowrap ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-black border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
                 {opt === 'uptime' && <Clock size={10} className="md:w-3 md:h-3" />}
@@ -190,14 +199,25 @@ export const Header = ({
                 {opt === 'version' && <Server size={10} className="md:w-3 md:h-3" />}
                 {opt === 'health' && <HeartPulse size={10} className="md:w-3 md:h-3" />}
                 {opt === 'credits' && <Coins size={10} className="md:w-3 md:h-3" />}
-                {opt === 'storage' ? 'COMMITTED' : opt === 'storage_used' ? 'USED' : opt.toUpperCase()}
+                {/* Updated Labels */}
+                {opt === 'storage' ? 'COMM.' : opt === 'storage_used' ? 'USED' : opt.toUpperCase()}
                 {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={8} className="ml-0.5 md:ml-1 md:w-[10px] md:h-[10px]" /> : <ArrowDown size={8} className="ml-0.5 md:ml-1 md:w-[10px] md:h-[10px]" />)}
                 </button>
             ))}
         </div>
         
+        {/* NETWORK SWITCHER (RESTORED FOR MOBILE) */}
         {!isScrolled && (
-             <div className="relative shrink-0 md:hidden"></div>
+             <div className="relative shrink-0 md:hidden ml-1">
+                <button 
+                    onClick={onCycleNetwork}
+                    className={`flex items-center gap-1 px-2 h-6 rounded-xl transition font-bold text-[9px] border active:scale-95 ${zenMode ? 'bg-black border-zinc-800 text-zinc-400' : 'bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}
+                >
+                    <div className={`w-1.5 h-1.5 rounded-full ${networkFilter === 'MAINNET' ? 'bg-green-500' : networkFilter === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
+                    {/* Full Text */}
+                    <span>{networkFilter === 'ALL' ? 'ALL' : networkFilter === 'MAINNET' ? 'MAINNET' : 'DEVNET'}</span>
+                </button>
+             </div>
         )}
          
       </div>
