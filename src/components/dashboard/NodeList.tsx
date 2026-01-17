@@ -3,7 +3,7 @@ import { Node } from '../../types';
 import { formatBytes } from '../../utils/formatters';
 import { getSafeIp } from '../../utils/nodeHelpers';
 
-// Fixed Uptime Helper
+// ... (Helpers unchanged) ...
 const formatUptime = (seconds: number) => {
   if (!seconds) return '0m';
   const h = Math.floor(seconds / 3600);
@@ -15,7 +15,6 @@ const formatUptime = (seconds: number) => {
   return `${m}m`;
 };
 
-// Fixed Last Seen Helper
 const formatLastSeen = (timestamp: number) => {
   if (!timestamp || timestamp === 0) return 'Never';
   const time = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
@@ -45,7 +44,6 @@ export const NodeList = ({
 }: NodeListProps) => {
   if (nodes.length === 0) return null;
 
-  // --- HELPER: Header Cell Component with Permanent Arrows ---
   const HeaderCell = ({ label, metric, alignRight = false }: { label: string, metric?: 'uptime' | 'version' | 'storage' | 'storage_used' | 'health' | 'credits', alignRight?: boolean }) => (
     <div 
       onClick={() => metric && onSortChange(metric)}
@@ -60,8 +58,8 @@ export const NodeList = ({
     </div>
   );
 
-  // GRID DEFINITION: 10 Columns
-  const gridClass = "grid-cols-[auto_2fr_1.2fr_1.2fr_0.8fr_0.8fr_0.7fr_0.7fr_0.8fr_auto]";
+  // ALIGNMENT FIX: Synced with Header
+  const gridClass = "grid-cols-[auto_2fr_1.6fr_1.1fr_0.9fr_0.9fr_0.9fr_0.9fr_0.8fr_auto]";
 
   return (
     <div className="flex flex-col min-w-full bg-[#09090b]/40">
@@ -75,7 +73,6 @@ export const NodeList = ({
         <HeaderCell label="Health" metric="health" />
         <HeaderCell label="Uptime" metric="uptime" alignRight />
         
-        {/* Split Storage Headers */}
         <HeaderCell label="Comm." metric="storage" alignRight />
         <HeaderCell label="Used" metric="storage_used" alignRight />
         
@@ -97,7 +94,6 @@ export const NodeList = ({
           // --- SPOTLIGHT COLOR LOGIC ---
           const storageColorMain = sortBy === 'storage' ? 'text-purple-400' : 'text-zinc-500';
           const storageColorSub  = sortBy === 'storage_used' ? 'text-blue-400' : 'text-zinc-600';
-          
           const uptimeColor = sortBy === 'uptime' ? 'text-orange-400' : 'text-zinc-400';
           const healthColor = sortBy === 'health' ? 'text-green-400' : 'text-zinc-400';
           const versionColor = sortBy === 'version' ? 'text-cyan-400' : 'text-zinc-400';
@@ -144,12 +140,11 @@ export const NodeList = ({
                    {formatUptime(node.uptime || 0)}
                 </div>
                 
-                {/* Split Storage: Committed */}
+                {/* Committed */}
                 <div className={`text-right font-bold text-xs font-mono transition-colors duration-300 ${storageColorMain}`}>
                    {formatBytes(node.storage_committed)}
                 </div>
-                
-                {/* Split Storage: Used */}
+                {/* Used */}
                 <div className={`text-right text-[9px] font-mono transition-colors duration-300 ${storageColorSub}`}>
                    {formatBytes(node.storage_used)}
                 </div>
@@ -164,14 +159,9 @@ export const NodeList = ({
                 </button>
               </div>
 
-
-              {/* === MOBILE ROW === */}
+              {/* === MOBILE ROW (Unchanged) === */}
               <div className="grid md:hidden grid-cols-[auto_1.5fr_0.8fr_0.5fr_1fr_auto] gap-3 px-4 py-3 items-center border-b border-zinc-800/20">
-
-                 {/* 1. Status Dot */}
                  <div className={`w-1.5 h-1.5 rounded-full ${statusColor} shrink-0`}></div>
-
-                 {/* 2. Identity Stack (Key + Network | Version) */}
                  <div className="flex flex-col min-w-0">
                      <div className="flex items-center gap-1.5 mb-1">
                         <span className="font-mono text-xs font-bold text-white truncate w-full">{node.pubkey ? `${node.pubkey.slice(0, 8)}...` : 'Unknown'}</span>
@@ -181,14 +171,10 @@ export const NodeList = ({
                         v{node.version || '0.0.0'}
                      </div>
                  </div>
-
-                 {/* 3. Time Stack (Uptime | Last Seen) */}
                  <div className="flex flex-col items-start leading-none gap-1">
                     <span className={`font-mono text-[9px] transition-colors duration-300 ${uptimeColor}`}>{formatUptime(node.uptime || 0)}</span>
                     <span className="font-mono text-[8px] text-zinc-600">{formatLastSeen(node.last_seen_timestamp || 0).replace(' ago', '')}</span>
                  </div>
-
-                 {/* 4. Health/Credits Stack */}
                  <div className="flex flex-col items-center leading-none gap-1">
                     <div className={`font-mono text-[10px] font-bold transition-colors duration-300 ${healthColor}`}>
                         {health}%
@@ -197,18 +183,13 @@ export const NodeList = ({
                         {node.credits !== null ? node.credits.toLocaleString() : '-'}
                     </div>
                  </div>
-
-                 {/* 5. Storage Stack (Committed / Used) */}
                  <div className="flex flex-col items-end leading-none">
                      <span className={`font-bold text-[10px] font-mono transition-colors duration-300 ${storageColorMain}`}>{formatBytes(node.storage_committed)}</span>
                      <span className={`text-[8px] font-mono mt-0.5 transition-colors duration-300 ${storageColorSub}`}>{formatBytes(node.storage_used)}</span>
                  </div>
-
-                 {/* 6. Star */}
                  <button onClick={(e) => onToggleFavorite(e, node.address || '')} className="pl-1">
                     <Star size={12} className={isFav ? "text-yellow-500" : "text-zinc-700"} fill={isFav ? "currentColor" : "none"} />
                  </button>
-
               </div>
 
             </div>
