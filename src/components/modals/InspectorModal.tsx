@@ -16,7 +16,6 @@ import { IdentityView } from './views/IdentityView';
 import { HealthView } from './views/HealthView';
 import { StorageView } from './views/StorageView';
 import { ShareProof } from './ShareProof';
-import { VersusMode } from './VersusMode';
 import Link from 'next/link';
 
 interface InspectorModalProps {
@@ -57,7 +56,8 @@ export const InspectorModal = ({
 }: InspectorModalProps) => {
   const router = useRouter();
   const [modalView, setModalView] = useState<'overview' | 'health' | 'storage' | 'identity'>('overview');
-  const [mode, setMode] = useState<'VIEW' | 'COMPARE' | 'SHARE'>('VIEW');
+  // Removed 'COMPARE' from internal mode
+  const [mode, setMode] = useState<'VIEW' | 'SHARE'>('VIEW');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
@@ -99,6 +99,14 @@ export const InspectorModal = ({
     }
   };
 
+  // --- NEW: COMPARE NAVIGATION ---
+  const handleCompareNav = () => {
+      if (selectedNode.pubkey) {
+          // Closes modal and pushes to new page with this node as the first selection
+          router.push(`/compare?nodes=${selectedNode.pubkey}`);
+      }
+  };
+
   const handleCardToggle = (view: 'health' | 'storage' | 'identity') => {
      setModalView(modalView === view ? 'overview' : view);
   };
@@ -106,12 +114,12 @@ export const InspectorModal = ({
   // --- HEALTH & STORAGE CALCULATIONS ---
   const healthScore = selectedNode.health || 0;
   const healthStatusLabel = healthScore >= 80 ? 'OPTIMAL' : 'FAIR'; 
-  
+
   // Zen Mode: Monochrome logic
   const healthColor = zenMode 
     ? 'text-white' 
     : healthScore >= 80 ? 'text-green-500' : healthScore >= 50 ? 'text-yellow-500' : 'text-red-500';
-  
+
   const healthGlowColor = zenMode 
     ? '' 
     : healthScore >= 80 ? 'bg-green-500' : healthScore >= 50 ? 'bg-yellow-500' : 'bg-red-500';
@@ -119,7 +127,7 @@ export const InspectorModal = ({
   const healthRingColor = zenMode 
     ? 'border border-zinc-800'
     : healthScore >= 80 ? 'ring-green-500/20 hover:ring-green-500/60' : healthScore >= 50 ? 'ring-yellow-500/20 hover:ring-yellow-500/60' : 'ring-red-500/20 hover:ring-red-500/60';
-  
+
   const identityRingColor = zenMode 
     ? 'border border-zinc-800'
     : isSelectedNodeLatest ? 'ring-green-500/20 hover:ring-green-500/60' : 'ring-orange-500/20 hover:ring-orange-500/60';
@@ -131,12 +139,10 @@ export const InspectorModal = ({
   const avgCommitted = totalStorageCommitted / (nodes.length || 1);
   const maxValue = Math.max(nodeCap, medianCommitted, avgCommitted) * 1.1; 
 
-  // Calculate percentages relative to the largest value in the set for the bar chart
   const nodeP = (nodeCap / maxValue) * 100;
   const medP = (medianCommitted / maxValue) * 100;
   const avgP = (avgCommitted / maxValue) * 100;
 
-  // Helper to split value and unit safely
   const getStorageDisplay = (bytes: number) => {
     const formatted = formatBytes(bytes);
     const parts = formatted.split(' ');
@@ -160,7 +166,6 @@ export const InspectorModal = ({
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  // ZEN MODE: Disable animations
   const shimmerOnceAnimation = zenMode ? "" : "group-hover:animate-[shimmer-once_2.5s_forwards]";
   const breatheAnimation = zenMode ? "" : "animate-[slow-breathe_5s_infinite_ease-in-out]";
 
@@ -234,9 +239,7 @@ export const InspectorModal = ({
 
         {/* CONTENT */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-6 relative flex flex-col">
-          {mode === 'COMPARE' ? (
-            <VersusMode selectedNode={selectedNode} nodes={nodes} onBack={() => setMode('VIEW')} />
-          ) : mode === 'SHARE' ? (
+          {mode === 'SHARE' ? (
             <ShareProof node={selectedNode} onBack={() => setMode('VIEW')} />
           ) : (
             <div className="flex flex-col gap-3 md:gap-4 h-full">
@@ -257,7 +260,7 @@ export const InspectorModal = ({
                          </div>
                        )}
 
-                       {/* --- STORAGE HEADER (VERTICAL BAR CHART - MONOLITH STYLE) --- */}
+                       {/* --- STORAGE HEADER --- */}
                        {modalView === 'storage' && (
                          <div className={`h-full min-h-[400px] md:min-h-0 rounded-3xl p-6 border flex flex-col justify-between cursor-pointer relative overflow-hidden ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900 border-purple-500 ring-1 ring-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.1)]'}`} onClick={() => handleCardToggle('storage')}>
                            {!zenMode && <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none"></div>}
@@ -290,12 +293,9 @@ export const InspectorModal = ({
                                     { label: 'AVERAGE', val: avgP, raw: avgCommitted, type: 'AVG' }
                                 ].map((bar, i) => {
                                     const isMyNode = bar.type === 'MY_NODE';
-                                    
-                                    // Zen Logic for Bars
                                     const barColor = zenMode 
                                         ? (isMyNode ? 'bg-white' : 'bg-zinc-800')
                                         : (isMyNode ? 'bg-gradient-to-t from-purple-900/80 to-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]' : 'bg-zinc-800/60 border-t border-white/5');
-
                                     const labelColor = isMyNode ? (zenMode ? 'text-white' : 'text-purple-400') : 'text-zinc-600';
 
                                     return (
@@ -327,7 +327,7 @@ export const InspectorModal = ({
                        {modalView === 'identity' && (
                          <div className={`h-full rounded-3xl border flex flex-col justify-between relative overflow-hidden cursor-pointer ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900 border-blue-500 ring-1 ring-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.1)]'}`} onClick={() => handleCardToggle('identity')}>
                            {!zenMode && <div className="absolute top-0 right-0 p-24 bg-blue-500/5 blur-3xl rounded-full pointer-events-none"></div>}
-                           
+
                            <div className="p-6 relative z-10">
                                <div className="w-full flex justify-between items-start mb-6">
                                    <div className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest">IDENTITY</div>
@@ -541,16 +541,17 @@ export const InspectorModal = ({
                         <button onClick={() => copyToClipboard(`${window.location.origin}/?open=${selectedNode.pubkey}`, 'url')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-1.5 md:py-2 rounded-full text-[9px] md:text-[10px] font-bold transition ${zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white' : 'bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/20 text-blue-400'}`}>{copiedField === 'url' ? <Check size={12} /> : <LinkIcon size={12} />} {copiedField === 'url' ? 'COPIED' : 'COPY NODE URL'}</button>
                       </div>
                       <div className="flex gap-2 md:gap-4">
-                        <button onClick={() => setMode('COMPARE')} className={`flex-1 py-3 md:py-4 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border ${zenMode ? 'bg-black border-zinc-700 hover:bg-zinc-900' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700'}`}><Swords size={16} className={zenMode ? 'text-white' : 'text-red-400'} /> <span className="hidden md:inline">COMPARE NODES</span><span className="md:hidden">COMPARE</span></button>
+                        {/* UPDATE: NAVIGATE TO NEW PAGE */}
+                        <button onClick={handleCompareNav} className={`flex-1 py-3 md:py-4 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border ${zenMode ? 'bg-black border-zinc-700 hover:bg-zinc-900' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700'}`}><Swords size={16} className={zenMode ? 'text-white' : 'text-red-400'} /> <span className="hidden md:inline">COMPARE NODES</span><span className="md:hidden">COMPARE</span></button>
+                        
                         <button 
-  onClick={() => setMode('SHARE')} 
-  // I removed 'text-white' from the start and added it to the second conditional block below
-  className={`flex-1 py-3 md:py-4 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 ${zenMode ? 'bg-white text-black border-transparent hover:bg-zinc-200' : 'text-white bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20'}`}
->
-  <Camera size={16} /> 
-  <span className="hidden md:inline">PROOF OF PULSE</span>
-  <span className="md:hidden">PROOF</span>
-</button>
+                          onClick={() => setMode('SHARE')} 
+                          className={`flex-1 py-3 md:py-4 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 ${zenMode ? 'bg-white text-black border-transparent hover:bg-zinc-200' : 'text-white bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20'}`}
+                        >
+                          <Camera size={16} /> 
+                          <span className="hidden md:inline">PROOF OF PULSE</span>
+                          <span className="md:hidden">PROOF</span>
+                        </button>
                       </div>
                     </div>
                  </div>
