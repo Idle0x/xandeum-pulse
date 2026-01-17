@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Node } from '../types';
 import { getSafeIp, compareVersions } from '../utils/nodeHelpers';
 
-type SortOption = 'uptime' | 'version' | 'storage' | 'health';
+type SortOption = 'uptime' | 'version' | 'storage' | 'health' | 'credits'; // Added credits
 type SortOrder = 'asc' | 'desc';
 type NetworkOption = 'ALL' | 'MAINNET' | 'DEVNET';
 
@@ -25,6 +25,8 @@ export const useNodeFilter = (
         return node.health ?? -1;
       case 'version':
         return node.version || '0.0.0';
+      case 'credits':
+        return node.credits ?? -1; // Added logic
       default:
         return 0;
     }
@@ -62,15 +64,10 @@ export const useNodeFilter = (
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
 
-      // C. TIE-BREAKER (CRITICAL FOR VISUAL UPDATES)
-      // If values are equal (e.g. both have 0 storage), sort by Pubkey.
-      // This ensures they don't just "sit there" looking stuck.
+      // C. TIE-BREAKER (Pubkey)
       return (a.pubkey || '').localeCompare(b.pubkey || '');
     });
 
-    // 3. RETURN SHALLOW COPY
-    // Spreading [...result] creates a new array reference.
-    // This forces React to acknowledge the change immediately without a 'key' prop.
     return [...result]; 
 
   }, [nodes, searchQuery, networkFilter, sortBy, sortOrder]);
