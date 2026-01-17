@@ -1,4 +1,4 @@
-import { Star, HardDrive, Server, Coins, Clock, Activity, Globe, ArrowUp, ArrowDown } from 'lucide-react';
+import { Star, Clock, ArrowUp, ArrowDown } from 'lucide-react';
 import { Node } from '../../types';
 import { formatBytes } from '../../utils/formatters';
 import { getSafeIp } from '../../utils/nodeHelpers';
@@ -23,6 +23,7 @@ const formatLastSeen = (timestamp: number) => {
   const sec = Math.floor(diff / 1000);
   if (sec < 0) return 'Just now';
   if (sec < 60) return `${sec}s ago`;
+  if (sec < 600) return `${Math.floor(sec / 60)}m ago`;
   if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
   if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
   return `${Math.floor(sec / 86400)}d ago`;
@@ -35,7 +36,7 @@ interface NodeListProps {
   favorites: string[];
   sortBy: string;
   sortOrder: 'asc' | 'desc';
-  onSortChange: (metric: 'uptime' | 'version' | 'storage' | 'health') => void;
+  onSortChange: (metric: 'uptime' | 'version' | 'storage' | 'health' | 'credits') => void;
 }
 
 export const NodeList = ({ 
@@ -44,15 +45,17 @@ export const NodeList = ({
 }: NodeListProps) => {
   if (nodes.length === 0) return null;
 
-  // --- HELPER: Header Cell Component ---
-  const HeaderCell = ({ label, metric, alignRight = false }: { label: string, metric?: 'uptime' | 'version' | 'storage' | 'health', alignRight?: boolean }) => (
+  // --- HELPER: Header Cell Component with Permanent Arrows ---
+  const HeaderCell = ({ label, metric, alignRight = false }: { label: string, metric?: 'uptime' | 'version' | 'storage' | 'health' | 'credits', alignRight?: boolean }) => (
     <div 
       onClick={() => metric && onSortChange(metric)}
       className={`flex items-center gap-1 cursor-pointer transition-colors group select-none ${alignRight ? 'justify-end' : ''} ${sortBy === metric ? 'text-white' : 'hover:text-zinc-300'}`}
     >
       {label}
-      {metric && sortBy === metric && (
-        sortOrder === 'asc' ? <ArrowUp size={10} className="text-blue-500" /> : <ArrowDown size={10} className="text-blue-500" />
+      {metric && (
+        <div className={`transition-transform duration-300 ${sortBy === metric && sortOrder === 'asc' ? 'rotate-180' : ''}`}>
+           <ArrowDown size={10} className={sortBy === metric ? 'text-blue-500' : 'text-zinc-700 group-hover:text-zinc-500'} />
+        </div>
       )}
     </div>
   );
@@ -64,12 +67,12 @@ export const NodeList = ({
       <div className="hidden md:grid grid-cols-[auto_2fr_1.2fr_1.2fr_0.8fr_0.8fr_1.2fr_0.8fr_auto] gap-4 px-5 py-3 border-b border-zinc-800/50 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
         <div className="w-2"></div>
         <div>Identity</div>
-        <div className="cursor-default">Last Seen</div> {/* Last Seen is not sorted in current logic, optional to add later */}
+        <div className="cursor-default">Last Seen</div> 
         <HeaderCell label="Version" metric="version" />
         <HeaderCell label="Health" metric="health" />
         <HeaderCell label="Uptime" metric="uptime" alignRight />
         <HeaderCell label="Storage" metric="storage" alignRight />
-        <div className="text-right cursor-default">Credits</div>
+        <HeaderCell label="Credits" metric="credits" alignRight />
         <div className="w-6"></div>
       </div>
 
@@ -85,18 +88,12 @@ export const NodeList = ({
           const uniqueKey = node.pubkey ? `${node.pubkey}-${node.network}` : `fallback-${index}`;
 
           // --- SPOTLIGHT COLOR LOGIC ---
-          // 1. Storage
           const storageColorMain = sortBy === 'storage' ? 'text-purple-400' : 'text-zinc-500';
           const storageColorSub  = sortBy === 'storage' ? 'text-blue-400'   : 'text-zinc-600';
-          
-          // 2. Uptime
           const uptimeColor = sortBy === 'uptime' ? 'text-orange-400' : 'text-zinc-400';
-
-          // 3. Health
           const healthColor = sortBy === 'health' ? 'text-green-400' : 'text-zinc-400';
-
-          // 4. Version
           const versionColor = sortBy === 'version' ? 'text-cyan-400' : 'text-zinc-400';
+          const creditsColor = sortBy === 'credits' ? 'text-yellow-400' : 'text-zinc-500';
 
           return (
             <div 
@@ -107,12 +104,10 @@ export const NodeList = ({
 
               {/* === DESKTOP ROW === */}
               <div className="hidden md:grid grid-cols-[auto_2fr_1.2fr_1.2fr_0.8fr_0.8fr_1.2fr_0.8fr_auto] gap-4 px-5 py-3 items-center">
-
                 {/* Status */}
                 <div className="flex items-center justify-center">
                    <div className={`w-1.5 h-1.5 rounded-full ${statusColor} shadow-[0_0_6px_rgba(255,255,255,0.2)]`}></div>
                 </div>
-
                 {/* Identity */}
                 <div className="relative h-5 overflow-hidden">
                    <div className="absolute inset-0 flex items-center gap-2 transition-transform duration-300 group-hover:-translate-y-full">
@@ -124,28 +119,23 @@ export const NodeList = ({
                       <span className="font-mono text-xs text-white font-bold tracking-tight">{getSafeIp(node)}</span>
                    </div>
                 </div>
-
                 {/* Last Seen */}
                 <div className="flex items-center gap-1.5 text-zinc-500 text-[10px] font-mono">
                    <Clock size={10} /> <span>{formatLastSeen(node.last_seen_timestamp || 0)}</span>
                 </div>
-
-                {/* Version (Dynamic Color) */}
+                {/* Version */}
                 <div className={`font-mono text-[10px] truncate transition-colors duration-300 ${versionColor}`} title={node.version}>
                    {node.version}
                 </div>
-
-                {/* Health (Dynamic Color) */}
+                {/* Health */}
                 <div className={`font-mono text-xs font-bold transition-colors duration-300 ${healthColor}`}>
                    {health}%
                 </div>
-
-                {/* Uptime (Dynamic Color) */}
+                {/* Uptime */}
                 <div className={`text-right font-mono text-[10px] transition-colors duration-300 ${uptimeColor}`}>
                    {formatUptime(node.uptime || 0)}
                 </div>
-
-                {/* Storage (Dynamic Color Stack) */}
+                {/* Storage */}
                 <div className="flex flex-col items-end leading-none">
                    <div className={`font-bold text-xs font-mono mb-0.5 transition-colors duration-300 ${storageColorMain}`}>
                       {formatBytes(node.storage_committed)}
@@ -154,12 +144,10 @@ export const NodeList = ({
                       {formatBytes(node.storage_used)}
                    </div>
                 </div>
-
                 {/* Credits */}
-                <div className="text-right font-mono text-[10px] text-zinc-500">
-                   {node.credits?.toLocaleString() ?? 0}
+                <div className={`text-right font-mono text-[10px] ${creditsColor}`}>
+                   {node.credits !== null ? node.credits.toLocaleString() : <span className="text-zinc-700">-</span>}
                 </div>
-
                 {/* Star */}
                 <button onClick={(e) => onToggleFavorite(e, node.address || '')} className={`p-1.5 rounded-md hover:bg-white/10 transition-colors ${isFav ? 'text-yellow-500' : 'text-zinc-600 hover:text-yellow-500'}`}>
                   <Star size={14} fill={isFav ? "currentColor" : "none"} />
@@ -167,48 +155,46 @@ export const NodeList = ({
               </div>
 
 
-              {/* === MOBILE ROW === */}
+              {/* === MOBILE ROW (RESTRUCTURED) === */}
               <div className="grid md:hidden grid-cols-[auto_1.5fr_0.8fr_0.5fr_1fr_auto] gap-3 px-4 py-3 items-center border-b border-zinc-800/20">
 
-                 {/* Status */}
+                 {/* 1. Status Dot */}
                  <div className={`w-1.5 h-1.5 rounded-full ${statusColor} shrink-0`}></div>
 
-                 {/* Identity Stack */}
+                 {/* 2. Identity Stack (Key + Network | Version) */}
                  <div className="flex flex-col min-w-0">
-                     <div className="relative h-5 overflow-hidden w-full">
-                         <div className="absolute inset-0 flex items-center gap-2 transition-transform duration-300 group-hover:-translate-y-full">
-                            <span className="font-mono text-xs font-bold text-white truncate w-full">{node.pubkey ? `${node.pubkey.slice(0, 8)}...` : 'Unknown'}</span>
-                         </div>
-                         <div className="absolute inset-0 flex items-center gap-2 translate-y-full transition-transform duration-300 group-hover:translate-y-0">
-                            {showFlag && <img src={`https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`} alt={countryCode} className="w-3 h-auto opacity-90 rounded-[2px]" />}
-                            <span className="font-mono text-[10px] text-zinc-300 font-bold truncate">{getSafeIp(node)}</span>
-                         </div>
+                     <div className="flex items-center gap-1.5 mb-1">
+                        <span className="font-mono text-xs font-bold text-white truncate w-full">{node.pubkey ? `${node.pubkey.slice(0, 8)}...` : 'Unknown'}</span>
+                        <span className={`text-[6px] px-1 rounded border uppercase font-bold ${isMainnet ? 'text-green-500 border-green-900' : 'text-blue-500 border-blue-900'}`}>{isMainnet ? 'MN' : 'DN'}</span>
                      </div>
-                     {/* Mobile Sub-row: Uptime (Dynamic) & Last Seen */}
-                     <div className="flex items-center gap-2 text-[9px] font-mono leading-none -mt-0.5">
-                        <span className={`transition-colors duration-300 ${uptimeColor}`}>{formatUptime(node.uptime || 0)}</span>
-                        <span className="text-zinc-800">|</span>
-                        <span className="text-zinc-600">{formatLastSeen(node.last_seen_timestamp || 0).replace(' ago', '')}</span>
+                     <div className={`font-mono text-[9px] truncate transition-colors duration-300 ${versionColor}`}>
+                        v{node.version || '0.0.0'}
                      </div>
                  </div>
 
-                 {/* Version (Dynamic) */}
-                 <div className={`font-mono text-[9px] truncate text-center transition-colors duration-300 ${versionColor}`}>
-                    {node.version}
+                 {/* 3. Time Stack (Uptime | Last Seen) */}
+                 <div className="flex flex-col items-start leading-none gap-1">
+                    <span className={`font-mono text-[9px] transition-colors duration-300 ${uptimeColor}`}>{formatUptime(node.uptime || 0)}</span>
+                    <span className="font-mono text-[8px] text-zinc-600">{formatLastSeen(node.last_seen_timestamp || 0).replace(' ago', '')}</span>
                  </div>
 
-                 {/* Health (Dynamic) */}
-                 <div className={`font-mono text-[10px] font-bold text-center transition-colors duration-300 ${healthColor}`}>
-                    {health}%
+                 {/* 4. Health/Credits Stack */}
+                 <div className="flex flex-col items-center leading-none gap-1">
+                    <div className={`font-mono text-[10px] font-bold transition-colors duration-300 ${healthColor}`}>
+                        {health}%
+                    </div>
+                    <div className={`font-mono text-[8px] ${creditsColor}`}>
+                        {node.credits !== null ? node.credits.toLocaleString() : '-'}
+                    </div>
                  </div>
 
-                 {/* Storage (Dynamic) */}
+                 {/* 5. Storage Stack */}
                  <div className="flex flex-col items-end leading-none">
                      <span className={`font-bold text-[10px] font-mono transition-colors duration-300 ${storageColorMain}`}>{formatBytes(node.storage_committed)}</span>
                      <span className={`text-[8px] font-mono mt-0.5 transition-colors duration-300 ${storageColorSub}`}>{formatBytes(node.storage_used)}</span>
                  </div>
 
-                 {/* Star */}
+                 {/* 6. Star */}
                  <button onClick={(e) => onToggleFavorite(e, node.address || '')} className="pl-1">
                     <Star size={12} className={isFav ? "text-yellow-500" : "text-zinc-700"} fill={isFav ? "currentColor" : "none"} />
                  </button>
