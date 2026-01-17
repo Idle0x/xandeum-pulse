@@ -36,7 +36,7 @@ interface NodeListProps {
   favorites: string[];
   sortBy: string;
   sortOrder: 'asc' | 'desc';
-  onSortChange: (metric: 'uptime' | 'version' | 'storage' | 'health' | 'credits') => void;
+  onSortChange: (metric: 'uptime' | 'version' | 'storage' | 'storage_used' | 'health' | 'credits') => void;
 }
 
 export const NodeList = ({ 
@@ -46,7 +46,7 @@ export const NodeList = ({
   if (nodes.length === 0) return null;
 
   // --- HELPER: Header Cell Component with Permanent Arrows ---
-  const HeaderCell = ({ label, metric, alignRight = false }: { label: string, metric?: 'uptime' | 'version' | 'storage' | 'health' | 'credits', alignRight?: boolean }) => (
+  const HeaderCell = ({ label, metric, alignRight = false }: { label: string, metric?: 'uptime' | 'version' | 'storage' | 'storage_used' | 'health' | 'credits', alignRight?: boolean }) => (
     <div 
       onClick={() => metric && onSortChange(metric)}
       className={`flex items-center gap-1 cursor-pointer transition-colors group select-none ${alignRight ? 'justify-end' : ''} ${sortBy === metric ? 'text-white' : 'hover:text-zinc-300'}`}
@@ -60,18 +60,25 @@ export const NodeList = ({
     </div>
   );
 
+  // GRID DEFINITION: 10 Columns
+  const gridClass = "grid-cols-[auto_2fr_1.2fr_1.2fr_0.8fr_0.8fr_0.7fr_0.7fr_0.8fr_auto]";
+
   return (
     <div className="flex flex-col min-w-full bg-[#09090b]/40">
 
       {/* --- DESKTOP HEADER (Interactive) --- */}
-      <div className="hidden md:grid grid-cols-[auto_2fr_1.2fr_1.2fr_0.8fr_0.8fr_1.2fr_0.8fr_auto] gap-4 px-5 py-3 border-b border-zinc-800/50 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">
+      <div className={`hidden md:grid ${gridClass} gap-4 px-5 py-3 border-b border-zinc-800/50 text-[9px] font-bold text-zinc-500 uppercase tracking-wider`}>
         <div className="w-2"></div>
         <div>Identity</div>
         <div className="cursor-default">Last Seen</div> 
         <HeaderCell label="Version" metric="version" />
         <HeaderCell label="Health" metric="health" />
         <HeaderCell label="Uptime" metric="uptime" alignRight />
-        <HeaderCell label="Storage" metric="storage" alignRight />
+        
+        {/* Split Storage Headers */}
+        <HeaderCell label="Comm." metric="storage" alignRight />
+        <HeaderCell label="Used" metric="storage_used" alignRight />
+        
         <HeaderCell label="Credits" metric="credits" alignRight />
         <div className="w-6"></div>
       </div>
@@ -89,7 +96,8 @@ export const NodeList = ({
 
           // --- SPOTLIGHT COLOR LOGIC ---
           const storageColorMain = sortBy === 'storage' ? 'text-purple-400' : 'text-zinc-500';
-          const storageColorSub  = sortBy === 'storage' ? 'text-blue-400'   : 'text-zinc-600';
+          const storageColorSub  = sortBy === 'storage_used' ? 'text-blue-400' : 'text-zinc-600';
+          
           const uptimeColor = sortBy === 'uptime' ? 'text-orange-400' : 'text-zinc-400';
           const healthColor = sortBy === 'health' ? 'text-green-400' : 'text-zinc-400';
           const versionColor = sortBy === 'version' ? 'text-cyan-400' : 'text-zinc-400';
@@ -103,7 +111,7 @@ export const NodeList = ({
             >
 
               {/* === DESKTOP ROW === */}
-              <div className="hidden md:grid grid-cols-[auto_2fr_1.2fr_1.2fr_0.8fr_0.8fr_1.2fr_0.8fr_auto] gap-4 px-5 py-3 items-center">
+              <div className={`hidden md:grid ${gridClass} gap-4 px-5 py-3 items-center`}>
                 {/* Status */}
                 <div className="flex items-center justify-center">
                    <div className={`w-1.5 h-1.5 rounded-full ${statusColor} shadow-[0_0_6px_rgba(255,255,255,0.2)]`}></div>
@@ -135,15 +143,17 @@ export const NodeList = ({
                 <div className={`text-right font-mono text-[10px] transition-colors duration-300 ${uptimeColor}`}>
                    {formatUptime(node.uptime || 0)}
                 </div>
-                {/* Storage */}
-                <div className="flex flex-col items-end leading-none">
-                   <div className={`font-bold text-xs font-mono mb-0.5 transition-colors duration-300 ${storageColorMain}`}>
-                      {formatBytes(node.storage_committed)}
-                   </div>
-                   <div className={`text-[9px] font-mono transition-colors duration-300 ${storageColorSub}`}>
-                      {formatBytes(node.storage_used)}
-                   </div>
+                
+                {/* Split Storage: Committed */}
+                <div className={`text-right font-bold text-xs font-mono transition-colors duration-300 ${storageColorMain}`}>
+                   {formatBytes(node.storage_committed)}
                 </div>
+                
+                {/* Split Storage: Used */}
+                <div className={`text-right text-[9px] font-mono transition-colors duration-300 ${storageColorSub}`}>
+                   {formatBytes(node.storage_used)}
+                </div>
+
                 {/* Credits */}
                 <div className={`text-right font-mono text-[10px] ${creditsColor}`}>
                    {node.credits !== null ? node.credits.toLocaleString() : <span className="text-zinc-700">-</span>}
@@ -155,7 +165,7 @@ export const NodeList = ({
               </div>
 
 
-              {/* === MOBILE ROW (RESTRUCTURED) === */}
+              {/* === MOBILE ROW === */}
               <div className="grid md:hidden grid-cols-[auto_1.5fr_0.8fr_0.5fr_1fr_auto] gap-3 px-4 py-3 items-center border-b border-zinc-800/20">
 
                  {/* 1. Status Dot */}
@@ -188,7 +198,7 @@ export const NodeList = ({
                     </div>
                  </div>
 
-                 {/* 5. Storage Stack */}
+                 {/* 5. Storage Stack (Committed / Used) */}
                  <div className="flex flex-col items-end leading-none">
                      <span className={`font-bold text-[10px] font-mono transition-colors duration-300 ${storageColorMain}`}>{formatBytes(node.storage_committed)}</span>
                      <span className={`text-[8px] font-mono mt-0.5 transition-colors duration-300 ${storageColorSub}`}>{formatBytes(node.storage_used)}</span>
