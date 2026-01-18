@@ -223,17 +223,17 @@ export const Header = ({
         )}
       </div>
 
-      {/* === MOBILE-ONLY SEARCH DATA STRIP === */}
+      {/* === MOBILE-ONLY SEARCH DATA STRIP (UPDATED: SLIM & GLASSY) === */}
       {searchQuery && (
-        <div className="md:hidden w-full bg-cyan-400 border-b border-cyan-500 animate-in slide-in-from-top-2">
-            <div className="px-4 py-2 text-center leading-tight">
-                <p className="text-sm italic font-medium text-cyan-950 break-words">
+        <div className="md:hidden w-full bg-cyan-500/10 border-b border-cyan-500/20 backdrop-blur-sm animate-in slide-in-from-top-2">
+            <div className="px-4 py-0.5 text-center leading-none">
+                <p className="text-[10px] italic font-medium text-cyan-200/70 break-words">
                 Showing 
-                <span className="not-italic font-extrabold text-blue-800 mx-1.5 text-base">
+                <span className="not-italic font-black text-white mx-1 text-[11px]">
                     {filteredCount}
                 </span> 
                 results for 
-                <span className="not-italic font-extrabold text-blue-800 ml-1.5 break-all">
+                <span className="not-italic font-bold text-cyan-100 ml-1 break-all">
                     "{searchQuery}"
                 </span>
                 </p>
