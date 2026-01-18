@@ -29,7 +29,6 @@ export const MetricDelta = ({ val, base, type = 'number', reverse = false }: { v
   if (base === undefined || base === null || val === base) return null;
 
   const diff = val - base;
-  // Logic: Generally Higher is Better (Green). If 'reverse' is true (like Rank), Lower is Better (Green).
   const isGood = reverse ? diff < 0 : diff > 0;
   
   const color = isGood ? 'text-green-400' : 'text-red-400';
@@ -40,7 +39,8 @@ export const MetricDelta = ({ val, base, type = 'number', reverse = false }: { v
   else display = Math.abs(diff).toLocaleString();
 
   return (
-    <div className={`flex items-center gap-0.5 text-[8px] font-bold ${color} bg-black/40 px-1.5 py-0.5 rounded border border-white/5 ml-2 shadow-sm whitespace-nowrap`}>
+    // UPDATED: text-[6px] on mobile, text-[8px] on desktop
+    <div className={`flex items-center gap-0.5 text-[6px] md:text-[8px] font-bold ${color} bg-black/40 px-1.5 py-0.5 rounded border border-white/5 ml-2 shadow-sm whitespace-nowrap`}>
       <Icon size={8} /> {display}
     </div>
   );
