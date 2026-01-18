@@ -85,11 +85,11 @@ export const Header = ({
         </div>
 
         {/* Center: Search Bar + Feedback Text */}
-        {/* UPDATE: Removed max-w limit to let it span fully right. */}
-        <div className="flex-1 mx-4 relative group flex flex-col items-center min-w-0 pt-0.5 md:pt-1">
+        {/* UPDATE: ml-4 for left spacing, but mr-2 to extend close to the right buttons. flex-1 takes all space. */}
+        <div className="flex-1 ml-4 mr-2 relative group flex flex-col min-w-0 pt-0.5 md:pt-1">
           
-          {/* Search Input: Capped width to keep it sane */}
-          <div className="relative w-full max-w-3xl overflow-hidden rounded-lg">
+          {/* Search Input: Explicitly centered with mx-auto and capped width (max-w-2xl) */}
+          <div className="relative w-full max-w-2xl mx-auto overflow-hidden rounded-lg">
             <Search className={`absolute left-3 top-2.5 size-4 z-10 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
             {!zenMode && !searchQuery && !isSearchFocused && (
               <div className="absolute inset-0 flex items-center pointer-events-none pl-10 pr-4 overflow-hidden z-0">
@@ -110,9 +110,9 @@ export const Header = ({
             {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-2.5 text-zinc-500 hover:text-white transition z-20 p-0.5 bg-black/20 rounded-full hover:bg-zinc-700"><X size={14} /></button>}
           </div>
 
-           {/* Feedback Text Area: FULL WIDTH (Uncapped) */}
+           {/* Feedback Text Area: FULL WIDTH of flex-1 parent */}
            {!zenMode && (
-             <div className="mt-1 md:mt-2 w-full max-w-full overflow-hidden relative h-[20px] transition-all duration-300 mask-linear-fade flex items-center justify-center">
+             <div className="mt-1 md:mt-2 w-full overflow-hidden relative h-[20px] transition-all duration-300 mask-linear-fade flex items-center justify-center">
                
                {/* 1. HAS SEARCH QUERY */}
                {searchQuery ? (
@@ -177,7 +177,7 @@ export const Header = ({
           <RefreshCw size={10} className={`md:w-[14px] md:h-[14px] ${loading || isBackgroundSyncing ? 'animate-spin' : ''}`} /> {loading ? 'SYNC...' : 'REFRESH'}
         </button>
 
-        {/* 2. NETWORK SWITCHER (Consolidated here) */}
+        {/* 2. NETWORK SWITCHER (Consolidated) */}
         <div className="relative shrink-0 ml-1">
             <button onClick={onCycleNetwork} className={`flex items-center gap-1 px-3 h-6 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs border active:scale-95 ${zenMode ? 'bg-black border-zinc-800 text-zinc-400' : 'bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}>
                 <div className={`w-1.5 h-1.5 rounded-full ${networkFilter === 'MAINNET' ? 'bg-green-500' : networkFilter === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
@@ -189,10 +189,7 @@ export const Header = ({
         {viewMode === 'list' && !zenMode && isScrolled ? (
              <div className={`hidden md:grid flex-1 ${gridClass} gap-4 px-2 items-center text-[9px] font-bold uppercase tracking-wider`}>
                 <div className="w-2"></div>
-                
-                {/* Col 2: Empty Div (Invisible) to maintain alignment without text */}
-                <div className="pl-1"></div>
-
+                <div className="pl-1"></div> {/* Empty Identity Space */}
                 <div></div>
                 <ListHeaderCell label="Version" metric="version" />
                 <ListHeaderCell label="Health" metric="health" />
