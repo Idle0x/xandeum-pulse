@@ -1,6 +1,6 @@
 import { ArrowLeft, Zap } from 'lucide-react';
 import { Node } from '../../../types';
-import { RadialProgress } from '../../RadialProgress'; // Ensure import matches
+// import { RadialProgress } from '../../RadialProgress'; // UNCOMMENT IF NEEDED
 
 interface HealthViewProps {
   node: Node;
@@ -13,13 +13,18 @@ interface HealthViewProps {
 
 export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStorage, networkStats }: HealthViewProps) => {
   const health = node.health || 0;
+  
+  // Safe Accessors
   const bd = node.healthBreakdown || { uptime: health, version: health, reputation: health, storage: health };
-  const avgs = networkStats.avgBreakdown || {};
-  const totalNodes = networkStats.totalNodes || 1;
+  // Ensure avgs is an object and keys exist. Fallback to 0 if data isn't ready.
+  const avgs = networkStats?.avgBreakdown || { uptime: 0, version: 0, reputation: 0, storage: 0 };
+  
+  const totalNodes = networkStats?.totalNodes || 1;
   const rank = node.health_rank || node.rank || totalNodes;
   const rankPercentile = (rank / totalNodes) * 100;
-  const betterThanPercent = 100 - rankPercentile;
-  const diff = health - avgNetworkHealth;
+  const betterThanPercent = Math.max(0, 100 - rankPercentile);
+  const diff = (health - avgNetworkHealth).toFixed(1);
+  const diffNum = parseFloat(diff);
 
   // Status Flags
   const isUntracked = (node as any).isUntracked;
@@ -32,10 +37,10 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
       : { uptime: 0.35, storage: 0.30, reputation: 0.20, version: 0.15 };
 
   const metrics = [
-    { label: 'Storage', rawVal: bd.storage, avgRaw: avgs.storage, weight: weights.storage },
-    { label: 'Reputation', rawVal: bd.reputation, avgRaw: avgs.reputation, weight: weights.reputation },
-    { label: 'Uptime', rawVal: bd.uptime, avgRaw: avgs.uptime, weight: weights.uptime },
-    { label: 'Consensus', rawVal: bd.version, avgRaw: avgs.version, weight: weights.version },
+    { label: 'Storage', rawVal: bd.storage, avgRaw: avgs.storage ?? 0, weight: weights.storage },
+    { label: 'Reputation', rawVal: bd.reputation, avgRaw: avgs.reputation ?? 0, weight: weights.reputation },
+    { label: 'Uptime', rawVal: bd.uptime, avgRaw: avgs.uptime ?? 0, weight: weights.uptime },
+    { label: 'Consensus', rawVal: bd.version, avgRaw: avgs.version ?? 0, weight: weights.version },
   ];
 
   // Logic helpers (Bonus/Base)
@@ -55,7 +60,7 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
 
   return (
     <div className={`h-full flex flex-col ${zenMode ? '' : 'animate-in fade-in slide-in-from-right-2 duration-300'}`}>
-      
+
       {/* HEADER: Back Button */}
       <div className="flex justify-end items-center mb-4 shrink-0 md:hidden">
         <button onClick={onBack} className={`text-[10px] font-bold flex items-center gap-1 px-2.5 py-1.5 rounded-lg border transition ${zenMode ? 'bg-black border-zinc-700 text-white' : 'bg-zinc-900 border-zinc-800 text-red-500 hover:text-red-400 hover:bg-zinc-800'}`}>
@@ -64,7 +69,7 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
       </div>
 
       <div className="flex-grow flex flex-col gap-4 overflow-y-auto custom-scrollbar pr-1">
-        
+
         {/* SCORE CARD */}
         <div className={`p-4 rounded-2xl border flex justify-between items-center relative overflow-hidden ${zenMode ? 'bg-black border-zinc-600' : 'bg-black border-zinc-800'}`}>
           {!zenMode && <div className="absolute top-0 right-0 p-12 bg-green-500/5 blur-2xl rounded-full pointer-events-none"></div>}
@@ -75,22 +80,21 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
           <div className="text-right">
             <div className="text-[10px] text-zinc-500 font-bold uppercase mb-1">NETWORK AVG</div>
             <div className="flex items-center gap-2 justify-end">
-              <span className="text-2xl font-bold text-zinc-300">{avgNetworkHealth}</span>
-              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${zenMode ? 'bg-zinc-800 text-zinc-300' : (diff >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400')}`}>
-                {diff > 0 ? '+' : ''}{diff}
+              <span className="text-2xl font-bold text-zinc-300">{avgNetworkHealth.toFixed(0)}</span>
+              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${zenMode ? 'bg-zinc-800 text-zinc-300' : (diffNum >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400')}`}>
+                {diffNum > 0 ? '+' : ''}{diff}
               </span>
             </div>
           </div>
         </div>
 
-        {/* --- METRICS GRID (MOBILE) - RESTORED & ZEN-IFIED --- */}
+        {/* --- METRICS GRID (MOBILE) --- */}
         <div className="grid grid-cols-2 gap-2 md:hidden">
            {metrics.map((m) => {
               const rawVal = m.rawVal || 0;
               const weightedVal = (rawVal * m.weight).toFixed(1);
               const weightedAvg = (m.avgRaw * m.weight).toFixed(1);
-              
-              // Zen Mode: White bar. Normal: Traffic light.
+
               const barColor = zenMode 
                 ? 'bg-white'
                 : (rawVal >= 80 ? 'bg-green-500' : rawVal >= 50 ? 'bg-yellow-500' : 'bg-red-500');
@@ -142,7 +146,7 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
             const rawAvg = m.avgRaw || 0;
             const weightedVal = (rawVal * m.weight).toFixed(2);
             const weightedAvg = (rawAvg * m.weight).toFixed(2);
-            
+
             const barColor = zenMode 
                 ? 'bg-white' 
                 : rawVal >= 80 ? 'bg-green-500' : rawVal >= 50 ? 'bg-yellow-500' : 'bg-red-500';
@@ -177,10 +181,12 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
                 <div className="h-2 bg-zinc-800 rounded-full overflow-visible relative">
                   {!isInvalidRep && (
                     <>
-                        {/* Progress Bar */}
+                        {/* Progress Bar (User) */}
                         <div className={`h-full rounded-l-full ${barColor} ${zenMode ? '' : 'transition-all duration-1000 shadow-[0_0_10px_rgba(255,255,255,0.1)]'}`} style={{ width: `${Math.min(100, rawVal)}%` }}></div>
-                        {/* Marker for Avg */}
-                        <div className="absolute top-[-4px] bottom-[-4px] w-0.5 bg-white z-10" style={{ left: `${Math.min(100, rawAvg)}%` }} title={`Network Average: ${rawAvg}`}></div>
+                        
+                        {/* Marker for Avg (White Line) */}
+                        {/* Added z-index and explicit height to ensure visibility */}
+                        <div className="absolute top-[-4px] bottom-[-4px] w-0.5 bg-white z-20 shadow-[0_0_5px_black]" style={{ left: `${Math.min(100, rawAvg)}%` }} title={`Network Average: ${rawAvg}`}></div>
                     </>
                   )}
                 </div>
