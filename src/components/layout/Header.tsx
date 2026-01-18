@@ -24,6 +24,7 @@ interface HeaderProps {
   onSortChange: (metric: 'uptime' | 'version' | 'storage' | 'storage_used' | 'health' | 'credits') => void;
   viewMode: 'grid' | 'list';
   setViewMode: (mode: 'grid' | 'list') => void;
+  filteredCount: number; // <--- NEW PROP
 }
 
 export const Header = ({
@@ -32,7 +33,8 @@ export const Header = ({
   loading, isBackgroundSyncing, onRefetch,
   networkFilter, onCycleNetwork,
   sortBy, sortOrder, onSortChange,
-  viewMode, setViewMode
+  viewMode, setViewMode,
+  filteredCount // <--- Destructure new prop
 }: HeaderProps) => {
 
   const [isScrolled, setIsScrolled] = useState(false);
@@ -63,10 +65,6 @@ export const Header = ({
     </div>
   );
 
-  // ALIGNMENT STRATEGY:
-  // 1. Shrank 'Last Seen' (Col 3) to 1.0fr.
-  // 2. Evenly spaced Middle Columns (1.1fr).
-  // 3. Credits fixed at 0.8fr.
   const gridClass = "grid-cols-[auto_2fr_1.0fr_1.1fr_1.1fr_1.1fr_1.0fr_1.0fr_0.8fr_auto]";
 
   return (
@@ -107,14 +105,27 @@ export const Header = ({
             />
             {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-2.5 text-zinc-500 hover:text-white transition z-20 p-0.5 bg-black/20 rounded-full hover:bg-zinc-700"><X size={14} /></button>}
           </div>
-           {/* ... (Marquee CSS unchanged) ... */}
+
+           {/* --- UPDATED: SEARCH FEEDBACK LOGIC --- */}
            {!zenMode && (
              <div className="mt-1 md:mt-2 w-full max-w-full overflow-hidden relative h-[16px] md:h-[20px] transition-all duration-300 mask-linear-fade">
-               {isSearchFocused ? (
+               
+               {/* 1. HAS SEARCH QUERY: Show Results */}
+               {searchQuery ? (
+                 <div className="flex items-center justify-center h-full text-[8px] md:text-xs text-zinc-400 font-mono tracking-wide uppercase animate-in fade-in slide-in-from-top-1">
+                    Showing <span className="text-white font-bold mx-1">{filteredCount}</span> results for <span className="text-blue-400 font-bold ml-1">"{searchQuery}"</span>
+                 </div>
+               ) : 
+               
+               /* 2. IS FOCUSED: Show Hint */
+               isSearchFocused ? (
                  <div className="flex items-center justify-center h-full text-[8px] md:text-xs text-blue-400 font-mono tracking-wide uppercase animate-in fade-in">
                     <Info size={10} className="mr-1.5" /> Type to filter nodes instantly
                  </div>
-               ) : (
+               ) : 
+               
+               /* 3. DEFAULT: Show Ticker */
+               (
                  <div className="flex items-center whitespace-nowrap animate-ticker">
                     {[...searchTips, ...searchTips].map((tip, i) => (
                       <div key={i} className="flex items-center mx-8">
@@ -129,10 +140,8 @@ export const Header = ({
            {!zenMode && <style>{` @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } } .animate-marquee { animation: marquee 15s linear infinite; } @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } } .animate-ticker { display: flex; width: max-content; animation: ticker 60s linear infinite; } .mask-linear-fade { mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); } `}</style>}
         </div>
 
-        {/* Right: STRICT SWAP between Zen Mode and Grid/List */}
+        {/* Right: Zen / Grid Toggle */}
         <div className="shrink-0 relative flex flex-col items-end gap-1 w-10 md:w-auto h-10 md:h-auto justify-center">
-            
-            {/* 1. Zen Button: Only visible when NOT Scrolled */}
             {!isScrolled && (
               <div className="transition-all duration-300 flex items-center justify-end animate-in fade-in zoom-in">
                   <button onClick={onToggleZen} className={`p-2 rounded-lg transition flex items-center gap-2 group ${zenMode ? 'bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white' : 'bg-red-900/10 border border-red-500/20 text-red-500 hover:bg-red-900/30'}`} title={zenMode ? 'Exit Zen Mode' : 'Enter Zen Mode'}>
@@ -141,12 +150,9 @@ export const Header = ({
                   </button>
               </div>
             )}
-
-            {/* 2. Grid/List Toggle: Only visible when SCROLLED */}
             {isScrolled && !zenMode && (
               <div className="transition-all duration-300 flex items-center justify-end animate-in fade-in zoom-in">
                    <div className="flex items-center gap-1 p-1 rounded-lg bg-zinc-900 border border-zinc-800">
-                      {/* Responsive Size: p-1.5/size-16 on Mobile, p-2/size-20 on Desktop */}
                       <button onClick={() => setViewMode('grid')} className={`p-1.5 md:p-2 rounded ${viewMode === 'grid' ? 'bg-zinc-700 text-white' : 'text-zinc-500'}`}>
                         <LayoutGrid size={16} className="md:w-5 md:h-5"/> 
                       </button>
@@ -159,55 +165,37 @@ export const Header = ({
         </div>
       </div>
 
-      {/* Bottom Row: Controls OR List Headers */}
+      {/* Bottom Row: Controls */}
       <div className="flex items-center gap-2 md:gap-4 overflow-x-auto pb-1 md:pb-2 scrollbar-hide w-full mt-1 md:mt-6 border-t border-zinc-800/50 pt-2 overflow-visible">
         
-        {/* 1. REFRESH (Always First) */}
+        {/* REFRESH */}
         <button onClick={onRefetch} disabled={loading} className={`flex items-center gap-1 md:gap-2 px-3 h-6 md:px-6 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs shrink-0 ${loading ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'}`}>
           <RefreshCw size={10} className={`md:w-[14px] md:h-[14px] ${loading || isBackgroundSyncing ? 'animate-spin' : ''}`} /> {loading ? 'SYNC...' : 'REFRESH'}
         </button>
 
-        {/* 2. MOBILE NETWORK SWITCHER (2nd Slot, Always Visible on Mobile) */}
+        {/* MOBILE NETWORK SWITCHER */}
         <div className="relative shrink-0 md:hidden ml-1">
-            <button 
-                onClick={onCycleNetwork}
-                className={`flex items-center gap-1 px-3 h-6 rounded-xl transition font-bold text-[9px] border active:scale-95 ${zenMode ? 'bg-black border-zinc-800 text-zinc-400' : 'bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}
-            >
+            <button onClick={onCycleNetwork} className={`flex items-center gap-1 px-3 h-6 rounded-xl transition font-bold text-[9px] border active:scale-95 ${zenMode ? 'bg-black border-zinc-800 text-zinc-400' : 'bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}>
                 <div className={`w-1.5 h-1.5 rounded-full ${networkFilter === 'MAINNET' ? 'bg-green-500' : networkFilter === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
                 <span>{networkFilter === 'ALL' ? 'ALL' : networkFilter === 'MAINNET' ? 'MAINNET' : 'DEVNET'}</span>
             </button>
         </div>
 
-
-        {/* === DESKTOP STICKY HEADER (Conditional) === */}
+        {/* DESKTOP STICKY HEADER */}
         {viewMode === 'list' && !zenMode && isScrolled ? (
              <div className={`hidden md:grid flex-1 ${gridClass} gap-4 px-2 items-center text-[9px] font-bold uppercase tracking-wider`}>
-                
-                {/* Col 1: Empty Spacer */}
                 <div className="w-2"></div>
-                
-                {/* Col 2 (Identity space): INJECT BUTTONS HERE */}
                 <div className="flex items-center gap-3">
-                   {/* 1. REFRESH */}
                    <button onClick={onRefetch} disabled={loading} className={`flex items-center gap-1.5 px-3 h-8 rounded-lg transition font-bold text-[10px] shrink-0 border ${loading ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500/50 cursor-wait' : 'bg-zinc-900 border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 active:scale-95'}`}>
                       <RefreshCw size={12} className={loading || isBackgroundSyncing ? 'animate-spin' : ''} /> {loading ? 'SYNC' : 'REFRESH'}
                    </button>
-                   
-                   {/* 2. NETWORK (Full Text) */}
-                   <button 
-                      onClick={onCycleNetwork}
-                      className="flex items-center gap-1.5 px-3 h-8 rounded-lg transition font-bold text-[10px] border active:scale-95 bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white"
-                   >
+                   <button onClick={onCycleNetwork} className="flex items-center gap-1.5 px-3 h-8 rounded-lg transition font-bold text-[10px] border active:scale-95 bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white">
                       <div className={`w-1.5 h-1.5 rounded-full ${networkFilter === 'MAINNET' ? 'bg-green-500' : networkFilter === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
                       <span>{networkFilter === 'ALL' ? 'ALL' : networkFilter === 'MAINNET' ? 'MAINNET' : 'DEVNET'}</span>
                       <Repeat size={10} className="opacity-50"/>
                    </button>
                 </div>
-
-                {/* Col 3: Empty Spacer */}
                 <div></div>
-
-                {/* Cols 4+: Sort Labels */}
                 <ListHeaderCell label="Version" metric="version" />
                 <ListHeaderCell label="Health" metric="health" />
                 <ListHeaderCell label="Uptime" metric="uptime" alignRight />
@@ -218,8 +206,7 @@ export const Header = ({
              </div>
         ) : null}
 
-        {/* === SORT BUTTONS === */}
-        {/* MOBILE: Always Visible (md:hidden) */}
+        {/* SORT BUTTONS (Mobile) */}
         <div className="flex gap-1 relative ml-auto md:hidden">
              {['uptime', 'storage', 'storage_used', 'version', 'health', 'credits'].map((opt) => (
                 <button key={opt} onClick={() => onSortChange(opt as any)} className={`flex items-center gap-1 px-1.5 h-6 rounded-lg text-[8px] font-bold transition border whitespace-nowrap ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-black border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
@@ -229,14 +216,13 @@ export const Header = ({
                 {opt === 'version' && <Server size={10} />}
                 {opt === 'health' && <HeartPulse size={10} />}
                 {opt === 'credits' && <Coins size={10} />}
-                
                 {opt === 'storage' ? 'COMM.' : opt === 'storage_used' ? 'USED' : opt.toUpperCase()}
                 {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={8} className="ml-0.5" /> : <ArrowDown size={8} className="ml-0.5" />)}
                 </button>
             ))}
         </div>
 
-        {/* DESKTOP: Visible when Grid OR Not Scrolled (hidden md:flex) */}
+        {/* SORT BUTTONS (Desktop) */}
         {!zenMode && (!isScrolled || viewMode === 'grid') && (
              <div className="hidden md:flex gap-2 relative ml-auto">
                 {['uptime', 'storage', 'storage_used', 'version', 'health', 'credits'].map((opt) => (
@@ -247,7 +233,6 @@ export const Header = ({
                 ))}
              </div>
         )}
-
       </div>
     </header>
   );
