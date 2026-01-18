@@ -3,7 +3,7 @@ import {
   ArrowLeft, HelpCircle, AlertTriangle, CheckCircle 
 } from 'lucide-react';
 import { Node } from '../../../types';
-import { RadialProgress } from '../RadialProgress';
+import { RadialProgress } from '../../RadialProgress';
 
 interface HealthViewProps {
   node: Node;
