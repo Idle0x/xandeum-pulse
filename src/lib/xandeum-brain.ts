@@ -4,7 +4,7 @@ import geoip from 'geoip-lite';
 // --- CONFIGURATION ---
 
 const PUBLIC_RPC_NODES = [
-  '173.212.203.145'
+  '161.97.97.41'
 ];
 
 const TIMEOUT_RPC = 8000;
