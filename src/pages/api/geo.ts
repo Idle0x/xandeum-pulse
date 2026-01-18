@@ -2,14 +2,27 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getNetworkPulse } from '../../lib/xandeum-brain';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Prevent caching so the network switch feels instant/fresh
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
   try {
-    const { nodes, stats } = await getNetworkPulse();
+    const { nodes: allNodes, stats: globalStats } = await getNetworkPulse();
+
+    // 1. GET NETWORK FILTER FROM QUERY
+    const targetNetwork = (req.query.network as string || 'ALL').toUpperCase();
+
+    // 2. FILTER NODES BEFORE AGGREGATION
+    // If 'ALL', keep everything. If 'MAINNET'/'DEVNET', filter by node.network
+    const nodesToProcess = allNodes.filter(node => {
+        if (targetNetwork === 'MAINNET') return node.network === 'MAINNET';
+        if (targetNetwork === 'DEVNET') return node.network === 'DEVNET';
+        return true; // 'ALL'
+    });
 
     const cityMap = new Map<string, any>();
 
-    nodes.forEach(node => {
+    // 3. ITERATE OVER THE FILTERED LIST
+    nodesToProcess.forEach(node => {
       const { city, countryName, countryCode, lat, lon } = node.location;
 
       // Skip nodes without valid coordinates
@@ -18,8 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const key = `${city}-${countryName}`;
       const storageGB = (node.storage_committed || 0) / (1024 ** 3);
       const network = node.network || 'UNKNOWN';
-      
-      // FIX 1: Use the explicit flag from getNetworkPulse
+
       const isUntracked = node.isUntracked || false;
       const hasCredits = node.credits !== null; 
 
@@ -39,7 +51,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         existing.ips.push(node.address.split(':')[0]);
 
-        // --- TRACKING KINGS ---
+        // --- TRACKING KINGS (Within the filtered dataset) ---
 
         // 1. Storage King
         if (storageGB > existing.bestNodes.storageVal) {
@@ -50,10 +62,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         // 2. Credits King
-        // Logic: If current king is untracked, but this node HAS credits, take over.
-        // Or if both have credits (or both untracked), compare values.
         const currentKingUntracked = existing.bestNodes.creditsUntracked;
-        
+
         // If the new node is "better" (has credits while king doesn't, or has more credits)
         const isBetter = (!isUntracked && currentKingUntracked) || 
                          ((node.credits || 0) >= existing.bestNodes.creditsVal);
@@ -63,7 +73,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             existing.bestNodes.creditsPk = node.pubkey;
             existing.bestNodes.creditsNet = network;
             existing.bestNodes.creditsAddr = node.address;
-            existing.bestNodes.creditsUntracked = isUntracked; // Explicit assignment
+            existing.bestNodes.creditsUntracked = isUntracked; 
         }
 
         // 3. Health King
@@ -103,7 +113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               creditsPk: node.pubkey, 
               creditsNet: network,
               creditsAddr: node.address,
-              creditsUntracked: isUntracked, // Explicit assignment
+              creditsUntracked: isUntracked, 
 
               // Health
               healthVal: node.health, 
@@ -164,7 +174,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(200).json({
       locations,
       stats: {
-        totalNodes: stats.totalNodes,
+        // 4. UPDATE STATS TO REFLECT FILTERED COUNT
+        // If filtering by Mainnet, this will show only Mainnet node count
+        totalNodes: nodesToProcess.length, 
         countries: new Set(locations.map(l => l.country)).size,
         topRegion: topRegion ? topRegion.name : 'Global',
         topRegionMetric: topRegion ? topRegion.totalStorage : 0
@@ -172,6 +184,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Geo System Offline' });
   }
 }
