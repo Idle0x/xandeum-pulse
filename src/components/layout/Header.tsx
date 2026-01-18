@@ -71,25 +71,34 @@ export const Header = ({
     <header className={`sticky top-0 z-[50] border-b px-4 py-1 md:py-3 flex flex-col gap-1 md:gap-4 transition-all duration-500 overflow-visible ${zenMode ? 'bg-black border-zinc-800' : 'bg-[#09090b]/90 backdrop-blur-md border-zinc-800'}`}>
       <div className="flex justify-between items-start w-full">
         
-        {/* Left: Menu & Logo */}
-        <div className="flex items-center gap-4 shrink-0 h-10 md:h-12">
-          <button onClick={onToggleMenu} className={`p-2 md:p-3.5 rounded-xl transition ${zenMode ? 'text-zinc-400 border border-zinc-800 hover:text-white' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white hover:bg-zinc-800'}`}>
-            <Menu size={20} className="md:w-7 md:h-7" />
+        {/* Left: Menu & Logo - UPDATED STRUCTURE */}
+        {/* Changed items-center to items-start to allow vertical stacking of Logo/Time */}
+        {/* Removed fixed height (h-10) to allow content to dictate size */}
+        <div className="flex items-start gap-3 md:gap-4 shrink-0 pt-1"> 
+          <button onClick={onToggleMenu} className={`p-2 rounded-xl transition mt-1 ${zenMode ? 'text-zinc-400 border border-zinc-800 hover:text-white' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white hover:bg-zinc-800'}`}>
+            <Menu size={20} className="md:w-6 md:h-6" />
           </button>
-          <div className="flex flex-col justify-center">
-            <h1 className="text-lg md:text-xl font-extrabold tracking-tight flex items-center gap-2 text-white">
-              <Activity className={zenMode ? 'text-zinc-500' : 'text-blue-500'} size={20} /> PULSE
+          
+          <div className="flex flex-col">
+            {/* Row 1: Big Logo */}
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight flex items-center gap-2 text-white leading-none">
+              <Activity className={zenMode ? 'text-zinc-500' : 'text-blue-500'} size={28} /> PULSE
             </h1>
-            <span className="text-[9px] text-zinc-600 font-mono tracking-wider ml-1">Sync: {lastSync}</span>
+            
+            {/* Row 2: Sync Time - Pushed down to align with tooltips */}
+            <div className="mt-2 md:mt-3 pl-1 flex items-center">
+               <span className="text-[9px] md:text-[10px] text-zinc-500 font-mono tracking-wider uppercase">
+                 Sync: <span className={zenMode ? 'text-zinc-400' : 'text-zinc-300'}>{lastSync}</span>
+               </span>
+            </div>
           </div>
         </div>
 
         {/* Center: Search Bar + Feedback Text */}
-        {/* UPDATE: ml-4 for left spacing, but mr-2 to extend close to the right buttons. flex-1 takes all space. */}
-        <div className="flex-1 ml-4 mr-2 relative group flex flex-col min-w-0 pt-0.5 md:pt-1">
+        <div className="flex-1 mx-4 relative group flex flex-col items-center min-w-0 pt-0.5 md:pt-1">
           
-          {/* Search Input: Explicitly centered with mx-auto and capped width (max-w-2xl) */}
-          <div className="relative w-full max-w-2xl mx-auto overflow-hidden rounded-lg">
+          {/* Search Input: Capped width */}
+          <div className="relative w-full max-w-3xl overflow-hidden rounded-lg">
             <Search className={`absolute left-3 top-2.5 size-4 z-10 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
             {!zenMode && !searchQuery && !isSearchFocused && (
               <div className="absolute inset-0 flex items-center pointer-events-none pl-10 pr-4 overflow-hidden z-0">
@@ -110,26 +119,18 @@ export const Header = ({
             {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-2.5 text-zinc-500 hover:text-white transition z-20 p-0.5 bg-black/20 rounded-full hover:bg-zinc-700"><X size={14} /></button>}
           </div>
 
-           {/* Feedback Text Area: FULL WIDTH of flex-1 parent */}
+           {/* Feedback Text Area: EXTENDED WIDTH (As requested previously) */}
            {!zenMode && (
-             <div className="mt-1 md:mt-2 w-full overflow-hidden relative h-[20px] transition-all duration-300 mask-linear-fade flex items-center justify-center">
-               
-               {/* 1. HAS SEARCH QUERY */}
+             <div className="mt-1 md:mt-2 w-full md:w-[140%] md:translate-x-[20%] overflow-hidden relative h-[20px] transition-all duration-300 mask-linear-fade flex items-center justify-center">
                {searchQuery ? (
                  <div className="flex items-center justify-center w-full text-[8px] md:text-xs text-zinc-400 font-mono tracking-wide uppercase animate-in fade-in slide-in-from-top-1 whitespace-nowrap">
                     Showing <span className="text-white font-bold mx-1">{filteredCount}</span> results for <span className="text-blue-400 font-bold ml-1">"{searchQuery}"</span>
                  </div>
-               ) : 
-               
-               /* 2. IS FOCUSED */
-               isSearchFocused ? (
+               ) : isSearchFocused ? (
                  <div className="flex items-center justify-center w-full text-[8px] md:text-xs text-blue-400 font-mono tracking-wide uppercase animate-in fade-in whitespace-nowrap">
                     <Info size={10} className="mr-1.5" /> Type to filter nodes instantly
                  </div>
-               ) : 
-               
-               /* 3. DEFAULT (Ticker) */
-               (
+               ) : (
                  <div className="flex items-center whitespace-nowrap animate-ticker w-full">
                     {[...searchTips, ...searchTips].map((tip, i) => (
                       <div key={i} className="flex items-center mx-8">
@@ -171,13 +172,10 @@ export const Header = ({
 
       {/* Bottom Row: Controls */}
       <div className="flex items-center gap-2 md:gap-4 overflow-x-auto pb-1 md:pb-2 scrollbar-hide w-full mt-1 md:mt-6 border-t border-zinc-800/50 pt-2 overflow-visible">
-        
-        {/* 1. REFRESH */}
         <button onClick={onRefetch} disabled={loading} className={`flex items-center gap-1 md:gap-2 px-3 h-6 md:px-6 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs shrink-0 ${loading ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'}`}>
           <RefreshCw size={10} className={`md:w-[14px] md:h-[14px] ${loading || isBackgroundSyncing ? 'animate-spin' : ''}`} /> {loading ? 'SYNC...' : 'REFRESH'}
         </button>
 
-        {/* 2. NETWORK SWITCHER (Consolidated) */}
         <div className="relative shrink-0 ml-1">
             <button onClick={onCycleNetwork} className={`flex items-center gap-1 px-3 h-6 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs border active:scale-95 ${zenMode ? 'bg-black border-zinc-800 text-zinc-400' : 'bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}>
                 <div className={`w-1.5 h-1.5 rounded-full ${networkFilter === 'MAINNET' ? 'bg-green-500' : networkFilter === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
@@ -185,11 +183,10 @@ export const Header = ({
             </button>
         </div>
 
-        {/* === DESKTOP STICKY HEADER === */}
         {viewMode === 'list' && !zenMode && isScrolled ? (
              <div className={`hidden md:grid flex-1 ${gridClass} gap-4 px-2 items-center text-[9px] font-bold uppercase tracking-wider`}>
                 <div className="w-2"></div>
-                <div className="pl-1"></div> {/* Empty Identity Space */}
+                <div className="pl-1"></div>
                 <div></div>
                 <ListHeaderCell label="Version" metric="version" />
                 <ListHeaderCell label="Health" metric="health" />
@@ -201,7 +198,6 @@ export const Header = ({
              </div>
         ) : null}
 
-        {/* SORT BUTTONS (Mobile) */}
         <div className="flex gap-1 relative ml-auto md:hidden">
              {['uptime', 'storage', 'storage_used', 'version', 'health', 'credits'].map((opt) => (
                 <button key={opt} onClick={() => onSortChange(opt as any)} className={`flex items-center gap-1 px-1.5 h-6 rounded-lg text-[8px] font-bold transition border whitespace-nowrap ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-black border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
@@ -217,7 +213,6 @@ export const Header = ({
             ))}
         </div>
 
-        {/* SORT BUTTONS (Desktop) */}
         {!zenMode && (!isScrolled || viewMode === 'grid') && (
              <div className="hidden md:flex gap-2 relative ml-auto">
                 {['uptime', 'storage', 'storage_used', 'version', 'health', 'credits'].map((opt) => (
