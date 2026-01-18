@@ -2,36 +2,19 @@ import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { LocationData, MapStats, ViewMode, NetworkType } from '../types/map';
 
-export function useMapData(viewMode: ViewMode, selectedNetwork: NetworkType, routerQueryFocus?: string | string[]) {
+export function useMapData(viewMode: ViewMode, selectedNetwork: NetworkType) {
   const [locations, setLocations] = useState<LocationData[]>([]);
   const [stats, setStats] = useState<MapStats>({ totalNodes: 0, countries: 0, topRegion: 'Scanning...', topRegionMetric: 0 });
   const [loading, setLoading] = useState(true);
   
-  // To verify if the deep-linked node exists (for toast purposes)
-  const [targetNodeStatus, setTargetNodeStatus] = useState<{ found: boolean; ip: string } | null>(null);
-
   // 1. Fetching Logic
   useEffect(() => {
     const fetchGeo = async () => {
       try {
         const res = await axios.get(`/api/geo?network=${selectedNetwork}`);
         if (res.data) {
-          const fetchedLocs: LocationData[] = res.data.locations || [];
-          setLocations(fetchedLocs);
+          setLocations(res.data.locations || []);
           setStats(res.data.stats || { totalNodes: 0, countries: 0, topRegion: 'Unknown', topRegionMetric: 0 });
-
-          // Check for deep link focus once loaded
-          if (routerQueryFocus) {
-              const targetIP = routerQueryFocus as string;
-              // Only run this check if we haven't already determined status or if data updated
-              const targetLoc = fetchedLocs.find((l) => l.ips && l.ips.includes(targetIP));
-              
-              if (targetLoc) {
-                  setTargetNodeStatus({ found: true, ip: targetIP });
-              } else {
-                  setTargetNodeStatus({ found: false, ip: targetIP });
-              }
-          }
         }
       } catch (err) { console.error(err); } finally { setLoading(false); }
     };
@@ -39,7 +22,7 @@ export function useMapData(viewMode: ViewMode, selectedNetwork: NetworkType, rou
     fetchGeo();
     const interval = setInterval(fetchGeo, 10000);
     return () => clearInterval(interval);
-  }, [selectedNetwork, routerQueryFocus]);
+  }, [selectedNetwork]);
 
   // 2. Aggregation Logic (Country Breakdown)
   const countryBreakdown = useMemo(() => {
@@ -122,7 +105,6 @@ export function useMapData(viewMode: ViewMode, selectedNetwork: NetworkType, rou
     countryBreakdown,
     globalTotals,
     isGlobalCreditsOffline,
-    sortedLocations,
-    targetNodeStatus // Pass this back so the UI knows if the focused node was found
+    sortedLocations
   };
 }
