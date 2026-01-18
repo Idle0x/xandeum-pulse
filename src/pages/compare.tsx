@@ -3,13 +3,13 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { toPng } from 'html-to-image';
-import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
+import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup, Line } from 'react-simple-maps';
 import { 
   ArrowLeft, Search, Plus, Minus, RotateCcw, X, Trash2, 
   Download, Settings2, CheckCircle, 
   Database, Shield, Zap, 
   Activity, Share2, Map as MapIcon, ChevronDown, Crown, 
-  BarChart3, PieChart, Grid, Star, Clock, Info, AlertTriangle
+  BarChart3, PieChart, Grid, Star, Clock, Info
 } from 'lucide-react';
 
 // Hooks & Utils
@@ -70,26 +70,28 @@ const SectionHeader = ({ label, icon: Icon }: { label: string, icon: any }) => (
   </div>
 );
 
-const UnifiedLegend = ({ nodes, themes, metricMode = 'COUNTRY', specificMetric }: { nodes: Node[], themes: any[], metricMode: 'COUNTRY' | 'METRIC', specificMetric?: 'storage' | 'credits' | 'health' | 'uptime' }) => {
+const UnifiedLegend = ({ nodes, themes, metricMode = 'COUNTRY', specificMetric, onNodeClick }: { nodes: Node[], themes: any[], metricMode: 'COUNTRY' | 'METRIC', specificMetric?: 'storage' | 'credits' | 'health' | 'uptime', onNodeClick?: (node: Node) => void }) => {
     return (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 p-4 md:p-6 mt-auto border-t border-white/5 bg-black/40 min-h-[80px]">
          {nodes.map((node, i) => {
              let metricDisplay = null;
+             
+             // Hide metric display in legend specifically for 'health'
+             const showMetricInLegend = metricMode === 'METRIC' && specificMetric && specificMetric !== 'health';
+
              if (metricMode === 'COUNTRY') {
-                 // Map Tab: Keep exactly as was
                  metricDisplay = (
                     <div className="flex items-center gap-1 md:gap-2 mt-0.5 md:mt-1">
                         {node.location?.countryCode && <img src={`https://flagcdn.com/w40/${node.location.countryCode.toLowerCase()}.png`} className="w-2.5 h-2 md:w-4 md:h-3 rounded-[1px]" />}
                         <span className="text-[8px] md:text-[10px] text-zinc-400 font-bold uppercase tracking-wide truncate">{node.location?.countryName || 'Unknown Region'}</span>
                     </div>
                  );
-             } else if (metricMode === 'METRIC' && specificMetric) {
+             } else if (showMetricInLegend) {
                  let val = '';
                  if (specificMetric === 'storage') val = formatBytes(node.storage_committed || 0);
                  if (specificMetric === 'credits') val = (node.credits || 0).toLocaleString();
-                 if (specificMetric === 'health') val = `${node.health || 0}/100`;
                  if (specificMetric === 'uptime') val = formatUptimePrecise(node.uptime || 0);
-                 
+
                  metricDisplay = (
                     <div className="flex items-center gap-2 mt-1">
                         <span className="text-[9px] md:text-xs text-white font-mono font-bold">{val}</span>
@@ -97,12 +99,15 @@ const UnifiedLegend = ({ nodes, themes, metricMode = 'COUNTRY', specificMetric }
                     </div>
                  );
              }
- 
+
              return (
-                 <div key={node.pubkey} className="flex gap-2 md:gap-3 items-start p-2 md:p-3 rounded md:rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition">
+                 <div 
+                    key={node.pubkey} 
+                    onClick={() => onNodeClick && onNodeClick(node)}
+                    className={`flex gap-2 md:gap-3 items-start p-2 md:p-3 rounded md:rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition ${onNodeClick ? 'cursor-pointer hover:border-white/20' : ''}`}
+                 >
                      <div className="w-2 h-2 md:w-3 md:h-3 rounded-full mt-1 shrink-0 shadow-lg" style={{ backgroundColor: themes[i].hex }}></div>
                      <div className="flex flex-col gap-0.5 md:gap-1 overflow-hidden w-full">
-                         {/* Swapped Hierarchy: PubKey dominant, IP + Flag subtitle */}
                          <div className="text-[8px] md:text-xs font-mono font-bold text-zinc-300 truncate w-full tracking-wide" title={node.pubkey}>
                             {metricMode === 'COUNTRY' ? node.pubkey : node.pubkey?.slice(0, 16) + '...'}
                          </div>
@@ -152,12 +157,12 @@ const ControlRail = ({ showNetwork, leaderMetric, benchmarks }: any) => {
       <div className="h-24 md:h-32 border-b border-white/5 p-2 md:p-4 flex flex-col justify-end bg-black rounded-tl-xl">
         <div className="text-[6px] md:text-xs font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1 md:gap-2"><Settings2 size={8} className="md:w-3 md:h-3" /> METRICS</div>
       </div>
-      
+
       <div className="bg-transparent">
         <SectionHeader label="IDENTITY" icon={Shield} />
         <Benchmark label="Version" val={benchmarks.network.version} subVal={benchmarks.leader.version} netLabel="LATEST" />
         <Benchmark label="Network" val="-" />
-        
+
         <SectionHeader label="VITALITY" icon={Activity} />
         <Benchmark label="Health Score" val={benchmarks.network.health} subVal={benchmarks.leader.health} netLabel="AVG" />
         <Benchmark label="Uptime" val={benchmarks.network.uptime} subVal={benchmarks.leader.uptime} netLabel="AVG" />
@@ -169,7 +174,7 @@ const ControlRail = ({ showNetwork, leaderMetric, benchmarks }: any) => {
         <SectionHeader label="ECONOMY" icon={Zap} />
         <Benchmark label="Credits" val={benchmarks.network.credits} subVal={benchmarks.leader.credits} netLabel="MED" />
         <Benchmark label="Global Rank" val="-" />
-        
+
         <div className="h-[28px] md:h-[32px] border-t border-white/5 bg-black/50 rounded-bl-xl"></div>
       </div>
     </div>
@@ -177,17 +182,14 @@ const ControlRail = ({ showNetwork, leaderMetric, benchmarks }: any) => {
 };
 
 const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner, benchmarks, leaderMetric, showNetwork }: any) => {
-  // Removed border-b from rows
   const Row = ({ children }: { children: React.ReactNode }) => (<div className={`h-[36px] md:h-[72px] flex flex-col justify-center px-3 md:px-4 min-w-[100px] md:min-w-[140px] relative`}>{children}</div>);
   const SectionSpacer = () => <div className="h-5 md:h-8 bg-transparent border-y border-transparent mt-1"></div>;
 
   return (
     <div className={`flex flex-col min-w-[100px] md:min-w-[140px] ${theme.bodyBg} relative border-r border-white/5 last:rounded-tr-xl last:rounded-br-xl`}>
-      {/* Header - Reorganized Hierarchy */}
       <div className={`h-24 md:h-32 ${theme.headerBg} p-2 md:p-4 flex flex-col items-center justify-between relative overflow-hidden group first:rounded-tr-xl`}>
         {overallWinner && <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 animate-in zoom-in duration-500"><Crown size={10} className="md:w-3.5 md:h-3.5 text-yellow-400 fill-yellow-400 drop-shadow-sm" /></div>}
-        
-        {/* Country Flag Centered & Bigger */}
+
         <div className="mt-1 md:mt-2">
              {node.location?.countryCode ? (
                  <img src={`https://flagcdn.com/w80/${node.location.countryCode.toLowerCase()}.png`} className="w-6 h-4 md:w-10 md:h-7 rounded-[2px] shadow-md object-cover" />
@@ -197,9 +199,7 @@ const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner,
         </div>
 
         <div className="flex flex-col items-center gap-1 w-full text-center">
-            {/* IP Address - Muted Subtitle */}
             <div className={`text-[7px] md:text-[10px] font-mono text-white/50`}>{getSafeIp(node)}</div>
-            {/* Public Key - Dominant */}
             <div className="text-[8px] md:text-xs font-bold font-mono text-white bg-black/20 px-1 py-0.5 md:px-2 md:py-1 rounded border border-white/10 w-full truncate">
                 {node.pubkey?.slice(0, 8)}<span className="hidden md:inline">{node.pubkey?.slice(8, 12)}...</span>
             </div>
@@ -253,7 +253,6 @@ const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner,
         </Row>
         <Row><span className="text-[9px] md:text-base font-mono text-zinc-500">#{node.rank || '-'}</span></Row>
 
-        {/* TRASHCAN ROW */}
         <div className="h-[28px] md:h-[32px] border-t border-white/5 flex items-center justify-center bg-black/20 hover:bg-red-500/10 transition-colors cursor-pointer group/trash" onClick={onRemove}>
             <Trash2 size={10} className="md:w-3 md:h-3 text-zinc-700 group-hover/trash:text-red-500 transition-colors" />
         </div>
@@ -268,7 +267,6 @@ const OverviewLegend = ({ nodes, themes }: { nodes: Node[], themes: any[] }) => 
           {nodes.map((node, i) => (
               <div key={node.pubkey} className="flex items-center gap-1.5 md:gap-2">
                    <div className="w-2 h-2 md:w-3 md:h-3 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)] border border-white/10" style={{ backgroundColor: themes[i].hex }}></div>
-                   {/* PubKey Dominant, IP + Flag Subtitle */}
                    <div className="flex flex-col">
                         <span className="text-[9px] md:text-xs font-mono font-bold text-zinc-300">{node.pubkey?.slice(0, 12)}...</span>
                         <div className="flex items-center gap-1 opacity-50">
@@ -302,6 +300,13 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
   const handleZoomOut = () => setPos(p => ({ ...p, zoom: Math.max(p.zoom / 1.5, 1) }));
   const handleReset = () => setPos({ coordinates: [0, 20], zoom: 1 });
 
+  // Map Focus Helper
+  const handleNodeFocus = (node: Node) => {
+    if (node.location) {
+        setPos({ coordinates: [node.location.lon, node.location.lat], zoom: 4 });
+    }
+  };
+
   // Click Outside Hook for Metric Dropdown
   const metricDropdownRef = useRef<HTMLDivElement>(null);
   useOutsideClick(metricDropdownRef, () => setIsMetricDropdownOpen(false));
@@ -311,7 +316,7 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
   const maxStorage = Math.max(...nodes.map(n => n.storage_committed || 0), 1);
   const maxCredits = Math.max(...nodes.map(n => n.credits || 0), 1);
   const maxUptime = Math.max(...nodes.map(n => n.uptime || 0), 1);
-  
+
   const totalStorage = nodes.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
   const totalCredits = nodes.reduce((sum, n) => sum + (n.credits || 0), 0);
   const totalUptime = nodes.reduce((sum, n) => sum + (n.uptime || 0), 0);
@@ -356,7 +361,7 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
             <Icon size={10} className="md:w-3.5 md:h-3.5" />
             <span className="text-[8px] md:text-xs font-bold uppercase tracking-widest">{title}</span>
         </div>
-        <div className="flex items-end justify-center gap-3 md:gap-6 h-32 md:h-48 w-full px-2 md:px-4">
+        <div className="flex items-end justify-center gap-3 md:gap-6 h-32 md:h-48 w-full px-2 md:px-4 pt-8">
             {children}
         </div>
     </div>
@@ -415,7 +420,7 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
                 <InterpretationPanel contextText={getEvaluation('OVERVIEW')} />
                 </>
             )}
-            
+
             {tab === 'MARKET' && (
                 <>
                     <div className="relative flex flex-col flex-1">
@@ -443,7 +448,7 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
                                             {marketMetric === 'storage' && <Database size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
                                             {marketMetric === 'credits' && <Zap size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
                                             {marketMetric === 'uptime' && <Clock size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
-                                            
+
                                             <span className="text-xs md:text-sm font-bold text-zinc-400 tracking-widest uppercase mb-1">{marketMetric} Share</span>
                                             <span className="text-[10px] md:text-xs text-zinc-600 font-mono">
                                                 {marketMetric === 'storage' && formatBytes(totalStorage)}
@@ -461,8 +466,8 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
                                             <span className="text-xs font-mono font-bold text-zinc-400 w-32 text-right truncate">{getSafeIp(n)}</span>
                                             <div className="flex-1 h-8 bg-zinc-900 rounded-full overflow-hidden relative border border-white/5">
                                                 <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${n.health}%`, backgroundColor: themes[i].hex }}></div>
-                                                <span className="absolute top-1/2 left-4 -translate-y-1/2 text-[10px] font-bold text-black mix-blend-screen">{n.health} / 100</span>
                                             </div>
+                                            <span className="text-xs font-bold text-white font-mono w-16 text-left">{n.health} / 100</span>
                                         </div>
                                     ))}
                                 </div>
@@ -486,22 +491,30 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
                     <div className="flex-1 rounded-xl overflow-hidden border border-white/5 bg-[#050505] mx-4 md:mx-6 relative group shadow-inner">
                         <ComposableMap projectionConfig={{ scale: 160 }} className="w-full h-full">
                             <ZoomableGroup 
-    zoom={pos.zoom} 
-    center={pos.coordinates as [number, number]} 
-    maxZoom={10} 
-    onMoveEnd={(e: any) => setPos({ coordinates: e.coordinates as [number, number], zoom: e.zoom })}
->
-    <Geographies geography={GEO_URL}>{({ geographies }: { geographies: any[] }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#18181b" stroke="#27272a" strokeWidth={0.5} />))}</Geographies>
-    {nodes.map((n, i) => (n.location && (
-        <Marker key={n.pubkey} coordinates={[n.location.lon, n.location.lat]}>
-            <circle r={8/pos.zoom} fill={themes[i].hex} fillOpacity={0.4} className="animate-pulse" />
-            <circle r={4/pos.zoom} fill="#fff" stroke={themes[i].hex} strokeWidth={2/pos.zoom} />
-        </Marker>
-    )))}
-</ZoomableGroup>
+                                zoom={pos.zoom} 
+                                center={pos.coordinates as [number, number]} 
+                                maxZoom={10} 
+                                onMoveEnd={(e: any) => setPos({ coordinates: e.coordinates as [number, number], zoom: e.zoom })}
+                            >
+                                <Geographies geography={GEO_URL}>{({ geographies }: { geographies: any[] }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#18181b" stroke="#27272a" strokeWidth={0.5} />))}</Geographies>
+                                
+                                <Line 
+                                    coordinates={nodes.filter(n => n.location).map(n => [n.location!.lon, n.location!.lat])}
+                                    stroke="#52525b"
+                                    strokeWidth={1}
+                                    strokeOpacity={0.5}
+                                />
+
+                                {nodes.map((n, i) => (n.location && (
+                                    <Marker key={n.pubkey} coordinates={[n.location.lon, n.location.lat]}>
+                                        <circle r={24/pos.zoom} fill={themes[i].hex} fillOpacity={0.4} className="animate-pulse" />
+                                        <circle r={12/pos.zoom} fill="#fff" stroke={themes[i].hex} strokeWidth={4/pos.zoom} />
+                                    </Marker>
+                                )))}
+                            </ZoomableGroup>
                         </ComposableMap>
                     </div>
-                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="COUNTRY" />
+                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="COUNTRY" onNodeClick={handleNodeFocus} />
                 </div>
             )}
         </div>
@@ -509,8 +522,9 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
   );
 };
 
+// ADDED: print-exclude class to handleExport filter
 const EmptySlot = ({ onClick }: { onClick: () => void }) => (
-  <div className="flex flex-col min-w-[100px] md:min-w-[140px] h-full bg-white/[0.01] group cursor-pointer hover:bg-white/[0.03] transition relative last:rounded-tr-xl last:rounded-br-xl" onClick={onClick}>
+  <div className="flex flex-col min-w-[100px] md:min-w-[140px] h-full bg-white/[0.01] group cursor-pointer hover:bg-white/[0.03] transition relative last:rounded-tr-xl last:rounded-br-xl print-exclude" onClick={onClick}>
     <div className="h-24 md:h-32 p-2 flex flex-col items-center justify-center border-b border-white/5 bg-black/40 first:rounded-tr-xl">
       <Plus size={12} className="md:w-4 md:h-4 text-zinc-700 group-hover:text-zinc-400 transition" />
     </div>
@@ -523,14 +537,14 @@ const EmptySlot = ({ onClick }: { onClick: () => void }) => (
 export default function ComparePage() {
   const router = useRouter();
   const printRef = useRef<HTMLDivElement>(null);
-  
+
   const { nodes, loading } = useNetworkData(); 
 
   const [networkScope, setNetworkScope] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [showNetwork, setShowNetwork] = useState(true);
   const [leaderMetric, setLeaderMetric] = useState<'STORAGE' | 'CREDITS' | 'HEALTH' | null>(null);
-  
+
   const [isLeaderDropdownOpen, setIsLeaderDropdownOpen] = useState(false);
   const [isWatchlistOpen, setIsWatchlistOpen] = useState(false);
   const [isNetworkOpen, setIsNetworkOpen] = useState(false);
@@ -543,7 +557,7 @@ export default function ComparePage() {
   const leaderRef = useRef<HTMLDivElement>(null);
   const watchlistRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<HTMLDivElement>(null);
-  
+
   useOutsideClick(leaderRef, () => setIsLeaderDropdownOpen(false));
   useOutsideClick(watchlistRef, () => setIsWatchlistOpen(false));
   useOutsideClick(networkRef, () => setIsNetworkOpen(false));
@@ -569,7 +583,7 @@ export default function ComparePage() {
       const storages = availableNodes.map(n => n.storage_committed || 0);
       const credits = availableNodes.map(n => n.credits || 0);
       const uptimes = availableNodes.map(n => n.uptime || 0);
-      
+
       const getMedian = (vals: number[]) => { if (vals.length === 0) return 0; const sorted = [...vals].sort((a, b) => a - b); const mid = Math.floor(sorted.length / 2); return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2; };
 
       const netHealthRaw = Math.round(healths.reduce((a, b) => a + b, 0) / healths.length) || 0;
@@ -603,23 +617,88 @@ export default function ComparePage() {
 
   useEffect(() => { const saved = localStorage.getItem('xandeum_favorites'); if (saved) setFavorites(JSON.parse(saved)); }, []);
   const updateUrl = (keys: string[]) => router.replace({ pathname: '/compare', query: { nodes: keys.join(',') } }, undefined, { shallow: true });
-  
+
   const addNode = (pubkey: string) => { if (!selectedKeys.includes(pubkey) && selectedKeys.length < 30) { const k = [...selectedKeys, pubkey]; setSelectedKeys(k); updateUrl(k); setIsSearchOpen(false); setSearchQuery(''); setIsWatchlistOpen(false); } };
   const removeNode = (pubkey: string) => { const k = selectedKeys.filter(x => x !== pubkey); setSelectedKeys(k); updateUrl(k); };
   const clearAllNodes = () => { setSelectedKeys([]); updateUrl([]); };
 
+  // --- DEEP LINKING LOGIC ---
+  const hasProcessedDeepLink = useRef(false);
+
+  useEffect(() => {
+    if (!router.isReady || loading || nodes.length === 0 || hasProcessedDeepLink.current) return;
+    const { nodes: nodesParam, network: networkParam } = router.query;
+    if (nodesParam && typeof nodesParam === 'string') {
+        const keys = nodesParam.split(',');
+        if (networkParam && typeof networkParam === 'string') {
+            const upperNet = networkParam.toUpperCase();
+            if (upperNet === 'MAINNET' || upperNet === 'DEVNET') {
+                setNetworkScope(upperNet as 'MAINNET' | 'DEVNET');
+            }
+        }
+        setSelectedKeys(keys);
+        setShowNetwork(true);
+        hasProcessedDeepLink.current = true;
+    }
+  }, [router.isReady, loading, nodes, router.query]);
+
+
   const handleShare = () => { navigator.clipboard.writeText(window.location.href); setToast('Link Copied!'); setTimeout(() => setToast(null), 2000); };
-  const handleExport = async () => { if (printRef.current) { try { const dataUrl = await toPng(printRef.current, { cacheBust: true, backgroundColor: '#020202', pixelRatio: 3 }); const link = document.createElement('a'); link.download = `pulse-report.png`; link.href = dataUrl; link.click(); } catch (err) { console.error(err); } } };
+  
+  // UPDATED: EXPORT LOGIC FOR FULL SCROLL WIDTH
+  const handleExport = async () => {
+    if (printRef.current) {
+      try {
+        const dataUrl = await toPng(printRef.current, {
+          cacheBust: true,
+          backgroundColor: '#020202',
+          pixelRatio: 2, 
+          width: printRef.current.scrollWidth, 
+          height: printRef.current.scrollHeight,
+          filter: (node) => {
+             // Exclude elements with 'print-exclude' class (The "Add" Button)
+             if (node instanceof HTMLElement && node.classList.contains('print-exclude')) {
+                 return false;
+             }
+             return true;
+          },
+          style: {
+              overflow: 'visible' // Forces hidden scrolled content to be rendered
+          }
+        });
+        const link = document.createElement('a');
+        link.download = `pulse-report-${new Date().toISOString().slice(0, 10)}.png`;
+        link.href = dataUrl;
+        link.click();
+      } catch (err) {
+        console.error("Export failed:", err);
+        setToast('Export Failed');
+        setTimeout(() => setToast(null), 2000);
+      }
+    }
+  };
+
   const watchlistNodes = availableNodes.filter(n => favorites.includes(n.address || ''));
 
   return (
     <div className="min-h-screen bg-[#020202] text-zinc-100 font-sans selection:bg-blue-500/30 flex flex-col overflow-hidden relative">
       <Head><title>Pulse Compare</title></Head>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#18181b_0%,#020202_100%)] pointer-events-none z-0"></div>
-      
+
       {/* STANDALONE BACK BUTTON (TOP LEFT) */}
       <div className="absolute top-4 left-4 z-[60]">
-        <Link href="/" className="p-3 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition"><ArrowLeft size={20} /></Link>
+        <Link href="/" className="flex items-center justify-center p-3 rounded-full bg-zinc-900/40 backdrop-blur-md border border-white/5 hover:bg-white/10 hover:border-white/20 transition group">
+            <ArrowLeft size={18} className="text-red-500/80 group-hover:text-red-400" />
+        </Link>
+      </div>
+
+       {/* NETWORK SWITCHER (TOP RIGHT) */}
+       <div className="absolute top-4 right-4 z-[60]" ref={networkRef}>
+          <button onClick={() => setIsNetworkOpen(!isNetworkOpen)} className="flex items-center gap-2 px-4 py-3 rounded-full bg-zinc-900/40 backdrop-blur-md text-white text-[10px] font-bold uppercase transition border border-white/5 hover:bg-white/10">
+              <div className={`w-2 h-2 rounded-full ${networkScope === 'MAINNET' ? 'bg-green-500' : networkScope === 'DEVNET' ? 'bg-blue-500' : 'bg-white'}`}></div>
+              {networkScope === 'ALL' ? 'ALL NETWORKS' : networkScope} <ChevronDown size={12} />
+          </button>
+          {isNetworkOpen && <div className="absolute top-full right-0 mt-2 w-44 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col">{[{ id: 'ALL', label: 'All Networks', color: 'bg-white' }, { id: 'MAINNET', label: 'Mainnet', color: 'bg-green-500' }, { id: 'DEVNET', label: 'Devnet', color: 'bg-blue-500' }].map(opt => (<button key={opt.id} onClick={() => { setNetworkScope(opt.id as any); setIsNetworkOpen(false); }} className="px-4 py-3 text-[10px] font-bold text-left text-zinc-300 hover:text-white hover:bg-zinc-800 transition uppercase flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${opt.color}`}></div> {opt.label}</button>))}</div>}
       </div>
 
       {toast && <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-white text-black font-black uppercase text-xs rounded-full animate-in fade-in slide-in-from-top-4 flex items-center gap-2 shadow-2xl"><CheckCircle size={14}/>{toast}</div>}
@@ -650,31 +729,26 @@ export default function ComparePage() {
 
       {/* TOOLBAR */}
       <div className="px-4 md:px-8 pb-6 relative z-50 flex justify-center">
-        <div className="flex flex-wrap items-center justify-center gap-3 max-w-5xl">
-            <button onClick={() => setShowNetwork(!showNetwork)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[9px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border ${showNetwork ? 'bg-white text-black border-white' : 'bg-black/40 text-zinc-400 border-white/5 hover:border-white/20'}`}>{showNetwork ? <CheckCircle size={12} /> : <div className="w-3 h-3 rounded-full border border-zinc-500"></div>} VS NETWORK</button>
-            
+        <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3 max-w-5xl">
+            <button onClick={() => setShowNetwork(!showNetwork)} className={`flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border w-auto ${showNetwork ? 'bg-white text-black border-white' : 'bg-black/40 text-zinc-400 border-white/5 hover:border-white/20'}`}>{showNetwork ? <CheckCircle size={12} /> : <div className="w-3 h-3 rounded-full border border-zinc-500"></div>} VS NETWORK</button>
+
             <div className="relative" ref={leaderRef}>
-                <button onClick={() => setIsLeaderDropdownOpen(!isLeaderDropdownOpen)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[9px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border ${leaderMetric ? 'bg-white text-black border-white' : 'bg-black/40 text-zinc-400 border-white/5 hover:border-white/20'}`}>{leaderMetric ? `VS ${leaderMetric} LEADER` : 'VS LEADER'} <ChevronDown size={12} /></button>
+                <button onClick={() => setIsLeaderDropdownOpen(!isLeaderDropdownOpen)} className={`flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border w-auto ${leaderMetric ? 'bg-white text-black border-white' : 'bg-black/40 text-zinc-400 border-white/5 hover:border-white/20'}`}>{leaderMetric ? `VS ${leaderMetric} LEADER` : 'VS LEADER'} <ChevronDown size={12} /></button>
                 {isLeaderDropdownOpen && <div className="absolute top-full left-0 mt-2 w-36 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col">{['STORAGE', 'CREDITS', 'HEALTH'].map(opt => (<button key={opt} onClick={() => { setLeaderMetric(leaderMetric === opt ? null : opt as any); setIsLeaderDropdownOpen(false); }} className="px-4 py-3 text-[9px] font-bold text-left text-zinc-400 hover:text-white hover:bg-zinc-800 transition uppercase">{opt}</button>))}</div>}
             </div>
 
             <div className="relative" ref={watchlistRef}>
-                <button onClick={() => setIsWatchlistOpen(!isWatchlistOpen)} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-black/40 text-zinc-400 border border-white/5 hover:border-white/20 hover:text-white text-[9px] md:text-[10px] font-bold uppercase transition whitespace-nowrap"><Star size={12} /> WATCHLIST <ChevronDown size={12} /></button>
+                <button onClick={() => setIsWatchlistOpen(!isWatchlistOpen)} className="flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg bg-black/40 text-zinc-400 border border-white/5 hover:border-white/20 hover:text-white text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap w-auto"><Star size={12} /> WATCHLIST <ChevronDown size={12} /></button>
                 {isWatchlistOpen && <div className="absolute top-full left-0 mt-2 w-56 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col max-h-64 overflow-y-auto">{watchlistNodes.length > 0 ? watchlistNodes.map(n => (<button key={n.pubkey} onClick={() => addNode(n.pubkey!)} disabled={selectedKeys.includes(n.pubkey!)} className={`px-4 py-3 text-[10px] font-bold text-left flex justify-between items-center ${selectedKeys.includes(n.pubkey!) ? 'text-zinc-600 cursor-not-allowed' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'}`}><span>{getSafeIp(n)}</span>{selectedKeys.includes(n.pubkey!) && <CheckCircle size={12} />}</button>)) : <div className="p-4 text-[10px] text-zinc-600 text-center">No Favorites</div>}</div>}
             </div>
 
-            <div className="relative" ref={networkRef}>
-                <button onClick={() => setIsNetworkOpen(!isNetworkOpen)} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-[9px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border border-zinc-600"><div className={`w-2 h-2 rounded-full ${networkScope === 'MAINNET' ? 'bg-green-500' : networkScope === 'DEVNET' ? 'bg-blue-500' : 'bg-white'}`}></div>{networkScope === 'ALL' ? 'ALL NETWORKS' : networkScope} <ChevronDown size={12} /></button>
-                {isNetworkOpen && <div className="absolute top-full left-0 mt-2 w-44 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col">{[{ id: 'ALL', label: 'All Networks', color: 'bg-white' }, { id: 'MAINNET', label: 'Mainnet', color: 'bg-green-500' }, { id: 'DEVNET', label: 'Devnet', color: 'bg-blue-500' }].map(opt => (<button key={opt.id} onClick={() => { setNetworkScope(opt.id as any); setIsNetworkOpen(false); }} className="px-4 py-3 text-[10px] font-bold text-left text-zinc-300 hover:text-white hover:bg-zinc-800 transition uppercase flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${opt.color}`}></div> {opt.label}</button>))}</div>}
-            </div>
-
-            <button onClick={handleShare} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-[9px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border border-zinc-700"><Share2 size={12}/> SHARE</button>
-            <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[9px] md:text-[10px] font-bold uppercase transition shadow-[0_0_15px_rgba(37,99,235,0.3)] whitespace-nowrap"><Download size={12}/> REPORT CARD</button>
+            <button onClick={handleShare} className="flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border border-zinc-700 w-auto"><Share2 size={12}/> SHARE</button>
+            <button onClick={handleExport} className="flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[8px] md:text-[10px] font-bold uppercase transition shadow-[0_0_15px_rgba(37,99,235,0.3)] whitespace-nowrap w-auto"><Download size={12}/> REPORT CARD</button>
         </div>
       </div>
 
       <div className="flex-1 overflow-hidden relative z-10 px-4 pb-4 md:px-8 md:pb-8 flex flex-col max-w-[1600px] mx-auto w-full">
-         
+
          {/* MAIN DATA DECK */}
          <div className="flex-initial min-h-[400px] flex flex-col bg-[#09090b]/60 backdrop-blur-2xl rounded-xl border border-white/5 shadow-2xl overflow-hidden relative mb-6">
              {selectedNodes.length === 0 ? (
@@ -683,9 +757,19 @@ export default function ComparePage() {
                         <div className="absolute inset-0 border border-zinc-900 rounded-full scale-125 border-dashed opacity-50"></div>
                         <Grid size={64} className="text-zinc-800 relative z-10" />
                     </div>
-                    <h2 className="text-xl font-black text-white uppercase tracking-[0.2em] mb-2 z-10">Matrix Initialization</h2>
-                    <p className="text-sm text-zinc-500 mb-8 max-w-sm z-10 leading-relaxed font-mono">System ready. Scope: <span className="text-white">{networkScope}</span>.</p>
-                    <button onClick={() => setIsSearchOpen(true)} className="px-10 py-4 bg-white text-black hover:bg-zinc-200 font-black uppercase tracking-widest text-xs rounded-full shadow-[0_0_40px_rgba(255,255,255,0.2)] transition-all hover:scale-105 z-10 flex items-center gap-2"><Plus size={14} /> Add Node</button>
+                    {/* Empty State Copy */}
+                    <h2 className="text-xl font-black text-white uppercase tracking-[0.2em] mb-2 z-10">Compare Nodes</h2>
+                    <p className="text-sm text-zinc-500 mb-2 max-w-sm z-10 leading-relaxed font-mono">
+                         Select a minimum of 2 nodes for head to head comparison.
+                    </p>
+                    <p className="text-xs text-zinc-600 mb-8 max-w-sm z-10 leading-relaxed font-mono">
+                         You can also compare against the entire network or a specific top performer.
+                    </p>
+                    <div className="text-[10px] uppercase font-bold text-zinc-600 mb-6">Current Network: <span className="text-zinc-300">{networkScope}</span></div>
+                    
+                    <button onClick={() => setIsSearchOpen(true)} className="px-10 py-4 bg-white text-black hover:bg-zinc-200 font-black uppercase tracking-widest text-xs rounded-full shadow-[0_0_40px_rgba(255,255,255,0.2)] transition-all hover:scale-105 z-10 flex items-center gap-2">
+                        <Plus size={16} className="animate-pulse" /> Add Node
+                    </button>
                  </div>
              ) : (
                  <main ref={printRef} className="flex-1 overflow-x-auto overflow-y-auto bg-transparent relative flex custom-scrollbar snap-x items-start content-start">
