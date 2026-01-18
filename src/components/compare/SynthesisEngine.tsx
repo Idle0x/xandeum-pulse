@@ -40,22 +40,12 @@ const ChartCell = ({ title, icon: Icon, children, isFocused, onClick }: any) => 
     </div>
 );
 
-// --- NARRATIVE ENGINE LOGIC ---
-const generateLiveReport = (
-    tab: string, 
-    metric: string, 
-    focusKey: string | null, 
-    focusSection: string | null, 
-    nodes: Node[],
-    benchmarks: any,
-    clusters: any[]
-) => {
+// --- NARRATIVE ENGINE LOGIC (RESTORED) ---
+const generateLiveReport = (tab: string, metric: string, focusKey: string | null, focusSection: string | null, nodes: Node[], benchmarks: any, clusters: any[]) => {
     const groupCount = nodes.length;
     if (groupCount === 0) return "Select nodes to generate analysis.";
-
     if (tab === 'OVERVIEW') {
         if (!focusSection) return `Global Overview: You are comparing ${groupCount} nodes. The dashboard highlights relative strengths (Power) versus absolute reliability (Vitality). Click any chart to dive deeper.`;
-        
         if (focusSection === 'health') {
             const avgHealth = Math.round(nodes.reduce((a, b) => a + (b.health || 0), 0) / groupCount);
             const netAvg = benchmarks.networkRaw?.health || 0;
@@ -66,55 +56,39 @@ const generateLiveReport = (
             const total = nodes.reduce((a, b) => a + (b.storage_committed || 0), 0);
             return `Capacity Focus: Combined, this cluster provides ${formatBytes(total)} of storage. In a decentralized network, high concentration in few nodes (Whales) can present a risk, while even distribution suggests a healthy mesh.`;
         }
-        if (focusSection === 'credits') {
-            return `Economy Focus: Credits represent proven work. This view exposes the 'Earners' vs the 'Idlers'. High disparity here often points to configuration issues or uptime gaps in the lower-performing nodes.`;
-        }
-        if (focusSection === 'uptime') {
-            return `Longevity Focus: Uptime is the historic footprint of a node. Newer nodes will naturally show smaller bars here, but look for gaps in older nodes which indicate instability.`;
-        }
+        if (focusSection === 'credits') return `Economy Focus: Credits represent proven work. This view exposes the 'Earners' vs the 'Idlers'. High disparity here often points to configuration issues or uptime gaps in the lower-performing nodes.`;
+        if (focusSection === 'uptime') return `Longevity Focus: Uptime is the historic footprint of a node. Newer nodes will naturally show smaller bars here, but look for gaps in older nodes which indicate instability.`;
     }
-
     if (tab === 'MARKET') {
         const totalVal = nodes.reduce((a, b) => a + ((b as any)[metric === 'storage' ? 'storage_committed' : metric] || 0), 0);
-        
         if (!focusKey) {
             if (metric === 'storage') return `Storage Market: This chart visualizes data centralization risks. A balanced pie means a resilient cluster. If one slice dominates (>50%), that node is a local single-point-of-failure.`;
             if (metric === 'credits') return `Credit Distribution: This is the reward pie. Ideally, rewards should correlate with storage provided. If a small node has a huge credit slice, it may be over-performing or older than the rest.`;
             if (metric === 'health') return `Health Distribution: Unlike competitive metrics, this should be uniform. A 'cracked' bar where one node is significantly lower indicates a specific failure that needs attention.`;
             return `Market Analysis: Click on any node color in the chart or legend to isolate its specific performance metrics against the group.`;
         }
-
         const node = nodes.find(n => n.pubkey === focusKey);
         if (!node) return "Node data unavailable.";
-
         const val = (node as any)[metric === 'storage' ? 'storage_committed' : metric] || 0;
         const share = totalVal > 0 ? (val / totalVal) * 100 : 0;
         const safeName = getSafeIp(node);
-
         let verdict = "";
         if (share > 50) verdict = "This node is the dominant force in this group (a 'Whale').";
         else if (share < 10) verdict = "This node is a minor contributor in this specific comparison.";
         else verdict = "This node holds a balanced share of the group's resources.";
-
         return `Node Focus [${safeName}]: It controls ${share.toFixed(1)}% of the selected ${metric}. ${verdict} Comparing against the ${nodes.length - 1} other peers, its performance in this sector is ${share > (100/nodes.length) ? 'above' : 'below'} the group average.`;
     }
-
     if (tab === 'TOPOLOGY') {
         if (!focusKey) {
             const countryCounts: Record<string, number> = {};
-            nodes.forEach(n => {
-                const c = n.location?.countryName || 'Unknown';
-                countryCounts[c] = (countryCounts[c] || 0) + 1;
-            });
+            nodes.forEach(n => { const c = n.location?.countryName || 'Unknown'; countryCounts[c] = (countryCounts[c] || 0) + 1; });
             const uniqueCountries = Object.keys(countryCounts).length;
             const maxConcentration = Math.max(...Object.values(countryCounts));
             const concentrationPct = (maxConcentration / nodes.length) * 100;
-
             if (uniqueCountries === 1 && nodes.length > 1) return `⚠️ High Geographic Risk: 100% of this group shares a single jurisdiction (${Object.keys(countryCounts)[0]}). A regional outage would knock out this entire fleet.`;
             if (concentrationPct > 50) return `⚠️ Moderate Centralization: ${concentrationPct.toFixed(0)}% of your nodes are concentrated in one country. Consider diversifying to improve flood/power resilience.`;
             return `✅ Resilient Topology: Your fleet spans ${uniqueCountries} distinct regions. This geo-redundancy creates a robust mesh resistant to local outages.`;
         }
-
         const cluster = clusters.find(c => c.id === focusKey);
         if (cluster) {
             const isHub = cluster.nodes.length > 1;
@@ -122,7 +96,6 @@ const generateLiveReport = (
             return `Region Focus: ${cluster.country}. ${isHub ? `This is a dense HUB hosting ${cluster.nodes.length} nodes.` : "This is a standalone outpost."} Collectively, this location contributes ${formatBytes(totalStorage)} of storage capacity. ${isHub ? "Multiple nodes here maximize hardware efficiency but share physical risks." : "Single nodes here expand the network's physical edge."}`;
         }
     }
-
     return "Interactive Analysis Ready.";
 };
 
@@ -136,8 +109,8 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
   // --- INTERACTION STATE ---
   const [focusedSection, setFocusedSection] = useState<string | null>(null); 
   const [focusedNodeKey, setFocusedNodeKey] = useState<string | null>(null); 
+  const [hoveredNodeKey, setHoveredNodeKey] = useState<string | null>(null); // NEW: Shared hover state
 
-  // --- CLUSTERING LOGIC ---
   const clusters = useMemo(() => {
       const map = new Map();
       nodes.forEach((node, index) => {
@@ -145,23 +118,15 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
           const lat = node.location.lat.toFixed(2);
           const lon = node.location.lon.toFixed(2);
           const key = `${lat},${lon}`;
-
           if (!map.has(key)) {
-              map.set(key, {
-                  id: `cluster-${key}`,
-                  lat: node.location.lat,
-                  lon: node.location.lon,
-                  country: node.location.countryName || 'Unknown',
-                  nodes: [],
-                  themeIndex: index
-              });
+              map.set(key, { id: `cluster-${key}`, lat: node.location.lat, lon: node.location.lon, country: node.location.countryName || 'Unknown', nodes: [], themeIndex: index });
           }
           map.get(key).nodes.push(node);
       });
       return Array.from(map.values());
   }, [nodes]);
 
-  const handleTabChange = (t: any) => { setTab(t); setFocusedSection(null); setFocusedNodeKey(null); };
+  const handleTabChange = (t: any) => { setTab(t); setFocusedSection(null); setFocusedNodeKey(null); setHoveredNodeKey(null); };
   const handleZoomIn = () => setPos(p => ({ ...p, zoom: Math.min(p.zoom * 1.5, 10) }));
   const handleZoomOut = () => setPos(p => ({ ...p, zoom: Math.max(p.zoom / 1.5, 1) }));
   const handleReset = () => setPos({ coordinates: [0, 20], zoom: 1 });
@@ -183,44 +148,50 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
   const maxStorage = Math.max(...nodes.map(n => n.storage_committed || 0), 1);
   const maxCredits = Math.max(...nodes.map(n => n.credits || 0), 1);
   const maxUptime = Math.max(...nodes.map(n => n.uptime || 0), 1);
-
   const totalStorage = nodes.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
   const totalCredits = nodes.reduce((sum, n) => sum + (n.credits || 0), 0);
   const totalUptime = nodes.reduce((sum, n) => sum + (n.uptime || 0), 0);
 
-  const getConicGradient = (type: 'storage' | 'credits' | 'uptime') => {
-    let currentDeg = 0;
-    let total = 0;
-    if (type === 'storage') total = totalStorage;
-    else if (type === 'credits') total = totalCredits;
-    else if (type === 'uptime') total = totalUptime;
+  // --- STYLE HELPERS ---
+  const isDense = nodes.length > 5;
+  const overviewBarWidth = isDense ? 'flex-1 mx-[1px] md:mx-1' : 'w-6 md:w-8';
+  const marketBarWidth = isDense ? 'flex-1' : 'w-48 md:w-64';
 
+  const getElementStyle = (nodeKey: string | null, sectionType?: string) => {
+      if (focusedSection && sectionType && sectionType !== focusedSection) return 'opacity-20 blur-[1px] grayscale transition-all duration-500';
+      if (hoveredNodeKey) {
+          return hoveredNodeKey === nodeKey ? 'opacity-100 scale-y-[1.05] brightness-125 z-30' : 'opacity-15 grayscale blur-[0.5px]';
+      }
+      if (focusedNodeKey) {
+          return focusedNodeKey === nodeKey ? 'opacity-100 scale-[1.02]' : 'opacity-30 blur-[1px] grayscale-[0.5]';
+      }
+      return 'opacity-100';
+  };
+
+  const getConicGradient = (type: string) => {
+    let currentDeg = 0;
+    let total = type === 'storage' ? totalStorage : type === 'credits' ? totalCredits : totalUptime;
     if (total === 0) return 'conic-gradient(#333 0deg 360deg)';
     return `conic-gradient(${nodes.map((n, i) => {
-        let val = 0;
-        if (type === 'storage') val = n.storage_committed || 0;
-        else if (type === 'credits') val = n.credits || 0;
-        else if (type === 'uptime') val = n.uptime || 0;
-
+        let val = (n as any)[type === 'storage' ? 'storage_committed' : type] || 0;
         const deg = (val / total) * 360;
         const theme = themes[i % themes.length];
-        const stop = `${theme.hex} ${currentDeg}deg ${currentDeg + deg}deg`;
+        const color = hoveredNodeKey ? (hoveredNodeKey === n.pubkey ? theme.hex : '#111') : theme.hex;
+        const stop = `${color} ${currentDeg}deg ${currentDeg + deg}deg`;
         currentDeg += deg;
         return stop;
     }).join(', ')})`;
   };
 
-  const getOpacityClass = (isTarget: boolean) => {
-      if (!focusedSection && !focusedNodeKey) return 'opacity-100'; 
-      return isTarget ? 'opacity-100 scale-[1.02]' : 'opacity-30 blur-[1px] grayscale-[0.5]';
-  };
-
   return (
-    <div className="shrink-0 min-h-[600px] border border-white/5 bg-[#09090b]/40 backdrop-blur-xl flex flex-col relative z-40 rounded-xl mt-6 shadow-2xl overflow-hidden" onClick={() => { setFocusedSection(null); setFocusedNodeKey(null); }}>
+    <div className="shrink-0 min-h-[600px] border border-white/5 bg-[#09090b]/40 backdrop-blur-xl flex flex-col relative z-40 rounded-xl mt-6 shadow-2xl overflow-hidden" 
+         onMouseLeave={() => setHoveredNodeKey(null)}
+         onClick={() => { setFocusedSection(null); setFocusedNodeKey(null); }}>
+        
         {/* TAB CONTROLS */}
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50">
             <div className="bg-zinc-900/90 backdrop-blur-md p-1.5 rounded-full flex gap-2 border border-white/10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                {[ { id: 'OVERVIEW', icon: BarChart3, label: 'Overview' }, { id: 'MARKET', icon: PieChart, label: 'Market Share' }, { id: 'TOPOLOGY', icon: MapIcon, label: 'Topology' } ].map((t) => (
+                {[{ id: 'OVERVIEW', icon: BarChart3, label: 'Overview' }, { id: 'MARKET', icon: PieChart, label: 'Market Share' }, { id: 'TOPOLOGY', icon: MapIcon, label: 'Topology' }].map((t) => (
                     <button key={t.id} onClick={() => handleTabChange(t.id)} className={`px-4 py-1.5 md:px-6 md:py-2 rounded-full text-[9px] md:text-xs font-bold uppercase transition-all duration-300 flex items-center gap-2 ${tab === t.id ? 'bg-zinc-100 text-black shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'bg-white/5 text-zinc-500 hover:text-zinc-300 hover:bg-white/10'}`}>
                         <t.icon size={10} className="md:w-3.5 md:h-3.5" /> {t.label}
                     </button>
@@ -232,60 +203,30 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
             {tab === 'OVERVIEW' && (
                 <>
                 <div className="grid grid-cols-2 grid-rows-2 gap-4 md:gap-6 p-4 md:p-6 h-full">
-                    {/* UPDATED: Removed w-6, added flex-1 for responsive width */}
-                    <div className={getOpacityClass(focusedSection === 'storage')}>
-                        <ChartCell title="Storage Capacity" icon={Database} isFocused={focusedSection === 'storage'} onClick={(e: any) => { e.stopPropagation(); setFocusedSection(focusedSection === 'storage' ? null : 'storage'); }}>
-                            {nodes.map((n, i) => {
-                                const theme = themes[i % themes.length];
-                                return (
-                                <div key={n.pubkey} className="flex-1 mx-[1px] md:mx-1 bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end min-w-[2px]">
-                                    <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${((n.storage_committed || 0) / maxStorage) * 100}%`, backgroundColor: theme.hex }}></div>
-                                    <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-10">{formatBytes(n.storage_committed || 0)}</div>
-                                </div>
-                            )})}
-                        </ChartCell>
-                    </div>
-
-                    <div className={getOpacityClass(focusedSection === 'credits')}>
-                        <ChartCell title="Credits Earned" icon={Zap} isFocused={focusedSection === 'credits'} onClick={(e: any) => { e.stopPropagation(); setFocusedSection(focusedSection === 'credits' ? null : 'credits'); }}>
-                            {nodes.map((n, i) => {
-                                const theme = themes[i % themes.length];
-                                return (
-                                <div key={n.pubkey} className="flex-1 mx-[1px] md:mx-1 bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end min-w-[2px]">
-                                    <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${((n.credits || 0) / maxCredits) * 100}%`, backgroundColor: theme.hex }}></div>
-                                    <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-10">{n.credits?.toLocaleString()}</div>
-                                </div>
-                            )})}
-                        </ChartCell>
-                    </div>
-
-                    <div className={getOpacityClass(focusedSection === 'health')}>
-                        <ChartCell title="Health Score" icon={Activity} isFocused={focusedSection === 'health'} onClick={(e: any) => { e.stopPropagation(); setFocusedSection(focusedSection === 'health' ? null : 'health'); }}>
-                            {nodes.map((n, i) => {
-                                const theme = themes[i % themes.length];
-                                return (
-                                <div key={n.pubkey} className="flex-1 mx-[1px] md:mx-1 bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end min-w-[2px]">
-                                    <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${Math.min(n.health || 0, 100)}%`, backgroundColor: theme.hex }}></div>
-                                    <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-10">{n.health}/100</div>
-                                </div>
-                            )})}
-                        </ChartCell>
-                    </div>
-
-                    <div className={getOpacityClass(focusedSection === 'uptime')}>
-                        <ChartCell title="Uptime Duration" icon={Clock} isFocused={focusedSection === 'uptime'} onClick={(e: any) => { e.stopPropagation(); setFocusedSection(focusedSection === 'uptime' ? null : 'uptime'); }}>
-                            {nodes.map((n, i) => {
-                                const theme = themes[i % themes.length];
-                                return (
-                                <div key={n.pubkey} className="flex-1 mx-[1px] md:mx-1 bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end min-w-[2px]">
-                                    <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${((n.uptime || 0) / maxUptime) * 100}%`, backgroundColor: theme.hex }}></div>
-                                    <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-10">{formatUptimePrecise(n.uptime || 0)}</div>
-                                </div>
-                            )})}
-                        </ChartCell>
-                    </div>
+                    {[
+                        { id: 'storage', title: 'Storage Capacity', icon: Database, max: maxStorage, key: 'storage_committed', unit: (v: number) => formatBytes(v) },
+                        { id: 'credits', title: 'Credits Earned', icon: Zap, max: maxCredits, key: 'credits', unit: (v: number) => v.toLocaleString() },
+                        { id: 'health', title: 'Health Score', icon: Activity, max: 100, key: 'health', unit: (v: number) => `${v}/100` },
+                        { id: 'uptime', title: 'Uptime Duration', icon: Clock, max: maxUptime, key: 'uptime', unit: (v: number) => formatUptimePrecise(v) }
+                    ].map((sec) => (
+                        <div key={sec.id} className={getElementStyle(null, sec.id)}>
+                            <ChartCell title={sec.title} icon={sec.icon} isFocused={focusedSection === sec.id} onClick={(e: any) => { e.stopPropagation(); setFocusedSection(focusedSection === sec.id ? null : sec.id); }}>
+                                {nodes.map((n, i) => (
+                                    <div 
+                                        key={n.pubkey} 
+                                        onMouseEnter={() => setHoveredNodeKey(n.pubkey || null)}
+                                        onMouseLeave={() => setHoveredNodeKey(null)}
+                                        className={`${overviewBarWidth} bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end min-w-[2px] transition-all duration-200 ${getElementStyle(n.pubkey || null)}`}
+                                    >
+                                        <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${(((n as any)[sec.key] || 0) / sec.max) * 100}%`, backgroundColor: themes[i % themes.length].hex }}></div>
+                                        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-10">{sec.unit((n as any)[sec.key] || 0)}</div>
+                                    </div>
+                                ))}
+                            </ChartCell>
+                        </div>
+                    ))}
                 </div>
-                <OverviewLegend nodes={nodes} themes={themes} />
+                <OverviewLegend nodes={nodes} themes={themes} hoveredKey={hoveredNodeKey} onHover={setHoveredNodeKey} />
                 <InterpretationPanel contextText={narrative} />
                 </>
             )}
@@ -311,51 +252,40 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                         <div className="flex-1 flex items-center justify-center p-8">
                             {marketMetric !== 'health' ? (
                                 <div className="flex flex-col items-center gap-6 animate-in zoom-in-50 duration-500">
-                                    <div className="w-56 h-56 md:w-72 md:h-72 rounded-full relative flex items-center justify-center shadow-[0_0_50px_rgba(0,0,0,0.5)] transition-all" style={{ background: getConicGradient(marketMetric as any) }}>
+                                    <div className="w-56 h-56 md:w-72 md:h-72 rounded-full relative flex items-center justify-center shadow-[0_0_50px_rgba(0,0,0,0.5)] transition-all" style={{ background: getConicGradient(marketMetric) }}>
                                         <div className="w-44 h-44 md:w-56 md:h-56 bg-[#050505] rounded-full flex flex-col items-center justify-center z-10 shadow-inner border border-white/5 p-4 text-center">
                                             {marketMetric === 'storage' && <Database size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
                                             {marketMetric === 'credits' && <Zap size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
                                             {marketMetric === 'uptime' && <Clock size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
-
                                             <span className="text-xs md:text-sm font-bold text-zinc-400 tracking-widest uppercase mb-1">{marketMetric} Share</span>
-                                            <span className="text-[10px] md:text-xs text-zinc-600 font-mono">
-                                                {marketMetric === 'storage' && formatBytes(totalStorage)}
-                                                {marketMetric === 'credits' && `${(totalCredits / 1000000).toFixed(1)}M`}
-                                                {marketMetric === 'uptime' && formatUptimePrecise(totalUptime)}
-                                                <br/>Combined
+                                            <span className="text-[10px] md:text-xs text-zinc-600 font-mono text-center">
+                                                {hoveredNodeKey ? getSafeIp(nodes.find(n => n.pubkey === hoveredNodeKey)!) : 'Aggregated Fleet'}
                                             </span>
                                         </div>
                                     </div>
                                 </div>
                             ) : (
                                 <div className="w-full max-w-3xl flex flex-col gap-4 animate-in slide-in-from-bottom-10 duration-500">
-                                    {nodes.map((n, i) => {
-                                        const theme = themes[i % themes.length];
-                                        const isFocus = focusedNodeKey === n.pubkey;
-                                        return (
+                                    {nodes.map((n, i) => (
                                         <div 
                                             key={n.pubkey} 
-                                            className={`flex items-center gap-4 transition-all duration-300 cursor-pointer ${getOpacityClass(isFocus)}`}
-                                            onClick={(e) => { e.stopPropagation(); setFocusedNodeKey(isFocus ? null : (n.pubkey || null)); }}
+                                            onMouseEnter={() => setHoveredNodeKey(n.pubkey || null)}
+                                            onMouseLeave={() => setHoveredNodeKey(null)}
+                                            className={`flex items-center gap-4 transition-all duration-300 cursor-pointer ${getElementStyle(n.pubkey || null)} ${!isDense ? 'justify-center' : ''}`}
+                                            onClick={(e) => { e.stopPropagation(); setFocusedNodeKey(focusedNodeKey === n.pubkey ? null : (n.pubkey || null)); }}
                                         >
                                             <span className="text-xs font-mono font-bold text-zinc-400 w-32 text-right truncate">{getSafeIp(n)}</span>
-                                            <div className="flex-1 h-8 bg-zinc-900 rounded-full overflow-hidden relative border border-white/5">
-                                                <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${n.health}%`, backgroundColor: theme.hex }}></div>
+                                            <div className={`${marketBarWidth} h-8 bg-zinc-900 rounded-full overflow-hidden relative border border-white/5`}>
+                                                <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${n.health}%`, backgroundColor: themes[i % themes.length].hex }}></div>
                                             </div>
                                             <span className="text-xs font-bold text-white font-mono w-16 text-left">{n.health} / 100</span>
                                         </div>
-                                    )})}
+                                    ))}
                                 </div>
                             )}
                         </div>
                     </div>
-                    <UnifiedLegend 
-                        nodes={nodes} 
-                        themes={themes} 
-                        metricMode="METRIC" 
-                        specificMetric={marketMetric} 
-                        onNodeClick={(n) => { setFocusedNodeKey(focusedNodeKey === n.pubkey ? null : (n.pubkey || null)); }} 
-                    />
+                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="METRIC" specificMetric={marketMetric} hoveredKey={hoveredNodeKey} onHover={setHoveredNodeKey} onNodeClick={(n) => setFocusedNodeKey(focusedNodeKey === n.pubkey ? null : (n.pubkey || null))} />
                     <InterpretationPanel contextText={narrative} />
                 </>
             )}
@@ -363,65 +293,27 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
             {tab === 'TOPOLOGY' && (
                 <div className="flex flex-col h-full relative">
                     <div className="absolute bottom-28 right-8 z-50 flex flex-col gap-2">
-                        <button onClick={handleZoomIn} className="p-2 bg-black/80 backdrop-blur text-zinc-300 hover:text-white border border-zinc-700 rounded-lg hover:bg-zinc-800 transition shadow-lg"><Plus size={16} /></button>
-                        <button onClick={handleReset} className="p-2 bg-black/80 backdrop-blur text-zinc-300 hover:text-white border border-zinc-700 rounded-lg hover:bg-zinc-800 transition shadow-lg"><RotateCcw size={16} /></button>
-                        <button onClick={handleZoomOut} className="p-2 bg-black/80 backdrop-blur text-zinc-300 hover:text-white border border-zinc-700 rounded-lg hover:bg-zinc-800 transition shadow-lg"><Minus size={16} /></button>
+                        <button onClick={handleZoomIn} className="p-2 bg-black/80 backdrop-blur text-zinc-300 hover:text-white border border-zinc-700 rounded-lg"><Plus size={16} /></button>
+                        <button onClick={handleReset} className="p-2 bg-black/80 backdrop-blur text-zinc-300 hover:text-white border border-zinc-700 rounded-lg"><RotateCcw size={16} /></button>
+                        <button onClick={handleZoomOut} className="p-2 bg-black/80 backdrop-blur text-zinc-300 hover:text-white border border-zinc-700 rounded-lg"><Minus size={16} /></button>
                     </div>
-
                     <div className="flex-1 rounded-xl overflow-hidden border border-white/5 bg-[#050505] mx-4 md:mx-6 relative group shadow-inner">
                         <ComposableMap projectionConfig={{ scale: 160 }} className="w-full h-full">
-                            <ZoomableGroup 
-                                zoom={pos.zoom} 
-                                center={pos.coordinates as [number, number]} 
-                                maxZoom={10} 
-                                onMoveEnd={(e: any) => setPos({ coordinates: e.coordinates as [number, number], zoom: e.zoom })}
-                            >
+                            <ZoomableGroup zoom={pos.zoom} center={pos.coordinates as [number, number]} maxZoom={10} onMoveEnd={(e: any) => setPos({ coordinates: e.coordinates as [number, number], zoom: e.zoom })}>
                                 <Geographies geography={GEO_URL}>{({ geographies }: { geographies: any[] }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#18181b" stroke="#27272a" strokeWidth={0.5} />))}</Geographies>
-                                
-                                {nodes.length > 1 && clusters.map((cluster) => {
-                                    if (cluster.nodes[0].pubkey === nodes[0].pubkey) return null; 
-                                    return (
-                                        <Line
-                                            key={`link-${cluster.id}`}
-                                            from={[nodes[0].location?.lon || 0, nodes[0].location?.lat || 0]}
-                                            to={[cluster.lon, cluster.lat]}
-                                            stroke="#3b82f6"
-                                            strokeWidth={1}
-                                            strokeOpacity={0.2}
-                                            strokeDasharray="4 4"
-                                        />
-                                    );
-                                })}
-
                                 {clusters.map((cluster) => {
                                     const theme = themes[cluster.themeIndex % themes.length];
-                                    const isHub = cluster.nodes.length > 1;
-                                    const isFocus = focusedNodeKey === cluster.id;
-
+                                    const isHovered = hoveredNodeKey === cluster.id;
                                     return (
-                                        <Marker 
-                                            key={cluster.id} 
-                                            coordinates={[cluster.lon, cluster.lat]}
-                                            onClick={(e: any) => {
-                                                e.stopPropagation();
-                                                handleFocus(cluster.id, { lat: cluster.lat, lon: cluster.lon });
-                                            }}
-                                            style={{ cursor: 'pointer' }}
-                                        >
-                                            {isFocus && <circle r={isHub ? 40/pos.zoom : 24/pos.zoom} fill={theme.hex} fillOpacity={0.2} className="animate-ping" />}
-                                            <circle r={isHub ? 24/pos.zoom : 12/pos.zoom} fill={theme.hex} fillOpacity={0.9} stroke="#fff" strokeWidth={2/pos.zoom} />
-                                            {isHub && (
-                                                <text textAnchor="middle" y={4/pos.zoom} style={{ fontFamily: 'monospace', fontSize: `${10/pos.zoom}px`, fill: 'black', fontWeight: 'bold' }}>
-                                                    {cluster.nodes.length}
-                                                </text>
-                                            )}
+                                        <Marker key={cluster.id} coordinates={[cluster.lon, cluster.lat]} onClick={(e: any) => { e.stopPropagation(); handleFocus(cluster.id, { lat: cluster.lat, lon: cluster.lon }); }}>
+                                            <circle r={(cluster.nodes.length > 1 ? 20 : 10) / pos.zoom} fill={theme.hex} fillOpacity={isHovered ? 1 : 0.6} stroke="#fff" strokeWidth={2/pos.zoom} className="transition-all duration-200" />
                                         </Marker>
                                     );
                                 })}
                             </ZoomableGroup>
                         </ComposableMap>
                     </div>
-                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="COUNTRY" onNodeClick={(n) => handleFocus(n.pubkey || null, n.location ? { lat: n.location.lat, lon: n.location.lon } : undefined)} />
+                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="COUNTRY" hoveredKey={hoveredNodeKey} onHover={setHoveredNodeKey} onNodeClick={(n) => handleFocus(n.pubkey || null, n.location ? { lat: n.location.lat, lon: n.location.lon } : undefined)} />
                 </div>
             )}
         </div>
