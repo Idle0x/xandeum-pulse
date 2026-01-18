@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { AlertCircle, Info, EyeOff } from 'lucide-react';
@@ -34,22 +34,83 @@ export default function MapPage() {
   // Hook for Data
   const { 
     locations, stats, loading, countryBreakdown, 
-    globalTotals, isGlobalCreditsOffline, sortedLocations, targetNodeStatus 
-  } = useMapData(viewMode, selectedNetwork, router.query.focus);
+    globalTotals, isGlobalCreditsOffline, sortedLocations 
+  } = useMapData(viewMode, selectedNetwork);
+
+  // DEEP LINK LOGIC REFS
+  const hasDeepLinkRun = useRef<string | null>(null);
+
+  // --- NEW: HANDLE NETWORK CHANGE WITH URL SYNC ---
+  const handleNetworkChange = (net: NetworkType) => {
+    setSelectedNetwork(net);
+    // Update URL without reloading page (Shallow Routing)
+    // Preserves existing query params (like focus) while updating network
+    router.push(
+      {
+        pathname: router.pathname,
+        query: { ...router.query, network: net }
+      },
+      undefined,
+      { shallow: true }
+    );
+  };
+
+  // --- EFFECT 1: SYNC STATE FROM URL (Initial Load + History) ---
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const { focus, network } = router.query;
+    
+    // Priority 1: Explicit Network Param
+    if (network) {
+        const netParam = (network as string).toUpperCase() as NetworkType;
+        if (['ALL', 'MAINNET', 'DEVNET'].includes(netParam) && netParam !== selectedNetwork) {
+            setSelectedNetwork(netParam);
+        }
+    } 
+    // Priority 2: Deep Link Focus (Default to ALL if no network specified)
+    else if (focus) {
+       if (selectedNetwork !== 'ALL') setSelectedNetwork('ALL');
+    }
+  }, [router.isReady, router.query.network, router.query.focus]);
+
+  // --- EFFECT 2: FIND TARGET AND LOCK ---
+  useEffect(() => {
+    if (!router.isReady || !router.query.focus || loading) return;
+
+    const targetIP = router.query.focus as string;
+
+    // Prevent re-running logic if we already handled this specific IP
+    if (hasDeepLinkRun.current === targetIP) return;
+
+    // Check if the locations data is actually populated (safety check)
+    if (locations.length === 0) return;
+
+    // Search for the node
+    const targetLoc = locations.find((l) => l.ips && l.ips.includes(targetIP));
+    
+    // Mark as run so we don't spam logic (especially toast)
+    hasDeepLinkRun.current = targetIP;
+
+    if (targetLoc) {
+        // SUCCESS: Lock target, open drawer, scroll to it
+        lockTarget(targetLoc.name, targetLoc.lat, targetLoc.lon);
+    } else {
+        // FAILURE: Only toast if we are on 'ALL' network.
+        // If user explicitly filtered to 'DEVNET' and node is missing, we assume they know why.
+        if (selectedNetwork === 'ALL') {
+            setToast({ 
+                msg: `Node ${targetIP} uses a Masked IP (VPN/CGNAT). Geolocation unavailable.`, 
+                type: 'private' 
+            });
+            setTimeout(() => setToast(null), 6000);
+        }
+    }
+  }, [router.isReady, router.query.focus, loading, locations, selectedNetwork]);
+
 
   const visibleNodes = locations.reduce((sum, loc) => sum + loc.count, 0);
   const privateNodes = Math.max(0, stats.totalNodes - visibleNodes);
-
-  // --- EFFECT: Toast for Deep Linking (from Hook Status) ---
-  useEffect(() => {
-      if (targetNodeStatus && !targetNodeStatus.found) {
-          setToast({ 
-              msg: `Node ${targetNodeStatus.ip} uses a Masked IP (VPN/CGNAT). Geolocation unavailable.`, 
-              type: 'private' 
-          });
-          setTimeout(() => setToast(null), 6000);
-      }
-  }, [targetNodeStatus]);
 
   // --- EFFECT: Threshold Calculation ---
   useEffect(() => {
@@ -83,10 +144,11 @@ export default function MapPage() {
         setPosition({ coordinates: [lon, lat], zoom: 3 });
         setIsSplitView(true);
     }
+    // Scroll Logic
     setTimeout(() => {
         const item = document.getElementById(`list-item-${name}`);
         if (item) item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 300);
+    }, 400); 
   };
 
   const toggleExpansion = (name: string, lat: number, lon: number) => {
@@ -189,7 +251,7 @@ export default function MapPage() {
         leadingRegion={sortedLocations[0]}
         countryBreakdown={countryBreakdown}
         selectedNetwork={selectedNetwork}
-        setSelectedNetwork={setSelectedNetwork}
+        setSelectedNetwork={handleNetworkChange} // PASSED NEW HANDLER
         onRegionClick={() => setIsCountryModalOpen(true)}
         onPrivateHelpClick={() => {
             setToast({ 
