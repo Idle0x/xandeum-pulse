@@ -1,28 +1,21 @@
 import axios from 'axios';
 import geoip from 'geoip-lite';
-import { publicSwarm } from './xandeum-brain/rpc-orchestrator'; // Import the new manager
+import { publicOrchestrator } from './xandeum-brain/rpc-orchestrator';
 
 // --- CONFIGURATION ---
 
 const TIMEOUT_RPC = 8000;
 const TIMEOUT_CREDITS = 8000;
 
-// Env vars for Private Hero
-const PRIVATE_RPC_URL = process.env.XANDEUM_PRIVATE_RPC_URL;
-const OPERATOR_PUBKEY = process.env.XANDEUM_OPERATOR_PUBKEY;
-const OPERATOR_IP = process.env.XANDEUM_OPERATOR_IP;
-
 const API_CREDITS_MAINNET = 'https://podcredits.xandeum.network/api/mainnet-pod-credits';
 const API_CREDITS_DEVNET = 'https://podcredits.xandeum.network/api/pods-credits';
 
 const geoCache = new Map<string, { lat: number; lon: number; country: string; countryCode: string; city: string }>();
 
-// Cache for Private Hero Resilience
-let lastKnownPrivateNodes: any[] = [];
-let lastPrivateFetchTime = 0;
-const CACHE_RETENTION_MS = 1000 * 60 * 10; // 10 minutes retention for Private RPC
+// Simple in-memory cache for Private RPC to prevent "0 nodes" on blips
+let privateMainnetCache: { data: any[], timestamp: number } = { data: [], timestamp: 0 };
 
-// --- INTERFACES (UNCHANGED) ---
+// --- INTERFACES ---
 
 export interface EnrichedNode {
   address: string;
@@ -55,7 +48,7 @@ export interface EnrichedNode {
   health_rank?: number;
 }
 
-// --- HELPERS (Scoring & Versioning - STRICTLY PRESERVED) ---
+// --- HELPERS (Scoring & Versioning - UNCHANGED) ---
 
 export const cleanSemver = (v: string) => {
   if (!v) return '0.0.0';
@@ -102,15 +95,9 @@ export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: str
 };
 
 export const calculateVitalityScore = (
-  storageCommitted: number,
-  storageUsed: number,
-  uptimeSeconds: number,
-  version: string,
-  consensusVersion: string,
-  sortedCleanVersions: string[],
-  medianCredits: number,
-  credits: number | null,
-  medianStorage: number,
+  storageCommitted: number, storageUsed: number, uptimeSeconds: number,
+  version: string, consensusVersion: string, sortedCleanVersions: string[],
+  medianCredits: number, credits: number | null, medianStorage: number,
   isCreditsApiOnline: boolean
 ) => {
   if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
@@ -141,58 +128,58 @@ export const calculateVitalityScore = (
 
   return {
     total: Math.max(0, Math.min(100, total)),
-    breakdown: {
-      uptime: Math.round(uptimeScore),
-      version: Math.round(versionScore),
-      reputation: reputationScore,
-      storage: Math.round(totalStorageScore)
-    }
+    breakdown: { uptime: Math.round(uptimeScore), version: Math.round(versionScore), reputation: reputationScore, storage: Math.round(totalStorageScore) }
   };
 };
 
-// --- FETCHING ---
+// --- FETCHING (Hero A: Private) ---
 
-// 1. Private Hero Fetch (With Caching Resilience)
 async function fetchPrivateMainnetNodes() {
-  if (!PRIVATE_RPC_URL) {
-    console.warn("XANDEUM_PRIVATE_RPC_URL is not set.");
-    return [];
+  const privateUrl = process.env.XANDEUM_PRIVATE_RPC_URL;
+  if (!privateUrl) { console.warn("XANDEUM_PRIVATE_RPC_URL is not set."); return []; }
+
+  // Serve cache if within 15 seconds (Robustness for Private Blips)
+  if (Date.now() - privateMainnetCache.timestamp < 15000 && privateMainnetCache.data.length > 0) {
+      return privateMainnetCache.data;
   }
+
   const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
   try {
-    const res = await axios.post(PRIVATE_RPC_URL, payload, { timeout: TIMEOUT_RPC });
+    const res = await axios.post(privateUrl, payload, { timeout: TIMEOUT_RPC });
     if (res.data?.result?.pods && Array.isArray(res.data.result.pods)) {
-      lastKnownPrivateNodes = res.data.result.pods;
-      lastPrivateFetchTime = Date.now();
+      // Update Cache
+      privateMainnetCache = { data: res.data.result.pods, timestamp: Date.now() };
       return res.data.result.pods;
     }
   } catch (e) {
     const errMsg = (e as any).message;
     console.warn("Private Mainnet RPC Failed:", errMsg);
-    
-    // Resilience: Return last known good data if recent
-    if (Date.now() - lastPrivateFetchTime < CACHE_RETENTION_MS) {
-      console.log("Serving cached Private Mainnet nodes due to connection failure.");
-      return lastKnownPrivateNodes;
-    }
+    // On failure, return stale cache if available
+    if (privateMainnetCache.data.length > 0) return privateMainnetCache.data;
   }
   return [];
 }
 
-// 2. Operator Node Fetch (Unchanged)
+// --- FETCHING (Operator Injection) ---
+
 async function fetchOperatorNode() {
-  if (!PRIVATE_RPC_URL || !OPERATOR_PUBKEY || !OPERATOR_IP) return null;
+  const privateUrl = process.env.XANDEUM_PRIVATE_RPC_URL;
+  const operatorPubkey = process.env.XANDEUM_OPERATOR_PUBKEY;
+  const operatorIp = process.env.XANDEUM_OPERATOR_IP;
+
+  if (!privateUrl || !operatorPubkey || !operatorIp) return null;
+  
   const payload = { jsonrpc: '2.0', method: 'get-stats', params: [], id: 1 };
   try {
-    const res = await axios.post(PRIVATE_RPC_URL, payload, { timeout: TIMEOUT_RPC });
+    const res = await axios.post(privateUrl, payload, { timeout: TIMEOUT_RPC });
     const stats = res.data?.result;
     if (stats) {
       return {
-        address: `${OPERATOR_IP}:9001`,
+        address: `${operatorIp}:9001`,
         rpc_port: 6000,
-        pubkey: OPERATOR_PUBKEY,
+        pubkey: operatorPubkey,
         is_public: false,
-        version: "1.2.0", // Manual mapping
+        version: "1.2.0", // Manual override
         uptime: stats.uptime,
         storage_committed: stats.file_size,
         storage_used: 0,
@@ -200,16 +187,11 @@ async function fetchOperatorNode() {
         is_operator: true
       };
     }
-  } catch (e) {
-    console.warn("Operator Node Fetch Failed:", (e as any).message);
-  }
+  } catch (e) { console.warn("Operator Node Fetch Failed:", (e as any).message); }
   return null;
 }
 
-// 3. Public Swarm Fetch (Delegated to Orchestrator)
-async function fetchPublicSwarmNodes() {
-    return await publicSwarm.fetchPublicNodes();
-}
+// --- FETCHING (Credits) ---
 
 async function fetchCredits() {
   const AXIOS_CONFIG = { timeout: TIMEOUT_CREDITS };
@@ -224,10 +206,7 @@ async function fetchCredits() {
     if (Array.isArray(d)) return d;
     return [];
   };
-  return {
-    mainnet: parseData(mainnetRes),
-    devnet: parseData(devnetRes)
-  };
+  return { mainnet: parseData(mainnetRes), devnet: parseData(devnetRes) };
 }
 
 async function resolveLocations(ips: string[]) {
@@ -257,23 +236,20 @@ async function resolveLocations(ips: string[]) {
 export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<{ nodes: EnrichedNode[], stats: any }> {
 
   // ---------------------------------------------------------
-  // PHASE 1: COLLECTION
+  // PHASE 1: COLLECTION (Dual Hero + Orchestrator)
   // ---------------------------------------------------------
-
-  // Dual Hero Collection: Private via Direct, Public via Orchestrator
+  
   const [rawPrivateNodes, operatorNode, rawPublicNodes, creditsData] = await Promise.all([
-    fetchPrivateMainnetNodes(),
-    fetchOperatorNode(),
-    fetchPublicSwarmNodes(),
+    fetchPrivateMainnetNodes(),      // Hero A (Private)
+    fetchOperatorNode(),             // Operator Injection
+    publicOrchestrator.fetchNodes(), // Hero B + Passive Discovery (Public)
     fetchCredits()
   ]);
 
-  // Inject Operator Node into Private List (Hero A Anchor)
+  // Inject Operator
   if (operatorNode) {
     const exists = rawPrivateNodes.find((p: any) => p.pubkey === operatorNode.pubkey);
-    if (!exists) {
-      rawPrivateNodes.unshift(operatorNode);
-    }
+    if (!exists) rawPrivateNodes.unshift(operatorNode);
   }
 
   if (rawPrivateNodes.length === 0 && rawPublicNodes.length === 0) {
@@ -292,7 +268,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     const key = c.pod_id || c.pubkey || c.node;
     if (key && !isNaN(val)) { mainnetCreditMap.set(key, val); mainnetValues.push(val); }
   });
-
   creditsData.devnet.forEach((c: any) => {
     const val = parseFloat(c.credits || c.amount || '0');
     const key = c.pod_id || c.pubkey || c.node;
@@ -303,11 +278,9 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   const medianDevnet = devnetValues.sort((a, b) => a - b)[Math.floor(devnetValues.length / 2)] || 0;
 
   // ---------------------------------------------------------
-  // PHASE 2 & 3: THE STRICT FINGERPRINTING & DEDUPLICATION SYSTEM
+  // PHASE 2: FINGERPRINTING & DEDUPLICATION (The Critical Logic)
   // ---------------------------------------------------------
-  // IMPORTANT: This logic is preserved exactly to handle the 
-  // conflict between Hero A (Private) and Hero B (Public) data.
-  
+
   const processedNodes: EnrichedNode[] = [];
 
   const getFingerprint = (p: any, assumedNetwork: 'MAINNET' | 'DEVNET') => {
@@ -328,33 +301,18 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     const rawCreds = mainnetCreditMap.get(pubkey);
     let credits: number | null = null;
     let isUntracked = false;
-    
-    if (rawCreds !== undefined) {
-      credits = rawCreds;
-    } else if (isCreditsApiOnline) {
-      isUntracked = true;
-    }
+    if (rawCreds !== undefined) { credits = rawCreds; }
+    else if (isCreditsApiOnline) { isUntracked = true; }
 
     const uptimeVal = Number(pod.uptime) || 0;
     const node: EnrichedNode = {
-      ...pod,
-      pubkey: pubkey,
-      network: 'MAINNET',
-      credits: credits,
-      isUntracked: isUntracked,
+      ...pod, pubkey: pubkey, network: 'MAINNET', credits: credits, isUntracked: isUntracked,
       is_operator: pod.is_operator || false,
       storage_committed: Number(pod.storage_committed) || 0,
       storage_used: Number(pod.storage_used) || 0,
       uptime: uptimeVal,
-      health: 0,
-      healthBreakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 },
-      location: {
-        lat: loc.lat,
-        lon: loc.lon,
-        countryName: (loc as any).country || (loc as any).countryName || 'Unknown',
-        countryCode: loc.countryCode,
-        city: loc.city
-      }
+      health: 0, healthBreakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 },
+      location: { lat: loc.lat, lon: loc.lon, countryName: (loc as any).country || (loc as any).countryName || 'Unknown', countryCode: loc.countryCode, city: loc.city }
     };
     processedNodes.push(node);
     const fingerprint = getFingerprint(pod, 'MAINNET');
@@ -362,28 +320,28 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   });
 
   // B. PROCESS PUBLIC SWARM (SUBTRACTION WITH TIME DELTA)
-  // This uses the data from the Orchestrator (Hero B + Discovery)
   rawPublicNodes.forEach((pod: any) => {
+    // 1. Check if this node is a duplicate Mainnet node
     const potentialMainnetFingerprint = getFingerprint(pod, 'MAINNET');
     const publicUptime = Number(pod.uptime) || 0;
 
-    // THE VITAL DEDUPLICATION CHECK
     if (mainnetFingerprints.has(potentialMainnetFingerprint)) {
       const privateUptime = mainnetFingerprints.get(potentialMainnetFingerprint) || 0;
       const diff = Math.abs(privateUptime - publicUptime);
       if (diff <= 100) {
-        return; // DUPLICATE DETECTED -> Skip this Public version, use Private version
+        return; // DUPLICATE DETECTED -> Skip. Trust Private RPC.
       }
     }
 
+    // 2. It is either Devnet OR a Mainnet node that Private RPC missed
     const pubkey = pod.pubkey || pod.public_key;
     const ip = pod.address.split(':')[0];
     const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
-
+    
     let network: 'MAINNET' | 'DEVNET' = 'DEVNET';
     let credits: number | null = null;
     let isUntracked = false;
-
+    
     const mainnetVal = mainnetCreditMap.get(pubkey);
     const devnetVal = devnetCreditMap.get(pubkey);
 
@@ -395,35 +353,22 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       credits = devnetVal;
     } else {
       network = 'DEVNET';
-      if (isCreditsApiOnline) {
-        isUntracked = true;
-      }
+      if (isCreditsApiOnline) { isUntracked = true; }
     }
 
     const node: EnrichedNode = {
-      ...pod,
-      pubkey: pubkey,
-      network: network,
-      credits: credits,
-      isUntracked: isUntracked,
+      ...pod, pubkey: pubkey, network: network, credits: credits, isUntracked: isUntracked,
       storage_committed: Number(pod.storage_committed) || 0,
       storage_used: Number(pod.storage_used) || 0,
       uptime: publicUptime,
-      health: 0,
-      healthBreakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 },
-      location: {
-        lat: loc.lat,
-        lon: loc.lon,
-        countryName: (loc as any).country || (loc as any).countryName || 'Unknown',
-        countryCode: loc.countryCode,
-        city: loc.city
-      }
+      health: 0, healthBreakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 },
+      location: { lat: loc.lat, lon: loc.lon, countryName: (loc as any).country || (loc as any).countryName || 'Unknown', countryCode: loc.countryCode, city: loc.city }
     };
     processedNodes.push(node);
   });
 
   // ---------------------------------------------------------
-  // PHASE 6: SCORING & STATS (UNCHANGED)
+  // PHASE 3: SCORING & STATS (UNCHANGED)
   // ---------------------------------------------------------
 
   const rawVersionCounts: Record<string, number> = {};
@@ -452,19 +397,12 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     const vitality = calculateVitalityScore(
       node.storage_committed, node.storage_used, node.uptime,
       node.version, consensusVersion, sortedCleanVersions,
-      medianCreditsForScore, node.credits,
-      medianStorage, isCreditsApiOnline
+      medianCreditsForScore, node.credits, medianStorage, isCreditsApiOnline
     );
 
     return {
       ...node,
-      location: {
-        lat: loc.lat,
-        lon: loc.lon,
-        countryName: (loc as any).country || (loc as any).countryName || 'Unknown',
-        countryCode: loc.countryCode,
-        city: loc.city
-      },
+      location: { lat: loc.lat, lon: loc.lon, countryName: (loc as any).country || (loc as any).countryName || 'Unknown', countryCode: loc.countryCode, city: loc.city },
       health: vitality.total,
       healthBreakdown: vitality.breakdown
     };
@@ -484,7 +422,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   assignRank(devnetList);
 
   const allSorted = [...mainnetList, ...devnetList];
-
   allSorted.sort((a, b) => b.health - a.health);
   let hr = 1;
   allSorted.forEach((n, i) => {
@@ -510,10 +447,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       medianCredits: medianMainnet,
       medianStorage,
       totalNodes: allSorted.length,
-      systemStatus: {
-        credits: isCreditsApiOnline,
-        rpc: true
-      },
+      systemStatus: { credits: isCreditsApiOnline, rpc: true },
       avgBreakdown: {
         total: avgHealth,
         uptime: Math.round(totalUptime / nodeCount),
