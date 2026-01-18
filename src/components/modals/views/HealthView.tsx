@@ -40,7 +40,7 @@ export const HealthView = ({
     { 
       id: 'uptime', 
       label: 'UPTIME', 
-      score: bd.uptime, 
+      score: bd.uptime ?? 0, // Add '?? 0' here
       avg: avgs.uptime, 
       icon: Activity,
       desc: 'Based on 24h heartbeat consistency'
@@ -48,7 +48,7 @@ export const HealthView = ({
     { 
       id: 'version', 
       label: 'VERSION', 
-      score: bd.version, 
+      score: bd.version ?? 0, // Add '?? 0' here
       avg: avgs.version, 
       icon: Server,
       desc: 'Latest software version adoption'
@@ -56,7 +56,7 @@ export const HealthView = ({
     { 
       id: 'storage', 
       label: 'STORAGE', 
-      score: bd.storage, 
+      score: bd.storage ?? 0, // Add '?? 0' here
       avg: avgs.storage, 
       icon: Database,
       desc: 'Reliability of committed storage'
@@ -64,7 +64,7 @@ export const HealthView = ({
     { 
       id: 'reputation', 
       label: 'REPUTATION', 
-      score: bd.reputation, 
+      score: bd.reputation ?? 0, // Add '?? 0' here
       avg: avgs.reputation, 
       icon: Shield,
       desc: 'Historical performance weight'
