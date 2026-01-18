@@ -1,84 +1,191 @@
 import axios from 'axios';
-import pino from 'pino';
-import http from 'http';
 
 // --- CONFIGURATION ---
-const HERO_PUBLIC_RPC = '173.212.203.145';
-const BACKUP_RPCS = [
+const PUBLIC_HERO_IP = '173.212.203.145';
+const BACKUP_NODES = [
   '161.97.97.41', '192.190.136.36', '192.190.136.38',
   '207.244.255.1', '192.190.136.28', '192.190.136.29', 
   '159.195.4.138', '152.53.155.30'
 ];
 
 const TIMEOUT_RPC = 8000;
+const BACKGROUND_POLL_INTERVAL = 30000; // 30 seconds
+const CACHE_TTL = 10000; // 10 seconds validity for cache
 
-/**
- * FIXED LOGGER: 
- * Vercel cannot handle pino-pretty in production.
- */
-const logger = pino({
-  level: 'info',
-  // Only use pretty printing in development
-  transport: process.env.NODE_ENV !== 'production' 
-    ? { target: 'pino-pretty', options: { colorize: true } } 
-    : undefined
-});
+interface RpcNodeStatus {
+  ip: string;
+  isHero: boolean;
+  isOnline: boolean;
+  lastSeen: number;
+  consecutiveFails: number;
+}
 
-const httpAgent = new http.Agent({ family: 4 });
+export class PublicSwarmOrchestrator {
+  private hero: RpcNodeStatus;
+  private backups: RpcNodeStatus[];
+  private activeNode: RpcNodeStatus; // The node we are currently routing traffic to
+  
+  // Cache to store the latest raw pods list
+  private cachedData: any[] = [];
+  private lastFetchTime: number = 0;
+  
+  // Storage for nodes found by backups (Passive Discovery)
+  private passiveDiscoveryCache: Map<string, any> = new Map();
 
-export class PublicRpcOrchestrator {
   constructor() {
-    logger.info("Orchestrator initialized (Production Safe Logging)");
-  }
+    this.hero = { ip: PUBLIC_HERO_IP, isHero: true, isOnline: true, lastSeen: 0, consecutiveFails: 0 };
+    this.backups = BACKUP_NODES.map(ip => ({ ip, isHero: false, isOnline: true, lastSeen: 0, consecutiveFails: 0 }));
+    this.activeNode = this.hero;
 
-  async fetchPublicNodes(): Promise<any[]> {
-    // 1. Priority: Hero RPC
-    try {
-      const heroData = await this.fetchFromNode(HERO_PUBLIC_RPC);
-      if (heroData.length > 0) return heroData;
-    } catch (e) {
-      logger.warn(`Hero RPC failed: ${HERO_PUBLIC_RPC}`);
-    }
-
-    // 2. Swarm Race: Fire all requests at once, take the first to finish
-    try {
-      logger.info("Racing all backup RPCs...");
-      const winner = await Promise.any(
-        BACKUP_RPCS.map(ip => this.fetchFromNode(ip))
-      );
-      return winner;
-    } catch (aggregateError) {
-      logger.error("All RPCs in swarm failed or timed out.");
-      return [];
+    // Start the background silent discovery
+    if (typeof window === 'undefined') { // Only run on server side
+      this.startPassiveDiscovery();
     }
   }
 
-  private async fetchFromNode(ip: string): Promise<any[]> {
-    const url = `http://${ip}:6000/rpc`;
-    try {
-      const res = await axios.post(
-        url,
-        { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 },
-        { 
-          timeout: TIMEOUT_RPC,
-          httpAgent: httpAgent // Force IPv4 to prevent connection resets
-        }
-      );
+  /**
+   * Main entry point to get Public Swarm nodes.
+   * Logic: Try Hero -> If Fail, Try Active Backup -> If Success, keep backup but ping Hero.
+   */
+  async fetchNodes(): Promise<any[]> {
+    // 1. Return cache if fresh
+    if (Date.now() - this.lastFetchTime < CACHE_TTL && this.cachedData.length > 0) {
+      return this.mergeWithPassiveDiscovery(this.cachedData);
+    }
 
-      const pods = res.data?.result?.pods;
-      if (Array.isArray(pods) && pods.length > 0) {
-        return pods;
+    // 2. Attempt fetch from Active Node (Hero prefers)
+    try {
+      const data = await this.rpcCall(this.activeNode.ip);
+      
+      // Success! Update stats
+      this.activeNode.isOnline = true;
+      this.activeNode.consecutiveFails = 0;
+      this.activeNode.lastSeen = Date.now();
+      
+      // If we are currently on a backup, check if Hero is back online
+      if (!this.activeNode.isHero) {
+        this.attemptHeroRecovery();
       }
-      throw new Error("No data");
-    } catch (err: any) {
-      // Log failure for debugging in Vercel console
-      logger.debug(`Node ${ip} failed: ${err.message}`);
-      throw err; 
+
+      this.cachedData = data;
+      this.lastFetchTime = Date.now();
+      
+      return this.mergeWithPassiveDiscovery(data);
+
+    } catch (e) {
+      // Failure!
+      this.activeNode.isOnline = false;
+      this.activeNode.consecutiveFails++;
+      console.warn(`[Orchestrator] Active node ${this.activeNode.ip} failed.`);
+
+      // If Hero failed, switch to a backup immediately
+      if (this.activeNode.isHero) {
+        console.warn(`[Orchestrator] HERO DOWN. Switching to Failover.`);
+        return this.failoverFetch();
+      } else {
+        // If a backup failed, try another backup
+        return this.failoverFetch();
+      }
     }
+  }
+
+  /**
+   * Recursively try backups until one works
+   */
+  private async failoverFetch(): Promise<any[]> {
+    // Sort backups by least failures
+    const candidates = this.backups.sort((a, b) => a.consecutiveFails - b.consecutiveFails);
+
+    for (const node of candidates) {
+      try {
+        console.log(`[Orchestrator] Attempting Failover: ${node.ip}`);
+        const data = await this.rpcCall(node.ip);
+        
+        // Success - Set this as the new Active Node (temporary)
+        this.activeNode = node;
+        node.isOnline = true;
+        node.consecutiveFails = 0;
+        
+        this.cachedData = data;
+        this.lastFetchTime = Date.now();
+
+        // Start checking for Hero recovery in background
+        this.attemptHeroRecovery(); 
+
+        return this.mergeWithPassiveDiscovery(data);
+      } catch (e) {
+        node.consecutiveFails++;
+      }
+    }
+    
+    // If all fail, return stale cache (Better than crash)
+    console.error("[Orchestrator] ALL PUBLIC RPCS FAILED.");
+    return this.cachedData; 
+  }
+
+  /**
+   * Silently pings the Hero. If it works, switch activeNode back to Hero.
+   */
+  private async attemptHeroRecovery() {
+    try {
+      await this.rpcCall(this.hero.ip);
+      console.log(`[Orchestrator] HERO RECOVERED. Switching back to ${this.hero.ip}`);
+      this.activeNode = this.hero;
+      this.hero.consecutiveFails = 0;
+      this.hero.isOnline = true;
+    } catch (e) {
+      // Hero still down, stay on backup
+    }
+  }
+
+  /**
+   * Background Process:
+   * Randomly polls backup nodes to find "hidden" nodes that the Hero might miss.
+   * Does NOT affect the main connection flow.
+   */
+  private startPassiveDiscovery() {
+    setInterval(async () => {
+      // Pick 2 random backups
+      const randomBackups = this.backups.sort(() => 0.5 - Math.random()).slice(0, 2);
+      
+      for (const node of randomBackups) {
+        try {
+          const pods = await this.rpcCall(node.ip);
+          pods.forEach((pod: any) => {
+            const pubkey = pod.pubkey || pod.public_key;
+            // If this is a new pod we haven't seen in the main list, cache it
+            if (pubkey && !this.cachedData.find(p => (p.pubkey || p.public_key) === pubkey)) {
+               this.passiveDiscoveryCache.set(pubkey, pod);
+            }
+          });
+        } catch (e) { /* Ignore background errors */ }
+      }
+      
+      // Clean up old passive nodes (optional logic could go here)
+    }, BACKGROUND_POLL_INTERVAL);
+  }
+
+  /**
+   * Merges the official Hero list with any unique nodes found by backups
+   */
+  private mergeWithPassiveDiscovery(heroData: any[]): any[] {
+    const combined = [...heroData];
+    const heroKeys = new Set(heroData.map(p => p.pubkey || p.public_key));
+
+    this.passiveDiscoveryCache.forEach((pod, key) => {
+      if (!heroKeys.has(key)) {
+        combined.push(pod);
+      }
+    });
+    return combined;
+  }
+
+  private async rpcCall(ip: string): Promise<any[]> {
+    const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
+    const res = await axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC });
+    return res.data?.result?.pods || [];
   }
 }
 
-// Global Singleton for Next.js to prevent memory leaks/multiple instances
-const globalForSwarm = global as unknown as { swarmInstance: PublicRpcOrchestrator };
-export const publicSwarm = globalForSwarm.swarmInstance || new PublicRpcOrchestrator();
-if (process.env.NODE_ENV !== 'production') globalForSwarm.swarmInstance = publicSwarm;
+// Singleton Export
+export const publicOrchestrator = new PublicSwarmOrchestrator();
