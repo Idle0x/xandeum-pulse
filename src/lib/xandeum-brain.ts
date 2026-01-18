@@ -328,7 +328,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     if (mainnetFingerprints.has(potentialMainnetFingerprint)) {
       const privateUptime = mainnetFingerprints.get(potentialMainnetFingerprint) || 0;
       const diff = Math.abs(privateUptime - publicUptime);
-      if (diff <= 100) {
+      if (diff <= 3600) {
         return; // DUPLICATE DETECTED -> Skip. Trust Private RPC.
       }
     }
