@@ -1,0 +1,322 @@
+// src/components/leaderboard/StoincSimulator.tsx
+import React, { useState } from 'react';
+import { 
+  Calculator, ChevronDown, Check, X, AlertTriangle, 
+  Zap, Info, Settings2, ArrowUpRight, Activity 
+} from 'lucide-react';
+
+// You will need to make sure these exports are available from your lib file
+import { ERA_BOOSTS, NFT_BOOSTS } from '../../lib/xandeum-economics';
+import { useStoincSimulator } from '../../hooks/useStoincSimulator';
+
+// We pass the "controller" (hook return value) as a prop to decouple it slightly
+// or we can just pass the props needed. 
+// For cleanest separation, let's accept the hook's return object as props.
+interface StoincSimulatorProps {
+  controller: ReturnType<typeof useStoincSimulator>;
+}
+
+export default function StoincSimulator({ controller }: StoincSimulatorProps) {
+  const {
+    showSim, setShowSim, simStep, setSimStep,
+    simMode, setSimMode, showManualInput, setShowManualInput,
+    importKey, setImportKey, importError, setImportError, importSuccess,
+    autoPilotCountdown, setAutoPilotCountdown,
+    simNodes, setSimNodes, simStorageVal, setSimStorageVal,
+    simStorageUnit, setSimStorageUnit, simStake, setSimStake, simPerf, setSimPerf,
+    importedBaseCredits, boostCounts,
+    simNetworkFees, setSimNetworkFees, networkAvgMult, setNetworkAvgMult,
+    metrics, isStep1Valid,
+    clearImport, handleImportNode, handleStepTransition, toggleBoostCount, resetSimulator
+  } = controller;
+
+  // Local UI state for tooltips (doesn't need to be in the global hook)
+  const [showFeeHelp, setShowFeeHelp] = useState(false); 
+  const [showNetworkHelp, setShowNetworkHelp] = useState(false);
+
+  return (
+    <div className="max-w-5xl mx-auto mb-6 md:mb-10 bg-gradient-to-b from-zinc-900 to-black border border-yellow-500/30 rounded-xl md:rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(234,179,8,0.1)] transition-all duration-300">
+      {/* HEADER */}
+      <div className="p-3 md:p-4 bg-yellow-500/10 border-b border-yellow-500/20 flex justify-between items-center cursor-pointer hover:bg-yellow-500/20 transition" onClick={() => setShowSim(!showSim)}>
+        <div className="flex items-center gap-3">
+            <div className="p-1.5 md:p-2 bg-yellow-500 text-black rounded-lg"><Calculator size={18} /></div>
+            <div>
+                <h2 className="font-bold text-yellow-500 text-xs md:text-sm uppercase tracking-widest">STOINC Simulator</h2>
+                <p className="text-[9px] md:text-[10px] text-zinc-400">Official Formula Calculator • Step {simStep + 1}/3</p>
+            </div>
+        </div>
+        <div className="flex items-center gap-4">
+              {showSim && (
+                  <div className="flex gap-2">
+                      {[0,1,2].map(s => (
+                          <div key={s} className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full transition-colors ${simStep === s ? 'bg-yellow-500' : 'bg-zinc-700'}`} />
+                      ))}
+                  </div>
+              )}
+              {showSim ? <ChevronDown size={20} className="rotate-180 text-yellow-500 transition-transform" /> : <ChevronDown size={20} className="text-zinc-500 transition-transform" />}
+        </div>
+      </div>
+
+      {showSim && (
+        <div className="relative transition-all duration-300 ease-in-out">
+            {/* --- STEP 0: CONFIG --- */}
+            {simStep === 0 && (
+                <div className="p-4 md:p-8 animate-in slide-in-from-right-4 fade-in duration-300 relative">
+                    {/* AUTO-PILOT OVERLAY */}
+                    {autoPilotCountdown !== null && (
+                        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-center p-6 animate-in fade-in duration-500">
+                            <div className="w-16 h-16 mb-4 relative">
+                                <div className="absolute inset-0 border-4 border-yellow-500/20 rounded-full"></div>
+                                <div className="absolute inset-0 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+                                <div className="absolute inset-0 flex items-center justify-center font-mono text-xl font-black text-yellow-500">{autoPilotCountdown}</div>
+                            </div>
+                            <h3 className="text-lg font-black text-white uppercase tracking-tighter">Node Identified!</h3>
+                            <p className="text-xs text-zinc-400 mt-1 mb-4">Auto-syncing configuration and moving to Step 2...</p>
+                            <button onClick={() => setAutoPilotCountdown(null)} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-bold rounded-lg border border-zinc-700 transition">STOP AUTOPILOT</button>
+                        </div>
+                    )}
+
+                    <div className="mb-6 text-center">
+                        <h3 className="text-lg md:text-xl font-bold text-white uppercase tracking-wider">Step 1: Configure Fleet</h3>
+                        <p className="text-[10px] md:text-xs text-zinc-500 mt-1">Load your live stats or simulate a new setup.</p>
+                    </div>
+
+                    {/* IMPORT INPUT */}
+                    <div className={`mb-6 md:mb-8 border rounded-xl p-3 md:p-4 flex flex-col md:flex-row gap-4 items-start transition-colors ${importError ? 'bg-red-500/10 border-red-500/30' : importSuccess ? 'bg-green-500/10 border-green-500/30' : 'bg-blue-500/10 border-blue-500/20'}`}>
+                        <div className="flex-1 w-full">
+                            <label className={`text-[9px] md:text-[10px] font-bold uppercase mb-1 block ${importError ? 'text-red-400' : importSuccess ? 'text-green-400' : 'text-blue-300'}`}>
+                                {importSuccess ? 'SUCCESS! STATS LOADED' : importError ? 'ERROR' : 'ALREADY LIVE? PASTE PUBLIC KEY'}
+                            </label>
+                            <div className="flex gap-2 relative">
+                                <div className="relative w-full">
+                                  <input 
+                                      type="text" 
+                                      placeholder="Paste your Node Public Key..." 
+                                      value={importKey}
+                                      onChange={(e) => { 
+                                          setImportKey(e.target.value); 
+                                          if(importError) setImportError(null);
+                                          if(e.target.value === '') clearImport();
+                                      }}
+                                      onKeyDown={(e) => e.key === 'Enter' && handleImportNode()}
+                                      className={`w-full bg-zinc-900 border rounded-lg p-2 pr-10 text-[10px] md:text-xs text-white font-mono outline-none transition ${importError ? 'border-red-500/50 focus:border-red-500' : 'border-zinc-700 focus:border-blue-500'}`}
+                                  />
+                                  {importKey && (
+                                      <button onClick={clearImport} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white">
+                                          <X size={14} />
+                                      </button>
+                                  )}
+                                </div>
+                                <button onClick={() => handleImportNode()} disabled={importSuccess} className={`font-bold text-[10px] px-3 md:px-4 rounded-lg uppercase transition whitespace-nowrap ${importSuccess ? 'bg-green-500 text-black' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}>
+                                    {importSuccess ? <Check size={14} /> : 'LOAD'}
+                                </button>
+                            </div>
+                            <div className="mt-3">
+                                <button onClick={() => { setShowManualInput(!showManualInput); setSimMode('NEW'); }} className="text-[10px] md:text-xs text-zinc-500 hover:text-white underline underline-offset-2 transition-colors font-medium">
+                                  Are your keys unavailable? Calculate manually instead
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* MANUAL INPUTS */}
+                    {showManualInput && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 animate-in slide-in-from-top-2 fade-in duration-300">
+                            <div className="space-y-4 md:space-y-6">
+                                <div>
+                                    <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simNodes < 1 ? 'text-red-500' : 'text-zinc-400'}`}>
+                                      <span>Number of pNodes</span>
+                                      {simNodes < 1 && <span className="flex items-center gap-1 text-red-500"><AlertTriangle size={10} /> MUST BE ≥ 1</span>}
+                                    </label>
+                                    <div className="relative">
+                                        <input type="number" min="0" value={simNodes} onChange={(e) => { const val = e.target.value === '' ? 0 : Number(e.target.value); setSimNodes(val); if(simMode === 'IMPORT') setSimMode('NEW'); }} className={`w-full bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${simNodes < 1 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`} />
+                                        <span className="absolute right-3 top-2 md:top-3 text-[10px] md:text-sm text-zinc-500 font-bold">NODES</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simStorageVal <= 0 ? 'text-red-500' : 'text-zinc-400'}`}>
+                                      <span>Total Storage</span>
+                                      {simStorageVal <= 0 && <span className="flex items-center gap-1 text-red-500"><AlertTriangle size={10} /> MUST BE {'>'} 0</span>}
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <input type="number" min="0" value={simStorageVal} onChange={(e) => setSimStorageVal(Number(e.target.value))} className={`flex-1 bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${simStorageVal <= 0 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}/>
+                                        <select value={simStorageUnit} onChange={(e) => setSimStorageUnit(e.target.value as any)} className="bg-zinc-900 border border-zinc-700 rounded-xl p-2 md:p-3 text-[10px] md:text-base text-zinc-300 font-bold outline-none"><option>MB</option><option>GB</option><option>TB</option><option>PB</option></select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simPerf <= 0 || simPerf > 1 ? 'text-red-500' : 'text-zinc-400'}`}>
+                                        <span>Performance Score (0.0 - 1.0)</span>
+                                        {(simPerf <= 0 || simPerf > 1) && <span className="flex items-center gap-1 text-red-500"><AlertTriangle size={10} /> INVALID</span>}
+                                    </label>
+                                    <div className="relative">
+                                        <input type="number" step="0.01" min="0" max="1" value={simPerf} onChange={(e) => setSimPerf(Number(e.target.value))} className={`w-full bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${(simPerf <= 0 || simPerf > 1) ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}/>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className={`text-[10px] uppercase font-bold flex justify-between mb-2 ${simStake <= 0 ? 'text-red-500' : 'text-zinc-400'}`}>
+                                      <span>Total Stake (XAND)</span>
+                                      {simStake <= 0 && <span className="flex items-center gap-1 text-red-500"><AlertTriangle size={10} /> MUST BE {'>'} 0</span>}
+                                    </label>
+                                    <input type="number" min="0" value={simStake} onChange={(e) => setSimStake(Number(e.target.value))} className={`w-full bg-zinc-900 border rounded-xl p-2 md:p-3 text-[10px] md:text-base text-white font-mono outline-none transition ${simStake <= 0 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-yellow-500'}`}/>
+                                </div>
+                            </div>
+                            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 md:p-6 flex flex-col justify-center items-center text-center">
+                                <div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold mb-1">Base Metric</div>
+                                <div className="text-2xl md:text-4xl font-mono font-bold text-white mb-2">{metrics.rawCredits.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* --- STEP 1: BOOSTS --- */}
+            {simStep === 1 && (
+                <div className="p-3 md:p-8 animate-in slide-in-from-right-4 fade-in duration-300 h-[450px] md:h-[400px] flex flex-col">
+                    <div className="mb-4 text-center shrink-0">
+                        <h3 className="text-lg md:text-xl font-bold text-white uppercase tracking-wider">Step 2: Boosts</h3>
+                        <p className="text-[10px] md:text-xs text-zinc-500 mt-1">Select Active Boosts</p>
+                        {simMode === 'IMPORT' && (
+                          <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full">
+                              <Check size={10} className="text-blue-400" />
+                              <span className="text-[9px] font-mono text-blue-300">Base Credits Loaded: {importedBaseCredits.toLocaleString()}</span>
+                          </div>
+                        )}
+                    </div>
+                    <div className="flex flex-col md:grid md:grid-cols-2 gap-4 md:gap-8 flex-grow min-h-0">
+                        <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar space-y-3 md:space-y-4">
+                            {/* ERAS */}
+                            <div className="space-y-1 md:space-y-2">
+                                <div className="text-[9px] text-zinc-500 font-bold uppercase sticky top-0 bg-[#09090b] z-10 py-1">Eras</div>
+                                {Object.entries(ERA_BOOSTS).map(([name, val]) => (
+                                    <div key={name} className="flex justify-between items-center bg-zinc-900 border border-zinc-800 p-2 md:p-3 rounded-lg md:rounded-xl">
+                                        <div><div className="text-[10px] md:text-xs font-bold text-white">{name}</div><div className="text-[9px] md:text-[10px] text-yellow-500 font-mono">x{val}</div></div>
+                                        <div className="flex items-center gap-2 md:gap-3 bg-black rounded-lg p-1">
+                                            <button onClick={() => toggleBoostCount(name, -1)} className="w-5 h-5 md:w-6 md:h-6 flex items-center justify-center text-zinc-500 hover:text-white text-sm">-</button>
+                                            <span className="text-[10px] md:text-xs font-mono w-4 text-center">{boostCounts[name] || 0}</span>
+                                            <button onClick={() => toggleBoostCount(name, 1)} className="w-5 h-5 md:w-6 md:h-6 flex items-center justify-center text-zinc-500 hover:text-white text-sm">+</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            {/* NFTs */}
+                            <div className="space-y-1 md:space-y-2">
+                                <div className="text-[9px] text-zinc-500 font-bold uppercase sticky top-0 bg-[#09090b] z-10 py-1">NFTs</div>
+                                {Object.entries(NFT_BOOSTS).map(([name, val]) => (
+                                    <div key={name} className="flex justify-between items-center bg-zinc-900 border border-zinc-800 p-2 md:p-3 rounded-lg md:rounded-xl">
+                                        <div><div className="text-[10px] md:text-xs font-bold text-white">{name}</div><div className="text-[9px] md:text-[10px] text-blue-400 font-mono">x{val}</div></div>
+                                        <div className="flex items-center gap-2 md:gap-3 bg-black rounded-lg p-1">
+                                            <button onClick={() => toggleBoostCount(name, -1)} className="w-5 h-5 md:w-6 md:h-6 flex items-center justify-center text-zinc-500 hover:text-white text-sm">-</button>
+                                            <span className="text-[10px] md:text-xs font-mono w-4 text-center">{boostCounts[name] || 0}</span>
+                                            <button onClick={() => toggleBoostCount(name, 1)} className="w-5 h-5 md:w-6 md:h-6 flex items-center justify-center text-zinc-500 hover:text-white text-sm">+</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="shrink-0 md:h-full flex flex-row md:flex-col gap-2 md:gap-4 border-t md:border-t-0 pt-2 md:pt-0 border-zinc-800">
+                            <div className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-lg md:rounded-xl p-2 md:p-6 flex flex-col justify-center items-center text-center">
+                                <div className="text-[9px] md:text-[10px] text-zinc-500 uppercase font-bold mb-0.5 md:mb-2 whitespace-nowrap">Geo Mean</div>
+                                <div className="text-sm md:text-4xl font-mono font-bold text-yellow-400 flex items-center gap-1 md:gap-2"><Zap size={12} className="md:w-6 md:h-6 fill-yellow-400" />{metrics.geoMean.toFixed(3)}x</div>
+                            </div>
+                            <div className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-lg md:rounded-xl p-2 md:p-4 flex flex-col justify-center items-center md:flex-row md:justify-between">
+                                <span className="text-[9px] md:text-xs text-zinc-500 font-bold uppercase mb-0.5 md:mb-0">Your Boosted Credits</span>
+                                <span className="font-mono text-sm md:text-xl font-bold text-white">{metrics.boostedCredits.toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 1 })}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- STEP 2: FINANCIALS --- */}
+            {simStep === 2 && (
+              <div className="p-4 md:p-8 animate-in slide-in-from-right-4 fade-in duration-300">
+                  <div className="mb-6 text-center">
+                      <h3 className="text-lg md:text-xl font-bold text-white uppercase tracking-wider">Step 3: Income</h3>
+                      <p className="text-[10px] md:text-xs text-zinc-500 mt-1">Estimate Network Share</p>
+                  </div>
+                  <div className="max-w-xl mx-auto space-y-6 md:space-y-8">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                          {/* NETWORK FEES */}
+                          <div className="relative">
+                              {showFeeHelp && <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowFeeHelp(false)}></div>}
+                              <div className="flex justify-between items-end mb-2 relative z-50">
+                                  <div className="flex items-center gap-2">
+                                  <label className={`text-[10px] uppercase font-bold ${simNetworkFees <= 0 ? 'text-red-500' : 'text-zinc-400'}`}>Total Network Fees</label>
+                                  <div className="relative">
+                                      <button onClick={() => setShowFeeHelp(!showFeeHelp)} className="text-zinc-500 hover:text-white transition"><Info size={14} /></button>
+                                      {showFeeHelp && (
+                                          <div className="absolute left-0 bottom-full mb-2 w-64 bg-zinc-800 border border-zinc-700 p-4 rounded-xl shadow-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+                                              <p className="text-[10px] md:text-xs text-zinc-300 leading-relaxed"><strong className="text-white block mb-1">About Network Fees:</strong>Revenue collected from sedApps. <span className="text-yellow-500 block mt-1">94% is distributed to pNode owners.</span></p>
+                                              <div className="absolute bottom-[-6px] left-1 w-3 h-3 bg-zinc-800 border-b border-r border-zinc-700 rotate-45"></div>
+                                          </div>
+                                      )}
+                                  </div>
+                                  </div>
+                              </div>
+                              <div className="relative">
+                                  <input type="number" min="0" value={simNetworkFees} onChange={(e) => setSimNetworkFees(Number(e.target.value))} className={`w-full bg-zinc-900 border rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none transition ${simNetworkFees <= 0 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-blue-500'}`}/>
+                                  <span className="absolute right-4 top-3.5 text-[10px] font-bold text-zinc-600">SOL</span>
+                              </div>
+                          </div>
+
+                          {/* NETWORK MULTIPLIER */}
+                          <div className="relative">
+                              {showNetworkHelp && <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowNetworkHelp(false)}></div>}
+                              <div className="flex justify-between items-end mb-2 relative z-50">
+                                  <div className="flex items-center gap-2">
+                                      <label className={`text-[10px] uppercase font-bold ${networkAvgMult < 1 ? 'text-red-500' : 'text-zinc-400'}`}>Est. Total Boosted Credits</label>
+                                      <div className="relative">
+                                          <button onClick={() => setShowNetworkHelp(!showNetworkHelp)} className="text-zinc-500 hover:text-white transition"><Settings2 size={14} /></button>
+                                          {showNetworkHelp && (
+                                              <div className="absolute left-0 bottom-full mb-2 w-64 bg-zinc-800 border border-zinc-700 p-4 rounded-xl shadow-2xl z-50 text-left animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+                                                  <p className="text-[10px] md:text-xs text-zinc-300 leading-relaxed"><strong className="text-white block mb-1">Estimation Multiplier</strong>Factor to estimate global score. <span className="text-yellow-500 block mt-1">14x accounts for high-impact nodes.</span></p>
+                                                  <div className="absolute bottom-[-6px] left-1 w-3 h-3 bg-zinc-800 border-b border-r border-zinc-700 rotate-45"></div>
+                                              </div>
+                                          )}
+                                      </div>
+                                  </div>
+                                  <div className="text-[9px] md:text-[10px] font-mono text-zinc-500 text-right">
+                                      {metrics.currentNetworkTotal.toLocaleString(undefined, { notation: 'compact' })} x {networkAvgMult} = <span className="text-white font-bold">{(metrics.currentNetworkTotal * networkAvgMult).toLocaleString(undefined, { notation: 'compact' })}</span>
+                                  </div>
+                              </div>
+                              <div className="relative">
+                                  <input type="number" min="0" step="0.1" value={networkAvgMult} onChange={(e) => { const val = e.target.value === '' ? 0 : Number(e.target.value); setNetworkAvgMult(val); }} className={`w-full bg-zinc-900 border rounded-xl p-3 text-[12px] md:text-sm text-white font-mono outline-none transition ${networkAvgMult < 1 ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-purple-500'}`}/>
+                                  <span className="absolute right-4 top-3.5 text-[10px] font-bold text-zinc-600">AVG X</span>
+                              </div>
+                          </div>
+                      </div>
+                      <div className="bg-gradient-to-br from-zinc-900 to-black border border-yellow-500/30 rounded-xl md:rounded-2xl p-6 md:p-8 relative overflow-hidden group">
+                          <div className="relative z-10 flex flex-col items-center text-center space-y-4 md:space-y-6">
+                              <div>
+                                  <div className="text-[9px] md:text-[10px] text-blue-400 font-bold uppercase tracking-widest mb-1">Your Share</div>
+                                  <div className="text-sm md:text-lg font-mono text-zinc-300">{(metrics.share * 100).toFixed(6)}%</div>
+                              </div>
+                              <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-700 to-transparent"></div>
+                              <div>
+                                  <div className="text-[10px] md:text-xs text-yellow-600 font-bold uppercase tracking-widest mb-2">Estimated Payout</div>
+                                  <div className="text-4xl md:text-6xl font-extrabold text-white text-shadow-lg tracking-tight flex items-baseline justify-center gap-2">{metrics.stoinc.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}<span className="text-sm md:text-lg font-bold text-zinc-500">SOL</span></div>
+                                  <div className="text-[9px] md:text-[10px] text-zinc-500 mt-2">Per Epoch (~2 Days)</div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+            )}
+
+            {/* FOOTER */}
+            <div className="p-3 md:p-4 border-t border-zinc-800 flex justify-between bg-black/20">
+                <button onClick={() => setSimStep(Math.max(0, simStep - 1))} disabled={simStep === 0} className={`px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold transition ${simStep === 0 ? 'opacity-0 pointer-events-none' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}>BACK</button>
+                {simStep < 2 ? (
+                    (simStep === 1 || (simStep === 0 && showManualInput)) ? (
+                        <button onClick={() => isStep1Valid && handleStepTransition(simStep + 1)} disabled={!isStep1Valid} className={`px-6 md:px-8 py-2 font-bold text-[10px] md:text-xs rounded-lg transition-colors flex items-center gap-2 ${isStep1Valid ? 'bg-yellow-500 hover:bg-yellow-400 text-black' : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'}`}>NEXT STEP <ArrowUpRight size={14} /></button>
+                    ) : null
+                ) : (
+                    <button onClick={resetSimulator} className="px-6 md:px-8 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-[10px] md:text-xs rounded-lg transition-colors flex items-center gap-2">RESET <Activity size={14} /></button>
+                )}
+            </div>
+        </div>
+      )}
+    </div>
+  );
+}
