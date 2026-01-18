@@ -32,8 +32,6 @@ export default function ComparePage() {
   const [networkScope, setNetworkScope] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [showNetwork, setShowNetwork] = useState(true);
-  
-  // Updated Type: Added 'UPTIME'
   const [leaderMetric, setLeaderMetric] = useState<'STORAGE' | 'CREDITS' | 'HEALTH' | 'UPTIME' | null>(null);
 
   const [isLeaderDropdownOpen, setIsLeaderDropdownOpen] = useState(false);
@@ -48,6 +46,8 @@ export default function ComparePage() {
   const leaderRef = useRef<HTMLDivElement>(null);
   const watchlistRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<HTMLDivElement>(null);
+
+  const prevNodeCount = useRef(0);
 
   useOutsideClick(leaderRef, () => setIsLeaderDropdownOpen(false));
   useOutsideClick(watchlistRef, () => setIsWatchlistOpen(false));
@@ -67,8 +67,6 @@ export default function ComparePage() {
       if (availableNodes.length === 0) return { network: {}, leader: {}, networkRaw: {}, leaderRaw: {} };
 
       let leaderNode: Node | null = null;
-      
-      // LOGIC UPDATE: Added UPTIME handling
       if (leaderMetric === 'STORAGE') leaderNode = availableNodes.reduce((p, c) => (p.storage_committed || 0) > (c.storage_committed || 0) ? p : c, availableNodes[0]);
       else if (leaderMetric === 'CREDITS') leaderNode = availableNodes.reduce((p, c) => (p.credits || 0) > (c.credits || 0) ? p : c, availableNodes[0]);
       else if (leaderMetric === 'HEALTH') leaderNode = availableNodes.reduce((p, c) => (p.health || 0) > (c.health || 0) ? p : c, availableNodes[0]);
@@ -117,6 +115,17 @@ export default function ComparePage() {
   const addNode = (pubkey: string) => { if (!selectedKeys.includes(pubkey) && selectedKeys.length < 30) { const k = [...selectedKeys, pubkey]; setSelectedKeys(k); updateUrl(k); setIsSearchOpen(false); setSearchQuery(''); setIsWatchlistOpen(false); } };
   const removeNode = (pubkey: string) => { const k = selectedKeys.filter(x => x !== pubkey); setSelectedKeys(k); updateUrl(k); };
   const clearAllNodes = () => { setSelectedKeys([]); updateUrl([]); };
+
+  useEffect(() => {
+    if (selectedKeys.length > prevNodeCount.current) {
+        if (printRef.current) {
+            const maxScroll = printRef.current.scrollWidth - printRef.current.clientWidth;
+            const targetScroll = Math.max(0, maxScroll - 70); 
+            printRef.current.scrollTo({ left: targetScroll, behavior: 'smooth' });
+        }
+    }
+    prevNodeCount.current = selectedKeys.length;
+  }, [selectedKeys.length]);
 
   const hasProcessedDeepLink = useRef(false);
   useEffect(() => {
@@ -218,7 +227,6 @@ export default function ComparePage() {
                 <button onClick={() => setIsLeaderDropdownOpen(!isLeaderDropdownOpen)} className={`flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border w-auto ${leaderMetric ? 'bg-white text-black border-white' : 'bg-black/40 text-zinc-400 border-white/5 hover:border-white/20'}`}>{leaderMetric ? `VS ${leaderMetric} LEADER` : 'VS LEADER'} <ChevronDown size={12} /></button>
                 {isLeaderDropdownOpen && (
                     <div className="absolute top-full left-0 mt-2 w-36 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col">
-                        {/* UPDATE: Added UPTIME and NONE */}
                         {['STORAGE', 'CREDITS', 'HEALTH', 'UPTIME', 'NONE'].map(opt => (
                             <button 
                                 key={opt} 
@@ -248,16 +256,30 @@ export default function ComparePage() {
       <div className="flex-1 overflow-hidden relative z-10 px-4 pb-4 md:px-8 md:pb-8 flex flex-col max-w-[1600px] mx-auto w-full">
          <div className="flex-initial min-h-[400px] flex flex-col bg-[#09090b]/60 backdrop-blur-2xl rounded-xl border border-white/5 shadow-2xl overflow-hidden relative mb-6">
              {selectedNodes.length === 0 ? (
-                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
-                    <div className="w-56 h-56 border border-zinc-800 rounded-full flex items-center justify-center relative mb-8 animate-[spin_60s_linear_infinite]">
-                        <div className="absolute inset-0 border border-zinc-900 rounded-full scale-125 border-dashed opacity-50"></div>
-                        <Grid size={64} className="text-zinc-800 relative z-10" />
+                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden h-[400px]">
+                    {/* BACKGROUND SPINNER + PULSE */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] scale-[2]">
+                        <div className="animate-[spin_60s_linear_infinite]"><Grid size={300} /></div>
                     </div>
-                    <button onClick={() => setIsSearchOpen(true)} className="px-10 py-4 bg-white text-black hover:bg-zinc-200 font-black uppercase tracking-widest text-xs rounded-full shadow-[0_0_40px_rgba(255,255,255,0.2)] transition-all hover:scale-105 z-10 flex items-center gap-2 mb-6"><Plus size={16} className="animate-pulse" /> Add Node</button>
-                    <h2 className="text-xl font-black text-white uppercase tracking-[0.2em] mb-2 z-10">Compare Nodes</h2>
-                    <p className="text-sm text-zinc-500 mb-2 max-w-sm z-10 leading-relaxed font-mono">Select a minimum of 2 nodes for head to head comparison.</p>
-                    <p className="text-xs text-zinc-600 mb-8 max-w-sm z-10 leading-relaxed font-mono">You can also compare against the entire network or a specific top performer.</p>
-                    <div className="text-[10px] uppercase font-bold text-zinc-600 mb-6">Current Network: <span className="text-zinc-300">{networkScope}</span></div>
+                    {/* SHOCKWAVE PULSE */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="w-96 h-96 bg-cyan-500/5 rounded-full animate-[ping_4s_cubic-bezier(0,0,0.2,1)_infinite]"></div>
+                    </div>
+
+                    <div className="relative z-10 flex flex-col items-center gap-6">
+                        {/* CYAN BUTTON */}
+                        <button onClick={() => setIsSearchOpen(true)} className="px-10 py-4 bg-cyan-500/10 border border-cyan-500/20 text-cyan-50 hover:bg-cyan-500/20 font-black uppercase tracking-widest text-xs rounded-full shadow-[0_0_30px_rgba(34,211,238,0.1)] transition-all hover:scale-105 flex items-center gap-2 mb-2">
+                            <Plus size={16} className="animate-pulse" /> Add Node
+                        </button>
+                        
+                        <div className="flex flex-col items-center gap-1">
+                            <h2 className="text-lg md:text-xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-500 uppercase tracking-[0.2em]">Compare Nodes</h2>
+                            <p className="text-[10px] md:text-xs text-zinc-500 font-mono tracking-wide max-w-xs text-center leading-relaxed">
+                                Select a minimum of 2 nodes for head-to-head analysis against the network or top performers.
+                            </p>
+                        </div>
+                        <div className="text-[9px] uppercase font-bold text-zinc-600">Current Network: <span className="text-zinc-400">{networkScope}</span></div>
+                    </div>
                  </div>
              ) : (
                  <main ref={printRef} className="flex-1 overflow-x-auto overflow-y-auto bg-transparent relative flex custom-scrollbar snap-x items-start content-start">
