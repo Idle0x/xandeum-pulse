@@ -1,7 +1,8 @@
 import { useState, useRef, useMemo } from 'react';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup, Line } from 'react-simple-maps';
 import { 
-  BarChart3, PieChart, Map as MapIcon, Database, Zap, Activity, Clock, Info 
+  BarChart3, PieChart, Map as MapIcon, Database, Zap, Activity, Clock, Info,
+  ChevronDown, Plus, Minus, RotateCcw // RESTORED THESE IMPORTS
 } from 'lucide-react';
 import { Node } from '../../types';
 import { formatBytes } from '../../utils/formatters';
