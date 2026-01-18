@@ -71,9 +71,7 @@ export const Header = ({
     <header className={`sticky top-0 z-[50] border-b px-4 py-1 md:py-3 flex flex-col gap-1 md:gap-4 transition-all duration-500 overflow-visible ${zenMode ? 'bg-black border-zinc-800' : 'bg-[#09090b]/90 backdrop-blur-md border-zinc-800'}`}>
       <div className="flex justify-between items-start w-full">
         
-        {/* Left: Menu & Logo - UPDATED STRUCTURE */}
-        {/* Changed items-center to items-start to allow vertical stacking of Logo/Time */}
-        {/* Removed fixed height (h-10) to allow content to dictate size */}
+        {/* Left: Menu & Logo - Stacked Layout */}
         <div className="flex items-start gap-3 md:gap-4 shrink-0 pt-1"> 
           <button onClick={onToggleMenu} className={`p-2 rounded-xl transition mt-1 ${zenMode ? 'text-zinc-400 border border-zinc-800 hover:text-white' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white hover:bg-zinc-800'}`}>
             <Menu size={20} className="md:w-6 md:h-6" />
@@ -85,7 +83,7 @@ export const Header = ({
               <Activity className={zenMode ? 'text-zinc-500' : 'text-blue-500'} size={28} /> PULSE
             </h1>
             
-            {/* Row 2: Sync Time - Pushed down to align with tooltips */}
+            {/* Row 2: Sync Time - On its own row */}
             <div className="mt-2 md:mt-3 pl-1 flex items-center">
                <span className="text-[9px] md:text-[10px] text-zinc-500 font-mono tracking-wider uppercase">
                  Sync: <span className={zenMode ? 'text-zinc-400' : 'text-zinc-300'}>{lastSync}</span>
@@ -119,9 +117,9 @@ export const Header = ({
             {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-2.5 text-zinc-500 hover:text-white transition z-20 p-0.5 bg-black/20 rounded-full hover:bg-zinc-700"><X size={14} /></button>}
           </div>
 
-           {/* Feedback Text Area: EXTENDED WIDTH (As requested previously) */}
+           {/* Feedback Text Area: CORRECTED WIDTH (107%) */}
            {!zenMode && (
-             <div className="mt-1 md:mt-2 w-full md:w-[140%] md:translate-x-[20%] overflow-hidden relative h-[20px] transition-all duration-300 mask-linear-fade flex items-center justify-center">
+             <div className="mt-1 md:mt-2 w-[107%] translate-x-[3.5%] overflow-hidden relative h-[20px] transition-all duration-300 mask-linear-fade flex items-center justify-center">
                {searchQuery ? (
                  <div className="flex items-center justify-center w-full text-[8px] md:text-xs text-zinc-400 font-mono tracking-wide uppercase animate-in fade-in slide-in-from-top-1 whitespace-nowrap">
                     Showing <span className="text-white font-bold mx-1">{filteredCount}</span> results for <span className="text-blue-400 font-bold ml-1">"{searchQuery}"</span>
