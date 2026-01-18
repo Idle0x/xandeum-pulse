@@ -2,7 +2,7 @@ import {
   Activity, Server, Database, Shield, 
   ArrowLeft, HelpCircle, AlertTriangle, CheckCircle 
 } from 'lucide-react';
-import { Node } from '../../types';
+import { Node } from '../../../types';
 import { RadialProgress } from '../RadialProgress';
 
 interface HealthViewProps {
