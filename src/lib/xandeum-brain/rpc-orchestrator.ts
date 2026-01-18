@@ -1,15 +1,6 @@
 import axios from 'axios';
 import pino from 'pino';
 
-// Setup pretty logging for development
-const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
-  transport: {
-    target: 'pino-pretty',
-    options: { colorize: true }
-  }
-});
-
 // --- CONFIGURATION ---
 const HERO_PUBLIC_RPC = '173.212.203.145';
 const BACKUP_RPCS = [
@@ -19,73 +10,107 @@ const BACKUP_RPCS = [
 ];
 
 const TIMEOUT_RPC = 5000;
-const BACKGROUND_REFRESH_RATE = 30000; 
-const ERROR_THRESHOLD = 3; // Circuit breaker: trip after 3 fails
-const CIRCUIT_RESET_MS = 60000; // Wait 1 minute before retrying a dead node
+const ERROR_THRESHOLD = 3; 
+const CIRCUIT_RESET_MS = 60000; 
+
+// Logger setup
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  transport: { target: 'pino-pretty', options: { colorize: true } }
+});
 
 interface RpcStats {
   failureCount: number;
   lastFailureTime: number;
   lastLatency: number;
-  isOpen: boolean; // Is the circuit breaker open (dead)?
+  isOpen: boolean; 
+  successCount: number;
 }
 
 export class PublicRpcOrchestrator {
-  private cache: { pods: any[]; timestamp: number } | null = null;
-  private discoveryCache: Map<string, any> = new Map();
   private stats: Map<string, RpcStats> = new Map();
-  private activeInterval: NodeJS.Timeout | null = null;
+  private discoveryCache: Map<string, any> = new Map();
 
   constructor() {
     this.initStats();
-    this.startBackgroundDiscovery();
-    logger.info("Public RPC Orchestrator initialized with Circuit Breaker.");
+    logger.info("Public RPC Orchestrator initialized (Global Singleton).");
   }
 
   private initStats() {
     [HERO_PUBLIC_RPC, ...BACKUP_RPCS].forEach(ip => {
-      this.stats.set(ip, { failureCount: 0, lastFailureTime: 0, lastLatency: 0, isOpen: false });
+      // Initialize with optimistic values so we don't block nodes on startup
+      this.stats.set(ip, { 
+        failureCount: 0, 
+        lastFailureTime: 0, 
+        lastLatency: 0, 
+        isOpen: false,
+        successCount: 0
+      });
     });
   }
 
   /**
-   * MAIN FETCH LOGIC
+   * MAIN ENTRY POINT
    */
   async fetchPublicNodes(): Promise<any[]> {
     let resultNodes: any[] = [];
 
-    // 1. Check if Hero is healthy
+    // 1. Try Hero (Primary)
     if (this.isNodeHealthy(HERO_PUBLIC_RPC)) {
       try {
         resultNodes = await this.fetchFromNode(HERO_PUBLIC_RPC);
-        this.cache = { pods: resultNodes, timestamp: Date.now() };
       } catch (e) {
-        logger.warn(`Hero RPC ${HERO_PUBLIC_RPC} failed. Tripping circuit.`);
+        logger.warn(`Hero RPC ${HERO_PUBLIC_RPC} failed. Failover engaged.`);
       }
     }
 
-    // 2. Failover if Hero failed or was already "Open"
+    // 2. Failover logic
     if (resultNodes.length === 0) {
-      resultNodes = await this.raceBackups();
+      resultNodes = await this.smartRaceBackups();
     }
 
-    // 3. Last Resort: Cache
-    if (resultNodes.length === 0 && this.cache) {
-      logger.error("All Public RPCs failed. Serving stale cache.");
-      resultNodes = this.cache.pods;
-    }
+    // 3. Trigger a non-blocking background refresh to keep stats alive
+    // This runs AFTER the user gets their data, keeping the lambda 'warm' with new stats
+    this.triggerBackgroundRefresh();
 
-    // 4. Merge background discovered nodes
     return this.mergeDiscoveredNodes(resultNodes);
   }
 
   /**
-   * CIRCUIT BREAKER & NETWORK LOGIC
+   * SMART RACE LOGIC
+   * Handles both "Cold Start" (no stats) and "Warm Start" (using stats)
    */
+  private async smartRaceBackups(): Promise<any[]> {
+    const healthyBackups = BACKUP_RPCS.filter(ip => this.isNodeHealthy(ip));
+    
+    // Check if we have actual latency data (Warm Start)
+    const hasStats = healthyBackups.some(ip => (this.stats.get(ip)?.lastLatency || 0) > 0);
+
+    let candidates: string[];
+
+    if (hasStats) {
+      // WARM START: Pick top 3 fastest
+      candidates = healthyBackups.sort((a, b) => 
+        (this.stats.get(a)?.lastLatency || 9999) - (this.stats.get(b)?.lastLatency || 9999)
+      ).slice(0, 3);
+    } else {
+      // COLD START: Randomize and pick 5 to ensure we hit a working one
+      // We pick more nodes (5) because we don't know who is good yet.
+      candidates = healthyBackups.sort(() => 0.5 - Math.random()).slice(0, 5);
+      logger.info("Cold start detected: Racing 5 random nodes.");
+    }
+
+    try {
+      // Promise.any races them and resolves with the FIRST success
+      return await Promise.any(candidates.map(ip => this.fetchFromNode(ip)));
+    } catch (e) {
+      logger.error("All selected backup candidates failed.");
+      return [];
+    }
+  }
+
   private async fetchFromNode(ip: string): Promise<any[]> {
     const start = Date.now();
-    const stat = this.stats.get(ip)!;
-
     try {
       const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
       const res = await axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC });
@@ -105,11 +130,10 @@ export class PublicRpcOrchestrator {
     if (!stat) return false;
     
     if (stat.isOpen) {
-      // Check if it's time to reset the circuit
       if (Date.now() - stat.lastFailureTime > CIRCUIT_RESET_MS) {
         stat.isOpen = false;
         stat.failureCount = 0;
-        return true;
+        return true; // Half-open state: allow one try
       }
       return false;
     }
@@ -117,31 +141,19 @@ export class PublicRpcOrchestrator {
   }
 
   private updateStats(ip: string, isError: boolean, latency: number) {
-    const stat = this.stats.get(ip)!;
+    const stat = this.stats.get(ip);
+    if (!stat) return;
+
     if (isError) {
       stat.failureCount++;
       stat.lastFailureTime = Date.now();
       if (stat.failureCount >= ERROR_THRESHOLD) {
         stat.isOpen = true;
-        logger.error(`Circuit OPEN for ${ip}. Node suspended.`);
       }
     } else {
-      stat.failureCount = 0;
+      stat.failureCount = 0; // Reset failures on success
       stat.lastLatency = latency;
-    }
-  }
-
-  private async raceBackups(): Promise<any[]> {
-    const healthyBackups = BACKUP_RPCS.filter(ip => this.isNodeHealthy(ip));
-    // Try the 3 fastest (or random if no latency data)
-    const candidates = healthyBackups.sort((a, b) => 
-      (this.stats.get(a)?.lastLatency || 999) - (this.stats.get(b)?.lastLatency || 999)
-    ).slice(0, 3);
-
-    try {
-      return await Promise.any(candidates.map(ip => this.fetchFromNode(ip)));
-    } catch (e) {
-      return [];
+      stat.successCount++;
     }
   }
 
@@ -157,48 +169,26 @@ export class PublicRpcOrchestrator {
     return merged;
   }
 
-  /**
-   * BACKGROUND DISCOVERY
-   */
-  private startBackgroundDiscovery() {
-    this.activeInterval = setInterval(async () => {
-      // Pick one backup node that isn't currently blocked
-      const pool = BACKUP_RPCS.filter(ip => this.isNodeHealthy(ip));
-      if (pool.length === 0) return;
-
-      const target = pool[Math.floor(Math.random() * pool.length)];
-      try {
-        const nodes = await this.fetchFromNode(target);
+  // Fire and forget - helps keep stats updated for the NEXT user request
+  private triggerBackgroundRefresh() {
+    const randomNode = BACKUP_RPCS[Math.floor(Math.random() * BACKUP_RPCS.length)];
+    // We don't await this. We let it run in the background context of the lambda.
+    this.fetchFromNode(randomNode).then(nodes => {
         nodes.forEach(n => {
-          const pk = n.pubkey || n.public_key;
-          if (pk) this.discoveryCache.set(pk, n);
+            const pk = n.pubkey || n.public_key;
+            if (pk) this.discoveryCache.set(pk, n);
         });
-        logger.debug({ target, nodesFound: nodes.length }, "Background discovery sync complete.");
-      } catch (e) {
-        // Silent fail for background tasks
-      }
-    }, BACKGROUND_REFRESH_RATE);
-  }
-
-  /**
-   * GRACEFUL SHUTDOWN
-   */
-  public shutdown() {
-    if (this.activeInterval) {
-      clearInterval(this.activeInterval);
-      logger.info("Background intervals cleared.");
-    }
-  }
-
-  public getTelemetry() {
-    return Object.fromEntries(this.stats);
+    }).catch(() => {});
   }
 }
 
-// Export singleton
-export const publicSwarm = new PublicRpcOrchestrator();
+/**
+ * SINGLETON PATTERN FOR NEXT.JS
+ * Prevents re-creating the class on every hot-reload or function invocation
+ * if the container is still warm.
+ */
+const globalForSwarm = global as unknown as { swarmInstance: PublicRpcOrchestrator };
 
-if (typeof process !== 'undefined') {
-  process.on('SIGTERM', () => publicSwarm.shutdown());
-  process.on('SIGINT', () => publicSwarm.shutdown());
-}
+export const publicSwarm = globalForSwarm.swarmInstance || new PublicRpcOrchestrator();
+
+if (process.env.NODE_ENV !== 'production') globalForSwarm.swarmInstance = publicSwarm;
