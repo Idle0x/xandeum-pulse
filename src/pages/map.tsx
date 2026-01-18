@@ -8,7 +8,7 @@ import { scaleSqrt } from 'd3-scale';
 import { 
   ArrowLeft, Globe, Plus, Minus, Activity, Database, Zap, ChevronUp, 
   MapPin, RotateCcw, Info, X, HelpCircle, Share2, Check, ArrowRight, 
-  AlertOctagon, AlertCircle, EyeOff, BarChart3, Clock
+  AlertOctagon, AlertCircle, EyeOff, BarChart3, ChevronDown, Server, Network
 } from 'lucide-react';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
@@ -52,11 +52,18 @@ interface MapStats {
 }
 
 type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
+type NetworkType = 'ALL' | 'MAINNET' | 'DEVNET';
 
 const MODE_COLORS = {
     STORAGE: { hex: '#6366f1', tailwind: 'text-indigo-500', bg: 'bg-indigo-600', border: 'border-indigo-500/50' },
     HEALTH:  { hex: '#10b981', tailwind: 'text-emerald-500', bg: 'bg-emerald-600', border: 'border-emerald-500/50' },
     CREDITS: { hex: '#f97316', tailwind: 'text-orange-500', bg: 'bg-orange-600', border: 'border-orange-500/50' }
+};
+
+const NETWORK_STYLES = {
+    ALL: { color: 'text-white', label: 'All Networks', icon: Globe },
+    MAINNET: { color: 'text-green-500', label: 'Mainnet', icon: Server },
+    DEVNET: { color: 'text-blue-500', label: 'Devnet', icon: Network }
 };
 
 const TIER_COLORS = [
@@ -85,10 +92,12 @@ export default function MapPage() {
 
   // View State
   const [viewMode, setViewMode] = useState<ViewMode>('STORAGE');
+  const [selectedNetwork, setSelectedNetwork] = useState<NetworkType>('ALL'); // NEW STATE
   const [isSplitView, setIsSplitView] = useState(false);
   const [activeLocation, setActiveLocation] = useState<string | null>(null);
   const [expandedLocation, setExpandedLocation] = useState<string | null>(null);
   const [isCountryModalOpen, setIsCountryModalOpen] = useState(false);
+  const [isNetworkDropdownOpen, setIsNetworkDropdownOpen] = useState(false); // NEW STATE
 
   // UI State
   const [toast, setToast] = useState<{ msg: string; type: 'error' | 'info' | 'private' } | null>(null);
@@ -118,7 +127,7 @@ export default function MapPage() {
       credits: number;
       healthSum: number;
       uptimeSum: number;
-      stableCount: number; // New field for stability count
+      stableCount: number;
     }>();
 
     // Aggregation Loop
@@ -140,8 +149,7 @@ export default function MapPage() {
       current.credits += (loc.totalCredits || 0);
       current.healthSum += (loc.avgHealth * loc.count); 
       current.uptimeSum += (loc.avgUptime * loc.count);
-      
-      // Stability Check: If location avg uptime > 24h (86400s), count these nodes as stable
+
       if (loc.avgUptime > 86400) {
           current.stableCount += loc.count;
       }
@@ -161,7 +169,6 @@ export default function MapPage() {
     });
   }, [locations, viewMode]);
 
-  // Global Totals for Percentage Calculation
   const globalTotals = useMemo(() => {
     return {
       storage: countryBreakdown.reduce((sum, c) => sum + c.storage, 0),
@@ -170,7 +177,6 @@ export default function MapPage() {
     };
   }, [countryBreakdown]);
 
-  // --- GLOBAL API HEALTH CHECK ---
   const isGlobalCreditsOffline = useMemo(() => {
       if (locations.length === 0) return false; 
       return !locations.some(l => l.totalCredits !== null);
@@ -187,7 +193,6 @@ export default function MapPage() {
     scrollPosRef.current = e.currentTarget.scrollTop;
   };
 
-  // Scroll to Active Effect
   useEffect(() => {
       if (activeLocation && isSplitView) {
           const timer = setTimeout(() => {
@@ -202,7 +207,8 @@ export default function MapPage() {
   useEffect(() => {
     const fetchGeo = async () => {
       try {
-        const res = await axios.get('/api/geo');
+        // UPDATED: Pass selectedNetwork to backend
+        const res = await axios.get(`/api/geo?network=${selectedNetwork}`);
         if (res.data) {
           setLocations(res.data.locations || []);
           setStats(res.data.stats || { totalNodes: 0, countries: 0, topRegion: 'Unknown', topRegionMetric: 0 });
@@ -227,7 +233,7 @@ export default function MapPage() {
     fetchGeo();
     const interval = setInterval(fetchGeo, 10000);
     return () => clearInterval(interval);
-  }, [router.isReady, router.query.focus]); 
+  }, [router.isReady, router.query.focus, selectedNetwork]); // Re-run when network changes
 
   // Threshold Calculation
   useEffect(() => {
@@ -300,7 +306,7 @@ export default function MapPage() {
       const d = Math.floor(seconds / 86400);
       const h = Math.floor((seconds % 86400) / 3600);
       const m = Math.floor((seconds % 3600) / 60);
-      
+
       // Detailed format for the Hybrid View
       if (d > 0) return `${d}d ${h}h`;
       return `${h}h ${m}m`;
@@ -533,6 +539,51 @@ export default function MapPage() {
     </div>
   );
 
+  // NEW: Network Switcher Component
+  const NetworkSwitcher = () => {
+      const activeStyle = NETWORK_STYLES[selectedNetwork];
+      const Icon = activeStyle.icon;
+
+      return (
+          <div className="relative z-50">
+              <button 
+                  onClick={() => setIsNetworkDropdownOpen(!isNetworkDropdownOpen)}
+                  className="flex items-center gap-2 px-3 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 rounded-xl transition-all w-full md:w-auto min-w-[130px] justify-between group shadow-lg"
+              >
+                  <div className="flex items-center gap-2">
+                      <Icon size={14} className={activeStyle.color} />
+                      <span className={`text-[10px] md:text-xs font-bold uppercase tracking-wide ${activeStyle.color}`}>{activeStyle.label}</span>
+                  </div>
+                  <ChevronDown size={14} className={`text-zinc-500 transition-transform ${isNetworkDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isNetworkDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsNetworkDropdownOpen(false)}></div>
+                    <div className="absolute right-0 top-full mt-2 w-full md:w-40 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl p-1 z-50 animate-in fade-in zoom-in-95 duration-200 flex flex-col gap-0.5">
+                        {(Object.keys(NETWORK_STYLES) as NetworkType[]).map((net) => {
+                            const style = NETWORK_STYLES[net];
+                            const NetIcon = style.icon;
+                            const isActive = selectedNetwork === net;
+                            return (
+                                <button
+                                    key={net}
+                                    onClick={() => { setSelectedNetwork(net); setIsNetworkDropdownOpen(false); }}
+                                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-all ${isActive ? 'bg-zinc-800' : 'hover:bg-zinc-800/50'}`}
+                                >
+                                    <NetIcon size={14} className={style.color} />
+                                    <span className={`text-[10px] md:text-xs font-bold uppercase tracking-wide ${isActive ? 'text-white' : 'text-zinc-400'}`}>{style.label}</span>
+                                    {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_white]"></div>}
+                                </button>
+                            );
+                        })}
+                    </div>
+                  </>
+              )}
+          </div>
+      );
+  };
+
   const RegionTrigger = ({ className = "" }: { className?: string }) => {
     const topFlags = countryBreakdown.slice(0, 3).map(c => c.code.toLowerCase());
     const count = Math.max(0, countryBreakdown.length - 3);
@@ -551,7 +602,7 @@ export default function MapPage() {
             </div>
           ))}
         </div>
-        <div className="text-xs font-bold text-zinc-300 group-hover:text-white flex items-center gap-1 relative z-10">
+        <div className="text-xs font-bold text-zinc-300 group-hover:text-white flex items-center gap-1 relative z-10 whitespace-nowrap">
           <span>+{count} Regions Active</span>
           <BarChart3 size={12} className="text-zinc-600 group-hover:text-white transition-colors" />
         </div>
@@ -630,8 +681,6 @@ export default function MapPage() {
                     <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden flex">
                       <div className={`h-full ${barColor} shadow-[0_0_10px_currentColor]`} style={{ width: `${Math.max(2, primaryShare)}%` }}></div>
                     </div>
-
-                    {/* --- UPDATED LOGIC HERE: HYBRID STABILITY VIEW --- */}
                     {viewMode === 'HEALTH' ? (
                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[9px] font-mono uppercase tracking-wide text-zinc-500 leading-none mt-1">
                           <span className="text-green-500 font-bold">{c.stableCount} nodes stable</span>
@@ -738,10 +787,26 @@ export default function MapPage() {
                 <p className="text-xs text-zinc-400 leading-relaxed mt-1 max-w-2xl">{getDynamicSubtitle()}</p>
             </div>
 
-            {!loading && <RegionTrigger className="hidden md:flex" />}
+            {/* Desktop: Region + Network Switcher Grouped Right */}
+            {!loading && (
+                <div className="hidden md:flex items-center gap-3">
+                    <RegionTrigger />
+                    <NetworkSwitcher />
+                </div>
+            )}
         </div>
 
-        {!loading && <RegionTrigger className="flex md:hidden w-full justify-center bg-zinc-900/50" />}
+        {/* Mobile Bottom Bar: Split Space Between Regions and Network */}
+        {!loading && (
+            <div className="flex md:hidden w-full items-center justify-between gap-2 px-0 pt-1">
+                <div className="flex-1 min-w-0">
+                    <RegionTrigger className="w-full justify-start text-[9px] px-2 py-2" />
+                </div>
+                <div className="shrink-0">
+                    <NetworkSwitcher />
+                </div>
+            </div>
+        )}
       </div>
 
       <div className={`relative w-full bg-[#080808] ${isSplitView ? 'h-[40vh] shrink-0' : 'flex-1 basis-0 min-h-0'}`}>
