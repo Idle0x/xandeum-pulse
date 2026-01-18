@@ -107,15 +107,17 @@ export const CountryBreakdownModal: React.FC<CountryBreakdownModalProps> = ({
                           <span className="text-zinc-700">|</span>
                           <span>avg uptime: <span className="text-zinc-300">{formatUptime(c.avgUptime)}</span></span>
                           <span className="text-zinc-700">|</span>
-                          <span>hosts <span className="text-zinc-300">{nodeShare.toFixed(1)}%</span> of total nodes</span>
+                          {/* UPDATED HEALTH VIEW TEXT AS WELL FOR CONSISTENCY */}
+                          <span>Hosts <span className="text-zinc-300">{c.count}</span> nodes ({nodeShare.toFixed(1)}%)</span>
                        </div>
                     ) : (
                        <div className="flex justify-between items-center text-[9px] font-mono uppercase tracking-wide text-zinc-500">
                           <span>
                             <span className={textColor}>{primaryShare.toFixed(2)}%</span> of {metricLabel}
                           </span>
+                          {/* --- UPDATED TEXT HERE --- */}
                           <span>
-                            Hosts <span className="text-zinc-300">{nodeShare.toFixed(2)}%</span> of Total Nodes
+                            Hosts <span className="text-zinc-300">{c.count}</span> nodes ({nodeShare.toFixed(1)}%)
                           </span>
                        </div>
                     )}
