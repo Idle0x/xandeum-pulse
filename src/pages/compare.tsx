@@ -116,6 +116,13 @@ export default function ComparePage() {
   const removeNode = (pubkey: string) => { const k = selectedKeys.filter(x => x !== pubkey); setSelectedKeys(k); updateUrl(k); };
   const clearAllNodes = () => { setSelectedKeys([]); updateUrl([]); };
 
+  // Watchlist Removal Handler
+  const removeFavorite = (pubkey: string) => {
+      const newFavs = favorites.filter(f => f !== pubkey);
+      setFavorites(newFavs);
+      localStorage.setItem('xandeum_favorites', JSON.stringify(newFavs));
+  };
+
   useEffect(() => {
     if (selectedKeys.length > prevNodeCount.current) {
         if (printRef.current) {
@@ -243,9 +250,32 @@ export default function ComparePage() {
                 )}
             </div>
 
+            {/* WATCHLIST DROPDOWN REFACTOR */}
             <div className="relative" ref={watchlistRef}>
                 <button onClick={() => setIsWatchlistOpen(!isWatchlistOpen)} className="flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg bg-black/40 text-zinc-400 border border-white/5 hover:border-white/20 hover:text-white text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap w-auto"><Star size={12} /> WATCHLIST <ChevronDown size={12} /></button>
-                {isWatchlistOpen && <div className="absolute top-full left-0 mt-2 w-56 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col max-h-64 overflow-y-auto">{watchlistNodes.length > 0 ? watchlistNodes.map(n => (<button key={n.pubkey} onClick={() => addNode(n.pubkey!)} disabled={selectedKeys.includes(n.pubkey!)} className={`px-4 py-3 text-[10px] font-bold text-left flex justify-between items-center ${selectedKeys.includes(n.pubkey!) ? 'text-zinc-600 cursor-not-allowed' : 'text-zinc-300 hover:text-white hover:bg-zinc-800'}`}><span>{getSafeIp(n)}</span>{selectedKeys.includes(n.pubkey!) && <CheckCircle size={12} />}</button>)) : <div className="p-4 text-[10px] text-zinc-600 text-center">No Favorites</div>}</div>}
+                {isWatchlistOpen && (
+                    <div className="absolute top-full left-0 mt-2 w-40 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col max-h-64 overflow-y-auto">
+                        {watchlistNodes.length > 0 ? watchlistNodes.map(n => (
+                            <div key={n.pubkey} className="flex justify-between items-center group/item hover:bg-zinc-800 transition border-b border-white/5 last:border-0">
+                                <button 
+                                    onClick={() => addNode(n.pubkey!)} 
+                                    disabled={selectedKeys.includes(n.pubkey!)} 
+                                    className={`px-3 py-2 text-left flex-1 ${selectedKeys.includes(n.pubkey!) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                                >
+                                    <div className="text-[10px] font-bold font-mono text-zinc-200 truncate w-24">{n.pubkey?.slice(0, 10)}...</div>
+                                    <div className="text-[8px] text-zinc-500 font-mono mt-0.5">{getSafeIp(n)}</div>
+                                </button>
+                                {/* REMOVE FAVORITE BUTTON */}
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); removeFavorite(n.pubkey!); }}
+                                    className="p-2 text-zinc-600 hover:text-red-500 transition"
+                                >
+                                    <X size={12} />
+                                </button>
+                            </div>
+                        )) : <div className="p-4 text-[10px] text-zinc-600 text-center">No Favorites</div>}
+                    </div>
+                )}
             </div>
 
             <button onClick={handleShare} className="flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border border-zinc-700 w-auto"><Share2 size={12}/> SHARE</button>
