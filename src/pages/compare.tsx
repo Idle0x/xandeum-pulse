@@ -3,611 +3,24 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { toPng } from 'html-to-image';
-import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup, Line } from 'react-simple-maps';
 import { 
-  ArrowLeft, Search, Plus, Minus, RotateCcw, X, Trash2, 
-  Download, Settings2, CheckCircle, 
-  Database, Shield, Zap, 
-  Activity, Share2, Map as MapIcon, ChevronDown, Crown, 
-  BarChart3, PieChart, Grid, Star, Clock, Info,
-  TrendingUp, TrendingDown 
+  ArrowLeft, Search, Plus, X, 
+  Download, CheckCircle, Share2, ChevronDown, Grid, Star
 } from 'lucide-react';
 
 // Hooks & Utils
 import { useNetworkData } from '../hooks/useNetworkData';
+import { useOutsideClick } from '../hooks/useOutsideClick';
 import { getSafeIp } from '../utils/nodeHelpers';
 import { formatBytes } from '../utils/formatters';
+import { formatUptimePrecise, PLAYER_THEMES } from '../components/compare/MicroComponents';
 import { Node } from '../types';
 
-const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
-
-// --- THEME ENGINE (EXPANDED TO 10) ---
-const PLAYER_THEMES = [
-  { name: 'cyan', hex: '#22d3ee', headerBg: 'bg-cyan-900/40', bodyBg: 'bg-cyan-900/5', text: 'text-cyan-400', border: 'border-cyan-500/20' },
-  { name: 'violet', hex: '#a78bfa', headerBg: 'bg-violet-900/40', bodyBg: 'bg-violet-900/5', text: 'text-violet-400', border: 'border-violet-500/20' },
-  { name: 'emerald', hex: '#34d399', headerBg: 'bg-emerald-900/40', bodyBg: 'bg-emerald-900/5', text: 'text-emerald-400', border: 'border-emerald-500/20' },
-  { name: 'amber', hex: '#fbbf24', headerBg: 'bg-amber-900/40', bodyBg: 'bg-amber-900/5', text: 'text-amber-400', border: 'border-amber-500/20' },
-  { name: 'rose', hex: '#fb7185', headerBg: 'bg-rose-900/40', bodyBg: 'bg-rose-900/5', text: 'text-rose-400', border: 'border-rose-500/20' },
-  { name: 'lime', hex: '#a3e635', headerBg: 'bg-lime-900/40', bodyBg: 'bg-lime-900/5', text: 'text-lime-400', border: 'border-lime-500/20' },
-  { name: 'fuchsia', hex: '#e879f9', headerBg: 'bg-fuchsia-900/40', bodyBg: 'bg-fuchsia-900/5', text: 'text-fuchsia-400', border: 'border-fuchsia-500/20' },
-  { name: 'sky', hex: '#38bdf8', headerBg: 'bg-sky-900/40', bodyBg: 'bg-sky-900/5', text: 'text-sky-400', border: 'border-sky-500/20' },
-  { name: 'orange', hex: '#fb923c', headerBg: 'bg-orange-900/40', bodyBg: 'bg-orange-900/5', text: 'text-orange-400', border: 'border-orange-500/20' },
-  { name: 'indigo', hex: '#818cf8', headerBg: 'bg-indigo-900/40', bodyBg: 'bg-indigo-900/5', text: 'text-indigo-400', border: 'border-indigo-500/20' }
-];
-
-// --- HOOKS ---
-
-function useOutsideClick(ref: any, callback: () => void) {
-  useEffect(() => {
-    function handleClickOutside(event: any) {
-      if (ref.current && !ref.current.contains(event.target)) {
-        callback();
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [ref, callback]);
-}
-
-// --- MICRO COMPONENTS ---
-
-const formatUptimePrecise = (seconds: number) => {
-  if (!seconds) return '0m';
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-};
-
-// Metric Delta Component
-const MetricDelta = ({ val, base, type = 'number', reverse = false }: { val: number, base: number, type?: 'number' | 'bytes', reverse?: boolean }) => {
-  if (base === undefined || base === null || val === base) return null;
-
-  const diff = val - base;
-  const isGood = reverse ? diff < 0 : diff > 0;
-  
-  const color = isGood ? 'text-green-400' : 'text-red-400';
-  const Icon = diff > 0 ? TrendingUp : TrendingDown;
-
-  let display = '';
-  if (type === 'bytes') display = formatBytes(Math.abs(diff));
-  else display = Math.abs(diff).toLocaleString();
-
-  return (
-    <div className={`flex items-center gap-0.5 text-[8px] font-bold ${color} bg-black/40 px-1.5 py-0.5 rounded border border-white/5 ml-2 shadow-sm whitespace-nowrap`}>
-      <Icon size={8} /> {display}
-    </div>
-  );
-};
-
-const MicroBar = ({ val, max, color }: { val: number, max: number, color: string }) => (
-  <div className="w-10 md:w-16 h-0.5 md:h-1 bg-zinc-800 rounded-full overflow-hidden ml-auto">
-    <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min((val/max)*100, 100)}%`, backgroundColor: color }}></div>
-  </div>
-);
-
-const SectionHeader = ({ label, icon: Icon }: { label: string, icon: any }) => (
-  <div className="h-5 md:h-8 bg-black/90 backdrop-blur-md border-y border-white/5 flex items-center px-2 md:px-3 gap-1 md:gap-2 sticky left-0 z-10 w-full mt-1">
-    <Icon size={8} className="text-zinc-500 md:w-3 md:h-3" />
-    <span className="text-[6px] md:text-[10px] font-bold text-zinc-500 uppercase tracking-[0.1em]">{label}</span>
-  </div>
-);
-
-// Updated Legend with Safety Loop
-const UnifiedLegend = ({ nodes, themes, metricMode = 'COUNTRY', specificMetric, onNodeClick }: { nodes: Node[], themes: any[], metricMode: 'COUNTRY' | 'METRIC', specificMetric?: 'storage' | 'credits' | 'health' | 'uptime', onNodeClick?: (node: Node) => void }) => {
-    return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 p-4 md:p-6 mt-auto border-t border-white/5 bg-black/40 min-h-[80px]">
-         {nodes.map((node, i) => {
-             // SAFETY FIX: Loop themes if nodes exceed array length
-             const theme = themes[i % themes.length];
-             
-             let metricDisplay = null;
-             const showMetricInLegend = metricMode === 'METRIC' && specificMetric && specificMetric !== 'health';
-
-             if (metricMode === 'COUNTRY') {
-                 metricDisplay = (
-                    <div className="flex items-center gap-1 md:gap-2 mt-0.5 md:mt-1">
-                        {node.location?.countryCode && <img src={`https://flagcdn.com/w40/${node.location.countryCode.toLowerCase()}.png`} className="w-2.5 h-2 md:w-4 md:h-3 rounded-[1px]" />}
-                        <span className="text-[8px] md:text-[10px] text-zinc-400 font-bold uppercase tracking-wide truncate">{node.location?.countryName || 'Unknown Region'}</span>
-                    </div>
-                 );
-             } else if (showMetricInLegend) {
-                 let val = '';
-                 if (specificMetric === 'storage') val = formatBytes(node.storage_committed || 0);
-                 if (specificMetric === 'credits') val = (node.credits || 0).toLocaleString();
-                 if (specificMetric === 'uptime') val = formatUptimePrecise(node.uptime || 0);
-
-                 metricDisplay = (
-                    <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[9px] md:text-xs text-white font-mono font-bold">{val}</span>
-                        <span className="text-[6px] md:text-[10px] text-zinc-500 uppercase tracking-wide">Actual</span>
-                    </div>
-                 );
-             }
-
-             return (
-                 <div 
-                    key={node.pubkey} 
-                    onClick={() => onNodeClick && onNodeClick(node)}
-                    className={`flex gap-2 md:gap-3 items-start p-2 md:p-3 rounded md:rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition ${onNodeClick ? 'cursor-pointer hover:border-white/20' : ''}`}
-                 >
-                     <div className="w-2 h-2 md:w-3 md:h-3 rounded-full mt-1 shrink-0 shadow-lg" style={{ backgroundColor: theme.hex }}></div>
-                     <div className="flex flex-col gap-0.5 md:gap-1 overflow-hidden w-full">
-                         <div className="text-[8px] md:text-xs font-mono font-bold text-zinc-300 truncate w-full tracking-wide" title={node.pubkey}>
-                            {metricMode === 'COUNTRY' ? node.pubkey : node.pubkey?.slice(0, 16) + '...'}
-                         </div>
-                         {metricMode !== 'COUNTRY' && (
-                             <div className="flex items-center gap-1.5 opacity-60">
-                                {node.location?.countryCode && <img src={`https://flagcdn.com/w40/${node.location.countryCode.toLowerCase()}.png`} className="w-2.5 h-2 rounded-[1px]" />}
-                                <div className="text-[7px] md:text-[9px] font-mono text-zinc-400 truncate">{getSafeIp(node)}</div>
-                             </div>
-                         )}
-                         {metricMode === 'COUNTRY' && (
-                             <div className="text-[9px] md:text-sm font-mono font-bold text-zinc-200 truncate">{getSafeIp(node)}</div>
-                         )}
-                         {metricDisplay}
-                     </div>
-                 </div>
-             )
-         })}
-      </div>
-    )
- }
-
-// --- MAIN COMPONENTS ---
-
-const ControlRail = ({ showNetwork, leaderMetric, benchmarks }: any) => {
-  const Benchmark = ({ label, val, subVal, netLabel }: { label: string, val: string, subVal?: string, netLabel?: string }) => (
-    <div className="flex flex-col justify-center h-[36px] md:h-[72px] border-b border-white/5 px-2 md:px-4">
-      <div className="flex justify-between md:items-center">
-        <span className="text-[6px] md:text-xs text-zinc-500 font-bold uppercase tracking-wide">{label}</span>
-        <div className="flex items-center gap-1 md:gap-2">
-            {showNetwork && netLabel && (
-                <span className="text-[5px] md:text-[9px] font-bold text-pink-500/70 uppercase tracking-wider">{netLabel}</span>
-            )}
-            <span className={`text-[6px] md:text-xs font-mono ${showNetwork ? 'text-pink-500/70' : 'text-zinc-300'}`}>{showNetwork ? val : '-'}</span>
-        </div>
-      </div>
-      {leaderMetric && subVal && (
-          <div className="flex justify-between md:justify-start items-center gap-1.5 mt-0.5 md:mt-1 text-yellow-600/80">
-              <span className="text-[6px] md:text-[8px] uppercase font-bold border border-yellow-900/40 px-0.5 md:px-1 rounded bg-yellow-900/10">TOP</span>
-              <span className="text-[6px] md:text-[9px] font-mono">{subVal}</span>
-          </div>
-      )}
-    </div>
-  );
-
-  return (
-    <div className="sticky left-0 z-40 bg-[#09090b] border-r border-white/10 w-[100px] md:w-[200px] shrink-0 flex flex-col shadow-[4px_0_24px_-4px_rgba(0,0,0,0.8)] rounded-tl-xl rounded-bl-xl">
-      <div className="h-24 md:h-32 border-b border-white/5 p-2 md:p-4 flex flex-col justify-end bg-black rounded-tl-xl">
-        <div className="text-[6px] md:text-xs font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1 md:gap-2"><Settings2 size={8} className="md:w-3 md:h-3" /> METRICS</div>
-      </div>
-
-      <div className="bg-transparent">
-        <SectionHeader label="IDENTITY" icon={Shield} />
-        <Benchmark label="Version" val={benchmarks.network.version} subVal={benchmarks.leader.version} netLabel="LATEST" />
-        <Benchmark label="Network" val="-" />
-
-        <SectionHeader label="VITALITY" icon={Activity} />
-        <Benchmark label="Health Score" val={benchmarks.network.health} subVal={benchmarks.leader.health} netLabel="AVG" />
-        <Benchmark label="Uptime" val={benchmarks.network.uptime} subVal={benchmarks.leader.uptime} netLabel="AVG" />
-
-        <SectionHeader label="HARDWARE" icon={Database} />
-        <Benchmark label="Capacity" val={benchmarks.network.storage} subVal={benchmarks.leader.storage} netLabel="MED" />
-        <Benchmark label="Used Space" val="-" />
-
-        <SectionHeader label="ECONOMY" icon={Zap} />
-        <Benchmark label="Credits" val={benchmarks.network.credits} subVal={benchmarks.leader.credits} netLabel="MED" />
-        <Benchmark label="Global Rank" val="-" />
-
-        <div className="h-[28px] md:h-[32px] border-t border-white/5 bg-black/50 rounded-bl-xl"></div>
-      </div>
-    </div>
-  );
-};
-
-const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner, benchmarks, leaderMetric, showNetwork }: any) => {
-  const Row = ({ children }: { children: React.ReactNode }) => (<div className={`h-[36px] md:h-[72px] flex flex-col justify-center px-3 md:px-4 min-w-[100px] md:min-w-[140px] relative`}>{children}</div>);
-  const SectionSpacer = () => <div className="h-5 md:h-8 bg-transparent border-y border-transparent mt-1"></div>;
-
-  const baselines = useMemo(() => {
-      if (showNetwork) return benchmarks.networkRaw;
-      if (leaderMetric) return benchmarks.leaderRaw;
-      if (anchorNode) return {
-          health: anchorNode.health || 0,
-          storage: anchorNode.storage_committed || 0,
-          credits: anchorNode.credits || 0,
-          uptime: anchorNode.uptime || 0
-      };
-      return {};
-  }, [showNetwork, leaderMetric, benchmarks, anchorNode]);
-
-  const showDelta = showNetwork || leaderMetric || (anchorNode && node.pubkey !== anchorNode.pubkey);
-
-  return (
-    <div className={`flex flex-col min-w-[100px] md:min-w-[140px] ${theme.bodyBg} relative border-r border-white/5 last:rounded-tr-xl last:rounded-br-xl`}>
-      <div className={`h-24 md:h-32 ${theme.headerBg} p-2 md:p-4 flex flex-col items-center justify-between relative overflow-hidden group first:rounded-tr-xl`}>
-        {overallWinner && <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 animate-in zoom-in duration-500"><Crown size={10} className="md:w-3.5 md:h-3.5 text-yellow-400 fill-yellow-400 drop-shadow-sm" /></div>}
-
-        <div className="mt-1 md:mt-2">
-             {node.location?.countryCode ? (
-                 <img src={`https://flagcdn.com/w80/${node.location.countryCode.toLowerCase()}.png`} className="w-6 h-4 md:w-10 md:h-7 rounded-[2px] shadow-md object-cover" />
-             ) : (
-                 <div className="w-6 h-4 md:w-10 md:h-7 bg-white/5 rounded-[2px] border border-white/10"></div>
-             )}
-        </div>
-
-        <div className="flex flex-col items-center gap-1 w-full text-center">
-            <div className={`text-[7px] md:text-[10px] font-mono text-white/50`}>{getSafeIp(node)}</div>
-            <div className="text-[8px] md:text-xs font-bold font-mono text-white bg-black/20 px-1 py-0.5 md:px-2 md:py-1 rounded border border-white/10 w-full truncate">
-                {node.pubkey?.slice(0, 8)}<span className="hidden md:inline">{node.pubkey?.slice(8, 12)}...</span>
-            </div>
-        </div>
-      </div>
-
-      <div className="relative z-10">
-        <SectionSpacer />
-        <Row><span className={`text-[9px] md:text-sm font-mono font-medium ${node.version === '0.0.0' ? 'text-zinc-600' : 'text-zinc-300'}`}>{node.version}</span></Row>
-        <Row><span className={`text-[6px] md:text-xs px-1.5 py-0.5 md:px-2 md:py-1 rounded border w-fit font-bold ${node.network === 'MAINNET' ? 'text-green-400 border-green-500/20 bg-green-500/5' : 'text-blue-400 border-blue-500/20 bg-blue-500/5'}`}>{node.network}</span></Row>
-
-        <SectionSpacer />
-        <Row>
-            <div className="flex flex-col w-full">
-                <div className="flex justify-between items-center w-full">
-                    <div className="flex items-center">
-                        <span className="text-[9px] md:text-base font-bold font-mono text-zinc-200">{node.health}</span>
-                        {showDelta && <MetricDelta val={node.health || 0} base={baselines.health} />}
-                    </div>
-                    {winners.health && <CheckCircle size={8} className="md:w-3.5 md:h-3.5 text-green-500" />}
-                </div>
-            </div>
-            <div className="absolute bottom-1 right-2 md:bottom-3 md:right-4 opacity-50"><MicroBar val={node.health} max={100} color={node.health >= 90 ? '#22c55e' : '#eab308'} /></div>
-        </Row>
-        <Row><span className="text-[9px] md:text-base font-mono text-zinc-300">{formatUptimePrecise(node.uptime)}</span></Row>
-
-        <SectionSpacer />
-        <Row>
-             <div className="flex flex-col w-full">
-                <div className="flex justify-between items-center w-full">
-                    <div className="flex items-center">
-                        <span className="text-[9px] md:text-base font-bold font-mono text-zinc-200">{formatBytes(node.storage_committed)}</span>
-                        {showDelta && <MetricDelta val={node.storage_committed || 0} base={baselines.storage} type="bytes" />}
-                    </div>
-                    {winners.storage && <CheckCircle size={8} className="md:w-3.5 md:h-3.5 text-green-500" />}
-                </div>
-            </div>
-        </Row>
-        <Row>
-            <div className="flex flex-col w-full">
-                <div className="flex justify-between items-center w-full">
-                    <span className="text-[9px] md:text-base font-mono text-zinc-300">{formatBytes(node.storage_used)}</span>
-                    <span className="text-[6px] md:text-[10px] text-zinc-500 font-mono mt-0 md:mt-0.5">{node.storage_committed > 0 ? ((node.storage_used / node.storage_committed) * 100).toFixed(0) : 0}% Utilized</span>
-                </div>
-            </div>
-            <div className="absolute bottom-1 right-2 md:bottom-3 md:right-4 opacity-50"><MicroBar val={node.storage_used} max={node.storage_committed} color="#60a5fa" /></div>
-        </Row>
-
-        <SectionSpacer />
-        <Row>
-            <div className="flex flex-col w-full">
-                <div className="flex justify-between items-center w-full">
-                    <div className="flex items-center">
-                        <span className="text-[9px] md:text-base font-bold font-mono text-zinc-200">{node.credits?.toLocaleString()}</span>
-                        {showDelta && <MetricDelta val={node.credits || 0} base={baselines.credits} />}
-                    </div>
-                    {winners.credits && <CheckCircle size={8} className="md:w-3.5 md:h-3.5 text-green-500" />}
-                </div>
-            </div>
-        </Row>
-        <Row><span className="text-[9px] md:text-base font-mono text-zinc-500">#{node.rank || '-'}</span></Row>
-
-        <div className="h-[28px] md:h-[32px] border-t border-white/5 flex items-center justify-center bg-black/20 hover:bg-red-500/10 transition-colors cursor-pointer group/trash" onClick={onRemove}>
-            <Trash2 size={10} className="md:w-3 md:h-3 text-zinc-700 group-hover/trash:text-red-500 transition-colors" />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const OverviewLegend = ({ nodes, themes }: { nodes: Node[], themes: any[] }) => {
-    return (
-      <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 p-4 border-t border-white/5 bg-black/40 min-h-[60px]">
-          {nodes.map((node, i) => {
-              // SAFETY FIX: Loop themes
-              const theme = themes[i % themes.length];
-              return (
-              <div key={node.pubkey} className="flex items-center gap-1.5 md:gap-2">
-                   <div className="w-2 h-2 md:w-3 md:h-3 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)] border border-white/10" style={{ backgroundColor: theme.hex }}></div>
-                   <div className="flex flex-col">
-                        <span className="text-[9px] md:text-xs font-mono font-bold text-zinc-300">{node.pubkey?.slice(0, 12)}...</span>
-                        <div className="flex items-center gap-1 opacity-50">
-                             {node.location?.countryCode && <img src={`https://flagcdn.com/w40/${node.location.countryCode.toLowerCase()}.png`} className="w-2 h-1.5 rounded-[1px]" />}
-                             <span className="text-[7px] md:text-[9px] font-mono text-zinc-400">{getSafeIp(node)}</span>
-                        </div>
-                   </div>
-              </div>
-          )})}
-      </div>
-    )
-  }
-
-const InterpretationPanel = ({ contextText }: { contextText: string }) => (
-    <div className="px-4 py-3 md:px-6 md:py-4 bg-zinc-900/30 border-t border-white/5 flex items-start gap-3 md:gap-4">
-        <Info size={14} className="text-blue-400 shrink-0 mt-0.5 md:w-4 md:h-4" />
-        <div className="flex flex-col gap-1">
-            <p className="text-xs md:text-sm text-zinc-300 leading-relaxed max-w-4xl">{contextText}</p>
-        </div>
-    </div>
-);
-
-const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], themes: typeof PLAYER_THEMES, networkScope: string }) => {
-  const [tab, setTab] = useState<'OVERVIEW' | 'MARKET' | 'TOPOLOGY'>('OVERVIEW');
-  const [marketMetric, setMarketMetric] = useState<'storage' | 'credits' | 'health' | 'uptime'>('storage');
-  const [pos, setPos] = useState({ coordinates: [0, 20], zoom: 1 });
-  const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false);
-
-  // Map Controls
-  const handleZoomIn = () => setPos(p => ({ ...p, zoom: Math.min(p.zoom * 1.5, 10) }));
-  const handleZoomOut = () => setPos(p => ({ ...p, zoom: Math.max(p.zoom / 1.5, 1) }));
-  const handleReset = () => setPos({ coordinates: [0, 20], zoom: 1 });
-
-  // Map Focus Helper
-  const handleNodeFocus = (node: Node) => {
-    if (node.location) {
-        setPos({ coordinates: [node.location.lon, node.location.lat], zoom: 4 });
-    }
-  };
-
-  // Click Outside Hook for Metric Dropdown
-  const metricDropdownRef = useRef<HTMLDivElement>(null);
-  useOutsideClick(metricDropdownRef, () => setIsMetricDropdownOpen(false));
-
-  if (nodes.length < 1) return null;
-
-  const maxStorage = Math.max(...nodes.map(n => n.storage_committed || 0), 1);
-  const maxCredits = Math.max(...nodes.map(n => n.credits || 0), 1);
-  const maxUptime = Math.max(...nodes.map(n => n.uptime || 0), 1);
-
-  const totalStorage = nodes.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
-  const totalCredits = nodes.reduce((sum, n) => sum + (n.credits || 0), 0);
-  const totalUptime = nodes.reduce((sum, n) => sum + (n.uptime || 0), 0);
-
-  // Updated Gradient to use Modulo Theme
-  const getConicGradient = (type: 'storage' | 'credits' | 'uptime') => {
-    let currentDeg = 0;
-    let total = 0;
-    if (type === 'storage') total = totalStorage;
-    else if (type === 'credits') total = totalCredits;
-    else if (type === 'uptime') total = totalUptime;
-
-    if (total === 0) return 'conic-gradient(#333 0deg 360deg)';
-    return `conic-gradient(${nodes.map((n, i) => {
-        let val = 0;
-        if (type === 'storage') val = n.storage_committed || 0;
-        else if (type === 'credits') val = n.credits || 0;
-        else if (type === 'uptime') val = n.uptime || 0;
-
-        const deg = (val / total) * 360;
-        // SAFETY FIX: Modulo loop
-        const theme = themes[i % themes.length];
-        const stop = `${theme.hex} ${currentDeg}deg ${currentDeg + deg}deg`;
-        currentDeg += deg;
-        return stop;
-    }).join(', ')})`;
-  };
-
-  const getEvaluation = (tabName: string, metric?: string) => {
-    if (tabName === 'OVERVIEW') {
-        return "This grid separates performance into Relative Power (Storage, Credits, Uptime) versus Absolute Vitality (Health). While health is measured against a perfect 100 score, the other metrics are normalized against the strongest node in your selection, visually identifying the local leaders in each category.";
-    }
-    if (tabName === 'MARKET') {
-        if (metric === 'storage') return `This sector analysis reveals the data holding power of your selection. A highly skewed chart indicates a "Whale" presence, where one node creates a centralization risk for stored data. A balanced chart suggests a healthy distribution of responsibility.`;
-        if (metric === 'credits') return `Credit dominance highlights the primary earners in this group. Disparity here often reflects a significant gap in uptime or hardware reliability, as the protocol rewards consistency over raw capacity.`;
-        if (metric === 'health') return `Unlike competitive metrics, Health is cooperative. Any node dropping below 80/100 represents a liability to the network's resilience. Consistent low scores across the board would indicate a systemic network issue rather than individual failure.`;
-        if (metric === 'uptime') return `The Time-Online distribution. Elders of the network will dominate this chart. If a new node has a tiny slice, it doesn't mean it's failing—it simply lacks the historical provenance of the longer-running nodes.`;
-    }
-    return "";
-  };
-
-  const ChartCell = ({ title, icon: Icon, children }: any) => (
-    <div className="bg-black/20 border border-white/5 rounded-xl p-4 md:p-6 flex flex-col items-center justify-end relative overflow-hidden group hover:border-white/10 transition-colors">
-        <div className="absolute top-3 left-3 md:top-4 md:left-4 flex items-center gap-2 text-zinc-500">
-            <Icon size={10} className="md:w-3.5 md:h-3.5" />
-            <span className="text-[8px] md:text-xs font-bold uppercase tracking-widest">{title}</span>
-        </div>
-        <div className="flex items-end justify-center gap-3 md:gap-6 h-32 md:h-48 w-full px-2 md:px-4 pt-8">
-            {children}
-        </div>
-    </div>
-  );
-
-  return (
-    <div className="shrink-0 min-h-[600px] border border-white/5 bg-[#09090b]/40 backdrop-blur-xl flex flex-col relative z-40 rounded-xl mt-6 shadow-2xl overflow-hidden">
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50">
-            <div className="bg-zinc-900/90 backdrop-blur-md p-1.5 rounded-full flex gap-2 border border-white/10 shadow-2xl">
-                {[ { id: 'OVERVIEW', icon: BarChart3, label: 'Overview' }, { id: 'MARKET', icon: PieChart, label: 'Market Share' }, { id: 'TOPOLOGY', icon: MapIcon, label: 'Topology' } ].map((t) => (
-                    <button key={t.id} onClick={() => setTab(t.id as any)} className={`px-4 py-1.5 md:px-6 md:py-2 rounded-full text-[9px] md:text-xs font-bold uppercase transition-all duration-300 flex items-center gap-2 ${tab === t.id ? 'bg-zinc-100 text-black shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'bg-white/5 text-zinc-500 hover:text-zinc-300 hover:bg-white/10'}`}>
-                        <t.icon size={10} className="md:w-3.5 md:h-3.5" /> {t.label}
-                    </button>
-                ))}
-            </div>
-        </div>
-
-        <div className="flex-1 overflow-hidden relative flex flex-col pt-24">
-            {tab === 'OVERVIEW' && (
-                <>
-                <div className="grid grid-cols-2 grid-rows-2 gap-4 md:gap-6 p-4 md:p-6 h-full">
-                    {/* SAFETY FIX: Updated mapping to use modulo theme access */}
-                    <ChartCell title="Storage Capacity" icon={Database}>
-                        {nodes.map((n, i) => {
-                             const theme = themes[i % themes.length];
-                             return (
-                             <div key={n.pubkey} className="w-6 md:w-12 bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end">
-                                 <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${((n.storage_committed || 0) / maxStorage) * 100}%`, backgroundColor: theme.hex }}></div>
-                                 <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-10">{formatBytes(n.storage_committed || 0)}</div>
-                             </div>
-                        )})}
-                    </ChartCell>
-                    <ChartCell title="Credits Earned" icon={Zap}>
-                        {nodes.map((n, i) => {
-                             const theme = themes[i % themes.length];
-                             return (
-                             <div key={n.pubkey} className="w-6 md:w-12 bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end">
-                                 <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${((n.credits || 0) / maxCredits) * 100}%`, backgroundColor: theme.hex }}></div>
-                                 <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-10">{n.credits?.toLocaleString()}</div>
-                             </div>
-                        )})}
-                    </ChartCell>
-                    <ChartCell title="Health Score" icon={Activity}>
-                        {nodes.map((n, i) => {
-                             const theme = themes[i % themes.length];
-                             return (
-                             <div key={n.pubkey} className="w-6 md:w-12 bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end">
-                                 <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${Math.min(n.health || 0, 100)}%`, backgroundColor: theme.hex }}></div>
-                                 <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-10">{n.health}/100</div>
-                             </div>
-                        )})}
-                    </ChartCell>
-                     <ChartCell title="Uptime Duration" icon={Clock}>
-                        {nodes.map((n, i) => {
-                             const theme = themes[i % themes.length];
-                             return (
-                             <div key={n.pubkey} className="w-6 md:w-12 bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end">
-                                 <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${((n.uptime || 0) / maxUptime) * 100}%`, backgroundColor: theme.hex }}></div>
-                                 <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-10">{formatUptimePrecise(n.uptime || 0)}</div>
-                             </div>
-                        )})}
-                    </ChartCell>
-                </div>
-                <OverviewLegend nodes={nodes} themes={themes} />
-                <InterpretationPanel contextText={getEvaluation('OVERVIEW')} />
-                </>
-            )}
-
-            {tab === 'MARKET' && (
-                <>
-                    <div className="relative flex flex-col flex-1">
-                        {/* METRIC SELECTOR */}
-                        <div className="absolute top-0 right-4 md:right-8 z-20" ref={metricDropdownRef}>
-                            <button onClick={() => setIsMetricDropdownOpen(!isMetricDropdownOpen)} className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 rounded-lg text-[10px] md:text-xs font-bold uppercase transition">
-                                <span className="opacity-50">Analyzing:</span> {marketMetric} <ChevronDown size={12} className="md:w-3.5 md:h-3.5" />
-                            </button>
-                            {isMetricDropdownOpen && (
-                                <div className="absolute top-full right-0 mt-2 w-48 bg-[#09090b] border border-zinc-800 rounded-xl shadow-2xl overflow-hidden flex flex-col z-30">
-                                    {['storage', 'credits', 'health', 'uptime'].map(m => (
-                                        <button key={m} onClick={() => { setMarketMetric(m as any); setIsMetricDropdownOpen(false); }} className={`px-4 py-3 text-xs font-bold text-left uppercase hover:bg-zinc-800 transition ${marketMetric === m ? 'text-white bg-zinc-800' : 'text-zinc-400'}`}>
-                                            {m}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="flex-1 flex items-center justify-center p-8">
-                            {marketMetric !== 'health' ? (
-                                <div className="flex flex-col items-center gap-6 animate-in zoom-in-50 duration-500">
-                                    <div className="w-56 h-56 md:w-72 md:h-72 rounded-full relative flex items-center justify-center shadow-[0_0_50px_rgba(0,0,0,0.5)] transition-all" style={{ background: getConicGradient(marketMetric as any) }}>
-                                        <div className="w-44 h-44 md:w-56 md:h-56 bg-[#050505] rounded-full flex flex-col items-center justify-center z-10 shadow-inner border border-white/5 p-4 text-center">
-                                            {marketMetric === 'storage' && <Database size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
-                                            {marketMetric === 'credits' && <Zap size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
-                                            {marketMetric === 'uptime' && <Clock size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
-
-                                            <span className="text-xs md:text-sm font-bold text-zinc-400 tracking-widest uppercase mb-1">{marketMetric} Share</span>
-                                            <span className="text-[10px] md:text-xs text-zinc-600 font-mono">
-                                                {marketMetric === 'storage' && formatBytes(totalStorage)}
-                                                {marketMetric === 'credits' && `${(totalCredits / 1000000).toFixed(1)}M`}
-                                                {marketMetric === 'uptime' && formatUptimePrecise(totalUptime)}
-                                                <br/>Combined
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="w-full max-w-3xl flex flex-col gap-4 animate-in slide-in-from-bottom-10 duration-500">
-                                    {nodes.map((n, i) => {
-                                        // SAFETY FIX: Modulo loop
-                                        const theme = themes[i % themes.length];
-                                        return (
-                                        <div key={n.pubkey} className="flex items-center gap-4">
-                                            <span className="text-xs font-mono font-bold text-zinc-400 w-32 text-right truncate">{getSafeIp(n)}</span>
-                                            <div className="flex-1 h-8 bg-zinc-900 rounded-full overflow-hidden relative border border-white/5">
-                                                <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${n.health}%`, backgroundColor: theme.hex }}></div>
-                                            </div>
-                                            <span className="text-xs font-bold text-white font-mono w-16 text-left">{n.health} / 100</span>
-                                        </div>
-                                    )})}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="METRIC" specificMetric={marketMetric} />
-                    <InterpretationPanel contextText={getEvaluation('MARKET', marketMetric)} />
-                </>
-            )}
-
-            {tab === 'TOPOLOGY' && (
-                <div className="flex flex-col h-full relative">
-                    {/* MAP CONTROLS */}
-                    <div className="absolute bottom-28 right-8 z-50 flex flex-col gap-2">
-                        <button onClick={handleZoomIn} className="p-2 bg-black/80 backdrop-blur text-zinc-300 hover:text-white border border-zinc-700 rounded-lg hover:bg-zinc-800 transition shadow-lg"><Plus size={16} /></button>
-                        <button onClick={handleReset} className="p-2 bg-black/80 backdrop-blur text-zinc-300 hover:text-white border border-zinc-700 rounded-lg hover:bg-zinc-800 transition shadow-lg"><RotateCcw size={16} /></button>
-                        <button onClick={handleZoomOut} className="p-2 bg-black/80 backdrop-blur text-zinc-300 hover:text-white border border-zinc-700 rounded-lg hover:bg-zinc-800 transition shadow-lg"><Minus size={16} /></button>
-                    </div>
-
-                    <div className="flex-1 rounded-xl overflow-hidden border border-white/5 bg-[#050505] mx-4 md:mx-6 relative group shadow-inner">
-                        <ComposableMap projectionConfig={{ scale: 160 }} className="w-full h-full">
-                            <ZoomableGroup 
-                                zoom={pos.zoom} 
-                                center={pos.coordinates as [number, number]} 
-                                maxZoom={10} 
-                                onMoveEnd={(e: any) => setPos({ coordinates: e.coordinates as [number, number], zoom: e.zoom })}
-                            >
-                                <Geographies geography={GEO_URL}>{({ geographies }: { geographies: any[] }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#18181b" stroke="#27272a" strokeWidth={0.5} />))}</Geographies>
-                                
-                                <Line 
-                                    coordinates={nodes.filter(n => n.location).map(n => [n.location!.lon, n.location!.lat])}
-                                    stroke="#52525b"
-                                    strokeWidth={1}
-                                    strokeOpacity={0.5}
-                                />
-
-                                {nodes.map((n, i) => {
-                                    // SAFETY FIX: Modulo loop
-                                    const theme = themes[i % themes.length];
-                                    return (
-                                    n.location && (
-                                        <Marker key={n.pubkey} coordinates={[n.location.lon, n.location.lat]}>
-                                            <circle r={24/pos.zoom} fill={theme.hex} fillOpacity={0.4} className="animate-pulse" />
-                                            <circle r={12/pos.zoom} fill="#fff" stroke={theme.hex} strokeWidth={4/pos.zoom} />
-                                        </Marker>
-                                    )
-                                )})}
-                            </ZoomableGroup>
-                        </ComposableMap>
-                    </div>
-                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="COUNTRY" onNodeClick={handleNodeFocus} />
-                </div>
-            )}
-        </div>
-    </div>
-  );
-};
-
-// ADDED: print-exclude class to handleExport filter
-const EmptySlot = ({ onClick }: { onClick: () => void }) => (
-  <div className="flex flex-col min-w-[100px] md:min-w-[140px] h-full bg-white/[0.01] group cursor-pointer hover:bg-white/[0.03] transition relative last:rounded-tr-xl last:rounded-br-xl print-exclude" onClick={onClick}>
-    <div className="h-24 md:h-32 p-2 flex flex-col items-center justify-center border-b border-white/5 bg-black/40 first:rounded-tr-xl">
-      <Plus size={12} className="md:w-4 md:h-4 text-zinc-700 group-hover:text-zinc-400 transition" />
-    </div>
-    <div className="flex-1"></div>
-  </div>
-);
-
-// --- MAIN PAGE ---
+// Child Components
+import { ControlRail } from '../components/compare/ControlRail';
+import { NodeColumn } from '../components/compare/NodeColumn';
+import { SynthesisEngine } from '../components/compare/SynthesisEngine';
+import { EmptySlot } from '../components/compare/ComparisonUI';
 
 export default function ComparePage() {
   const router = useRouter();
@@ -615,6 +28,7 @@ export default function ComparePage() {
 
   const { nodes, loading } = useNetworkData(); 
 
+  // --- STATE ---
   const [networkScope, setNetworkScope] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [showNetwork, setShowNetwork] = useState(true);
@@ -628,7 +42,7 @@ export default function ComparePage() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Click Outside Refs
+  // --- REFS ---
   const leaderRef = useRef<HTMLDivElement>(null);
   const watchlistRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<HTMLDivElement>(null);
@@ -637,6 +51,7 @@ export default function ComparePage() {
   useOutsideClick(watchlistRef, () => setIsWatchlistOpen(false));
   useOutsideClick(networkRef, () => setIsNetworkOpen(false));
 
+  // --- DATA LOGIC ---
   const availableNodes = useMemo(() => {
       if (networkScope === 'ALL') return nodes;
       return nodes.filter(n => n.network === networkScope);
@@ -690,6 +105,7 @@ export default function ComparePage() {
       return bestKey;
   }, [selectedNodes]);
 
+  // --- EFFECTS & HANDLERS ---
   useEffect(() => { const saved = localStorage.getItem('xandeum_favorites'); if (saved) setFavorites(JSON.parse(saved)); }, []);
   const updateUrl = (keys: string[]) => router.replace({ pathname: '/compare', query: { nodes: keys.join(',') } }, undefined, { shallow: true });
 
@@ -697,9 +113,7 @@ export default function ComparePage() {
   const removeNode = (pubkey: string) => { const k = selectedKeys.filter(x => x !== pubkey); setSelectedKeys(k); updateUrl(k); };
   const clearAllNodes = () => { setSelectedKeys([]); updateUrl([]); };
 
-  // --- DEEP LINKING LOGIC ---
   const hasProcessedDeepLink = useRef(false);
-
   useEffect(() => {
     if (!router.isReady || loading || nodes.length === 0 || hasProcessedDeepLink.current) return;
     const { nodes: nodesParam, network: networkParam } = router.query;
@@ -717,10 +131,8 @@ export default function ComparePage() {
     }
   }, [router.isReady, loading, nodes, router.query]);
 
-
   const handleShare = () => { navigator.clipboard.writeText(window.location.href); setToast('Link Copied!'); setTimeout(() => setToast(null), 2000); };
   
-  // UPDATED: EXPORT LOGIC FOR FULL SCROLL WIDTH
   const handleExport = async () => {
     if (printRef.current) {
       try {
@@ -731,25 +143,16 @@ export default function ComparePage() {
           width: printRef.current.scrollWidth, 
           height: printRef.current.scrollHeight,
           filter: (node) => {
-             // Exclude elements with 'print-exclude' class (The "Add" Button)
-             if (node instanceof HTMLElement && node.classList.contains('print-exclude')) {
-                 return false;
-             }
+             if (node instanceof HTMLElement && node.classList.contains('print-exclude')) return false;
              return true;
           },
-          style: {
-              overflow: 'visible' // Forces hidden scrolled content to be rendered
-          }
+          style: { overflow: 'visible' }
         });
         const link = document.createElement('a');
         link.download = `pulse-report-${new Date().toISOString().slice(0, 10)}.png`;
         link.href = dataUrl;
         link.click();
-      } catch (err) {
-        console.error("Export failed:", err);
-        setToast('Export Failed');
-        setTimeout(() => setToast(null), 2000);
-      }
+      } catch (err) { console.error("Export failed:", err); setToast('Export Failed'); setTimeout(() => setToast(null), 2000); }
     }
   };
 
@@ -760,14 +163,14 @@ export default function ComparePage() {
       <Head><title>Pulse Compare</title></Head>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#18181b_0%,#020202_100%)] pointer-events-none z-0"></div>
 
-      {/* STANDALONE BACK BUTTON (TOP LEFT) */}
+      {/* BACK BUTTON */}
       <div className="absolute top-4 left-4 z-[60]">
         <Link href="/" className="flex items-center justify-center p-3 rounded-full bg-zinc-900/40 backdrop-blur-md border border-white/5 hover:bg-white/10 hover:border-white/20 transition group">
             <ArrowLeft size={18} className="text-red-500/80 group-hover:text-red-400" />
         </Link>
       </div>
 
-       {/* NETWORK SWITCHER (TOP RIGHT) */}
+       {/* NETWORK SWITCHER */}
        <div className="absolute top-4 right-4 z-[60]" ref={networkRef}>
           <button onClick={() => setIsNetworkOpen(!isNetworkOpen)} className="flex items-center gap-2 px-4 py-3 rounded-full bg-zinc-900/40 backdrop-blur-md text-white text-[10px] font-bold uppercase transition border border-white/5 hover:bg-white/10">
               <div className={`w-2 h-2 rounded-full ${networkScope === 'MAINNET' ? 'bg-green-500' : networkScope === 'DEVNET' ? 'bg-blue-500' : 'bg-white'}`}></div>
@@ -779,7 +182,6 @@ export default function ComparePage() {
       {toast && <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-white text-black font-black uppercase text-xs rounded-full animate-in fade-in slide-in-from-top-4 flex items-center gap-2 shadow-2xl"><CheckCircle size={14}/>{toast}</div>}
 
       <header className="shrink-0 pt-6 pb-4 px-4 md:px-8 relative z-50 flex justify-center">
-        {/* CENTERED GLASS HEADER */}
         <div className="flex flex-col items-center gap-3">
             <div className="bg-zinc-900/40 backdrop-blur-md border border-white/5 rounded-full px-8 py-3 shadow-2xl">
                 <h1 className="text-base font-bold text-white uppercase tracking-widest">COMPARATIVE INTELLIGENCE</h1>
@@ -823,8 +225,6 @@ export default function ComparePage() {
       </div>
 
       <div className="flex-1 overflow-hidden relative z-10 px-4 pb-4 md:px-8 md:pb-8 flex flex-col max-w-[1600px] mx-auto w-full">
-
-         {/* MAIN DATA DECK */}
          <div className="flex-initial min-h-[400px] flex flex-col bg-[#09090b]/60 backdrop-blur-2xl rounded-xl border border-white/5 shadow-2xl overflow-hidden relative mb-6">
              {selectedNodes.length === 0 ? (
                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
@@ -832,19 +232,11 @@ export default function ComparePage() {
                         <div className="absolute inset-0 border border-zinc-900 rounded-full scale-125 border-dashed opacity-50"></div>
                         <Grid size={64} className="text-zinc-800 relative z-10" />
                     </div>
-                    {/* Empty State Copy */}
                     <h2 className="text-xl font-black text-white uppercase tracking-[0.2em] mb-2 z-10">Compare Nodes</h2>
-                    <p className="text-sm text-zinc-500 mb-2 max-w-sm z-10 leading-relaxed font-mono">
-                         Select a minimum of 2 nodes for head to head comparison.
-                    </p>
-                    <p className="text-xs text-zinc-600 mb-8 max-w-sm z-10 leading-relaxed font-mono">
-                         You can also compare against the entire network or a specific top performer.
-                    </p>
+                    <p className="text-sm text-zinc-500 mb-2 max-w-sm z-10 leading-relaxed font-mono">Select a minimum of 2 nodes for head to head comparison.</p>
+                    <p className="text-xs text-zinc-600 mb-8 max-w-sm z-10 leading-relaxed font-mono">You can also compare against the entire network or a specific top performer.</p>
                     <div className="text-[10px] uppercase font-bold text-zinc-600 mb-6">Current Network: <span className="text-zinc-300">{networkScope}</span></div>
-                    
-                    <button onClick={() => setIsSearchOpen(true)} className="px-10 py-4 bg-white text-black hover:bg-zinc-200 font-black uppercase tracking-widest text-xs rounded-full shadow-[0_0_40px_rgba(255,255,255,0.2)] transition-all hover:scale-105 z-10 flex items-center gap-2">
-                        <Plus size={16} className="animate-pulse" /> Add Node
-                    </button>
+                    <button onClick={() => setIsSearchOpen(true)} className="px-10 py-4 bg-white text-black hover:bg-zinc-200 font-black uppercase tracking-widest text-xs rounded-full shadow-[0_0_40px_rgba(255,255,255,0.2)] transition-all hover:scale-105 z-10 flex items-center gap-2"><Plus size={16} className="animate-pulse" /> Add Node</button>
                  </div>
              ) : (
                  <main ref={printRef} className="flex-1 overflow-x-auto overflow-y-auto bg-transparent relative flex custom-scrollbar snap-x items-start content-start">
