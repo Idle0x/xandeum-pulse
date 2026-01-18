@@ -40,11 +40,10 @@ export default function MapPage() {
   // DEEP LINK LOGIC REFS
   const hasDeepLinkRun = useRef<string | null>(null);
 
-  // --- NEW: HANDLE NETWORK CHANGE WITH URL SYNC ---
+  // --- HELPER: HANDLE NETWORK CHANGE WITH URL SYNC ---
   const handleNetworkChange = (net: NetworkType) => {
     setSelectedNetwork(net);
     // Update URL without reloading page (Shallow Routing)
-    // Preserves existing query params (like focus) while updating network
     router.push(
       {
         pathname: router.pathname,
@@ -69,6 +68,7 @@ export default function MapPage() {
         }
     } 
     // Priority 2: Deep Link Focus (Default to ALL if no network specified)
+    // Note: This runs on initial load if network param is missing.
     else if (focus) {
        if (selectedNetwork !== 'ALL') setSelectedNetwork('ALL');
     }
@@ -86,18 +86,31 @@ export default function MapPage() {
     // Check if the locations data is actually populated (safety check)
     if (locations.length === 0) return;
 
-    // Search for the node
+    // Search for the node in the CURRENTLY LOADED locations
     const targetLoc = locations.find((l) => l.ips && l.ips.includes(targetIP));
     
-    // Mark as run so we don't spam logic (especially toast)
+    // Mark as run so we don't spam logic
     hasDeepLinkRun.current = targetIP;
 
     if (targetLoc) {
         // SUCCESS: Lock target, open drawer, scroll to it
         lockTarget(targetLoc.name, targetLoc.lat, targetLoc.lon);
     } else {
-        // FAILURE: Only toast if we are on 'ALL' network.
-        // If user explicitly filtered to 'DEVNET' and node is missing, we assume they know why.
+        // FAILURE to find node in current list.
+        
+        // Scenario: We might be on MAINNET, but the node is on DEVNET.
+        // If we are NOT on ALL, we should force switch to ALL to try and find it.
+        if (selectedNetwork !== 'ALL') {
+             // *** THE FIX: Update State AND URL to 'ALL' ***
+             // This ensures the visual dropdown updates AND persistence is respected
+             handleNetworkChange('ALL');
+             
+             // Reset the ref so the effect runs again after the network switch loads new data
+             hasDeepLinkRun.current = null; 
+             return;
+        }
+
+        // If we are ALREADY on 'ALL' and still can't find it, it's truly masked/offline.
         if (selectedNetwork === 'ALL') {
             setToast({ 
                 msg: `Node ${targetIP} uses a Masked IP (VPN/CGNAT). Geolocation unavailable.`, 
@@ -251,7 +264,7 @@ export default function MapPage() {
         leadingRegion={sortedLocations[0]}
         countryBreakdown={countryBreakdown}
         selectedNetwork={selectedNetwork}
-        setSelectedNetwork={handleNetworkChange} // PASSED NEW HANDLER
+        setSelectedNetwork={handleNetworkChange}
         onRegionClick={() => setIsCountryModalOpen(true)}
         onPrivateHelpClick={() => {
             setToast({ 
