@@ -85,8 +85,11 @@ export const Header = ({
         </div>
 
         {/* Center: Search Bar + Feedback Text */}
-        <div className="flex-1 max-w-5xl mx-4 relative group flex flex-col items-center min-w-0 pt-0.5 md:pt-1">
-          <div className="relative w-full overflow-hidden rounded-lg">
+        {/* UPDATE: Removed max-w limit to let it span fully right. */}
+        <div className="flex-1 mx-4 relative group flex flex-col items-center min-w-0 pt-0.5 md:pt-1">
+          
+          {/* Search Input: Capped width to keep it sane */}
+          <div className="relative w-full max-w-3xl overflow-hidden rounded-lg">
             <Search className={`absolute left-3 top-2.5 size-4 z-10 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
             {!zenMode && !searchQuery && !isSearchFocused && (
               <div className="absolute inset-0 flex items-center pointer-events-none pl-10 pr-4 overflow-hidden z-0">
@@ -107,18 +110,26 @@ export const Header = ({
             {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-2.5 text-zinc-500 hover:text-white transition z-20 p-0.5 bg-black/20 rounded-full hover:bg-zinc-700"><X size={14} /></button>}
           </div>
 
-           {/* Feedback Text Area */}
+           {/* Feedback Text Area: FULL WIDTH (Uncapped) */}
            {!zenMode && (
              <div className="mt-1 md:mt-2 w-full max-w-full overflow-hidden relative h-[20px] transition-all duration-300 mask-linear-fade flex items-center justify-center">
+               
+               {/* 1. HAS SEARCH QUERY */}
                {searchQuery ? (
                  <div className="flex items-center justify-center w-full text-[8px] md:text-xs text-zinc-400 font-mono tracking-wide uppercase animate-in fade-in slide-in-from-top-1 whitespace-nowrap">
                     Showing <span className="text-white font-bold mx-1">{filteredCount}</span> results for <span className="text-blue-400 font-bold ml-1">"{searchQuery}"</span>
                  </div>
-               ) : isSearchFocused ? (
+               ) : 
+               
+               /* 2. IS FOCUSED */
+               isSearchFocused ? (
                  <div className="flex items-center justify-center w-full text-[8px] md:text-xs text-blue-400 font-mono tracking-wide uppercase animate-in fade-in whitespace-nowrap">
                     <Info size={10} className="mr-1.5" /> Type to filter nodes instantly
                  </div>
-               ) : (
+               ) : 
+               
+               /* 3. DEFAULT (Ticker) */
+               (
                  <div className="flex items-center whitespace-nowrap animate-ticker w-full">
                     {[...searchTips, ...searchTips].map((tip, i) => (
                       <div key={i} className="flex items-center mx-8">
@@ -161,12 +172,12 @@ export const Header = ({
       {/* Bottom Row: Controls */}
       <div className="flex items-center gap-2 md:gap-4 overflow-x-auto pb-1 md:pb-2 scrollbar-hide w-full mt-1 md:mt-6 border-t border-zinc-800/50 pt-2 overflow-visible">
         
-        {/* 1. REFRESH (Main Toolbar) */}
+        {/* 1. REFRESH */}
         <button onClick={onRefetch} disabled={loading} className={`flex items-center gap-1 md:gap-2 px-3 h-6 md:px-6 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs shrink-0 ${loading ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50 cursor-wait' : zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400' : 'bg-zinc-900 border border-zinc-800 text-blue-400 hover:bg-zinc-800 hover:scale-105 transform active:scale-95'}`}>
           <RefreshCw size={10} className={`md:w-[14px] md:h-[14px] ${loading || isBackgroundSyncing ? 'animate-spin' : ''}`} /> {loading ? 'SYNC...' : 'REFRESH'}
         </button>
 
-        {/* 2. NETWORK SWITCHER (Now visible on Desktop too, removed md:hidden) */}
+        {/* 2. NETWORK SWITCHER (Consolidated here) */}
         <div className="relative shrink-0 ml-1">
             <button onClick={onCycleNetwork} className={`flex items-center gap-1 px-3 h-6 md:h-12 rounded-xl transition font-bold text-[9px] md:text-xs border active:scale-95 ${zenMode ? 'bg-black border-zinc-800 text-zinc-400' : 'bg-black/40 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white'}`}>
                 <div className={`w-1.5 h-1.5 rounded-full ${networkFilter === 'MAINNET' ? 'bg-green-500' : networkFilter === 'DEVNET' ? 'bg-blue-500' : 'bg-zinc-500'}`}></div>
@@ -179,8 +190,8 @@ export const Header = ({
              <div className={`hidden md:grid flex-1 ${gridClass} gap-4 px-2 items-center text-[9px] font-bold uppercase tracking-wider`}>
                 <div className="w-2"></div>
                 
-                {/* Col 2 (Identity): Cleaned up. Removed buttons. */}
-                <div className="text-zinc-600 pl-1">IDENTITY</div>
+                {/* Col 2: Empty Div (Invisible) to maintain alignment without text */}
+                <div className="pl-1"></div>
 
                 <div></div>
                 <ListHeaderCell label="Version" metric="version" />
@@ -209,7 +220,7 @@ export const Header = ({
             ))}
         </div>
 
-        {/* SORT BUTTONS (Desktop) - Hidden when Scrolled List (replaced by Sticky Header) */}
+        {/* SORT BUTTONS (Desktop) */}
         {!zenMode && (!isScrolled || viewMode === 'grid') && (
              <div className="hidden md:flex gap-2 relative ml-auto">
                 {['uptime', 'storage', 'storage_used', 'version', 'health', 'credits'].map((opt) => (
