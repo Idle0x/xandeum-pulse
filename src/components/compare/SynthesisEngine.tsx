@@ -2,7 +2,7 @@ import { useState, useRef, useMemo } from 'react';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup, Line } from 'react-simple-maps';
 import { 
   BarChart3, PieChart, Map as MapIcon, Database, Zap, Activity, Clock, Info,
-  ChevronDown, Plus, Minus, RotateCcw // RESTORED THESE IMPORTS
+  ChevronDown, Plus, Minus, RotateCcw, Globe
 } from 'lucide-react';
 import { Node } from '../../types';
 import { formatBytes } from '../../utils/formatters';
@@ -47,11 +47,13 @@ const generateLiveReport = (
     focusKey: string | null, 
     focusSection: string | null, 
     nodes: Node[],
-    benchmarks: any
+    benchmarks: any,
+    clusters: any[] // Added clusters for topology narrative
 ) => {
     const groupCount = nodes.length;
     if (groupCount === 0) return "Select nodes to generate analysis.";
 
+    // 1. OVERVIEW TAB LOGIC
     if (tab === 'OVERVIEW') {
         if (!focusSection) return `Global Overview: You are comparing ${groupCount} nodes. The dashboard highlights relative strengths (Power) versus absolute reliability (Vitality). Click any chart to dive deeper.`;
         
@@ -59,7 +61,7 @@ const generateLiveReport = (
             const avgHealth = Math.round(nodes.reduce((a, b) => a + (b.health || 0), 0) / groupCount);
             const netAvg = benchmarks.networkRaw?.health || 0;
             const diff = avgHealth - netAvg;
-            return `Vitality Focus: This group averages a Health Score of ${avgHealth}/100. ${diff > 0 ? `They outperform the network average by +${diff} points.` : `They lag behind the network average by ${diff} points.`} Vitality is a cooperative metric—consistency here is key to network stability.`;
+            return `Vitality Focus: This group averages a Health Score of ${avgHealth}/100. ${diff > 0 ? `They outperform the network average by +${diff} points.` : `They lag behind the network average by ${Math.abs(diff)} points.`} Vitality is a cooperative metric—consistency here is key to network stability.`;
         }
         if (focusSection === 'storage') {
             const total = nodes.reduce((a, b) => a + (b.storage_committed || 0), 0);
@@ -73,6 +75,7 @@ const generateLiveReport = (
         }
     }
 
+    // 2. MARKET TAB LOGIC
     if (tab === 'MARKET') {
         const totalVal = nodes.reduce((a, b) => a + ((b as any)[metric === 'storage' ? 'storage_committed' : metric] || 0), 0);
         
@@ -98,6 +101,37 @@ const generateLiveReport = (
         return `Node Focus [${safeName}]: It controls ${share.toFixed(1)}% of the selected ${metric}. ${verdict} Comparing against the ${nodes.length - 1} other peers, its performance in this sector is ${share > (100/nodes.length) ? 'above' : 'below'} the group average.`;
     }
 
+    // 3. TOPOLOGY TAB LOGIC
+    if (tab === 'TOPOLOGY') {
+        if (!focusKey) {
+            // Calculate Decentralization
+            const countryCounts: Record<string, number> = {};
+            nodes.forEach(n => {
+                const c = n.location?.countryName || 'Unknown';
+                countryCounts[c] = (countryCounts[c] || 0) + 1;
+            });
+            const uniqueCountries = Object.keys(countryCounts).length;
+            const maxConcentration = Math.max(...Object.values(countryCounts));
+            const concentrationPct = (maxConcentration / nodes.length) * 100;
+
+            if (uniqueCountries === 1 && nodes.length > 1) {
+                return `⚠️ High Geographic Risk: 100% of this group shares a single jurisdiction (${Object.keys(countryCounts)[0]}). A regional outage would knock out this entire fleet.`;
+            }
+            if (concentrationPct > 50) {
+                return `⚠️ Moderate Centralization: ${concentrationPct.toFixed(0)}% of your nodes are concentrated in one country. Consider diversifying to improve flood/power resilience.`;
+            }
+            return `✅ Resilient Topology: Your fleet spans ${uniqueCountries} distinct regions. This geo-redundancy creates a robust mesh resistant to local outages.`;
+        }
+
+        // Cluster Focus Logic (Using focusKey to find the cluster)
+        const cluster = clusters.find(c => c.id === focusKey); // We pass cluster ID as focusKey here
+        if (cluster) {
+            const isHub = cluster.nodes.length > 1;
+            const totalStorage = cluster.nodes.reduce((acc: number, n: Node) => acc + (n.storage_committed || 0), 0);
+            return `Region Focus: ${cluster.country}. ${isHub ? `This is a dense HUB hosting ${cluster.nodes.length} nodes.` : "This is a standalone outpost."} Collectively, this location contributes ${formatBytes(totalStorage)} of storage capacity. ${isHub ? "Multiple nodes here maximize hardware efficiency but share physical risks." : "Single nodes here expand the network's physical edge."}`;
+        }
+    }
+
     return "Interactive Analysis Ready.";
 };
 
@@ -110,7 +144,32 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
 
   // --- INTERACTION STATE ---
   const [focusedSection, setFocusedSection] = useState<string | null>(null); 
-  const [focusedNodeKey, setFocusedNodeKey] = useState<string | null>(null);
+  const [focusedNodeKey, setFocusedNodeKey] = useState<string | null>(null); // Uses Pubkey for charts, Cluster ID for maps
+
+  // --- CLUSTERING LOGIC ---
+  const clusters = useMemo(() => {
+      const map = new Map();
+      nodes.forEach((node, index) => {
+          if (!node.location) return;
+          // Create a unique key for coordinates (rounded to avoid tiny drifts)
+          const lat = node.location.lat.toFixed(2);
+          const lon = node.location.lon.toFixed(2);
+          const key = `${lat},${lon}`;
+
+          if (!map.has(key)) {
+              map.set(key, {
+                  id: `cluster-${key}`, // Unique ID for the cluster
+                  lat: node.location.lat,
+                  lon: node.location.lon,
+                  country: node.location.countryName || 'Unknown',
+                  nodes: [],
+                  themeIndex: index // Keep color of first node
+              });
+          }
+          map.get(key).nodes.push(node);
+      });
+      return Array.from(map.values());
+  }, [nodes]);
 
   const handleTabChange = (t: any) => {
       setTab(t);
@@ -122,19 +181,20 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
   const handleZoomOut = () => setPos(p => ({ ...p, zoom: Math.max(p.zoom / 1.5, 1) }));
   const handleReset = () => setPos({ coordinates: [0, 20], zoom: 1 });
 
-  const handleNodeFocus = (node: Node) => {
-    if (node.location) {
-        setPos({ coordinates: [node.location.lon, node.location.lat], zoom: 4 });
+  // Modified to handle both Node (Charts) and Cluster (Map) focus
+  const handleFocus = (key: string | null, location?: {lat: number, lon: number}) => {
+    if (location) {
+        setPos({ coordinates: [location.lon, location.lat], zoom: 4 });
     }
-    setFocusedNodeKey(node.pubkey === focusedNodeKey ? null : (node.pubkey || null));
+    setFocusedNodeKey(focusedNodeKey === key ? null : key);
   };
 
   const metricDropdownRef = useRef<HTMLDivElement>(null);
   useOutsideClick(metricDropdownRef, () => setIsMetricDropdownOpen(false));
 
   const narrative = useMemo(() => {
-      return generateLiveReport(tab, marketMetric, focusedNodeKey, focusedSection, nodes, benchmarks);
-  }, [tab, marketMetric, focusedNodeKey, focusedSection, nodes, benchmarks]);
+      return generateLiveReport(tab, marketMetric, focusedNodeKey, focusedSection, nodes, benchmarks, clusters);
+  }, [tab, marketMetric, focusedNodeKey, focusedSection, nodes, benchmarks, clusters]);
 
   if (nodes.length < 1) return null;
 
@@ -189,6 +249,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
             {tab === 'OVERVIEW' && (
                 <>
                 <div className="grid grid-cols-2 grid-rows-2 gap-4 md:gap-6 p-4 md:p-6 h-full">
+                    {/* ... (Overview Charts - Same as before) ... */}
                     <div className={getOpacityClass(focusedSection === 'storage')}>
                         <ChartCell title="Storage Capacity" icon={Database} isFocused={focusedSection === 'storage'} onClick={(e: any) => { e.stopPropagation(); setFocusedSection(focusedSection === 'storage' ? null : 'storage'); }}>
                             {nodes.map((n, i) => {
@@ -201,7 +262,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                             )})}
                         </ChartCell>
                     </div>
-
+                    {/* ... (Other Charts: Credits, Health, Uptime - Same logic) ... */}
                     <div className={getOpacityClass(focusedSection === 'credits')}>
                         <ChartCell title="Credits Earned" icon={Zap} isFocused={focusedSection === 'credits'} onClick={(e: any) => { e.stopPropagation(); setFocusedSection(focusedSection === 'credits' ? null : 'credits'); }}>
                             {nodes.map((n, i) => {
@@ -214,7 +275,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                             )})}
                         </ChartCell>
                     </div>
-
                     <div className={getOpacityClass(focusedSection === 'health')}>
                         <ChartCell title="Health Score" icon={Activity} isFocused={focusedSection === 'health'} onClick={(e: any) => { e.stopPropagation(); setFocusedSection(focusedSection === 'health' ? null : 'health'); }}>
                             {nodes.map((n, i) => {
@@ -227,7 +287,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                             )})}
                         </ChartCell>
                     </div>
-
                     <div className={getOpacityClass(focusedSection === 'uptime')}>
                         <ChartCell title="Uptime Duration" icon={Clock} isFocused={focusedSection === 'uptime'} onClick={(e: any) => { e.stopPropagation(); setFocusedSection(focusedSection === 'uptime' ? null : 'uptime'); }}>
                             {nodes.map((n, i) => {
@@ -248,6 +307,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
 
             {tab === 'MARKET' && (
                 <>
+                    {/* Market Tab Content (Same as before but with Narrative Hook) */}
                     <div className="relative flex flex-col flex-1">
                         <div className="absolute top-0 right-4 md:right-8 z-20" ref={metricDropdownRef}>
                             <button onClick={() => setIsMetricDropdownOpen(!isMetricDropdownOpen)} className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 rounded-lg text-[10px] md:text-xs font-bold uppercase transition">
@@ -292,7 +352,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                                         <div 
                                             key={n.pubkey} 
                                             className={`flex items-center gap-4 transition-all duration-300 cursor-pointer ${getOpacityClass(isFocus)}`}
-                                            onClick={(e) => { e.stopPropagation(); setFocusedNodeKey(isFocus ? null : (n.pubkey || null)); }}
+                                            onClick={(e) => { e.stopPropagation(); handleFocus(n.pubkey || null); }}
                                         >
                                             <span className="text-xs font-mono font-bold text-zinc-400 w-32 text-right truncate">{getSafeIp(n)}</span>
                                             <div className="flex-1 h-8 bg-zinc-900 rounded-full overflow-hidden relative border border-white/5">
@@ -310,7 +370,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                         themes={themes} 
                         metricMode="METRIC" 
                         specificMetric={marketMetric} 
-                        onNodeClick={(n) => { setFocusedNodeKey(focusedNodeKey === n.pubkey ? null : (n.pubkey || null)); }} 
+                        onNodeClick={(n) => handleFocus(n.pubkey || null)} 
                     />
                     <InterpretationPanel contextText={narrative} />
                 </>
@@ -334,36 +394,58 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                             >
                                 <Geographies geography={GEO_URL}>{({ geographies }: { geographies: any[] }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#18181b" stroke="#27272a" strokeWidth={0.5} />))}</Geographies>
                                 
-                                <Line 
-                                    coordinates={nodes.filter(n => n.location).map(n => [n.location!.lon, n.location!.lat])}
-                                    stroke="#52525b"
-                                    strokeWidth={1}
-                                    strokeOpacity={0.5}
-                                />
-
-                                {nodes.map((n, i) => {
-                                    const theme = themes[i % themes.length];
-                                    const isFocus = focusedNodeKey === n.pubkey;
+                                {/* Connection Arcs (Anchor to Others) */}
+                                {nodes.length > 1 && clusters.map((cluster) => {
+                                    if (cluster.nodes[0].pubkey === nodes[0].pubkey) return null; // Don't draw line to self
                                     return (
-                                    n.location && (
+                                        <Line
+                                            key={`link-${cluster.id}`}
+                                            from={[nodes[0].location?.lon || 0, nodes[0].location?.lat || 0]}
+                                            to={[cluster.lon, cluster.lat]}
+                                            stroke="#3b82f6"
+                                            strokeWidth={1}
+                                            strokeOpacity={0.2}
+                                            strokeDasharray="4 4"
+                                        />
+                                    );
+                                })}
+
+                                {/* Render Clusters */}
+                                {clusters.map((cluster) => {
+                                    const theme = themes[cluster.themeIndex % themes.length];
+                                    const isHub = cluster.nodes.length > 1;
+                                    const isFocus = focusedNodeKey === cluster.id;
+
+                                    return (
                                         <Marker 
-                                            key={n.pubkey} 
-                                            coordinates={[n.location.lon, n.location.lat]}
+                                            key={cluster.id} 
+                                            coordinates={[cluster.lon, cluster.lat]}
                                             onClick={(e: any) => {
                                                 e.stopPropagation();
-                                                handleNodeFocus(n);
+                                                handleFocus(cluster.id, { lat: cluster.lat, lon: cluster.lon });
                                             }}
                                             style={{ cursor: 'pointer' }}
                                         >
-                                            <circle r={isFocus ? 32/pos.zoom : 24/pos.zoom} fill={theme.hex} fillOpacity={isFocus ? 0.8 : 0.4} className={isFocus ? "animate-pulse" : ""} />
-                                            <circle r={12/pos.zoom} fill="#fff" stroke={theme.hex} strokeWidth={4/pos.zoom} />
+                                            {/* Pulse Effect for Focus */}
+                                            {isFocus && <circle r={isHub ? 40/pos.zoom : 24/pos.zoom} fill={theme.hex} fillOpacity={0.2} className="animate-ping" />}
+                                            
+                                            {/* Main Pin */}
+                                            <circle r={isHub ? 24/pos.zoom : 12/pos.zoom} fill={theme.hex} fillOpacity={0.9} stroke="#fff" strokeWidth={2/pos.zoom} />
+                                            
+                                            {/* Hub Count */}
+                                            {isHub && (
+                                                <text textAnchor="middle" y={4/pos.zoom} style={{ fontFamily: 'monospace', fontSize: `${10/pos.zoom}px`, fill: 'black', fontWeight: 'bold' }}>
+                                                    {cluster.nodes.length}
+                                                </text>
+                                            )}
                                         </Marker>
-                                    )
-                                )})}
+                                    );
+                                })}
                             </ZoomableGroup>
                         </ComposableMap>
                     </div>
-                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="COUNTRY" onNodeClick={handleNodeFocus} />
+                    {/* Using UnifiedLegend to trigger focus on first node of the cluster if needed, or just visual reference */}
+                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="COUNTRY" onNodeClick={(n) => handleFocus(n.pubkey || null, n.location ? { lat: n.location.lat, lon: n.location.lon } : undefined)} />
                 </div>
             )}
         </div>
