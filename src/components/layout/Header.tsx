@@ -222,6 +222,24 @@ export const Header = ({
              </div>
         )}
       </div>
+
+      {/* === MOBILE-ONLY SEARCH DATA STRIP === */}
+      {searchQuery && (
+        <div className="md:hidden w-full bg-cyan-400 border-b border-cyan-500 animate-in slide-in-from-top-2">
+            <div className="px-4 py-2 text-center leading-tight">
+                <p className="text-sm italic font-medium text-cyan-950 break-words">
+                Showing 
+                <span className="not-italic font-extrabold text-blue-800 mx-1.5 text-base">
+                    {filteredCount}
+                </span> 
+                results for 
+                <span className="not-italic font-extrabold text-blue-800 ml-1.5 break-all">
+                    "{searchQuery}"
+                </span>
+                </p>
+            </div>
+        </div>
+      )}
     </header>
   );
 };
