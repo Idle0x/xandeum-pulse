@@ -101,7 +101,12 @@ export const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overall
             <div className="flex flex-col w-full">
                 <div className="flex justify-between items-center w-full">
                     <span className="text-[9px] md:text-base font-mono text-zinc-300">{formatBytes(node.storage_used)}</span>
-                    <span className="text-[6px] md:text-[10px] text-zinc-500 font-mono mt-0 md:mt-0.5">{node.storage_committed > 0 ? ((node.storage_used || 0) / (node.storage_committed || 1) * 100).toFixed(0) : 0}% Utilized</span>
+                    <span className="text-[6px] md:text-[10px] text-zinc-500 font-mono mt-0 md:mt-0.5">
+                        {/* FIX: Added fallback (node.storage_committed || 0) here */}
+                        {(node.storage_committed || 0) > 0 
+                            ? ((node.storage_used || 0) / (node.storage_committed || 1) * 100).toFixed(0) 
+                            : 0}% Utilized
+                    </span>
                 </div>
             </div>
             <div className="absolute bottom-1 right-2 md:bottom-3 md:right-4 opacity-50"><MicroBar val={node.storage_used || 0} max={node.storage_committed || 1} color="#60a5fa" /></div>
@@ -121,7 +126,6 @@ export const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overall
         </Row>
         <Row><span className="text-[9px] md:text-base font-mono text-zinc-500">#{node.rank || '-'}</span></Row>
 
-        {/* Trash Action */}
         <div className="h-[28px] md:h-[32px] border-t border-white/5 flex items-center justify-center bg-black/20 hover:bg-red-500/10 transition-colors cursor-pointer group/trash" onClick={onRemove}>
             <Trash2 size={10} className="md:w-3 md:h-3 text-zinc-700 group-hover/trash:text-red-500 transition-colors" />
         </div>
