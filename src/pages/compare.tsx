@@ -9,7 +9,8 @@ import {
   Download, Settings2, CheckCircle, 
   Database, Shield, Zap, 
   Activity, Share2, Map as MapIcon, ChevronDown, Crown, 
-  BarChart3, PieChart, Grid, Star, Clock, Info
+  BarChart3, PieChart, Grid, Star, Clock, Info,
+  TrendingUp, TrendingDown 
 } from 'lucide-react';
 
 // Hooks & Utils
@@ -20,13 +21,18 @@ import { Node } from '../types';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
-// --- THEME ENGINE ---
+// --- THEME ENGINE (EXPANDED TO 10) ---
 const PLAYER_THEMES = [
   { name: 'cyan', hex: '#22d3ee', headerBg: 'bg-cyan-900/40', bodyBg: 'bg-cyan-900/5', text: 'text-cyan-400', border: 'border-cyan-500/20' },
   { name: 'violet', hex: '#a78bfa', headerBg: 'bg-violet-900/40', bodyBg: 'bg-violet-900/5', text: 'text-violet-400', border: 'border-violet-500/20' },
   { name: 'emerald', hex: '#34d399', headerBg: 'bg-emerald-900/40', bodyBg: 'bg-emerald-900/5', text: 'text-emerald-400', border: 'border-emerald-500/20' },
   { name: 'amber', hex: '#fbbf24', headerBg: 'bg-amber-900/40', bodyBg: 'bg-amber-900/5', text: 'text-amber-400', border: 'border-amber-500/20' },
-  { name: 'rose', hex: '#fb7185', headerBg: 'bg-rose-900/40', bodyBg: 'bg-rose-900/5', text: 'text-rose-400', border: 'border-rose-500/20' }
+  { name: 'rose', hex: '#fb7185', headerBg: 'bg-rose-900/40', bodyBg: 'bg-rose-900/5', text: 'text-rose-400', border: 'border-rose-500/20' },
+  { name: 'lime', hex: '#a3e635', headerBg: 'bg-lime-900/40', bodyBg: 'bg-lime-900/5', text: 'text-lime-400', border: 'border-lime-500/20' },
+  { name: 'fuchsia', hex: '#e879f9', headerBg: 'bg-fuchsia-900/40', bodyBg: 'bg-fuchsia-900/5', text: 'text-fuchsia-400', border: 'border-fuchsia-500/20' },
+  { name: 'sky', hex: '#38bdf8', headerBg: 'bg-sky-900/40', bodyBg: 'bg-sky-900/5', text: 'text-sky-400', border: 'border-sky-500/20' },
+  { name: 'orange', hex: '#fb923c', headerBg: 'bg-orange-900/40', bodyBg: 'bg-orange-900/5', text: 'text-orange-400', border: 'border-orange-500/20' },
+  { name: 'indigo', hex: '#818cf8', headerBg: 'bg-indigo-900/40', bodyBg: 'bg-indigo-900/5', text: 'text-indigo-400', border: 'border-indigo-500/20' }
 ];
 
 // --- HOOKS ---
@@ -57,6 +63,27 @@ const formatUptimePrecise = (seconds: number) => {
   return `${m}m`;
 };
 
+// Metric Delta Component
+const MetricDelta = ({ val, base, type = 'number', reverse = false }: { val: number, base: number, type?: 'number' | 'bytes', reverse?: boolean }) => {
+  if (base === undefined || base === null || val === base) return null;
+
+  const diff = val - base;
+  const isGood = reverse ? diff < 0 : diff > 0;
+  
+  const color = isGood ? 'text-green-400' : 'text-red-400';
+  const Icon = diff > 0 ? TrendingUp : TrendingDown;
+
+  let display = '';
+  if (type === 'bytes') display = formatBytes(Math.abs(diff));
+  else display = Math.abs(diff).toLocaleString();
+
+  return (
+    <div className={`flex items-center gap-0.5 text-[8px] font-bold ${color} bg-black/40 px-1.5 py-0.5 rounded border border-white/5 ml-2 shadow-sm whitespace-nowrap`}>
+      <Icon size={8} /> {display}
+    </div>
+  );
+};
+
 const MicroBar = ({ val, max, color }: { val: number, max: number, color: string }) => (
   <div className="w-10 md:w-16 h-0.5 md:h-1 bg-zinc-800 rounded-full overflow-hidden ml-auto">
     <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min((val/max)*100, 100)}%`, backgroundColor: color }}></div>
@@ -70,13 +97,15 @@ const SectionHeader = ({ label, icon: Icon }: { label: string, icon: any }) => (
   </div>
 );
 
+// Updated Legend with Safety Loop
 const UnifiedLegend = ({ nodes, themes, metricMode = 'COUNTRY', specificMetric, onNodeClick }: { nodes: Node[], themes: any[], metricMode: 'COUNTRY' | 'METRIC', specificMetric?: 'storage' | 'credits' | 'health' | 'uptime', onNodeClick?: (node: Node) => void }) => {
     return (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 p-4 md:p-6 mt-auto border-t border-white/5 bg-black/40 min-h-[80px]">
          {nodes.map((node, i) => {
-             let metricDisplay = null;
+             // SAFETY FIX: Loop themes if nodes exceed array length
+             const theme = themes[i % themes.length];
              
-             // Hide metric display in legend specifically for 'health'
+             let metricDisplay = null;
              const showMetricInLegend = metricMode === 'METRIC' && specificMetric && specificMetric !== 'health';
 
              if (metricMode === 'COUNTRY') {
@@ -106,7 +135,7 @@ const UnifiedLegend = ({ nodes, themes, metricMode = 'COUNTRY', specificMetric, 
                     onClick={() => onNodeClick && onNodeClick(node)}
                     className={`flex gap-2 md:gap-3 items-start p-2 md:p-3 rounded md:rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition ${onNodeClick ? 'cursor-pointer hover:border-white/20' : ''}`}
                  >
-                     <div className="w-2 h-2 md:w-3 md:h-3 rounded-full mt-1 shrink-0 shadow-lg" style={{ backgroundColor: themes[i].hex }}></div>
+                     <div className="w-2 h-2 md:w-3 md:h-3 rounded-full mt-1 shrink-0 shadow-lg" style={{ backgroundColor: theme.hex }}></div>
                      <div className="flex flex-col gap-0.5 md:gap-1 overflow-hidden w-full">
                          <div className="text-[8px] md:text-xs font-mono font-bold text-zinc-300 truncate w-full tracking-wide" title={node.pubkey}>
                             {metricMode === 'COUNTRY' ? node.pubkey : node.pubkey?.slice(0, 16) + '...'}
@@ -185,6 +214,20 @@ const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner,
   const Row = ({ children }: { children: React.ReactNode }) => (<div className={`h-[36px] md:h-[72px] flex flex-col justify-center px-3 md:px-4 min-w-[100px] md:min-w-[140px] relative`}>{children}</div>);
   const SectionSpacer = () => <div className="h-5 md:h-8 bg-transparent border-y border-transparent mt-1"></div>;
 
+  const baselines = useMemo(() => {
+      if (showNetwork) return benchmarks.networkRaw;
+      if (leaderMetric) return benchmarks.leaderRaw;
+      if (anchorNode) return {
+          health: anchorNode.health || 0,
+          storage: anchorNode.storage_committed || 0,
+          credits: anchorNode.credits || 0,
+          uptime: anchorNode.uptime || 0
+      };
+      return {};
+  }, [showNetwork, leaderMetric, benchmarks, anchorNode]);
+
+  const showDelta = showNetwork || leaderMetric || (anchorNode && node.pubkey !== anchorNode.pubkey);
+
   return (
     <div className={`flex flex-col min-w-[100px] md:min-w-[140px] ${theme.bodyBg} relative border-r border-white/5 last:rounded-tr-xl last:rounded-br-xl`}>
       <div className={`h-24 md:h-32 ${theme.headerBg} p-2 md:p-4 flex flex-col items-center justify-between relative overflow-hidden group first:rounded-tr-xl`}>
@@ -215,7 +258,10 @@ const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner,
         <Row>
             <div className="flex flex-col w-full">
                 <div className="flex justify-between items-center w-full">
-                    <span className="text-[9px] md:text-base font-bold font-mono text-zinc-200">{node.health}</span>
+                    <div className="flex items-center">
+                        <span className="text-[9px] md:text-base font-bold font-mono text-zinc-200">{node.health}</span>
+                        {showDelta && <MetricDelta val={node.health || 0} base={baselines.health} />}
+                    </div>
                     {winners.health && <CheckCircle size={8} className="md:w-3.5 md:h-3.5 text-green-500" />}
                 </div>
             </div>
@@ -227,7 +273,10 @@ const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner,
         <Row>
              <div className="flex flex-col w-full">
                 <div className="flex justify-between items-center w-full">
-                    <span className="text-[9px] md:text-base font-bold font-mono text-zinc-200">{formatBytes(node.storage_committed)}</span>
+                    <div className="flex items-center">
+                        <span className="text-[9px] md:text-base font-bold font-mono text-zinc-200">{formatBytes(node.storage_committed)}</span>
+                        {showDelta && <MetricDelta val={node.storage_committed || 0} base={baselines.storage} type="bytes" />}
+                    </div>
                     {winners.storage && <CheckCircle size={8} className="md:w-3.5 md:h-3.5 text-green-500" />}
                 </div>
             </div>
@@ -246,7 +295,10 @@ const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner,
         <Row>
             <div className="flex flex-col w-full">
                 <div className="flex justify-between items-center w-full">
-                    <span className="text-[9px] md:text-base font-bold font-mono text-zinc-200">{node.credits?.toLocaleString()}</span>
+                    <div className="flex items-center">
+                        <span className="text-[9px] md:text-base font-bold font-mono text-zinc-200">{node.credits?.toLocaleString()}</span>
+                        {showDelta && <MetricDelta val={node.credits || 0} base={baselines.credits} />}
+                    </div>
                     {winners.credits && <CheckCircle size={8} className="md:w-3.5 md:h-3.5 text-green-500" />}
                 </div>
             </div>
@@ -264,9 +316,12 @@ const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner,
 const OverviewLegend = ({ nodes, themes }: { nodes: Node[], themes: any[] }) => {
     return (
       <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 p-4 border-t border-white/5 bg-black/40 min-h-[60px]">
-          {nodes.map((node, i) => (
+          {nodes.map((node, i) => {
+              // SAFETY FIX: Loop themes
+              const theme = themes[i % themes.length];
+              return (
               <div key={node.pubkey} className="flex items-center gap-1.5 md:gap-2">
-                   <div className="w-2 h-2 md:w-3 md:h-3 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)] border border-white/10" style={{ backgroundColor: themes[i].hex }}></div>
+                   <div className="w-2 h-2 md:w-3 md:h-3 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)] border border-white/10" style={{ backgroundColor: theme.hex }}></div>
                    <div className="flex flex-col">
                         <span className="text-[9px] md:text-xs font-mono font-bold text-zinc-300">{node.pubkey?.slice(0, 12)}...</span>
                         <div className="flex items-center gap-1 opacity-50">
@@ -275,7 +330,7 @@ const OverviewLegend = ({ nodes, themes }: { nodes: Node[], themes: any[] }) => 
                         </div>
                    </div>
               </div>
-          ))}
+          )})}
       </div>
     )
   }
@@ -321,6 +376,7 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
   const totalCredits = nodes.reduce((sum, n) => sum + (n.credits || 0), 0);
   const totalUptime = nodes.reduce((sum, n) => sum + (n.uptime || 0), 0);
 
+  // Updated Gradient to use Modulo Theme
   const getConicGradient = (type: 'storage' | 'credits' | 'uptime') => {
     let currentDeg = 0;
     let total = 0;
@@ -336,7 +392,9 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
         else if (type === 'uptime') val = n.uptime || 0;
 
         const deg = (val / total) * 360;
-        const stop = `${themes[i].hex} ${currentDeg}deg ${currentDeg + deg}deg`;
+        // SAFETY FIX: Modulo loop
+        const theme = themes[i % themes.length];
+        const stop = `${theme.hex} ${currentDeg}deg ${currentDeg + deg}deg`;
         currentDeg += deg;
         return stop;
     }).join(', ')})`;
@@ -383,37 +441,46 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
             {tab === 'OVERVIEW' && (
                 <>
                 <div className="grid grid-cols-2 grid-rows-2 gap-4 md:gap-6 p-4 md:p-6 h-full">
+                    {/* SAFETY FIX: Updated mapping to use modulo theme access */}
                     <ChartCell title="Storage Capacity" icon={Database}>
-                        {nodes.map((n, i) => (
+                        {nodes.map((n, i) => {
+                             const theme = themes[i % themes.length];
+                             return (
                              <div key={n.pubkey} className="w-6 md:w-12 bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end">
-                                 <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${((n.storage_committed || 0) / maxStorage) * 100}%`, backgroundColor: themes[i].hex }}></div>
+                                 <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${((n.storage_committed || 0) / maxStorage) * 100}%`, backgroundColor: theme.hex }}></div>
                                  <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-10">{formatBytes(n.storage_committed || 0)}</div>
                              </div>
-                        ))}
+                        )})}
                     </ChartCell>
                     <ChartCell title="Credits Earned" icon={Zap}>
-                        {nodes.map((n, i) => (
+                        {nodes.map((n, i) => {
+                             const theme = themes[i % themes.length];
+                             return (
                              <div key={n.pubkey} className="w-6 md:w-12 bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end">
-                                 <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${((n.credits || 0) / maxCredits) * 100}%`, backgroundColor: themes[i].hex }}></div>
+                                 <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${((n.credits || 0) / maxCredits) * 100}%`, backgroundColor: theme.hex }}></div>
                                  <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-10">{n.credits?.toLocaleString()}</div>
                              </div>
-                        ))}
+                        )})}
                     </ChartCell>
                     <ChartCell title="Health Score" icon={Activity}>
-                        {nodes.map((n, i) => (
+                        {nodes.map((n, i) => {
+                             const theme = themes[i % themes.length];
+                             return (
                              <div key={n.pubkey} className="w-6 md:w-12 bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end">
-                                 <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${Math.min(n.health || 0, 100)}%`, backgroundColor: themes[i].hex }}></div>
+                                 <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${Math.min(n.health || 0, 100)}%`, backgroundColor: theme.hex }}></div>
                                  <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-10">{n.health}/100</div>
                              </div>
-                        ))}
+                        )})}
                     </ChartCell>
                      <ChartCell title="Uptime Duration" icon={Clock}>
-                        {nodes.map((n, i) => (
+                        {nodes.map((n, i) => {
+                             const theme = themes[i % themes.length];
+                             return (
                              <div key={n.pubkey} className="w-6 md:w-12 bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end">
-                                 <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${((n.uptime || 0) / maxUptime) * 100}%`, backgroundColor: themes[i].hex }}></div>
+                                 <div className="w-full rounded-t-sm transition-all duration-1000 relative" style={{ height: `${((n.uptime || 0) / maxUptime) * 100}%`, backgroundColor: theme.hex }}></div>
                                  <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-10">{formatUptimePrecise(n.uptime || 0)}</div>
                              </div>
-                        ))}
+                        )})}
                     </ChartCell>
                 </div>
                 <OverviewLegend nodes={nodes} themes={themes} />
@@ -461,15 +528,18 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
                                 </div>
                             ) : (
                                 <div className="w-full max-w-3xl flex flex-col gap-4 animate-in slide-in-from-bottom-10 duration-500">
-                                    {nodes.map((n, i) => (
+                                    {nodes.map((n, i) => {
+                                        // SAFETY FIX: Modulo loop
+                                        const theme = themes[i % themes.length];
+                                        return (
                                         <div key={n.pubkey} className="flex items-center gap-4">
                                             <span className="text-xs font-mono font-bold text-zinc-400 w-32 text-right truncate">{getSafeIp(n)}</span>
                                             <div className="flex-1 h-8 bg-zinc-900 rounded-full overflow-hidden relative border border-white/5">
-                                                <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${n.health}%`, backgroundColor: themes[i].hex }}></div>
+                                                <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${n.health}%`, backgroundColor: theme.hex }}></div>
                                             </div>
                                             <span className="text-xs font-bold text-white font-mono w-16 text-left">{n.health} / 100</span>
                                         </div>
-                                    ))}
+                                    )})}
                                 </div>
                             )}
                         </div>
@@ -505,12 +575,17 @@ const SynthesisEngine = ({ nodes, themes, networkScope }: { nodes: Node[], theme
                                     strokeOpacity={0.5}
                                 />
 
-                                {nodes.map((n, i) => (n.location && (
-                                    <Marker key={n.pubkey} coordinates={[n.location.lon, n.location.lat]}>
-                                        <circle r={24/pos.zoom} fill={themes[i].hex} fillOpacity={0.4} className="animate-pulse" />
-                                        <circle r={12/pos.zoom} fill="#fff" stroke={themes[i].hex} strokeWidth={4/pos.zoom} />
-                                    </Marker>
-                                )))}
+                                {nodes.map((n, i) => {
+                                    // SAFETY FIX: Modulo loop
+                                    const theme = themes[i % themes.length];
+                                    return (
+                                    n.location && (
+                                        <Marker key={n.pubkey} coordinates={[n.location.lon, n.location.lat]}>
+                                            <circle r={24/pos.zoom} fill={theme.hex} fillOpacity={0.4} className="animate-pulse" />
+                                            <circle r={12/pos.zoom} fill="#fff" stroke={theme.hex} strokeWidth={4/pos.zoom} />
+                                        </Marker>
+                                    )
+                                )})}
                             </ZoomableGroup>
                         </ComposableMap>
                     </div>
