@@ -15,18 +15,22 @@ export const RegionTrigger: React.FC<RegionTriggerProps> = ({ countryBreakdown, 
   return (
     <button 
       onClick={onClick}
-      className={`relative overflow-hidden bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-500/50 rounded-xl px-3 py-2 transition-all cursor-pointer group items-center gap-3 backdrop-blur-md shadow-lg ${className}`}
+      // ADDED: 'flex' to force row layout. 
+      // MOVED: 'text-xs' here so it can be overridden by className prop on mobile
+      className={`relative flex overflow-hidden bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-500/50 rounded-xl px-3 py-2 transition-all cursor-pointer group items-center gap-2 md:gap-3 backdrop-blur-md shadow-lg text-xs ${className}`}
     >
       <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/10 to-transparent animate-scanner pointer-events-none" />
 
-      <div className="flex -space-x-2 relative z-10">
+      <div className="flex -space-x-2 relative z-10 shrink-0">
         {topFlags.map(code => (
           <div key={code} className="w-5 h-5 rounded-full border border-zinc-900 overflow-hidden relative z-0 group-hover:z-10 transition-all shadow-sm">
             <img src={`https://flagcdn.com/w40/${code}.png`} className="w-full h-full object-cover" alt="flag" />
           </div>
         ))}
       </div>
-      <div className="text-xs font-bold text-zinc-300 group-hover:text-white flex items-center gap-1 relative z-10 whitespace-nowrap">
+      
+      {/* REMOVED: 'text-xs' from here so it inherits from parent */}
+      <div className="font-bold text-zinc-300 group-hover:text-white flex items-center gap-1 relative z-10 whitespace-nowrap">
         <span>+{count} Regions Active</span>
         <BarChart3 size={12} className="text-zinc-600 group-hover:text-white transition-colors" />
       </div>
