@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react'; // Added useMemo
 import { useRouter } from 'next/router';
 import { 
   X, Star, Check, Copy, Shield, Maximize2, HelpCircle, Minimize2, 
@@ -48,7 +48,7 @@ export const InspectorModal = ({
   favorites,
   onToggleFavorite,
   nodes,
-  networkStats,
+  networkStats, // We will largely ignore this now and calculate our own
   medianCommitted,
   totalStorageCommitted,
   mostCommonVersion,
@@ -56,7 +56,6 @@ export const InspectorModal = ({
 }: InspectorModalProps) => {
   const router = useRouter();
   const [modalView, setModalView] = useState<'overview' | 'health' | 'storage' | 'identity'>('overview');
-  // Removed 'COMPARE' from internal mode
   const [mode, setMode] = useState<'VIEW' | 'SHARE'>('VIEW');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -65,9 +64,43 @@ export const InspectorModal = ({
     setMode('VIEW');
   }, [selectedNode.pubkey]);
 
+  // --- FIX: LOCAL STATS CALCULATION ---
+  // We calculate the averages directly from the nodes list to ensure accuracy,
+  // mirroring the logic used in VitalsModal.
+  const computedNetworkStats = useMemo(() => {
+    if (!nodes || nodes.length === 0) return null;
+
+    const totals = nodes.reduce((acc, node) => {
+        // Safe access to breakdown scores (defaulting to 0 if missing)
+        const bd = node.healthBreakdown || { uptime: 0, version: 0, reputation: 0, storage: 0 };
+        return {
+            health: acc.health + (node.health || 0),
+            uptime: acc.uptime + (bd.uptime || 0),
+            version: acc.version + (bd.version || 0),
+            reputation: acc.reputation + (bd.reputation || 0),
+            storage: acc.storage + (bd.storage || 0),
+        };
+    }, { health: 0, uptime: 0, version: 0, reputation: 0, storage: 0 });
+
+    const count = nodes.length;
+
+    return {
+        totalNodes: count,
+        avgBreakdown: {
+            total: totals.health / count,
+            uptime: totals.uptime / count,
+            version: totals.version / count,
+            reputation: totals.reputation / count,
+            storage: totals.storage / count,
+        }
+    };
+  }, [nodes]);
+
   const timeAgo = useTimeAgo(selectedNode.last_seen_timestamp);
   const isSelectedNodeLatest = checkIsLatest(selectedNode.version, mostCommonVersion);
-  const avgNetworkHealth = networkStats?.avgBreakdown?.total || 0;
+  
+  // Use the computed total average
+  const avgNetworkHealth = computedNetworkStats?.avgBreakdown?.total || 0;
 
   // --- SIBLINGS & FLEET LOGIC ---
   const siblingCount = nodes.filter(n => 
@@ -99,10 +132,8 @@ export const InspectorModal = ({
     }
   };
 
-  // --- NEW: COMPARE NAVIGATION (UPDATED) ---
   const handleCompareNav = () => {
       if (selectedNode.pubkey) {
-          // Closes modal and pushes to new page with this node AND its network context
           router.push(`/compare?nodes=${selectedNode.pubkey}&network=${selectedNode.network}`);
       }
   };
@@ -115,7 +146,6 @@ export const InspectorModal = ({
   const healthScore = selectedNode.health || 0;
   const healthStatusLabel = healthScore >= 80 ? 'OPTIMAL' : 'FAIR'; 
 
-  // Zen Mode: Monochrome logic
   const healthColor = zenMode 
     ? 'text-white' 
     : healthScore >= 80 ? 'text-green-500' : healthScore >= 50 ? 'text-yellow-500' : 'text-red-500';
@@ -370,7 +400,16 @@ export const InspectorModal = ({
 
                     {/* RIGHT CONTENT */}
                     <div className="md:col-span-2 h-full">
-                       {modalView === 'health' && <HealthView node={selectedNode} zenMode={zenMode} onBack={() => setModalView('overview')} avgNetworkHealth={avgNetworkHealth} medianStorage={medianCommitted} networkStats={networkStats} />}
+                       {modalView === 'health' && (
+                           <HealthView 
+                               node={selectedNode} 
+                               zenMode={zenMode} 
+                               onBack={() => setModalView('overview')} 
+                               avgNetworkHealth={avgNetworkHealth} // Computed internally now
+                               medianStorage={medianCommitted} 
+                               networkStats={computedNetworkStats} // Computed internally now
+                            />
+                        )}
                        {modalView === 'storage' && <StorageView node={selectedNode} zenMode={zenMode} onBack={() => setModalView('overview')} medianCommitted={medianCommitted} totalStorageCommitted={totalStorageCommitted} nodeCount={nodes.length} />}
                        {modalView === 'identity' && (
                          <IdentityView 
@@ -541,7 +580,6 @@ export const InspectorModal = ({
                         <button onClick={() => copyToClipboard(`${window.location.origin}/?open=${selectedNode.pubkey}`, 'url')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-1.5 md:py-2 rounded-full text-[9px] md:text-[10px] font-bold transition ${zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white' : 'bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/20 text-blue-400'}`}>{copiedField === 'url' ? <Check size={12} /> : <LinkIcon size={12} />} {copiedField === 'url' ? 'COPIED' : 'COPY NODE URL'}</button>
                       </div>
                       <div className="flex gap-2 md:gap-4">
-                        {/* UPDATE: NAVIGATE TO NEW PAGE */}
                         <button onClick={handleCompareNav} className={`flex-1 py-3 md:py-4 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border ${zenMode ? 'bg-black border-zinc-700 hover:bg-zinc-900' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700'}`}><Swords size={16} className={zenMode ? 'text-white' : 'text-red-400'} /> <span className="hidden md:inline">COMPARE NODES</span><span className="md:hidden">COMPARE</span></button>
 
                         <button 
