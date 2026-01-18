@@ -61,7 +61,7 @@ export default function Home() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [toast, setToast] = useState<{visible: boolean, msg: string} | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  
+
   // PAGINATION STATE (Performance Windowing)
   const [visibleCount, setVisibleCount] = useState(30);
 
@@ -76,6 +76,17 @@ export default function Home() {
   const displayedNodes = filteredNodes.slice(0, visibleCount);
   const hasMore = visibleCount < filteredNodes.length;
 
+  // --- HELPER: SYNC NETWORK STATE TO URL ---
+  const updateNetwork = (net: 'ALL' | 'MAINNET' | 'DEVNET') => {
+    setNetworkFilter(net);
+    // Shallow routing ensures we update URL without re-running data fetching methods (if any)
+    // or refreshing the page
+    router.push({
+      pathname: router.pathname,
+      query: { ...router.query, network: net }
+    }, undefined, { shallow: true });
+  };
+
   // --- EFFECTS ---
 
   useEffect(() => {
@@ -86,6 +97,20 @@ export default function Home() {
     const savedView = localStorage.getItem('xandeum_view_mode');
     if (savedView === 'list') setViewMode('list');
   }, []);
+
+  // --- NEW: INITIALIZE NETWORK FROM URL ---
+  useEffect(() => {
+    if (!router.isReady) return;
+    
+    // Check if 'network' query param exists
+    const { network } = router.query;
+    if (network) {
+        const netParam = (network as string).toUpperCase();
+        if (['ALL', 'MAINNET', 'DEVNET'].includes(netParam) && netParam !== networkFilter) {
+            setNetworkFilter(netParam as 'ALL' | 'MAINNET' | 'DEVNET');
+        }
+    }
+  }, [router.isReady, router.query.network]);
 
   // MASTER TIMER LOGIC (For Card Metrics Cycling)
   useEffect(() => {
@@ -105,13 +130,13 @@ export default function Home() {
   // --- ADVANCED DEEP LINKING LOGIC ---
   useEffect(() => {
     if (loading || !router.isReady || !router.query.open || nodes.length === 0) return;
-    
+
     const targetKey = router.query.open as string;
-    const targetNetwork = router.query.network as string;
+    const targetNetwork = router.query.network as string; // This might be used by the new sync logic too
     const targetAddr = router.query.focusAddr as string;
 
     const requestSignature = `${targetKey}-${targetNetwork}-${targetAddr}`;
-    
+
     // Prevent infinite loop if already handled
     if (lastProcessedDeepLink.current === requestSignature) return;
 
@@ -130,8 +155,13 @@ export default function Home() {
 
     if (match) {
         lastProcessedDeepLink.current = requestSignature;
-        // If node is hidden by current filter, reset filter
+        // If node is hidden by current filter, force update filter using our new helper
         if (match.network !== networkFilter && networkFilter !== 'ALL') {
+             // We don't use updateNetwork here to avoid overwriting the 'open' query param flow immediately, 
+             // but we could. For safety in deep linking, simple state set is often safer unless we want to persist 'ALL'
+             // Let's use updateNetwork to keep URL clean and synced.
+             // However, deep linking logic often has its own complex URL params. 
+             // Let's stick to setNetworkFilter('ALL') here to avoid fighting the router if it's already navigating
              setNetworkFilter('ALL'); 
         }
         setSelectedNode(match);
@@ -170,9 +200,12 @@ export default function Home() {
 
   const handleNetworkCycle = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (networkFilter === 'ALL') setNetworkFilter('MAINNET');
-    else if (networkFilter === 'MAINNET') setNetworkFilter('DEVNET');
-    else setNetworkFilter('ALL');
+    let next: 'ALL' | 'MAINNET' | 'DEVNET' = 'ALL';
+    if (networkFilter === 'ALL') next = 'MAINNET';
+    else if (networkFilter === 'MAINNET') next = 'DEVNET';
+    else next = 'ALL';
+    
+    updateNetwork(next);
   };
 
   const toggleFavorite = (e: React.MouseEvent, address: string) => {
@@ -218,7 +251,7 @@ export default function Home() {
         zenMode={zenMode}
         onToggleZen={handleToggleZen} 
         networkFilter={networkFilter}
-        onNetworkChange={setNetworkFilter}
+        onNetworkChange={updateNetwork} // UPDATED: Use helper
         filteredCount={filteredNodes.length}
         onExport={exportCSV}
       />
@@ -236,13 +269,13 @@ export default function Home() {
         isBackgroundSyncing={isBackgroundSyncing}
         onRefetch={refetch}
         networkFilter={networkFilter}
-        onCycleNetwork={handleNetworkCycle}
+        onCycleNetwork={handleNetworkCycle} // Updated to use helper internally
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSortChange={handleSortChange}
         viewMode={viewMode}
         setViewMode={(m) => { setViewMode(m); localStorage.setItem('xandeum_view_mode', m); }}
-        
+
         // Pass Filtered Count for Search Feedback
         filteredCount={filteredNodes.length}
       />
@@ -254,7 +287,7 @@ export default function Home() {
           totalNodes={nodes.length}    
           displayedCount={filteredNodes.length} 
           networkFilter={networkFilter}
-          onNetworkChange={setNetworkFilter}
+          onNetworkChange={updateNetwork} // UPDATED: Use helper
           loading={loading}
           onOpenModal={setActiveStatsModal}
           zenMode={zenMode}
@@ -316,7 +349,7 @@ export default function Home() {
           {/* --- PAGINATION CONTROLS (LOAD MORE) --- */}
           {!loading && nodes.length > 0 && (
             <div className="flex flex-col items-center justify-center py-6 border-t border-zinc-800/50 bg-black/20 gap-3">
-               
+
                <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
                   Showing {Math.min(visibleCount, filteredNodes.length)} of {filteredNodes.length} Nodes
                </div>
