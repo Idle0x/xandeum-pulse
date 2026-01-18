@@ -32,7 +32,9 @@ export default function ComparePage() {
   const [networkScope, setNetworkScope] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [showNetwork, setShowNetwork] = useState(true);
-  const [leaderMetric, setLeaderMetric] = useState<'STORAGE' | 'CREDITS' | 'HEALTH' | null>(null);
+  
+  // Updated Type: Added 'UPTIME'
+  const [leaderMetric, setLeaderMetric] = useState<'STORAGE' | 'CREDITS' | 'HEALTH' | 'UPTIME' | null>(null);
 
   const [isLeaderDropdownOpen, setIsLeaderDropdownOpen] = useState(false);
   const [isWatchlistOpen, setIsWatchlistOpen] = useState(false);
@@ -65,9 +67,12 @@ export default function ComparePage() {
       if (availableNodes.length === 0) return { network: {}, leader: {}, networkRaw: {}, leaderRaw: {} };
 
       let leaderNode: Node | null = null;
+      
+      // LOGIC UPDATE: Added UPTIME handling
       if (leaderMetric === 'STORAGE') leaderNode = availableNodes.reduce((p, c) => (p.storage_committed || 0) > (c.storage_committed || 0) ? p : c, availableNodes[0]);
       else if (leaderMetric === 'CREDITS') leaderNode = availableNodes.reduce((p, c) => (p.credits || 0) > (c.credits || 0) ? p : c, availableNodes[0]);
       else if (leaderMetric === 'HEALTH') leaderNode = availableNodes.reduce((p, c) => (p.health || 0) > (c.health || 0) ? p : c, availableNodes[0]);
+      else if (leaderMetric === 'UPTIME') leaderNode = availableNodes.reduce((p, c) => (p.uptime || 0) > (c.uptime || 0) ? p : c, availableNodes[0]);
 
       const healths = availableNodes.map(n => n.health || 0);
       const storages = availableNodes.map(n => n.storage_committed || 0);
@@ -211,7 +216,23 @@ export default function ComparePage() {
 
             <div className="relative" ref={leaderRef}>
                 <button onClick={() => setIsLeaderDropdownOpen(!isLeaderDropdownOpen)} className={`flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border w-auto ${leaderMetric ? 'bg-white text-black border-white' : 'bg-black/40 text-zinc-400 border-white/5 hover:border-white/20'}`}>{leaderMetric ? `VS ${leaderMetric} LEADER` : 'VS LEADER'} <ChevronDown size={12} /></button>
-                {isLeaderDropdownOpen && <div className="absolute top-full left-0 mt-2 w-36 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col">{['STORAGE', 'CREDITS', 'HEALTH'].map(opt => (<button key={opt} onClick={() => { setLeaderMetric(leaderMetric === opt ? null : opt as any); setIsLeaderDropdownOpen(false); }} className="px-4 py-3 text-[9px] font-bold text-left text-zinc-400 hover:text-white hover:bg-zinc-800 transition uppercase">{opt}</button>))}</div>}
+                {isLeaderDropdownOpen && (
+                    <div className="absolute top-full left-0 mt-2 w-36 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col">
+                        {/* UPDATE: Added UPTIME and NONE */}
+                        {['STORAGE', 'CREDITS', 'HEALTH', 'UPTIME', 'NONE'].map(opt => (
+                            <button 
+                                key={opt} 
+                                onClick={() => { 
+                                    setLeaderMetric(opt === 'NONE' ? null : opt as any); 
+                                    setIsLeaderDropdownOpen(false); 
+                                }} 
+                                className={`px-4 py-3 text-[9px] font-bold text-left hover:bg-zinc-800 transition uppercase ${opt === 'NONE' ? 'text-zinc-600 hover:text-zinc-400 border-t border-zinc-800' : 'text-zinc-400 hover:text-white'}`}
+                            >
+                                {opt === 'NONE' ? 'None (Reset)' : opt}
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
 
             <div className="relative" ref={watchlistRef}>
@@ -268,12 +289,12 @@ export default function ComparePage() {
              )}
          </div>
 
-         {/* ANALYTICS DECK - NOW RECEIVES BENCHMARKS */}
+         {/* ANALYTICS DECK */}
          <SynthesisEngine 
             nodes={selectedNodes} 
             themes={PLAYER_THEMES} 
             networkScope={networkScope} 
-            benchmarks={benchmarks} // PASSING DATA HERE
+            benchmarks={benchmarks} 
          />
       </div>
 
