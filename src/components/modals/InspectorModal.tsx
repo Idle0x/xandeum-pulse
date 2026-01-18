@@ -99,11 +99,11 @@ export const InspectorModal = ({
     }
   };
 
-  // --- NEW: COMPARE NAVIGATION ---
+  // --- NEW: COMPARE NAVIGATION (UPDATED) ---
   const handleCompareNav = () => {
       if (selectedNode.pubkey) {
-          // Closes modal and pushes to new page with this node as the first selection
-          router.push(`/compare?nodes=${selectedNode.pubkey}`);
+          // Closes modal and pushes to new page with this node AND its network context
+          router.push(`/compare?nodes=${selectedNode.pubkey}&network=${selectedNode.network}`);
       }
   };
 
@@ -543,7 +543,7 @@ export const InspectorModal = ({
                       <div className="flex gap-2 md:gap-4">
                         {/* UPDATE: NAVIGATE TO NEW PAGE */}
                         <button onClick={handleCompareNav} className={`flex-1 py-3 md:py-4 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border ${zenMode ? 'bg-black border-zinc-700 hover:bg-zinc-900' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700'}`}><Swords size={16} className={zenMode ? 'text-white' : 'text-red-400'} /> <span className="hidden md:inline">COMPARE NODES</span><span className="md:hidden">COMPARE</span></button>
-                        
+
                         <button 
                           onClick={() => setMode('SHARE')} 
                           className={`flex-1 py-3 md:py-4 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 ${zenMode ? 'bg-white text-black border-transparent hover:bg-zinc-200' : 'text-white bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20'}`}
