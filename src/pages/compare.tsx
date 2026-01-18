@@ -254,7 +254,6 @@ export default function ComparePage() {
                                 onRemove={() => removeNode(node.pubkey!)} 
                                 anchorNode={selectedNodes[0]} 
                                 theme={PLAYER_THEMES[index % PLAYER_THEMES.length]} 
-                                isAnchor={index === 0} 
                                 winners={isWinner}
                                 overallWinner={node.pubkey === overallWinnerKey}
                                 benchmarks={benchmarks}
