@@ -181,7 +181,7 @@ export default function ComparePage() {
 
       {toast && <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-white text-black font-black uppercase text-xs rounded-full animate-in fade-in slide-in-from-top-4 flex items-center gap-2 shadow-2xl"><CheckCircle size={14}/>{toast}</div>}
 
-      <header className="shrink-0 pt-6 pb-4 px-4 md:px-8 relative z-50 flex justify-center">
+      <header className="shrink-0 pt-20 md:pt-6 pb-4 px-4 md:px-8 relative z-50 flex justify-center">
         <div className="flex flex-col items-center gap-3">
             <div className="bg-zinc-900/40 backdrop-blur-md border border-white/5 rounded-full px-8 py-3 shadow-2xl">
                 <h1 className="text-base font-bold text-white uppercase tracking-widest">COMPARATIVE INTELLIGENCE</h1>
@@ -232,11 +232,11 @@ export default function ComparePage() {
                         <div className="absolute inset-0 border border-zinc-900 rounded-full scale-125 border-dashed opacity-50"></div>
                         <Grid size={64} className="text-zinc-800 relative z-10" />
                     </div>
+                    <button onClick={() => setIsSearchOpen(true)} className="px-10 py-4 bg-white text-black hover:bg-zinc-200 font-black uppercase tracking-widest text-xs rounded-full shadow-[0_0_40px_rgba(255,255,255,0.2)] transition-all hover:scale-105 z-10 flex items-center gap-2 mb-6"><Plus size={16} className="animate-pulse" /> Add Node</button>
                     <h2 className="text-xl font-black text-white uppercase tracking-[0.2em] mb-2 z-10">Compare Nodes</h2>
                     <p className="text-sm text-zinc-500 mb-2 max-w-sm z-10 leading-relaxed font-mono">Select a minimum of 2 nodes for head to head comparison.</p>
                     <p className="text-xs text-zinc-600 mb-8 max-w-sm z-10 leading-relaxed font-mono">You can also compare against the entire network or a specific top performer.</p>
                     <div className="text-[10px] uppercase font-bold text-zinc-600 mb-6">Current Network: <span className="text-zinc-300">{networkScope}</span></div>
-                    <button onClick={() => setIsSearchOpen(true)} className="px-10 py-4 bg-white text-black hover:bg-zinc-200 font-black uppercase tracking-widest text-xs rounded-full shadow-[0_0_40px_rgba(255,255,255,0.2)] transition-all hover:scale-105 z-10 flex items-center gap-2"><Plus size={16} className="animate-pulse" /> Add Node</button>
                  </div>
              ) : (
                  <main ref={printRef} className="flex-1 overflow-x-auto overflow-y-auto bg-transparent relative flex custom-scrollbar snap-x items-start content-start">
@@ -268,8 +268,13 @@ export default function ComparePage() {
              )}
          </div>
 
-         {/* ANALYTICS DECK */}
-         <SynthesisEngine nodes={selectedNodes} themes={PLAYER_THEMES} networkScope={networkScope} />
+         {/* ANALYTICS DECK - NOW RECEIVES BENCHMARKS */}
+         <SynthesisEngine 
+            nodes={selectedNodes} 
+            themes={PLAYER_THEMES} 
+            networkScope={networkScope} 
+            benchmarks={benchmarks} // PASSING DATA HERE
+         />
       </div>
 
       {isSearchOpen && (
