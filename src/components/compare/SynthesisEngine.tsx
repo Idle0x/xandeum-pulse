@@ -1,8 +1,7 @@
 import { useState, useRef, useMemo } from 'react';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup, Line } from 'react-simple-maps';
 import { 
-  Plus, Minus, RotateCcw, Database, Zap, Activity, Map as MapIcon, 
-  ChevronDown, BarChart3, PieChart, Clock, Info
+  BarChart3, PieChart, Map as MapIcon, Database, Zap, Activity, Clock, Info 
 } from 'lucide-react';
 import { Node } from '../../types';
 import { formatBytes } from '../../utils/formatters';
@@ -43,16 +42,15 @@ const ChartCell = ({ title, icon: Icon, children, isFocused, onClick }: any) => 
 // --- NARRATIVE ENGINE LOGIC ---
 const generateLiveReport = (
     tab: string, 
-    metric: string, // 'storage' | 'credits' | 'health' | 'uptime' | null
-    focusKey: string | null, // Focused Node Pubkey
-    focusSection: string | null, // Focused Chart Section (Overview)
+    metric: string, 
+    focusKey: string | null, 
+    focusSection: string | null, 
     nodes: Node[],
     benchmarks: any
 ) => {
     const groupCount = nodes.length;
     if (groupCount === 0) return "Select nodes to generate analysis.";
 
-    // 1. OVERVIEW TAB LOGIC
     if (tab === 'OVERVIEW') {
         if (!focusSection) return `Global Overview: You are comparing ${groupCount} nodes. The dashboard highlights relative strengths (Power) versus absolute reliability (Vitality). Click any chart to dive deeper.`;
         
@@ -74,19 +72,16 @@ const generateLiveReport = (
         }
     }
 
-    // 2. MARKET TAB LOGIC
     if (tab === 'MARKET') {
         const totalVal = nodes.reduce((a, b) => a + ((b as any)[metric === 'storage' ? 'storage_committed' : metric] || 0), 0);
         
         if (!focusKey) {
-            // General Market Context
             if (metric === 'storage') return `Storage Market: This chart visualizes data centralization risks. A balanced pie means a resilient cluster. If one slice dominates (>50%), that node is a local single-point-of-failure.`;
             if (metric === 'credits') return `Credit Distribution: This is the reward pie. Ideally, rewards should correlate with storage provided. If a small node has a huge credit slice, it may be over-performing or older than the rest.`;
             if (metric === 'health') return `Health Distribution: Unlike competitive metrics, this should be uniform. A 'cracked' bar where one node is significantly lower indicates a specific failure that needs attention.`;
             return `Market Analysis: Click on any node color in the chart or legend to isolate its specific performance metrics against the group.`;
         }
 
-        // Specific Node Context
         const node = nodes.find(n => n.pubkey === focusKey);
         if (!node) return "Node data unavailable.";
 
@@ -113,10 +108,9 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
   const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false);
 
   // --- INTERACTION STATE ---
-  const [focusedSection, setFocusedSection] = useState<string | null>(null); // 'health', 'storage', etc.
+  const [focusedSection, setFocusedSection] = useState<string | null>(null); 
   const [focusedNodeKey, setFocusedNodeKey] = useState<string | null>(null);
 
-  // Clear focus when switching tabs
   const handleTabChange = (t: any) => {
       setTab(t);
       setFocusedSection(null);
@@ -131,15 +125,12 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
     if (node.location) {
         setPos({ coordinates: [node.location.lon, node.location.lat], zoom: 4 });
     }
-    // Also set narrative focus
     setFocusedNodeKey(node.pubkey === focusedNodeKey ? null : (node.pubkey || null));
   };
 
-  // Click Outside Hook for Metric Dropdown
   const metricDropdownRef = useRef<HTMLDivElement>(null);
   useOutsideClick(metricDropdownRef, () => setIsMetricDropdownOpen(false));
 
-  // --- NARRATIVE GENERATION ---
   const narrative = useMemo(() => {
       return generateLiveReport(tab, marketMetric, focusedNodeKey, focusedSection, nodes, benchmarks);
   }, [tab, marketMetric, focusedNodeKey, focusedSection, nodes, benchmarks]);
@@ -176,15 +167,13 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
     }).join(', ')})`;
   };
 
-  // --- RENDER HELPERS ---
-  // Dimming logic: if something is focused, dim everything else.
   const getOpacityClass = (isTarget: boolean) => {
-      if (!focusedSection && !focusedNodeKey) return 'opacity-100'; // No focus active
+      if (!focusedSection && !focusedNodeKey) return 'opacity-100'; 
       return isTarget ? 'opacity-100 scale-[1.02]' : 'opacity-30 blur-[1px] grayscale-[0.5]';
   };
 
   return (
-    <div className="shrink-0 min-h-[600px] border border-white/5 bg-[#09090b]/40 backdrop-blur-xl flex flex-col relative z-40 rounded-xl mt-6 shadow-2xl overflow-hidden" onClick={() => { /* Reset focus on background click */ setFocusedSection(null); setFocusedNodeKey(null); }}>
+    <div className="shrink-0 min-h-[600px] border border-white/5 bg-[#09090b]/40 backdrop-blur-xl flex flex-col relative z-40 rounded-xl mt-6 shadow-2xl overflow-hidden" onClick={() => { setFocusedSection(null); setFocusedNodeKey(null); }}>
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50">
             <div className="bg-zinc-900/90 backdrop-blur-md p-1.5 rounded-full flex gap-2 border border-white/10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
                 {[ { id: 'OVERVIEW', icon: BarChart3, label: 'Overview' }, { id: 'MARKET', icon: PieChart, label: 'Market Share' }, { id: 'TOPOLOGY', icon: MapIcon, label: 'Topology' } ].map((t) => (
@@ -199,7 +188,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
             {tab === 'OVERVIEW' && (
                 <>
                 <div className="grid grid-cols-2 grid-rows-2 gap-4 md:gap-6 p-4 md:p-6 h-full">
-                    {/* STORAGE CHART */}
                     <div className={getOpacityClass(focusedSection === 'storage')}>
                         <ChartCell title="Storage Capacity" icon={Database} isFocused={focusedSection === 'storage'} onClick={(e: any) => { e.stopPropagation(); setFocusedSection(focusedSection === 'storage' ? null : 'storage'); }}>
                             {nodes.map((n, i) => {
@@ -213,7 +201,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                         </ChartCell>
                     </div>
 
-                    {/* CREDITS CHART */}
                     <div className={getOpacityClass(focusedSection === 'credits')}>
                         <ChartCell title="Credits Earned" icon={Zap} isFocused={focusedSection === 'credits'} onClick={(e: any) => { e.stopPropagation(); setFocusedSection(focusedSection === 'credits' ? null : 'credits'); }}>
                             {nodes.map((n, i) => {
@@ -227,7 +214,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                         </ChartCell>
                     </div>
 
-                    {/* HEALTH CHART */}
                     <div className={getOpacityClass(focusedSection === 'health')}>
                         <ChartCell title="Health Score" icon={Activity} isFocused={focusedSection === 'health'} onClick={(e: any) => { e.stopPropagation(); setFocusedSection(focusedSection === 'health' ? null : 'health'); }}>
                             {nodes.map((n, i) => {
@@ -241,7 +227,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                         </ChartCell>
                     </div>
 
-                    {/* UPTIME CHART */}
                     <div className={getOpacityClass(focusedSection === 'uptime')}>
                         <ChartCell title="Uptime Duration" icon={Clock} isFocused={focusedSection === 'uptime'} onClick={(e: any) => { e.stopPropagation(); setFocusedSection(focusedSection === 'uptime' ? null : 'uptime'); }}>
                             {nodes.map((n, i) => {
@@ -263,7 +248,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
             {tab === 'MARKET' && (
                 <>
                     <div className="relative flex flex-col flex-1">
-                        {/* METRIC SELECTOR */}
                         <div className="absolute top-0 right-4 md:right-8 z-20" ref={metricDropdownRef}>
                             <button onClick={() => setIsMetricDropdownOpen(!isMetricDropdownOpen)} className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 rounded-lg text-[10px] md:text-xs font-bold uppercase transition">
                                 <span className="opacity-50">Analyzing:</span> {marketMetric} <ChevronDown size={12} className="md:w-3.5 md:h-3.5" />
@@ -320,7 +304,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                             )}
                         </div>
                     </div>
-                    {/* Unified Legend with Clickable Nodes */}
                     <UnifiedLegend 
                         nodes={nodes} 
                         themes={themes} 
@@ -334,7 +317,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
 
             {tab === 'TOPOLOGY' && (
                 <div className="flex flex-col h-full relative">
-                    {/* MAP CONTROLS */}
                     <div className="absolute bottom-28 right-8 z-50 flex flex-col gap-2">
                         <button onClick={handleZoomIn} className="p-2 bg-black/80 backdrop-blur text-zinc-300 hover:text-white border border-zinc-700 rounded-lg hover:bg-zinc-800 transition shadow-lg"><Plus size={16} /></button>
                         <button onClick={handleReset} className="p-2 bg-black/80 backdrop-blur text-zinc-300 hover:text-white border border-zinc-700 rounded-lg hover:bg-zinc-800 transition shadow-lg"><RotateCcw size={16} /></button>
@@ -366,7 +348,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                                         <Marker 
                                             key={n.pubkey} 
                                             coordinates={[n.location.lon, n.location.lat]}
-                                            onClick={(e) => {
+                                            onClick={(e: any) => {
                                                 e.stopPropagation();
                                                 handleNodeFocus(n);
                                             }}
