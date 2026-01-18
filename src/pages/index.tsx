@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowUpCircle, AlertTriangle, X } from 'lucide-react'; 
+import { ArrowUpCircle, AlertTriangle, X, ChevronDown, ChevronUp } from 'lucide-react'; 
 
 // --- CUSTOM HOOKS ---
 import { useNetworkData } from '../hooks/useNetworkData';
@@ -61,18 +61,20 @@ export default function Home() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [toast, setToast] = useState<{visible: boolean, msg: string} | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  
+  // PAGINATION STATE
+  const [visibleCount, setVisibleCount] = useState(30);
 
   const toastTimer = useRef<NodeJS.Timeout | null>(null);
-  const lastProcessedDeepLink = useRef<string | null>(null); // Prevents loops
+  const lastProcessedDeepLink = useRef<string | null>(null);
 
   // 5. USE FILTER HOOK
   const filteredNodes = useNodeFilter(nodes, searchQuery, networkFilter, sortBy, sortOrder);
   const stats = useDashboardStats(nodes, networkFilter, totalStorageCommitted, totalStorageUsed);
 
-  // 6. CALCULATE DISPLAY COUNT
-  const networkCount = networkFilter === 'ALL' 
-    ? nodes.length 
-    : nodes.filter(n => n.network === networkFilter).length;
+  // 6. CALCULATE DISPLAY NODES (The Slicing Logic)
+  const displayedNodes = filteredNodes.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredNodes.length;
 
   // --- EFFECTS ---
 
@@ -90,55 +92,44 @@ export default function Home() {
     const cycleInterval = setInterval(() => {
       setCycleStep((prev) => prev + 1);
     }, 13000); 
-
     return () => clearInterval(cycleInterval);
   }, [cycleReset]); 
 
+  // AUTO-RESET PAGINATION ON FILTER CHANGE
+  // This ensures if I sort by "Uptime", I see the top 30 uptimes immediately
+  useEffect(() => {
+    setVisibleCount(30);
+  }, [searchQuery, networkFilter, sortBy, sortOrder]);
+
+
   // --- ADVANCED DEEP LINKING LOGIC ---
   useEffect(() => {
-    // 1. Guard Clauses: Wait for data & router
     if (loading || !router.isReady || !router.query.open || nodes.length === 0) return;
-
-    // 2. Extract Params
     const targetKey = router.query.open as string;
-    const targetNetwork = router.query.network as string; // Optional
-    const targetAddr = router.query.focusAddr as string;  // Optional (Tie Breaker)
+    const targetNetwork = router.query.network as string;
+    const targetAddr = router.query.focusAddr as string;
 
-    // 3. Create Signature to prevent re-running
     const requestSignature = `${targetKey}-${targetNetwork}-${targetAddr}`;
     if (lastProcessedDeepLink.current === requestSignature) return;
 
-    // 4. Find Node (Tiered Matching)
-    // Priority 1: Exact Match (Key + Network + IP)
     let match = nodes.find(n => 
         n.pubkey === targetKey && 
         (!targetNetwork || n.network === targetNetwork) &&
         (!targetAddr || n.address === targetAddr)
     );
-
-    // Priority 2: Fallback to Key + Network (if IP changed or missing)
     if (!match && targetNetwork) {
         match = nodes.find(n => n.pubkey === targetKey && n.network === targetNetwork);
     }
-
-    // Priority 3: Fallback to Key only (First available)
     if (!match) {
         match = nodes.find(n => n.pubkey === targetKey);
     }
 
-    // 5. Execute Action
     if (match) {
         lastProcessedDeepLink.current = requestSignature;
-        
-        // Auto-switch filter so the node is visible in the background list
         if (match.network !== networkFilter && networkFilter !== 'ALL') {
              setNetworkFilter('ALL'); 
         }
-
         setSelectedNode(match);
-        
-        // Optional: Clean URL (Remove params) - Uncomment if desired
-        // router.replace('/', undefined, { shallow: true });
     }
   }, [loading, router.isReady, router.query, nodes, networkFilter]);
 
@@ -154,9 +145,8 @@ export default function Home() {
     }
 
     let targetStep = cycleStep; 
-    // Logic: Map metric to Card Cycle Step
-    if (metric === 'storage') targetStep = 1;      // Commited
-    if (metric === 'storage_used') targetStep = 0; // Used
+    if (metric === 'storage') targetStep = 1;
+    if (metric === 'storage_used') targetStep = 0;
     if (metric === 'health') targetStep = 2;
     if (metric === 'uptime') targetStep = 3;
 
@@ -253,7 +243,7 @@ export default function Home() {
           stats={stats}
           totalStorageCommitted={totalStorageCommitted}
           totalNodes={nodes.length}    
-          displayedCount={networkCount} 
+          displayedCount={filteredNodes.length} 
           networkFilter={networkFilter}
           onNetworkChange={setNetworkFilter}
           loading={loading}
@@ -288,10 +278,10 @@ export default function Home() {
              <PulseGraphLoader />
           ) : viewMode === 'grid' ? (
              <NodeGrid 
-               // Force rebuild on sort to allow smooth re-ordering
+               // Force rebuild on sort
                key={`grid-${sortBy}-${sortOrder}-${filteredNodes.length}`} 
                loading={loading}
-               nodes={filteredNodes}
+               nodes={displayedNodes} // PASSING SLICED DATA
                zenMode={zenMode}
                cycleStep={cycleStep}
                mostCommonVersion={mostCommonVersion}
@@ -304,7 +294,7 @@ export default function Home() {
              <NodeList
                // Force rebuild on sort
                key={`list-${sortBy}-${sortOrder}-${filteredNodes.length}`}
-               nodes={filteredNodes}
+               nodes={displayedNodes} // PASSING SLICED DATA
                onNodeClick={setSelectedNode}
                onToggleFavorite={toggleFavorite}
                favorites={favorites}
@@ -314,35 +304,48 @@ export default function Home() {
              />
           )}
 
+          {/* --- PAGINATION CONTROLS (LOAD MORE) --- */}
           {!loading && nodes.length > 0 && (
-            <div className="flex items-center justify-center py-6 border-t border-zinc-800/50 bg-black/20 gap-4">
-               {/* Active Pods Indicator */}
-               <div className="group flex items-center gap-3 px-4 py-2 rounded-full bg-black/40 border border-white/5 shadow-[inset_0_1px_4px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all hover:border-white/10 hover:bg-black/60 cursor-help" title="Live count of filtered nodes currently in view">
-                  <div className="relative flex h-1.5 w-1.5">
-                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75 duration-1000"></span>
-                     <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[9px] font-mono font-bold tracking-widest uppercase text-zinc-500 group-hover:text-zinc-400 transition-colors">
-                     <span>Active Pods Uplink</span>
-                     <span className="text-zinc-700">|</span>
-                     <span className="text-zinc-300 font-black text-[10px]">{filteredNodes.length}</span>
-                  </div>
+            <div className="flex flex-col items-center justify-center py-6 border-t border-zinc-800/50 bg-black/20 gap-3">
+               
+               <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                  Showing {Math.min(visibleCount, filteredNodes.length)} of {filteredNodes.length} Nodes
                </div>
 
-               {/* Back to Top Button */}
-               <button 
-                  onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                  className="p-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all shadow-lg active:scale-95"
-                  title="Back to Top"
-               >
-                  <ArrowUpCircle size={18} />
-               </button>
+               <div className="flex items-center gap-3">
+                   {hasMore && (
+                       <button 
+                         onClick={() => setVisibleCount(prev => prev + 30)}
+                         className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 transition-all active:scale-95 ${zenMode ? 'bg-zinc-800 text-white border border-zinc-700' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20'}`}
+                       >
+                         <ChevronDown size={12} /> Load Next 30
+                       </button>
+                   )}
+
+                   {visibleCount > 30 && (
+                       <button 
+                         onClick={() => {
+                            setVisibleCount(30);
+                            window.scrollTo({ top: 0, behavior: 'smooth' }); // Optional nice-to-have
+                         }}
+                         className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 transition-all active:scale-95 ${zenMode ? 'bg-zinc-900 text-zinc-400 border border-zinc-800' : 'bg-zinc-900/50 text-zinc-500 border border-zinc-800 hover:text-zinc-300'}`}
+                       >
+                         <ChevronUp size={12} /> Collapse
+                       </button>
+                   )}
+               </div>
+
             </div>
           )}
         </NodesContainer>
       </main>
 
-      <Footer zenMode={zenMode} nodeCount={filteredNodes.length} />
+      {/* FOOTER: Pass Total and Filtered Count */}
+      <Footer 
+        zenMode={zenMode} 
+        totalNodes={nodes.length} 
+        filteredCount={filteredNodes.length} 
+      />
 
       {activeStatsModal === 'capacity' && <CapacityModal onClose={() => setActiveStatsModal(null)} nodes={nodes} medianCommitted={medianCommitted} totalCommitted={totalStorageCommitted} totalUsed={totalStorageUsed} />}
       {activeStatsModal === 'vitals' && <VitalsModal onClose={() => setActiveStatsModal(null)} nodes={nodes} avgHealth={avgNetworkHealth} consensusPercent={networkConsensus} consensusVersion={mostCommonVersion} />}
