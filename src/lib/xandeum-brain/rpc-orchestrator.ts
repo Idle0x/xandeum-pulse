@@ -1,7 +1,6 @@
 import axios from 'axios';
 import pino from 'pino';
 import http from 'http';
-import https from 'https';
 
 // --- CONFIGURATION ---
 const HERO_PUBLIC_RPC = '173.212.203.145';
@@ -13,116 +12,73 @@ const BACKUP_RPCS = [
 
 const TIMEOUT_RPC = 8000;
 
+/**
+ * FIXED LOGGER: 
+ * Vercel cannot handle pino-pretty in production.
+ */
 const logger = pino({
   level: 'info',
-  transport: { target: 'pino-pretty', options: { colorize: true } }
+  // Only use pretty printing in development
+  transport: process.env.NODE_ENV !== 'production' 
+    ? { target: 'pino-pretty', options: { colorize: true } } 
+    : undefined
 });
 
-// Force IPv4 agents to prevent dual-stack DNS delays/errors
 const httpAgent = new http.Agent({ family: 4 });
-const httpsAgent = new https.Agent({ family: 4 });
 
 export class PublicRpcOrchestrator {
-  
   constructor() {
-    logger.info("Public RPC Orchestrator initialized.");
+    logger.info("Orchestrator initialized (Production Safe Logging)");
   }
 
-  /**
-   * MAIN ENTRY POINT
-   */
   async fetchPublicNodes(): Promise<any[]> {
-    let resultNodes: any[] = [];
-
-    // 1. Try Hero
+    // 1. Priority: Hero RPC
     try {
-      logger.info(`Attempting Hero RPC: ${HERO_PUBLIC_RPC}`);
-      resultNodes = await this.fetchFromNode(HERO_PUBLIC_RPC);
-      if (resultNodes.length > 0) return resultNodes;
-    } catch (e: any) {
-      logger.warn(`Hero RPC failed: ${e.message}`);
+      const heroData = await this.fetchFromNode(HERO_PUBLIC_RPC);
+      if (heroData.length > 0) return heroData;
+    } catch (e) {
+      logger.warn(`Hero RPC failed: ${HERO_PUBLIC_RPC}`);
     }
 
-    // 2. Try Swarm (Race)
+    // 2. Swarm Race: Fire all requests at once, take the first to finish
     try {
-        logger.info("Engaging Swarm Race...");
-        resultNodes = await this.raceSwarm();
-        if (resultNodes.length > 0) return resultNodes;
-    } catch (e: any) {
-        logger.error(`Swarm Race Critical Failure: ${e.message}`);
-    }
-
-    // 3. LAST STAND: Linear Fallback
-    // If racing failed instantly (network issues), try one by one slowly.
-    logger.warn("Racing failed. Attempting Linear Fallback (One-by-One).");
-    for (const ip of BACKUP_RPCS) {
-        try {
-            resultNodes = await this.fetchFromNode(ip);
-            if (resultNodes.length > 0) {
-                logger.info(`Linear fallback saved us on IP: ${ip}`);
-                return resultNodes;
-            }
-        } catch (e) {
-            continue; 
-        }
-    }
-
-    return [];
-  }
-
-  /**
-   * RACE LOGIC (Simplified & Robust)
-   */
-  private async raceSwarm(): Promise<any[]> {
-    // Shuffle to avoid hitting the same bad node first every time
-    const candidates = [...BACKUP_RPCS].sort(() => 0.5 - Math.random());
-
-    // Map promises but capturing individual errors
-    const promises = candidates.map(async (ip) => {
-        try {
-            return await this.fetchFromNode(ip);
-        } catch (err: any) {
-            // Throwing here is required for Promise.any to count it as a failure
-            throw new Error(`${ip}: ${err.message}`);
-        }
-    });
-
-    try {
-      // Wait for the FIRST success
-      const winner = await Promise.any(promises);
+      logger.info("Racing all backup RPCs...");
+      const winner = await Promise.any(
+        BACKUP_RPCS.map(ip => this.fetchFromNode(ip))
+      );
       return winner;
-    } catch (aggregateError: any) {
-        // Log all errors to see WHY it failed instantly
-        if (aggregateError.errors) {
-            aggregateError.errors.forEach((e: Error) => logger.warn(e.message));
-        }
-        throw new Error("All Swarm nodes rejected.");
+    } catch (aggregateError) {
+      logger.error("All RPCs in swarm failed or timed out.");
+      return [];
     }
   }
 
   private async fetchFromNode(ip: string): Promise<any[]> {
+    const url = `http://${ip}:6000/rpc`;
     try {
-      const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
-      
-      // Explicitly set httpAgent to force IPv4
-      const res = await axios.post(`http://${ip}:6000/rpc`, payload, { 
+      const res = await axios.post(
+        url,
+        { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 },
+        { 
           timeout: TIMEOUT_RPC,
-          httpAgent: httpAgent,
-          httpsAgent: httpsAgent
-      });
-      
+          httpAgent: httpAgent // Force IPv4 to prevent connection resets
+        }
+      );
+
       const pods = res.data?.result?.pods;
       if (Array.isArray(pods) && pods.length > 0) {
-          return pods;
+        return pods;
       }
-      throw new Error("Empty/Invalid Data");
-    } catch (e: any) {
-      throw new Error(e.message);
+      throw new Error("No data");
+    } catch (err: any) {
+      // Log failure for debugging in Vercel console
+      logger.debug(`Node ${ip} failed: ${err.message}`);
+      throw err; 
     }
   }
 }
 
-// Global Singleton for Next.js
+// Global Singleton for Next.js to prevent memory leaks/multiple instances
 const globalForSwarm = global as unknown as { swarmInstance: PublicRpcOrchestrator };
 export const publicSwarm = globalForSwarm.swarmInstance || new PublicRpcOrchestrator();
 if (process.env.NODE_ENV !== 'production') globalForSwarm.swarmInstance = publicSwarm;
