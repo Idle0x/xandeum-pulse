@@ -27,7 +27,6 @@ const getLinkColor = (startLat: number, startLon: number, endLat: number) => {
 };
 
 // --- SUB-COMPONENTS ---
-// UPDATE: Added 'print-exclude' class to hide this panel during export
 const InterpretationPanel = ({ contextText }: { contextText: string }) => (
     <div className="px-4 py-3 md:px-6 md:py-4 bg-zinc-900/30 border-t border-white/5 flex items-start gap-3 md:gap-4 transition-all duration-300 print-exclude">
         <Info size={14} className="text-blue-400 shrink-0 mt-0.5 md:w-4 md:h-4 animate-pulse" />
@@ -126,12 +125,12 @@ interface SynthesisEngineProps {
   themes: any[];
   networkScope: string;
   benchmarks: any;
-  // UPDATE: Optional props for external control (Parent-Child Sync)
   hoveredNodeKey?: string | null;
   onHover?: (key: string | null) => void;
+  isExport?: boolean; // NEW PROP
 }
 
-export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hoveredNodeKey: externalHoverKey, onHover: setExternalHover }: SynthesisEngineProps) => {
+export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hoveredNodeKey: externalHoverKey, onHover: setExternalHover, isExport = false }: SynthesisEngineProps) => {
   const [tab, setTab] = useState<'OVERVIEW' | 'MARKET' | 'TOPOLOGY'>('OVERVIEW');
   const [marketMetric, setMarketMetric] = useState<'storage' | 'credits' | 'health' | 'uptime'>('storage');
   const [pos, setPos] = useState({ coordinates: [0, 20], zoom: 1 });
@@ -265,22 +264,22 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
          onMouseLeave={() => handleHover(null)}
          onClick={() => { setFocusedSection(null); setFocusedNodeKey(null); }}>
 
-        {/* TAB CONTROLS */}
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50">
-            <div className="bg-zinc-900/90 backdrop-blur-md p-1.5 rounded-full flex gap-2 border border-white/10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                {[{ id: 'OVERVIEW', icon: BarChart3, label: 'Overview' }, { id: 'MARKET', icon: PieChart, label: 'Market Share' }, { id: 'TOPOLOGY', icon: MapIcon, label: 'Topology' }].map((t) => (
-                    <button key={t.id} onClick={() => handleTabChange(t.id)} className={`px-4 py-1.5 md:px-6 md:py-2 rounded-full text-[9px] md:text-xs font-bold uppercase transition-all duration-300 flex items-center gap-2 ${tab === t.id ? 'bg-zinc-100 text-black shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'bg-white/5 text-zinc-500 hover:text-zinc-300 hover:bg-white/10'}`}>
-                        <t.icon size={10} className="md:w-3.5 md:h-3.5" /> {t.label}
-                    </button>
-                ))}
+        {/* TAB CONTROLS (HIDDEN DURING EXPORT) */}
+        {!isExport && (
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50">
+                <div className="bg-zinc-900/90 backdrop-blur-md p-1.5 rounded-full flex gap-2 border border-white/10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                    {[{ id: 'OVERVIEW', icon: BarChart3, label: 'Overview' }, { id: 'MARKET', icon: PieChart, label: 'Market Share' }, { id: 'TOPOLOGY', icon: MapIcon, label: 'Topology' }].map((t) => (
+                        <button key={t.id} onClick={() => handleTabChange(t.id)} className={`px-4 py-1.5 md:px-6 md:py-2 rounded-full text-[9px] md:text-xs font-bold uppercase transition-all duration-300 flex items-center gap-2 ${tab === t.id ? 'bg-zinc-100 text-black shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'bg-white/5 text-zinc-500 hover:text-zinc-300 hover:bg-white/10'}`}>
+                            <t.icon size={10} className="md:w-3.5 md:h-3.5" /> {t.label}
+                        </button>
+                    ))}
+                </div>
             </div>
-        </div>
+        )}
 
-        {/* UPDATE: Removed 'e.stopPropagation()' 
-            Added click handler to explicitly clear focus when clicking the background area 
-        */}
+        {/* UPDATE: Conditional padding based on isExport */}
         <div 
-            className="flex-1 overflow-hidden relative flex flex-col pt-24" 
+            className={`flex-1 overflow-hidden relative flex flex-col ${isExport ? 'pt-6' : 'pt-24'}`}
             onClick={() => { setFocusedSection(null); setFocusedNodeKey(null); }}
         >
             {/* OVERVIEW TAB */}
@@ -311,7 +310,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                     ))}
                 </div>
                 <OverviewLegend nodes={nodes} themes={themes} hoveredKey={activeHoverKey} onHover={handleHover} />
-                <InterpretationPanel contextText={narrative} />
+                {!isExport && <InterpretationPanel contextText={narrative} />}
                 </>
             )}
 
@@ -360,19 +359,21 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                         </div>
                     </div>
                     <UnifiedLegend nodes={nodes} themes={themes} metricMode="METRIC" specificMetric={marketMetric} hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => setFocusedNodeKey(n.pubkey || null)} />
-                    <InterpretationPanel contextText={narrative} />
+                    {!isExport && <InterpretationPanel contextText={narrative} />}
                 </>
             )}
 
             {/* TOPOLOGY TAB (SPATIAL INTELLIGENCE) */}
             {tab === 'TOPOLOGY' && (
                 <div className="flex flex-col h-full relative group/map">
-                    {/* Controls relocated INSIDE map container (Bottom Right) */}
-                    <div className="absolute bottom-6 right-6 z-50 flex flex-col gap-2 opacity-80 hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={handleZoomIn} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><Plus size={16} /></button>
-                        <button onClick={handleReset} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><RotateCcw size={16} /></button>
-                        <button onClick={handleZoomOut} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><Minus size={16} /></button>
-                    </div>
+                    {/* Controls - Hide on Export */}
+                    {!isExport && (
+                        <div className="absolute bottom-6 right-6 z-50 flex flex-col gap-2 opacity-80 hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={handleZoomIn} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><Plus size={16} /></button>
+                            <button onClick={handleReset} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><RotateCcw size={16} /></button>
+                            <button onClick={handleZoomOut} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><Minus size={16} /></button>
+                        </div>
+                    )}
 
                     <div className="flex-1 rounded-xl overflow-hidden border border-white/5 bg-[#050505] mx-4 md:mx-6 relative shadow-inner">
                         <ComposableMap projectionConfig={{ scale: 160 }} className="w-full h-full">
@@ -426,7 +427,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                         </ComposableMap>
                     </div>
                     <UnifiedLegend nodes={nodes} themes={themes} metricMode="COUNTRY" hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => handleFocus(n.pubkey || null, n.location ? { lat: n.location.lat, lon: n.location.lon } : undefined)} />
-                    <InterpretationPanel contextText={narrative} />
+                    {!isExport && <InterpretationPanel contextText={narrative} />}
                 </div>
             )}
         </div>
