@@ -5,43 +5,137 @@ import { getSafeIp } from '../utils/nodeHelpers';
 // --- TYPES ---
 type NarrativeContext = {
   tab: 'OVERVIEW' | 'MARKET' | 'TOPOLOGY';
-  metric?: string; // 'storage', 'credits', 'health', 'uptime'
-  focusKey?: string | null; // The clicked node
-  hoverKey?: string | null; // The hovered node
+  metric?: string; 
+  focusKey?: string | null; 
+  hoverKey?: string | null; 
   nodes: Node[];
   benchmarks: any;
-  chartSection?: string | null; // Specific to Overview tab (clicked chart)
+  chartSection?: string | null;
 };
 
-// --- LEXICON (The Building Blocks) ---
+// --- LEXICON (The "Mad Libs" Dictionary) ---
 const LEXICON = {
+  // OPENERS
   openers: {
-    neutral: ["Analyzing the dataset,", "Upon review of the cluster,", "Current telemetry indicates", "The data suggests", "Cluster diagnostics reveal"],
-    positive: ["Impressively,", "Optimized performance detected:", "High-efficiency indicators found:", "Excellent signals:", "Superior metrics observed:"],
-    negative: ["Attention required:", "Critical variance detected:", "Performance alert:", "Sub-optimal configurations found:", "Warning:"],
+    analysis: [
+      // Tech
+      "Analyzing the dataset,", "Upon review of the cluster,", "Current telemetry indicates", "The data suggests", "Cluster diagnostics reveal", "System scan shows", "Reviewing aggregate logs,",
+      // Simple
+      "Looking at the numbers,", "Here is the summary:", "A quick check shows", "Basically,", "To put it simply,", "We can see that", "The main takeaway is", "Checking the details,"
+    ],
+    positive: [
+      // Tech
+      "Impressively,", "Optimized performance detected:", "High-efficiency indicators found:", "Excellent signals:", "Superior metrics observed:", "Healthy patterns detected:", "Top-tier performance:",
+      // Simple
+      "Good news:", "Things look good:", "Great job:", "Working well:", "Strong results:", "Nice work:", "This looks solid:", "All clear:"
+    ],
+    negative: [
+      // Tech
+      "Attention required:", "Critical variance detected:", "Performance alert:", "Sub-optimal configurations found:", "Warning:", "Degradation detected:", "Stability concern:",
+      // Simple
+      "Watch out:", "Not good:", "Problem here:", "Needs fixing:", "Bad sign:", "Check this:", "Something is wrong:", "Heads up:"
+    ],
+    spatial: [
+      // Tech
+      "Geospatial audit:", "Topology scan:", "Network geometry:", "Map analysis:", "Physical distribution check:",
+      // Simple
+      "Looking at the map:", "Where they are:", "Location check:", "On the ground:", "Physical spots:"
+    ],
+    market: [
+      // Tech
+      "Market structure:", "Economic spread:", "Resource allocation:", "Dominance check:", "Share distribution:",
+      // Simple
+      "Who owns what:", "The pie chart shows:", "Breaking it down:", "Share check:", "The split:"
+    ],
   },
+  
+  // CONNECTORS
   connectors: {
-    contrast: ["however,", "in contrast,", "conversely,", "despite this,", "although,"],
-    addition: ["furthermore,", "additionally,", "moreover,", "integrated with this,", "coupled with"],
-    causality: ["resulting in", "driving", "causing", "leading to", "facilitating"],
+    contrast: [
+      // Tech
+      "however,", "in contrast,", "conversely,", "despite this,", "although,", "yet,", "on the other hand,",
+      // Simple
+      "but,", "still,", "even so,", "mind you,", "though,", "except,"
+    ],
+    addition: [
+      // Tech
+      "furthermore,", "additionally,", "moreover,", "integrated with this,", "coupled with", "alongside this,",
+      // Simple
+      "plus,", "and,", "also,", "on top of that,", "besides,", "too,"
+    ],
+    causality: [
+      // Tech
+      "resulting in", "driving", "facilitating", "creating", "generating",
+      // Simple
+      "making", "causing", "meaning", "which means", "leading to", "so"
+    ],
   },
+  
+  // ADJECTIVES
   adjectives: {
-    good: ["robust", "stellar", "resilient", "optimal", "elite", "superior", "impeccable"],
-    bad: ["degraded", "volatile", "fragile", "inconsistent", "compromised", "lagging", "unstable"],
-    big: ["massive", "dominant", "substantial", "significant", "overwhelming"],
-    small: ["marginal", "negligible", "fractional", "minor", "minimal"]
+    good: [
+      // Tech
+      "robust", "stellar", "resilient", "optimal", "elite", "superior", "impeccable", "rock-solid", "efficient",
+      // Simple
+      "good", "great", "solid", "nice", "clean", "fine", "strong", "happy"
+    ],
+    bad: [
+      // Tech
+      "degraded", "volatile", "fragile", "inconsistent", "compromised", "lagging", "unstable", "shaky",
+      // Simple
+      "bad", "weak", "poor", "messy", "low", "sad", "broken", "rough"
+    ],
+    big: [
+      // Tech
+      "massive", "dominant", "substantial", "significant", "overwhelming", "hefty", "controlling",
+      // Simple
+      "big", "huge", "large", "giant", "fat", "major", "heavy"
+    ],
+    small: [
+      // Tech
+      "marginal", "negligible", "fractional", "minor", "minimal", "insignificant",
+      // Simple
+      "small", "tiny", "little", "bit of", "light", "slim"
+    ],
+    diverse: [
+      // Tech
+      "distributed", "decentralized", "scattered", "widespread",
+      // Simple
+      "spread out", "all over", "everywhere", "mixed"
+    ],
+    clumped: [
+      // Tech
+      "centralized", "clustered", "localized", "concentrated", "dense",
+      // Simple
+      "bunched up", "clumped", "too close", "stuck together"
+    ]
   },
+  
+  // VERBS
   verbs: {
-    rising: ["outperforming", "surpassing", "exceeding", "eclipsing", "dominating"],
-    falling: ["trailing", "dragging", "underperforming", "lagging behind", "failing"],
-    holding: ["anchoring", "stabilizing", "maintaining", "sustaining", "supporting"]
+    rising: [
+      // Tech
+      "outperforming", "surpassing", "exceeding", "eclipsing", "dominating", "outpacing",
+      // Simple
+      "beating", "winning", "passing", "topping", "rising above", "doing better than"
+    ],
+    falling: [
+      // Tech
+      "trailing", "dragging", "underperforming", "lagging behind", "dropping below",
+      // Simple
+      "losing", "dropping", "failing", "falling behind", "missing", "doing worse than"
+    ],
+    holding: [
+      // Tech
+      "anchoring", "stabilizing", "maintaining", "sustaining", "reinforcing",
+      // Simple
+      "keeping", "holding", "saving", "helping", "staying", "supporting"
+    ]
   }
 };
 
-// --- HELPER: Randomizer (FIXED: NOW GENERIC) ---
+// --- HELPER: Randomizer ---
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
-
-// FIXED: Typed the templates argument correctly as an array of functions returning strings
 const pickTemplate = (templates: ((data: any) => string)[], data: any) => pick(templates)(data);
 
 // --- STATISTICAL ENGINE ---
@@ -52,12 +146,10 @@ const analyzeContext = (nodes: Node[], benchmark: any) => {
   const totalStorage = nodes.reduce((a, b) => a + (b.storage_committed || 0), 0);
   const avgHealth = nodes.reduce((a, b) => a + (b.health || 0), 0) / count;
   const netAvg = benchmark?.networkRaw?.health || 75;
-  
-  // Calculate Standard Deviation (Volatility)
   const variance = nodes.reduce((a, b) => a + Math.pow((b.health || 0) - avgHealth, 2), 0) / count;
   const stdDev = Math.sqrt(variance);
-
-  // Gini Coefficient (Inequality) for Storage
+  
+  // Gini Calculation
   const sortedStorage = nodes.map(n => n.storage_committed || 0).sort((a, b) => a - b);
   let giniNumerator = 0;
   sortedStorage.forEach((val, i) => { giniNumerator += (i + 1) * val; });
@@ -69,130 +161,151 @@ const analyzeContext = (nodes: Node[], benchmark: any) => {
     avgHealth,
     delta: avgHealth - netAvg,
     stdDev,
-    gini, // High gini (>0.6) means centralization risk
-    whales: nodes.filter(n => (n.storage_committed || 0) / totalStorage > 0.3), // Nodes with >30% share
+    gini,
+    whales: nodes.filter(n => (n.storage_committed || 0) / totalStorage > 0.3),
     isElite: avgHealth > netAvg + 8,
-    isCritical: avgHealth < 50
+    isHeterogeneous: stdDev > 15
   };
 };
 
-// --- SCENARIO GENERATORS ---
-
-// 1. OVERVIEW: DEFAULT (Global Context)
-const generateOverviewDefault = (stats: any) => {
-  const healthStatus = stats.delta > 0 ? "positive" : "negative";
-  const consistency = stats.stdDev < 10 ? "highly consistent" : "highly volatile";
+// --- SCENARIO 1: OVERVIEW (DEFAULT) ---
+const generateOverviewDefault = (s: any) => {
+  const status = s.delta > 0 ? "positive" : "negative";
+  const perfVerb = s.delta > 0 ? pick(LEXICON.verbs.rising) : pick(LEXICON.verbs.falling);
+  const adj = s.delta > 0 ? pick(LEXICON.adjectives.good) : pick(LEXICON.adjectives.bad);
   
-  const t1 = (s: any) => `${pick(LEXICON.openers[healthStatus])} this fleet of ${s.count} nodes is ${s.delta > 0 ? pick(LEXICON.verbs.rising) : pick(LEXICON.verbs.falling)} the global benchmark by ${Math.abs(s.delta).toFixed(1)} points.`;
-  const t2 = (s: any) => `Global Context: This group represents a ${s.delta > 0 ? pick(LEXICON.adjectives.good) : pick(LEXICON.adjectives.bad)} segment of the network. Vitality scores are ${consistency} across the board.`;
-  const t3 = (s: any) => `Performance Synthesis: Collectively managing ${formatBytes(s.totalStorage)}, this cluster exhibits ${s.delta > 0 ? 'elite' : 'sub-standard'} reliability metrics relative to the network average.`;
+  // Template A: Formal Analysis
+  const t1 = () => `${pick(LEXICON.openers[status])} this cluster is ${perfVerb} the network baseline. With ${s.count} active nodes, the aggregate health score is ${adj}.`;
+  
+  // Template B: Comparative
+  const t2 = () => `Global Synthesis: Compared to the wider network, this group is ${s.delta > 0 ? "stronger" : "weaker"}. The average vitality is ${Math.abs(s.delta).toFixed(1)} points ${s.delta > 0 ? "above" : "below"} the benchmark.`;
+  
+  // Template C: Internal consistency focus
+  const t3 = () => `${pick(LEXICON.openers.analysis)} internal variance is ${s.stdDev < 10 ? "low" : "high"}. This indicates the group is ${s.stdDev < 10 ? "operating as a synchronized unit" : "fragmented in terms of hardware quality"}.`;
 
-  return pickTemplate([t1, t2, t3], stats) + ` ${stats.stdDev > 15 ? "However, internal variance suggests distinct performance tiers exist within the group." : "The tight deviation indicates a uniform hardware configuration."}`;
+  // Template D: Data focus
+  const t4 = () => `Capacity Report: Managing ${formatBytes(s.totalStorage)}, this fleet demonstrates ${adj} reliability traits. ${s.isElite ? "It qualifies as a Top-Tier cluster." : "Optimization is possible."}`;
+
+  return pickTemplate([t1, t2, t3, t4], s);
 };
 
-// 2. OVERVIEW: CHART FOCUSED (Metric Context)
-const generateOverviewChart = (stats: any, section: string) => {
-  // section is 'storage', 'health', 'credits', 'uptime'
+// --- SCENARIO 2: OVERVIEW (CHART CLICKED) ---
+const generateOverviewChart = (s: any, section: string) => {
+  const metricName = section.charAt(0).toUpperCase() + section.slice(1);
+  const isGood = s.delta > 0; // rough approximation for general sentiment
+  
   if (section === 'health') {
-    return `${pick(LEXICON.openers.neutral)} the Health Score distribution reveals the group's reliability. With an average of ${stats.avgHealth.toFixed(0)}/100, the group is ${stats.delta > 0 ? 'stable' : 'at risk'}. ${stats.stdDev > 20 ? "Caution: The wide spread indicates some nodes are critically failing while others succeed." : "The narrow spread proves consistent software versions."}`;
+    const t1 = () => `Vitality Deep Dive: The group averages ${s.avgHealth.toFixed(0)}/100. ${s.stdDev > 15 ? "However, this average hides significant disparity between best and worst performers." : "This score is consistent across almost all members."}`;
+    const t2 = () => `${pick(LEXICON.openers.analysis)} health is the primary indicator of longevity. This group is ${isGood ? "resilient" : "fragile"}, ${pick(LEXICON.verbs.driving)} the network average ${isGood ? "up" : "down"}.`;
+    const t3 = () => `Score Breakdown: A ${s.avgHealth.toFixed(0)} avg suggests ${isGood ? "excellent maintenance" : "deferred maintenance"}. ${pick(LEXICON.connectors.addition)} standard deviation is ${s.stdDev.toFixed(1)}.`;
+    return pickTemplate([t1, t2, t3], s);
   }
+  
   if (section === 'storage') {
-    return `Capacity Analysis: This chart visualizes the ${formatBytes(stats.totalStorage)} pledge. ${stats.gini > 0.6 ? `WARNING: High inequality detected (Gini: ${stats.gini.toFixed(2)}). The group relies too heavily on a few large nodes.` : "Distribution is democratic, reducing the risk of data loss from single-node failures."}`;
+    const t1 = () => `Capacity Audit: Total pledged storage is ${formatBytes(s.totalStorage)}. ${s.gini > 0.5 ? "Distribution is unequal (Gini > 0.5)." : "Load is evenly balanced."}`;
+    const t2 = () => `${pick(LEXICON.openers.market)} ${s.whales.length} node(s) carry the bulk of the data. ${s.whales.length > 0 ? "Risk of data loss is concentrated." : "Risk is well-distributed."}`;
+    return pickTemplate([t1, t2], s);
   }
-  return `Deep Dive (${section}): Analyzing the aggregate performance of ${section}. This metric correlates directly with the group's potential rewards. ${stats.isElite ? "The trajectory is upward." : "Optimization is recommended."}`;
+  
+  // Fallback for credits/uptime
+  return `Metric Focus (${metricName}): ${pick(LEXICON.openers.neutral)} this metric correlates with node seniority. ${s.isElite ? "The trend is highly positive." : "Gaps in performance are visible."}`;
 };
 
-// 3. OVERVIEW: NODE FOCUSED (Specific Context)
-const generateOverviewNode = (node: Node, stats: any, section: string | null) => {
-  const nVal = node.health || 0;
-  const diff = nVal - stats.avgHealth;
-  const isDrag = diff < -10;
-  const isLift = diff > 10;
+// --- SCENARIO 3: OVERVIEW (NODE CLICKED) ---
+const generateOverviewNode = (node: Node, stats: any) => {
+  const diff = (node.health || 0) - stats.avgHealth;
+  const isDriver = diff > 0;
+  const safeName = getSafeIp(node);
+  
+  const t1 = () => `Node Diagnostics [${safeName}]: This unit is ${isDriver ? pick(LEXICON.verbs.rising) : pick(LEXICON.verbs.falling)} the group average by ${Math.abs(diff).toFixed(1)} points.`;
+  const t2 = () => `Impact Assessment: ${safeName} acts as ${isDriver ? "a stabilizer" : "a drag"} on the cluster. ${isDriver ? "It is a model node." : "Maintenance recommended."}`;
+  const t3 = () => `Comparative Stat: With a health of ${node.health}, it sits in the ${isDriver ? "upper" : "lower"} percentile of this specific group.`;
+  
+  return pickTemplate([t1, t2, t3], stats);
+};
+
+// --- SCENARIO 4: MARKET (DEFAULT) ---
+const generateMarketDefault = (s: any, metric: string) => {
+  const shape = s.gini > 0.5 ? "Centralized (Oligarchic)" : "Decentralized (Democratic)";
+  const concern = s.gini > 0.5 ? "High dependence on top nodes." : "No single point of failure.";
+  
+  const t1 = () => `${pick(LEXICON.openers.market)} The ${metric} distribution is ${shape}. ${concern}`;
+  const t2 = () => `Inequality Index: The Gini coefficient is ${s.gini.toFixed(2)}. ${s.gini > 0.6 ? pick(LEXICON.openers.negative) + " Wealth/Load is too concentrated." : "This is a healthy, flat hierarchy."}`;
+  const t3 = () => `Pie Chart Analysis: Visually, a balanced pie indicates resilience. Here, we see ${s.gini > 0.5 ? "large dominating slices" : "equal slices"}.`;
+  
+  return pickTemplate([t1, t2, t3], s);
+};
+
+// --- SCENARIO 5: MARKET (NODE CLICKED) ---
+const generateMarketNode = (node: Node, s: any, metric: string) => {
+  const val = (node as any)[metric === 'storage' ? 'storage_committed' : metric] || 0;
+  const total = metric === 'storage' ? s.totalStorage : 1;
+  const share = metric === 'storage' || metric === 'credits' ? (val / total) * 100 : 0;
   const safeName = getSafeIp(node);
 
-  const role = isDrag ? "a liability" : isLift ? "a champion" : "a standard peer";
-  
-  const t1 = () => `Node Focus [${safeName}]: Currently acting as ${role}. Its health (${nVal}) is ${Math.abs(diff).toFixed(1)} points ${diff > 0 ? 'above' : 'below'} the group average.`;
-  const t2 = () => `Impact Analysis: ${safeName} is ${diff > 0 ? pick(LEXICON.verbs.holding) : pick(LEXICON.verbs.falling)} the cluster's reputation. ${isDrag ? "Removing or fixing this node would significantly boost the group average." : ""}`;
-  
-  return `${pick([t1, t2])()} ${section ? `Specifically in ${section}, it ranks in the ${diff > 0 ? 'top' : 'bottom'} percentile.` : "It is a key driver of the current group dynamics."}`;
+  if (metric === 'health') {
+     return `Vitality Rank: ${safeName} holds a score of ${node.health}. In the market of reliability, it is ${node.health && node.health > s.avgHealth ? "a market leader" : "losing market share"}.`;
+  }
+
+  const t1 = () => `Shareholder Report [${safeName}]: This node controls ${share.toFixed(1)}% of the ${metric}. ${share > 25 ? "It is a major stakeholder." : "It is a minority participant."}`;
+  const t2 = () => `dominance Check: ${share > 30 ? pick(LEXICON.adjectives.big) : pick(LEXICON.adjectives.small)} influence detected. If this node fails, ${share.toFixed(1)}% of the group's ${metric} vanishes.`;
+  const t3 = () => `Slice Analysis: This specific slice represents ${formatBytes(val)} (if storage). It is ${share > (100/s.count) ? "larger" : "smaller"} than the average slice size.`;
+
+  return pickTemplate([t1, t2, t3], s);
 };
 
-// 4. MARKET: DEFAULT (Distribution Context)
-const generateMarketDefault = (stats: any, metric: string) => {
-  const context = metric === 'storage' ? "capacity" : metric === 'credits' ? "rewards" : "vitality";
-  const shape = stats.gini > 0.5 ? "Oligarchic (Centralized)" : "Democratic (Decentralized)";
-  
-  return `Market Structure (${context}): The distribution shape is ${shape}. ${stats.whales.length > 0 ? `Dominance Alert: ${stats.whales.length} node(s) control a massive share.` : "Resources are perfectly balanced."} This visualization helps identify single-points-of-failure within the group.`;
-};
-
-// 5. MARKET: NODE FOCUSED (Slice Context)
-const generateMarketNode = (node: Node, stats: any, metric: string) => {
-  const val = (node as any)[metric === 'storage' ? 'storage_committed' : metric] || 0;
-  const total = metric === 'storage' ? stats.totalStorage : 1; // Simplify for non-sum metrics
-  const share = metric === 'storage' || metric === 'credits' ? (val / total) * 100 : 0;
-  
-  if (metric === 'health') return `Relative Vitality: This node sits at ${node.health}/100. In a competitive market, it is ${node.health && node.health > stats.avgHealth ? "winning" : "losing"} against its peers.`;
-
-  return `Share Analysis [${getSafeIp(node)}]: This node commands ${share.toFixed(1)}% of the ${metric} market. ${share > 30 ? "It is a Whale. The group is heavily dependent on it." : "It is a minor contributor, easily replaceable if it goes offline."}`;
-};
-
-// 6. MAP: DEFAULT (Spatial Context)
+// --- SCENARIO 6: MAP (DEFAULT) ---
 const generateMapDefault = (nodes: Node[]) => {
   const countries = new Set(nodes.map(n => n.location?.countryName)).size;
-  const density = nodes.length / (countries || 1);
-  const topology = density > 3 ? "Clustered" : "Dispersed";
+  const uniqueCount = countries;
+  
+  const t1 = () => `${pick(LEXICON.openers.spatial)} The fleet spans ${uniqueCount} unique jurisdictions. ${uniqueCount < 2 ? "Risk: Geographic redundancy is non-existent." : "Resilience: Good physical spread."}`;
+  const t2 = () => `Topology Report: Nodes are ${uniqueCount > 3 ? pick(LEXICON.adjectives.diverse) : pick(LEXICON.adjectives.clumped)}. This affects latency and legal risk.`;
+  const t3 = () => `Network Geometry: Analyzing the physical mesh. ${nodes.length} nodes across ${uniqueCount} regions suggests a ${uniqueCount > 2 ? "global" : "local"} operational footprint.`;
 
-  return `Geo-Spatial Audit: The fleet forms a ${topology} topology spanning ${countries} jurisdictions. ${countries < 2 ? "CRITICAL RISK: Geographic centralization detected. A regional outage could wipe out the group." : "High Resilience: The geographic spread minimizes jurisdiction risk."} P2P latency is estimated based on these physical distances.`;
+  return pickTemplate([t1, t2, t3], nodes);
 };
 
-// 7. MAP: NODE FOCUSED (Location Context)
+// --- SCENARIO 7: MAP (NODE CLICKED) ---
 const generateMapNode = (node: Node, nodes: Node[]) => {
-  const peers = nodes.filter(n => n.pubkey !== node.pubkey);
-  // Find closest peer
-  let minDst = 99999;
-  peers.forEach(p => {
-    if(node.location && p.location) {
-        const d = Math.sqrt(Math.pow(node.location.lat - p.location.lat, 2) + Math.pow(node.location.lon - p.location.lon, 2));
-        if (d < minDst) minDst = d;
-    }
-  });
+  const safeName = getSafeIp(node);
+  const country = node.location?.countryName || "Unknown";
+  
+  const t1 = () => `Location Intel [${safeName}]: Deployed in ${country}. ${pick(LEXICON.connectors.addition)} it serves as a physical anchor for the network in this region.`;
+  const t2 = () => `Geo-Point Analysis: This node in ${country} contributes to the group's censorship resistance.`;
+  const t3 = () => `Routing Context: Located in ${country}, this node's latency is determined by its distance to the cluster center of mass.`;
 
-  const isolation = minDst > 20 ? "Isolated Outpost" : "Cluster Component";
-  return `Location Intelligence [${getSafeIp(node)}]: Operating from ${node.location?.countryName || 'Unknown'}, this node acts as an ${isolation}. ${isolation === 'Isolated Outpost' ? "It provides critical reach to the network edge." : "It benefits from low-latency sync with nearby peers."}`;
+  return pickTemplate([t1, t2, t3], nodes);
 };
-
 
 // --- MAIN EXPORT ---
 export const generateNarrative = ({ tab, metric, focusKey, hoverKey, nodes, benchmarks, chartSection }: NarrativeContext): string => {
-  // 1. Resolve State
   if (!nodes || nodes.length === 0) return "Initialize selection...";
   
-  const activeKey = focusKey || hoverKey; // Priority to click, then hover
+  const activeKey = focusKey || hoverKey;
   const activeNode = activeKey ? nodes.find(n => n.pubkey === activeKey) : null;
   const stats = analyzeContext(nodes, benchmarks);
 
   if (!stats) return "Calculating...";
 
-  // 2. Route to Scenario
-  // SCENARIO 1, 2, 3: OVERVIEW
+  // OVERVIEW
   if (tab === 'OVERVIEW') {
-    if (activeNode) return generateOverviewNode(activeNode, stats, chartSection || null); // Scenario 3: Overview + Node
-    if (chartSection) return generateOverviewChart(stats, chartSection); // Scenario 2: Overview + Chart
-    return generateOverviewDefault(stats); // Scenario 1: Overview Default
+    if (activeNode) return generateOverviewNode(activeNode, stats);
+    if (chartSection) return generateOverviewChart(stats, chartSection);
+    return generateOverviewDefault(stats);
   }
 
-  // SCENARIO 4, 5: MARKET
+  // MARKET
   if (tab === 'MARKET') {
     const m = metric || 'storage';
-    if (activeNode) return generateMarketNode(activeNode, stats, m); // Scenario 5: Market + Node
-    return generateMarketDefault(stats, m); // Scenario 4: Market Default
+    if (activeNode) return generateMarketNode(activeNode, stats, m);
+    return generateMarketDefault(stats, m);
   }
 
-  // SCENARIO 6, 7: MAP
+  // TOPOLOGY
   if (tab === 'TOPOLOGY') {
-    if (activeNode) return generateMapNode(activeNode, nodes); // Scenario 7: Map + Node
-    return generateMapDefault(nodes); // Scenario 6: Map Default
+    if (activeNode) return generateMapNode(activeNode, nodes);
+    return generateMapDefault(nodes);
   }
 
   return "System Ready.";
