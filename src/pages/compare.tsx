@@ -177,41 +177,39 @@ export default function ComparePage() {
 
   const handleShare = () => { navigator.clipboard.writeText(window.location.href); setToast('Link Copied!'); setTimeout(() => setToast(null), 2000); };
 
-  // --- EXPORT HANDLER ---
+  // --- EXPORT HANDLER (FIXED TYPES) ---
   const handleExport = async (targetRef: React.RefObject<HTMLDivElement>, suffix: string) => {
     if (targetRef.current && printRef.current) {
       try {
-        // 1. Calculate Full Width (Horizontal Scroll)
         const fullTableWidth = printRef.current.scrollWidth;
         const finalWidth = Math.max(fullTableWidth, targetRef.current.clientWidth);
 
-        const dataUrl = await toPng(targetRef.current, {
+        // FIX: Casting options to 'any' to bypass strict TS check on 'onClone' which exists in library but might be missing in types
+        const options: any = {
           cacheBust: true,
           backgroundColor: '#020202',
           pixelRatio: 2,
           width: finalWidth,
           height: targetRef.current.scrollHeight,
-          // Filter out excluded elements (like the Footer Text)
-          filter: (node) => {
+          filter: (node: any) => {
              if (node instanceof HTMLElement && node.classList.contains('print-exclude')) return false;
              return true;
           },
-          // Style Overrides for the Exported Image
           style: { 
             width: `${finalWidth}px`, 
             maxWidth: 'none', 
             overflow: 'visible',
-            alignItems: 'center' // Force Centering of child elements (Charts)
+            alignItems: 'center' 
           },
-          // Clone Callback: Show Watermark inside the image
-          onClone: (clonedNode) => {
-             const watermark = clonedNode.querySelector('.watermark') as HTMLElement;
+          onClone: (clonedNode: any) => {
+             const watermark = clonedNode.querySelector('.watermark');
              if (watermark) {
-                watermark.style.display = 'flex'; // Unhide watermark
+                watermark.style.display = 'flex'; 
              }
           }
-        });
+        };
 
+        const dataUrl = await toPng(targetRef.current, options);
         const link = document.createElement('a');
         link.download = `pulse-report-${suffix}-${new Date().toISOString().slice(0, 10)}.png`;
         link.href = dataUrl;
@@ -325,11 +323,9 @@ export default function ComparePage() {
                 </button>
                 {isExportDropdownOpen && (
                     <div className="absolute top-full right-0 mt-2 w-44 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col">
-                        {/* Option 1: TABLE ONLY */}
                         <button onClick={() => handleExport(printRef, 'table')} className="px-4 py-3 text-[10px] font-bold text-left text-zinc-300 hover:text-white hover:bg-zinc-800 transition uppercase flex items-center gap-2">
                             <Table size={12} className="text-zinc-500" /> Table Only
                         </button>
-                        {/* Option 2: FULL REPORT */}
                         <button onClick={() => handleExport(fullPageRef, 'full')} className="px-4 py-3 text-[10px] font-bold text-left text-zinc-300 hover:text-white hover:bg-zinc-800 transition uppercase flex items-center gap-2 border-t border-white/5">
                             <BarChart size={12} className="text-zinc-500" /> With Charts
                         </button>
@@ -399,16 +395,14 @@ export default function ComparePage() {
          </div>
 
          {/* ANALYTICS DECK */}
-         {/* Note: Wrapped in a constrained div to ensure charts stay centered when export canvas expands */}
          <div className="w-full max-w-[1600px] mx-auto">
             <SynthesisEngine 
                 nodes={selectedNodes} 
                 themes={PLAYER_THEMES} 
                 networkScope={networkScope} 
                 benchmarks={benchmarks} 
-                // SPOTLIGHT PROPS PASSED HERE:
-                // hoveredNodeKey={hoveredNodeKey} 
-                // onHover={setHoveredNodeKey}
+                hoveredNodeKey={hoveredNodeKey} 
+                onHover={setHoveredNodeKey}
             />
          </div>
 
