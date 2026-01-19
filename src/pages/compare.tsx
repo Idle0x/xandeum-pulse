@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { toPng } from 'html-to-image';
 import { 
   ArrowLeft, Search, Plus, X, 
-  Download, CheckCircle, Share2, ChevronDown, Grid, Star
+  Download, CheckCircle, Share2, ChevronDown, Grid, Star, Table, BarChart
 } from 'lucide-react';
 
 // Hooks & Utils
@@ -24,7 +24,10 @@ import { EmptySlot } from '../components/compare/ComparisonUI';
 
 export default function ComparePage() {
   const router = useRouter();
-  const printRef = useRef<HTMLDivElement>(null);
+  
+  // --- REFS for Exporting ---
+  const printRef = useRef<HTMLDivElement>(null);      // For "Table Only"
+  const fullPageRef = useRef<HTMLDivElement>(null);   // For "With Charts"
 
   const { nodes, loading } = useNetworkData(); 
 
@@ -34,24 +37,32 @@ export default function ComparePage() {
   const [showNetwork, setShowNetwork] = useState(true);
   const [leaderMetric, setLeaderMetric] = useState<'STORAGE' | 'CREDITS' | 'HEALTH' | 'UPTIME' | null>(null);
 
+  // --- SPOTLIGHT STATE (New: Connects Table to Charts) ---
+  const [hoveredNodeKey, setHoveredNodeKey] = useState<string | null>(null);
+
+  // Dropdown States
   const [isLeaderDropdownOpen, setIsLeaderDropdownOpen] = useState(false);
   const [isWatchlistOpen, setIsWatchlistOpen] = useState(false);
   const [isNetworkOpen, setIsNetworkOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false); // New Dropdown State
+
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
 
-  // --- REFS ---
+  // --- REFS for Dropdowns ---
   const leaderRef = useRef<HTMLDivElement>(null);
   const watchlistRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<HTMLDivElement>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
 
   const prevNodeCount = useRef(0);
 
   useOutsideClick(leaderRef, () => setIsLeaderDropdownOpen(false));
   useOutsideClick(watchlistRef, () => setIsWatchlistOpen(false));
   useOutsideClick(networkRef, () => setIsNetworkOpen(false));
+  useOutsideClick(exportRef, () => setIsExportDropdownOpen(false));
 
   // --- DATA LOGIC ---
   const availableNodes = useMemo(() => {
@@ -116,7 +127,6 @@ export default function ComparePage() {
   const removeNode = (pubkey: string) => { const k = selectedKeys.filter(x => x !== pubkey); setSelectedKeys(k); updateUrl(k); };
   const clearAllNodes = () => { setSelectedKeys([]); updateUrl([]); };
 
-  // Watchlist Removal Handler
   const removeFavorite = (pubkey: string) => {
       const newFavs = favorites.filter(f => f !== pubkey);
       setFavorites(newFavs);
@@ -153,26 +163,30 @@ export default function ComparePage() {
   }, [router.isReady, loading, nodes, router.query]);
 
   const handleShare = () => { navigator.clipboard.writeText(window.location.href); setToast('Link Copied!'); setTimeout(() => setToast(null), 2000); };
-  
-  const handleExport = async () => {
-    if (printRef.current) {
+
+  // --- REFACTORED EXPORT HANDLER ---
+  const handleExport = async (targetRef: React.RefObject<HTMLDivElement>, suffix: string) => {
+    if (targetRef.current) {
       try {
-        const dataUrl = await toPng(printRef.current, {
+        const dataUrl = await toPng(targetRef.current, {
           cacheBust: true,
           backgroundColor: '#020202',
           pixelRatio: 2, 
-          width: printRef.current.scrollWidth, 
-          height: printRef.current.scrollHeight,
+          // Use scroll dimensions to capture full content even if scrolled
+          width: targetRef.current.scrollWidth, 
+          height: targetRef.current.scrollHeight,
           filter: (node) => {
              if (node instanceof HTMLElement && node.classList.contains('print-exclude')) return false;
              return true;
           },
-          style: { overflow: 'visible' }
+          style: { overflow: 'visible', maxHeight: 'none' } // Force visible overflow
         });
         const link = document.createElement('a');
-        link.download = `pulse-report-${new Date().toISOString().slice(0, 10)}.png`;
+        link.download = `pulse-report-${suffix}-${new Date().toISOString().slice(0, 10)}.png`;
         link.href = dataUrl;
         link.click();
+        setIsExportDropdownOpen(false);
+        setToast('Download Started'); setTimeout(() => setToast(null), 2000);
       } catch (err) { console.error("Export failed:", err); setToast('Export Failed'); setTimeout(() => setToast(null), 2000); }
     }
   };
@@ -250,7 +264,6 @@ export default function ComparePage() {
                 )}
             </div>
 
-            {/* WATCHLIST DROPDOWN REFACTOR */}
             <div className="relative" ref={watchlistRef}>
                 <button onClick={() => setIsWatchlistOpen(!isWatchlistOpen)} className="flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg bg-black/40 text-zinc-400 border border-white/5 hover:border-white/20 hover:text-white text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap w-auto"><Star size={12} /> WATCHLIST <ChevronDown size={12} /></button>
                 {isWatchlistOpen && (
@@ -265,13 +278,7 @@ export default function ComparePage() {
                                     <div className="text-[10px] font-bold font-mono text-zinc-200 truncate w-24">{n.pubkey?.slice(0, 10)}...</div>
                                     <div className="text-[8px] text-zinc-500 font-mono mt-0.5">{getSafeIp(n)}</div>
                                 </button>
-                                {/* REMOVE FAVORITE BUTTON */}
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); removeFavorite(n.pubkey!); }}
-                                    className="p-2 text-zinc-600 hover:text-red-500 transition"
-                                >
-                                    <X size={12} />
-                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); removeFavorite(n.pubkey!); }} className="p-2 text-zinc-600 hover:text-red-500 transition"><X size={12} /></button>
                             </div>
                         )) : <div className="p-4 text-[10px] text-zinc-600 text-center">No Favorites</div>}
                     </div>
@@ -279,29 +286,43 @@ export default function ComparePage() {
             </div>
 
             <button onClick={handleShare} className="flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border border-zinc-700 w-auto"><Share2 size={12}/> SHARE</button>
-            <button onClick={handleExport} className="flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[8px] md:text-[10px] font-bold uppercase transition shadow-[0_0_15px_rgba(37,99,235,0.3)] whitespace-nowrap w-auto"><Download size={12}/> REPORT CARD</button>
+            
+            {/* UPDATED REPORT CARD DROPDOWN */}
+            <div className="relative" ref={exportRef}>
+                <button onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)} className="flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[8px] md:text-[10px] font-bold uppercase transition shadow-[0_0_15px_rgba(37,99,235,0.3)] whitespace-nowrap w-auto">
+                    <Download size={12}/> REPORT CARD <ChevronDown size={12} />
+                </button>
+                {isExportDropdownOpen && (
+                    <div className="absolute top-full right-0 mt-2 w-44 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col">
+                        <button onClick={() => handleExport(printRef, 'table')} className="px-4 py-3 text-[10px] font-bold text-left text-zinc-300 hover:text-white hover:bg-zinc-800 transition uppercase flex items-center gap-2">
+                            <Table size={12} className="text-zinc-500" /> Table Only
+                        </button>
+                        <button onClick={() => handleExport(fullPageRef, 'full')} className="px-4 py-3 text-[10px] font-bold text-left text-zinc-300 hover:text-white hover:bg-zinc-800 transition uppercase flex items-center gap-2 border-t border-white/5">
+                            <BarChart size={12} className="text-zinc-500" /> With Charts
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden relative z-10 px-4 pb-4 md:px-8 md:pb-8 flex flex-col max-w-[1600px] mx-auto w-full">
+      {/* PARENT CONTAINER FOR FULL REPORT EXPORT */}
+      <div ref={fullPageRef} className="flex-1 overflow-hidden relative z-10 px-4 pb-4 md:px-8 md:pb-8 flex flex-col max-w-[1600px] mx-auto w-full bg-[#020202]"> 
          <div className="flex-initial min-h-[400px] flex flex-col bg-[#09090b]/60 backdrop-blur-2xl rounded-xl border border-white/5 shadow-2xl overflow-hidden relative mb-6">
              {selectedNodes.length === 0 ? (
                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden h-[400px]">
-                    {/* BACKGROUND SPINNER + PULSE */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] scale-[2]">
                         <div className="animate-[spin_60s_linear_infinite]"><Grid size={300} /></div>
                     </div>
-                    {/* SHOCKWAVE PULSE */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <div className="w-96 h-96 bg-cyan-500/5 rounded-full animate-[ping_4s_cubic-bezier(0,0,0.2,1)_infinite]"></div>
                     </div>
 
                     <div className="relative z-10 flex flex-col items-center gap-6">
-                        {/* CYAN BUTTON */}
                         <button onClick={() => setIsSearchOpen(true)} className="px-10 py-4 bg-cyan-500/10 border border-cyan-500/20 text-cyan-50 hover:bg-cyan-500/20 font-black uppercase tracking-widest text-xs rounded-full shadow-[0_0_30px_rgba(34,211,238,0.1)] transition-all hover:scale-105 flex items-center gap-2 mb-2">
                             <Plus size={16} className="animate-pulse" /> Add Node
                         </button>
-                        
+
                         <div className="flex flex-col items-center gap-1">
                             <h2 className="text-lg md:text-xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-500 uppercase tracking-[0.2em]">Compare Nodes</h2>
                             <p className="text-[10px] md:text-xs text-zinc-500 font-mono tracking-wide max-w-xs text-center leading-relaxed">
@@ -312,6 +333,7 @@ export default function ComparePage() {
                     </div>
                  </div>
              ) : (
+                 // TABLE SCROLL CONTAINER (Table Only Export Target)
                  <main ref={printRef} className="flex-1 overflow-x-auto overflow-y-auto bg-transparent relative flex custom-scrollbar snap-x items-start content-start">
                     <ControlRail showNetwork={showNetwork} leaderMetric={leaderMetric} benchmarks={benchmarks} />
                     {selectedNodes.map((node, index) => {
@@ -332,6 +354,9 @@ export default function ComparePage() {
                                 benchmarks={benchmarks}
                                 leaderMetric={leaderMetric}
                                 showNetwork={showNetwork}
+                                // PASSING SPOTLIGHT PROPS
+                                hoveredNodeKey={hoveredNodeKey} 
+                                onHover={setHoveredNodeKey}
                             />
                         );
                     })}
@@ -341,12 +366,15 @@ export default function ComparePage() {
              )}
          </div>
 
-         {/* ANALYTICS DECK */}
+         {/* ANALYTICS DECK (Included in Full Report) */}
          <SynthesisEngine 
             nodes={selectedNodes} 
             themes={PLAYER_THEMES} 
             networkScope={networkScope} 
             benchmarks={benchmarks} 
+            // NOTE: Assuming SynthesisEngine is updated to accept these props for two-way sync
+            // hoveredNodeKey={hoveredNodeKey} 
+            // onHover={setHoveredNodeKey}
          />
       </div>
 
