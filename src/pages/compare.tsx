@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { toPng } from 'html-to-image';
 import { 
   ArrowLeft, Search, Plus, X, 
-  Download, CheckCircle, Share2, ChevronDown, Grid, Star, Table, BarChart
+  Download, CheckCircle, Share2, ChevronDown, Grid, Star, Table, BarChart, Zap
 } from 'lucide-react';
 
 // Hooks & Utils
@@ -22,12 +22,25 @@ import { NodeColumn } from '../components/compare/NodeColumn';
 import { SynthesisEngine } from '../components/compare/SynthesisEngine';
 import { EmptySlot } from '../components/compare/ComparisonUI';
 
+// --- WATERMARK COMPONENT (Hidden by default, visible on export) ---
+const PulseWatermark = () => (
+  <div className="watermark hidden items-center justify-center gap-3 py-6 mt-4 w-full border-t border-zinc-800 bg-[#020202]">
+     <div className="w-5 h-5 bg-cyan-500 rounded-full shadow-[0_0_15px_#06b6d4] flex items-center justify-center">
+        <Zap size={10} className="text-black fill-black" />
+     </div>
+     <div className="flex flex-col">
+        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400">Verified by Pulse</span>
+        <span className="text-[8px] font-mono text-zinc-600">xandeum.network/pulse</span>
+     </div>
+  </div>
+);
+
 export default function ComparePage() {
   const router = useRouter();
   
   // --- REFS for Exporting ---
-  const printRef = useRef<HTMLDivElement>(null);      // For "Table Only"
-  const fullPageRef = useRef<HTMLDivElement>(null);   // For "With Charts"
+  const printRef = useRef<HTMLDivElement>(null);      // "Table Only" Target
+  const fullPageRef = useRef<HTMLDivElement>(null);   // "With Charts" Target
 
   const { nodes, loading } = useNetworkData(); 
 
@@ -37,7 +50,7 @@ export default function ComparePage() {
   const [showNetwork, setShowNetwork] = useState(true);
   const [leaderMetric, setLeaderMetric] = useState<'STORAGE' | 'CREDITS' | 'HEALTH' | 'UPTIME' | null>(null);
 
-  // --- SPOTLIGHT STATE (New: Connects Table to Charts) ---
+  // Spotlight State (Syncs Table & Charts)
   const [hoveredNodeKey, setHoveredNodeKey] = useState<string | null>(null);
 
   // Dropdown States
@@ -45,13 +58,13 @@ export default function ComparePage() {
   const [isWatchlistOpen, setIsWatchlistOpen] = useState(false);
   const [isNetworkOpen, setIsNetworkOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false); // New Dropdown State
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
 
-  // --- REFS for Dropdowns ---
+  // --- REFS ---
   const leaderRef = useRef<HTMLDivElement>(null);
   const watchlistRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<HTMLDivElement>(null);
@@ -164,23 +177,41 @@ export default function ComparePage() {
 
   const handleShare = () => { navigator.clipboard.writeText(window.location.href); setToast('Link Copied!'); setTimeout(() => setToast(null), 2000); };
 
-  // --- REFACTORED EXPORT HANDLER ---
+  // --- EXPORT HANDLER ---
   const handleExport = async (targetRef: React.RefObject<HTMLDivElement>, suffix: string) => {
-    if (targetRef.current) {
+    if (targetRef.current && printRef.current) {
       try {
+        // 1. Calculate Full Width (Horizontal Scroll)
+        const fullTableWidth = printRef.current.scrollWidth;
+        const finalWidth = Math.max(fullTableWidth, targetRef.current.clientWidth);
+
         const dataUrl = await toPng(targetRef.current, {
           cacheBust: true,
           backgroundColor: '#020202',
-          pixelRatio: 2, 
-          // Use scroll dimensions to capture full content even if scrolled
-          width: targetRef.current.scrollWidth, 
+          pixelRatio: 2,
+          width: finalWidth,
           height: targetRef.current.scrollHeight,
+          // Filter out excluded elements (like the Footer Text)
           filter: (node) => {
              if (node instanceof HTMLElement && node.classList.contains('print-exclude')) return false;
              return true;
           },
-          style: { overflow: 'visible', maxHeight: 'none' } // Force visible overflow
+          // Style Overrides for the Exported Image
+          style: { 
+            width: `${finalWidth}px`, 
+            maxWidth: 'none', 
+            overflow: 'visible',
+            alignItems: 'center' // Force Centering of child elements (Charts)
+          },
+          // Clone Callback: Show Watermark inside the image
+          onClone: (clonedNode) => {
+             const watermark = clonedNode.querySelector('.watermark') as HTMLElement;
+             if (watermark) {
+                watermark.style.display = 'flex'; // Unhide watermark
+             }
+          }
         });
+
         const link = document.createElement('a');
         link.download = `pulse-report-${suffix}-${new Date().toISOString().slice(0, 10)}.png`;
         link.href = dataUrl;
@@ -287,16 +318,18 @@ export default function ComparePage() {
 
             <button onClick={handleShare} className="flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border border-zinc-700 w-auto"><Share2 size={12}/> SHARE</button>
             
-            {/* UPDATED REPORT CARD DROPDOWN */}
+            {/* EXPORT DROPDOWN */}
             <div className="relative" ref={exportRef}>
                 <button onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)} className="flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[8px] md:text-[10px] font-bold uppercase transition shadow-[0_0_15px_rgba(37,99,235,0.3)] whitespace-nowrap w-auto">
                     <Download size={12}/> REPORT CARD <ChevronDown size={12} />
                 </button>
                 {isExportDropdownOpen && (
                     <div className="absolute top-full right-0 mt-2 w-44 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col">
+                        {/* Option 1: TABLE ONLY */}
                         <button onClick={() => handleExport(printRef, 'table')} className="px-4 py-3 text-[10px] font-bold text-left text-zinc-300 hover:text-white hover:bg-zinc-800 transition uppercase flex items-center gap-2">
                             <Table size={12} className="text-zinc-500" /> Table Only
                         </button>
+                        {/* Option 2: FULL REPORT */}
                         <button onClick={() => handleExport(fullPageRef, 'full')} className="px-4 py-3 text-[10px] font-bold text-left text-zinc-300 hover:text-white hover:bg-zinc-800 transition uppercase flex items-center gap-2 border-t border-white/5">
                             <BarChart size={12} className="text-zinc-500" /> With Charts
                         </button>
@@ -306,7 +339,7 @@ export default function ComparePage() {
         </div>
       </div>
 
-      {/* PARENT CONTAINER FOR FULL REPORT EXPORT */}
+      {/* FULL PAGE EXPORT WRAPPER (Target for "With Charts") */}
       <div ref={fullPageRef} className="flex-1 overflow-hidden relative z-10 px-4 pb-4 md:px-8 md:pb-8 flex flex-col max-w-[1600px] mx-auto w-full bg-[#020202]"> 
          <div className="flex-initial min-h-[400px] flex flex-col bg-[#09090b]/60 backdrop-blur-2xl rounded-xl border border-white/5 shadow-2xl overflow-hidden relative mb-6">
              {selectedNodes.length === 0 ? (
@@ -333,7 +366,7 @@ export default function ComparePage() {
                     </div>
                  </div>
              ) : (
-                 // TABLE SCROLL CONTAINER (Table Only Export Target)
+                 // TABLE SCROLL CONTAINER (Target for "Table Only")
                  <main ref={printRef} className="flex-1 overflow-x-auto overflow-y-auto bg-transparent relative flex custom-scrollbar snap-x items-start content-start">
                     <ControlRail showNetwork={showNetwork} leaderMetric={leaderMetric} benchmarks={benchmarks} />
                     {selectedNodes.map((node, index) => {
@@ -354,7 +387,6 @@ export default function ComparePage() {
                                 benchmarks={benchmarks}
                                 leaderMetric={leaderMetric}
                                 showNetwork={showNetwork}
-                                // PASSING SPOTLIGHT PROPS
                                 hoveredNodeKey={hoveredNodeKey} 
                                 onHover={setHoveredNodeKey}
                             />
@@ -366,16 +398,22 @@ export default function ComparePage() {
              )}
          </div>
 
-         {/* ANALYTICS DECK (Included in Full Report) */}
-         <SynthesisEngine 
-            nodes={selectedNodes} 
-            themes={PLAYER_THEMES} 
-            networkScope={networkScope} 
-            benchmarks={benchmarks} 
-            // NOTE: Assuming SynthesisEngine is updated to accept these props for two-way sync
-            // hoveredNodeKey={hoveredNodeKey} 
-            // onHover={setHoveredNodeKey}
-         />
+         {/* ANALYTICS DECK */}
+         {/* Note: Wrapped in a constrained div to ensure charts stay centered when export canvas expands */}
+         <div className="w-full max-w-[1600px] mx-auto">
+            <SynthesisEngine 
+                nodes={selectedNodes} 
+                themes={PLAYER_THEMES} 
+                networkScope={networkScope} 
+                benchmarks={benchmarks} 
+                // SPOTLIGHT PROPS PASSED HERE:
+                // hoveredNodeKey={hoveredNodeKey} 
+                // onHover={setHoveredNodeKey}
+            />
+         </div>
+
+         {/* WATERMARK (Appears only in export) */}
+         <PulseWatermark />
       </div>
 
       {isSearchOpen && (
