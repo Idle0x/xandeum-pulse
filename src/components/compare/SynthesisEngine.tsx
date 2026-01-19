@@ -10,12 +10,12 @@ import { getSafeIp } from '../../utils/nodeHelpers';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { formatUptimePrecise } from './MicroComponents';
 import { OverviewLegend, UnifiedLegend } from './ComparisonLegends';
-// IMPORT THE NEW ENGINE
+// IMPORT THE NEW NARRATIVE ENGINE
 import { generateNarrative } from '../../lib/narrative-engine';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
-// ... [Keep existing MESH_COLORS and getLinkColor helper] ...
+// --- MESH COLOR PALETTE ---
 const MESH_COLORS = [
     "#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899", "#06b6d4", "#f43f5e", "#84cc16",
     "#6366f1", "#14b8a6", "#d946ef", "#eab308", "#f97316", "#a855f7", "#22c55e", "#0ea5e9",
@@ -28,11 +28,14 @@ const getLinkColor = (startLat: number, startLon: number, endLat: number) => {
     return MESH_COLORS[Math.floor(hash) % MESH_COLORS.length];
 };
 
+// --- SUB-COMPONENTS ---
 const InterpretationPanel = ({ contextText }: { contextText: string }) => (
+    // Added min-h-[80px] to prevent layout shift when text changes length
     <div className="px-4 py-3 md:px-6 md:py-4 bg-zinc-900/30 border-t border-white/5 flex items-start gap-3 md:gap-4 transition-all duration-300 print-exclude min-h-[80px]">
         <Info size={14} className="text-blue-400 shrink-0 mt-0.5 md:w-4 md:h-4 animate-pulse" />
         <div className="flex flex-col gap-1">
-            <p className="text-xs md:text-sm text-zinc-300 leading-relaxed max-w-4xl font-medium animate-in fade-in slide-in-from-bottom-1 duration-300 key={contextText}">
+            {/* Added animate-in classes for fluid text transitions */}
+            <p key={contextText} className="text-xs md:text-sm text-zinc-300 leading-relaxed max-w-4xl font-medium animate-in fade-in slide-in-from-bottom-1 duration-300">
                 {contextText}
             </p>
         </div>
@@ -56,6 +59,7 @@ const ChartCell = ({ title, icon: Icon, children, isFocused, onClick }: any) => 
     </div>
 );
 
+// --- MAIN ENGINE ---
 interface SynthesisEngineProps {
   nodes: Node[];
   themes: any[];
@@ -72,11 +76,12 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
   const [pos, setPos] = useState({ coordinates: [0, 20], zoom: 1 });
   const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false);
 
-  // --- STATE ---
-  const [focusedSection, setFocusedSection] = useState<string | null>(null); // For Overview Scenarios
+  // --- INTERACTION STATE ---
+  const [focusedSection, setFocusedSection] = useState<string | null>(null); 
   const [focusedNodeKey, setFocusedNodeKey] = useState<string | null>(null); 
   const [internalHoverKey, setInternalHoverKey] = useState<string | null>(null);
 
+  // Derived Hover State
   const activeHoverKey = externalHoverKey !== undefined ? externalHoverKey : internalHoverKey;
 
   const handleHover = (key: string | null) => {
@@ -84,7 +89,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
       if (setExternalHover) setExternalHover(key);
   };
 
-  // --- DATA PREPARATION (Clusters/Links) ---
+  // --- DATA PREPARATION ---
   const clusters = useMemo(() => {
       const map = new Map();
       nodes.forEach((node, index) => {
@@ -145,7 +150,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
   const metricDropdownRef = useRef<HTMLDivElement>(null);
   useOutsideClick(metricDropdownRef, () => setIsMetricDropdownOpen(false));
 
-  // --- CONNECT NARRATIVE ENGINE ---
+  // --- NARRATIVE ENGINE INTEGRATION ---
   const narrative = useMemo(() => {
       return generateNarrative({
           tab,
@@ -154,7 +159,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
           hoverKey: activeHoverKey,
           nodes,
           benchmarks,
-          chartSection: focusedSection // Pass the chart click state for Overview Scenario 2
+          chartSection: focusedSection
       });
   }, [tab, marketMetric, focusedNodeKey, focusedSection, activeHoverKey, nodes, benchmarks]);
 
@@ -171,10 +176,13 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
   const overviewBarWidth = isDense ? 'flex-1 mx-[1px]' : 'w-2 md:w-3 mx-0.5'; 
   const marketBarWidth = isDense ? 'flex-1' : 'w-24 md:w-32';
 
+  // --- STYLES ---
   const getElementStyle = (nodeKey: string | null, sectionType?: string) => {
       if (focusedSection && sectionType && sectionType !== focusedSection) return 'opacity-30 grayscale-[0.5] transition-all duration-500';
+
       const isActive = activeHoverKey === nodeKey || focusedNodeKey === nodeKey;
       const isBackground = (activeHoverKey && activeHoverKey !== nodeKey) || (focusedNodeKey && focusedNodeKey !== nodeKey);
+
       if (isActive) return 'opacity-100 scale-[1.05] z-50 brightness-110 shadow-[0_0_15px_rgba(0,0,0,0.5)] relative transition-all duration-200 ease-out';
       if (isBackground) return 'opacity-40 grayscale-[0.5] scale-95 transition-all duration-300';
       return 'opacity-100 scale-100';
@@ -202,6 +210,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
          onMouseLeave={() => handleHover(null)}
          onClick={() => { setFocusedSection(null); setFocusedNodeKey(null); }}>
 
+        {/* TAB CONTROLS */}
         {!isExport && (
             <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50">
                 <div className="bg-zinc-900/90 backdrop-blur-md p-1.5 rounded-full flex gap-2 border border-white/10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -227,18 +236,21 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                         { id: 'uptime', title: 'Uptime Duration', icon: Clock, max: maxUptime, key: 'uptime', unit: (v: number) => formatUptimePrecise(v) }
                     ].map((sec) => (
                         <div key={sec.id} className={getElementStyle(null, sec.id)}>
-                            {/* NOTE: Added stopPropagation to setFocusedSection ensures Scenario 2 triggers */}
                             <ChartCell title={sec.title} icon={sec.icon} isFocused={focusedSection === sec.id} onClick={(e: any) => { e.stopPropagation(); setFocusedSection(sec.id); }}>
                                 {nodes.map((n, i) => (
                                     <div 
                                         key={n.pubkey} 
                                         onMouseEnter={() => handleHover(n.pubkey || null)}
                                         onMouseLeave={() => handleHover(null)}
-                                        // NOTE: Added stopPropagation to Node click ensures Scenario 3 triggers
                                         onClick={(e) => { e.stopPropagation(); setFocusedNodeKey(n.pubkey || null); }}
                                         className={`${overviewBarWidth} bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end min-w-[2px] transition-all duration-200 cursor-pointer ${getElementStyle(n.pubkey || null)}`}
                                     >
                                         <div className="w-full rounded-t-sm transition-all duration-500 relative" style={{ height: `${(((n as any)[sec.key] || 0) / sec.max) * 100}%`, backgroundColor: themes[i % themes.length].hex }}></div>
+                                        
+                                        {/* RESTORED TOOLTIP HERE */}
+                                        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-50 pointer-events-none">
+                                            {sec.unit((n as any)[sec.key] || 0)}
+                                        </div>
                                     </div>
                                 ))}
                             </ChartCell>
@@ -271,7 +283,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                         <div className="flex-1 flex items-center justify-center p-8">
                             {marketMetric !== 'health' ? (
                                 <div className="flex flex-col items-center gap-6 animate-in zoom-in-50 duration-500">
-                                    {/* PIE CHART - Scenario 5 triggers on activeHoverKey */}
                                     <div className="w-56 h-56 md:w-72 md:h-72 rounded-full relative flex items-center justify-center shadow-[0_0_50px_rgba(0,0,0,0.5)] transition-all" style={{ background: getConicGradient(marketMetric) }}>
                                         <div className="w-44 h-44 md:w-56 md:h-56 bg-[#050505] rounded-full flex flex-col items-center justify-center z-10 shadow-inner border border-white/5 p-4 text-center">
                                             {marketMetric === 'storage' && <Database size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
