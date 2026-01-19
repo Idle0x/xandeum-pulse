@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup, Line } from 'react-simple-maps';
 import { 
   BarChart3, PieChart, Map as MapIcon, Database, Zap, Activity, Clock, Info,
@@ -10,7 +10,7 @@ import { getSafeIp } from '../../utils/nodeHelpers';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { formatUptimePrecise } from './MicroComponents';
 import { OverviewLegend, UnifiedLegend } from './ComparisonLegends';
-// IMPORT THE NEW NARRATIVE ENGINE
+// IMPORT THE NEW ENGINE
 import { generateNarrative } from '../../lib/narrative-engine';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
@@ -30,11 +30,10 @@ const getLinkColor = (startLat: number, startLon: number, endLat: number) => {
 
 // --- SUB-COMPONENTS ---
 const InterpretationPanel = ({ contextText }: { contextText: string }) => (
-    // Added min-h-[80px] to prevent layout shift when text changes length
     <div className="px-4 py-3 md:px-6 md:py-4 bg-zinc-900/30 border-t border-white/5 flex items-start gap-3 md:gap-4 transition-all duration-300 print-exclude min-h-[80px]">
         <Info size={14} className="text-blue-400 shrink-0 mt-0.5 md:w-4 md:h-4 animate-pulse" />
         <div className="flex flex-col gap-1">
-            {/* Added animate-in classes for fluid text transitions */}
+            {/* key={contextText} ensures the animation replays when text changes */}
             <p key={contextText} className="text-xs md:text-sm text-zinc-300 leading-relaxed max-w-4xl font-medium animate-in fade-in slide-in-from-bottom-1 duration-300">
                 {contextText}
             </p>
@@ -151,6 +150,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
   useOutsideClick(metricDropdownRef, () => setIsMetricDropdownOpen(false));
 
   // --- NARRATIVE ENGINE INTEGRATION ---
+  // The logic is seeded, so re-renders won't cause text flicker unless input data changes
   const narrative = useMemo(() => {
       return generateNarrative({
           tab,
@@ -224,7 +224,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
         )}
 
         <div className={`flex-1 overflow-hidden relative flex flex-col ${isExport ? 'pt-6' : 'pt-24'}`} onClick={() => { setFocusedSection(null); setFocusedNodeKey(null); }}>
-            
+
             {/* OVERVIEW TAB */}
             {tab === 'OVERVIEW' && (
                 <>
@@ -246,8 +246,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                                         className={`${overviewBarWidth} bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end min-w-[2px] transition-all duration-200 cursor-pointer ${getElementStyle(n.pubkey || null)}`}
                                     >
                                         <div className="w-full rounded-t-sm transition-all duration-500 relative" style={{ height: `${(((n as any)[sec.key] || 0) / sec.max) * 100}%`, backgroundColor: themes[i % themes.length].hex }}></div>
-                                        
-                                        {/* RESTORED TOOLTIP HERE */}
                                         <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-50 pointer-events-none">
                                             {sec.unit((n as any)[sec.key] || 0)}
                                         </div>
