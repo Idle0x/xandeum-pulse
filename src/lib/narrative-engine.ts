@@ -14,8 +14,6 @@ type NarrativeContext = {
 };
 
 // --- LEXICON (The Building Blocks) ---
-// We build sentences like LEGOs: [Opener] + [Observation] + [Analytical Connector] + [Deep Insight] + [Verdict]
-
 const LEXICON = {
   openers: {
     neutral: ["Analyzing the dataset,", "Upon review of the cluster,", "Current telemetry indicates", "The data suggests", "Cluster diagnostics reveal"],
@@ -40,9 +38,11 @@ const LEXICON = {
   }
 };
 
-// --- HELPER: Randomizer ---
-const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
-const pickTemplate = (templates: Function[], data: any) => pick(templates)(data);
+// --- HELPER: Randomizer (FIXED: NOW GENERIC) ---
+const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+// FIXED: Typed the templates argument correctly as an array of functions returning strings
+const pickTemplate = (templates: ((data: any) => string)[], data: any) => pick(templates)(data);
 
 // --- STATISTICAL ENGINE ---
 const analyzeContext = (nodes: Node[], benchmark: any) => {
@@ -58,7 +58,6 @@ const analyzeContext = (nodes: Node[], benchmark: any) => {
   const stdDev = Math.sqrt(variance);
 
   // Gini Coefficient (Inequality) for Storage
-  // 0 = perfect equality, 1 = one node has everything
   const sortedStorage = nodes.map(n => n.storage_committed || 0).sort((a, b) => a - b);
   let giniNumerator = 0;
   sortedStorage.forEach((val, i) => { giniNumerator += (i + 1) * val; });
