@@ -13,7 +13,7 @@ export type NarrativeContext = {
   chartSection?: string | null;
 };
 
-// NEW: Explicit type for the analysis result to prevent "implicitly any" errors
+// Explicit type for the analysis result
 type AnalysisStats = {
   count: number;
   totalStorage: number;
@@ -21,132 +21,111 @@ type AnalysisStats = {
   netAvg: number;
   delta: number;
   tier: 'positive' | 'neutral' | 'negative';
+  gini: number;
+  countries: number;
 };
 
-// --- SESSION MEMORY (The "Lock") ---
+// --- SESSION MEMORY ---
 const NARRATIVE_CACHE = new Map<string, string>();
 
-// --- 1. THE MASSIVE TOKEN LEXICON ---
+// --- 1. THE EXPANDED LEXICON ---
 const VOCAB = {
-  // [OPENERS]
-  openers: {
-    tech: [
-      "Telemetry indicates", "System diagnostics show", "According to the logs,", "Node metrics suggest", 
-      "Analysis confirms", "Protocol scan results:", "Throughput analysis:", "Latency inspection:",
-      "Based on current telemetry,", "Algorithmic evaluation:"
-    ],
-    simple: [
-      "Here is the deal:", "Looking at the stats,", "Basically,", "To put it simply,", 
-      "We can see that", "Checking the numbers,", "Quick update:", "As you can see,",
-      "The story here is simple:", "Breaking this down,"
-    ]
-  },
-  
-  // [SUBJECTS]
-  subjects: {
-    node: [
-      "this unit", "the node", "this peer", "the device", "this machine", 
-      "the hardware", "this specific operator", "unit [IP]", "the server"
-    ],
-    group: [
-      "the cluster", "this fleet", "the group", "the collective", "the network subset",
-      "this cohort", "the swarm", "aggregate performance", "the mesh"
-    ]
+  // === GENERAL (Shared) ===
+  common: {
+    subjects: {
+      node: ["this unit", "the node", "this peer", "the device", "this machine", "the hardware", "unit [IP]", "the server"],
+      group: ["the cluster", "this fleet", "the group", "the collective", "the swarm", "aggregate performance", "the mesh"]
+    },
+    openers: {
+      tech: ["Telemetry indicates", "System diagnostics show", "According to logs,", "Metric evaluation:", "Analysis confirms"],
+      simple: ["Here is the deal:", "Looking at the stats,", "Basically,", "To put it simply,", "Checking the numbers,"]
+    }
   },
 
-  // [VERBS]
-  verbs: {
-    positive: [
-      "is crushing", "is dominating", "is outperforming", "is leading", "is driving up",
-      "is anchoring", "is boosting", "is optimizing", "is surpassing", "is eclipsing"
-    ],
-    neutral: [
-      "is maintaining", "is holding", "is tracking with", "is mirroring", "is operating at",
-      "is functioning as", "is delivering", "is outputting", "is sustaining"
-    ],
-    negative: [
-      "is dragging down", "is lagging behind", "is struggling with", "is failing to match",
-      "is bottlenecking", "is deteriorating relative to", "is weighing on", "is slipping below"
-    ]
+  // === OVERVIEW SPECIFIC ===
+  overview: {
+    verbs: {
+      positive: ["is crushing", "is dominating", "is outperforming", "is driving up", "is optimizing"],
+      neutral: ["is maintaining", "is holding", "is tracking with", "is operating at", "is sustaining"],
+      negative: ["is dragging down", "is lagging behind", "is struggling with", "is bottlenecking", "is weighing on"]
+    },
+    adjectives: {
+      positive: ["stellar", "robust", "elite", "superior", "flawless", "resilient"],
+      neutral: ["standard", "nominal", "average", "steady", "baseline", "consistent"],
+      negative: ["volatile", "shaky", "degraded", "compromised", "fragile", "inconsistent"]
+    }
   },
 
-  // [ADJECTIVES]
-  adjectives: {
-    positive: [
-      "stellar", "robust", "rock-solid", "elite", "prime", "superior", 
-      "flawless", "resilient", "clean", "healthy", "optimized", "impeccable"
-    ],
-    neutral: [
-      "standard", "nominal", "average", "steady", "baseline", "expected", 
-      "median", "consistent", "typical", "regular"
-    ],
-    negative: [
-      "volatile", "shaky", "degraded", "poor", "compromised", "fragile", 
-      "inconsistent", "weak", "sub-optimal", "critical", "unstable"
-    ]
+  // === MARKET SPECIFIC (Metric Aware) ===
+  market: {
+    // 1. STORAGE VOCAB
+    storage: {
+      tech: {
+        verbs: ["allocating capacity for", "provisioning shards for", "retaining data for", "anchoring state for"],
+        adjectives: ["high-density", "distributed", "redundant", "centralized", "archival-grade"],
+        nouns: ["data gravity", "storage throughput", "capacity load", "shard distribution"]
+      },
+      simple: {
+        verbs: ["holding files for", "saving data for", "keeping records for", "storing stuff for"],
+        adjectives: ["heavy", "full", "empty", "big", "reliable"],
+        nouns: ["total space", "file room", "data load", "storage size"]
+      }
+    },
+    // 2. CREDITS VOCAB
+    credits: {
+      tech: {
+        verbs: ["accruing yield from", "generating rewards via", "mining blocks for", "validating transactions for"],
+        adjectives: ["highly profitable", "yield-optimized", "incentivized", "reward-dominant"],
+        nouns: ["token generation", "economic throughput", "mining efficiency", "reward vectors"]
+      },
+      simple: {
+        verbs: ["earning points from", "getting paid by", "making money from", "collecting rewards from"],
+        adjectives: ["rich", "profitable", "valuable", "top-earning"],
+        nouns: ["earnings", "paycheck", "wallet size", "income"]
+      }
+    },
+    // 3. UPTIME VOCAB
+    uptime: {
+      tech: {
+        verbs: ["maintaining persistency for", "guaranteeing availability of", "sustaining connection to"],
+        adjectives: ["highly available", "fault-tolerant", "persistent", "always-on"],
+        nouns: ["system reliability", "connection stability", "session persistence"]
+      },
+      simple: {
+        verbs: ["staying online for", "keeping the lights on for", "running without stopping for"],
+        adjectives: ["dependable", "reliable", "steady", "non-stop"],
+        nouns: ["uptime streak", "reliability score", "online time"]
+      }
+    },
+    // 4. HEALTH VOCAB (Fallback to Overview styles usually, but specific here)
+    health: {
+      tech: { verbs: ["optimizing logic for"], adjectives: ["clinical", "performant"], nouns: ["integrity score"] },
+      simple: { verbs: ["running smoothly for"], adjectives: ["healthy", "fit"], nouns: ["health check"] }
+    }
   },
 
-  // [CONTEXTS]
-  contexts: {
-    positive: [
-      "by a significant margin", "setting a new standard", "well above the baseline", 
-      "beating global averages", "leading the pack", "showing top-tier results"
-    ],
-    neutral: [
-      "within expected parameters", "aligned with the baseline", "deviation is minimal",
-      "right on target", "matching network standards"
-    ],
-    negative: [
-      "requiring immediate attention", "well below the safe zone", "creating a risk factor",
-      "dragging the average down", "showing signs of stress"
-    ]
-  },
-
-  // [IMPLICATIONS]
-  implications: {
-    positive: [
-      "which is fantastic.", "signaling high reliability.", "making it a key asset.",
-      "so no worries here.", "indicating excellent health.", "proving its value."
-    ],
-    neutral: [
-      "which is normal.", "nothing to worry about.", "maintaining status quo.",
-      "keeping things stable.", "so it's business as usual."
-    ],
-    negative: [
-      "which is a problem.", "indicating potential failure.", "reducing overall resilience.",
-      "so maintenance is advised.", "increasing risk exposure.", "impacting the score."
-    ]
+  // === TOPOLOGY SPECIFIC ===
+  topology: {
+    tech: {
+      verbs: ["routing traffic via", "anchoring the mesh in", "bridging latency across", "serving requests from"],
+      adjectives: ["geospatially distinct", "jurisdictionally isolated", "physically redundant", "latency-optimized"],
+      implications: ["minimizing hop count.", "diversifying legal risk.", "reducing propagation delay.", "enhancing censorship resistance."]
+    },
+    simple: {
+      verbs: ["sitting in", "running out of", "located in", "sending data from"],
+      adjectives: ["far away", "alone", "well placed", "spread out"],
+      implications: ["which is good for safety.", "making it hard to block.", "helping speed things up.", "so it's safer."]
+    }
   }
 };
 
 // --- 2. HELPER FUNCTIONS ---
 
 const roll = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
-
-const buildSentence = (sentiment: 'positive' | 'neutral' | 'negative', subjectName: string) => {
-  const tone = Math.random() > 0.5 ? 'tech' : 'simple';
-  
-  const opener = roll(VOCAB.openers[tone]);
-  const subj = roll(VOCAB.subjects.node).replace('[IP]', subjectName); 
-  const verb = roll(VOCAB.verbs[sentiment]);
-  const adj = roll(VOCAB.adjectives[sentiment]);
-  const context = roll(VOCAB.contexts[sentiment]);
-  const implication = roll(VOCAB.implications[sentiment]);
-
-  const structures = [
-    () => `${opener} ${subj} ${verb} expectations, ${context}.`,
-    () => `${capitalize(adj)}. That describes ${subj}. It ${verb} the group average ${context}.`,
-    () => `${capitalize(subj)} ${verb} the benchmark, ${implication}`,
-    () => `${opener} ${adj} performance detected. ${capitalize(subj)} ${verb} the rest.`
-  ];
-
-  return roll(structures)();
-};
-
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const getSafeTone = () => Math.random() > 0.5 ? 'tech' : 'simple';
 
 // --- 3. ANALYTICS ENGINE ---
-// Explicitly return AnalysisStats so TS knows exactly what 'tier' is
 const analyze = (nodes: Node[], benchmark: any): AnalysisStats | null => {
   if (nodes.length === 0) return null;
   const count = nodes.length;
@@ -155,66 +134,94 @@ const analyze = (nodes: Node[], benchmark: any): AnalysisStats | null => {
   const netAvg = benchmark?.networkRaw?.health || 75;
   const delta = avgHealth - netAvg;
   
+  // Gini Calculation
+  const sortedStorage = nodes.map(n => n.storage_committed || 0).sort((a, b) => a - b);
+  let giniNumerator = 0;
+  sortedStorage.forEach((val, i) => { giniNumerator += (i + 1) * val; });
+  const gini = (2 * giniNumerator) / (count * totalStorage) - (count + 1) / count;
+  const countries = new Set(nodes.map(n => n.location?.countryName)).size;
+
   let tier: 'positive' | 'neutral' | 'negative' = 'neutral';
   if (delta > 5) tier = 'positive';
   if (delta < -5) tier = 'negative';
 
-  return { count, totalStorage, avgHealth, netAvg, delta, tier };
+  return { count, totalStorage, avgHealth, netAvg, delta, tier, gini, countries };
 };
 
-// --- 4. SCENARIO GENERATORS ---
-// Updated signatures to use AnalysisStats instead of 'any'
+// --- 4. ASSEMBLERS (The "Sentence Builders") ---
 
-const generateOverview = (activeNode: Node | null, stats: AnalysisStats, section: string | null): string => {
+// OVERVIEW ASSEMBLER (Subject + General Verb + General Adjective)
+const buildOverviewSentence = (stats: AnalysisStats, activeNode: Node | null) => {
+  const tone = getSafeTone();
+  const sentiment = stats.tier; // positive, neutral, negative
+
+  const opener = roll(VOCAB.common.openers[tone]);
+  const verb = roll(VOCAB.overview.verbs[sentiment]);
+  const adj = roll(VOCAB.overview.adjectives[sentiment]);
+  const subject = activeNode ? roll(VOCAB.common.subjects.node).replace('[IP]', getSafeIp(activeNode)) : roll(VOCAB.common.subjects.group);
+
+  // Structures
+  const s1 = () => `${opener} ${subject} ${verb} expectations. The current status is ${adj}.`;
+  const s2 = () => `${capitalize(adj)}. That describes ${subject} right now. It ${verb} the baseline.`;
+  const s3 = () => `${capitalize(subject)} ${verb} the network average, ${sentiment === 'positive' ? 'setting a high bar' : 'which requires attention'}.`;
+
+  return roll([s1, s2, s3])();
+};
+
+// MARKET ASSEMBLER (Metric Specific Vocab)
+const buildMarketSentence = (stats: AnalysisStats, activeNode: Node | null, metric: string) => {
+  const tone = getSafeTone();
+  const mKey = (metric === 'storage_committed' ? 'storage' : metric) as keyof typeof VOCAB.market;
+  // Fallback if metric key is weird (default to storage)
+  const vocab = VOCAB.market[mKey] || VOCAB.market.storage; 
   
-  // A1: CHART SECTION CLICKED
-  if (section) {
-    const isPositive = stats.tier === 'positive';
-    return `${roll(VOCAB.openers.tech)} Analysis of ${section}. The group average is ${stats.avgHealth.toFixed(0)}. ${isPositive ? "This is a strong sector." : "This sector needs work."} ${roll(VOCAB.implications[stats.tier])}`;
-  }
+  const vList = vocab[tone].verbs;
+  const aList = vocab[tone].adjectives;
+  const nList = vocab[tone].nouns;
 
-  // A2: SPECIFIC NODE CLICKED
-  if (activeNode) {
-    const diff = (activeNode.health || 0) - stats.avgHealth;
-    const sentiment = diff > 2 ? 'positive' : diff < -2 ? 'negative' : 'neutral';
-    const safeIp = getSafeIp(activeNode);
-    return buildSentence(sentiment, safeIp);
-  }
+  const subject = activeNode ? roll(VOCAB.common.subjects.node).replace('[IP]', getSafeIp(activeNode)) : roll(VOCAB.common.subjects.group);
+  const verb = roll(vList);
+  const noun = roll(nList);
+  const adj = roll(aList);
 
-  // A3: DEFAULT VIEW
-  const subject = roll(VOCAB.subjects.group);
-  const verb = roll(VOCAB.verbs[stats.tier]);
-  const adj = roll(VOCAB.adjectives[stats.tier]);
-  return `${roll(VOCAB.openers.simple)} ${subject} ${verb} the network baseline. We are seeing ${adj} signals, ${roll(VOCAB.contexts[stats.tier])}.`;
+  // Context Logic
+  let context = "";
+  if (metric === 'credits') context = stats.delta > 0 ? "generating massive value" : "earning below average";
+  if (metric === 'storage') context = stats.gini > 0.5 ? "leading to centralization" : "keeping data decentralized";
+  if (metric === 'uptime') context = "ensuring maximum availability";
+  if (metric === 'health') context = "operating at peak efficiency";
+
+  // Structures
+  const s1 = () => `${capitalize(noun)} Update: ${subject} is ${verb} the network, ${context}.`;
+  const s2 = () => `${capitalize(adj)} performance detected. ${capitalize(subject)} is currently ${verb} the cluster.`;
+  const s3 = () => `Economic Analysis: ${subject} contributes to ${noun} by ${verb} the system.`;
+
+  return roll([s1, s2, s3])();
 };
 
-const generateMarket = (activeNode: Node | null, stats: AnalysisStats, metric: string): string => {
-  const m = metric || 'storage';
-
-  // B1: SPECIFIC NODE CLICKED
-  if (activeNode) {
-    const val = (activeNode as any)[m === 'storage' ? 'storage_committed' : m] || 0;
-    const share = (val / (m === 'storage' ? stats.totalStorage : 100)) * 100; 
-    
-    // share logic
-    if (share > 20) return `Whale Alert: ${getSafeIp(activeNode)} controls a massive chunk of the ${m}. This represents a centralization risk.`;
-    return `Small Stakeholder: ${getSafeIp(activeNode)} holds a nominal share. It poses no centralization risk to the cluster.`;
-  }
-
-  // B2: DEFAULT VIEW
-  return `Market Analysis (${m}): Distribution is ${stats.delta > 0 ? "healthy" : "concerning"}. ${roll(VOCAB.openers.tech)} No single point of failure detected.`;
-};
-
-const generateTopology = (activeNode: Node | null, stats: AnalysisStats): string => {
+// TOPOLOGY ASSEMBLER (Spatial Vocab)
+const buildTopologySentence = (stats: AnalysisStats, activeNode: Node | null) => {
+  const tone = getSafeTone();
+  const vocab = VOCAB.topology[tone];
   
-  // C1: SPECIFIC NODE CLICKED
-  if (activeNode) {
-    const country = activeNode.location?.countryName || "Unknown";
-    return `Geo-Location Lock: ${getSafeIp(activeNode)} is physically located in ${country}. ${roll(VOCAB.implications.positive)}`;
-  }
+  const subject = activeNode ? roll(VOCAB.common.subjects.node).replace('[IP]', getSafeIp(activeNode)) : roll(VOCAB.common.subjects.group);
+  const country = activeNode?.location?.countryName || "Unknown Region";
+  const verb = roll(vocab.verbs);
+  const adj = roll(vocab.adjectives);
+  const implication = roll(vocab.implications);
 
-  // C2: DEFAULT VIEW
-  return `${roll(VOCAB.openers.simple)} The mesh topology indicates good geographic spread. Nodes are not physically clustered, reducing legal risk.`;
+  // Structures
+  if (activeNode) {
+    // Node Focus
+    const s1 = () => `Geo-Point: ${subject} is ${verb} ${country}. This makes it ${adj}, ${implication}`;
+    const s2 = () => `${capitalize(adj)} placement. ${capitalize(subject)} is ${verb} ${country}, ${implication}`;
+    return roll([s1, s2])();
+  } else {
+    // Global Focus
+    const s1 = () => `Mesh Audit: The fleet is ${adj}. We are ${verb} ${stats.countries} unique countries, ${implication}`;
+    const s2 = () => `${capitalize(adj)} distribution detected. The group is ${verb} multiple jurisdictions, ${implication}`;
+    return roll([s1, s2])();
+  }
 };
 
 
@@ -222,25 +229,41 @@ const generateTopology = (activeNode: Node | null, stats: AnalysisStats): string
 export const generateNarrative = (ctx: NarrativeContext): string => {
   if (!ctx.nodes || ctx.nodes.length === 0) return "Initializing...";
 
+  // 1. CACHE KEY GENERATION
   const activeKey = ctx.focusKey || ctx.hoverKey || 'default';
   const sectionKey = ctx.chartSection || 'none';
-  const cacheKey = `${ctx.tab}::${activeKey}::${sectionKey}::${ctx.metric || 'none'}`;
+  const metricKey = ctx.metric || 'storage';
+  const cacheKey = `${ctx.tab}::${activeKey}::${sectionKey}::${metricKey}`;
 
+  // 2. CHECK CACHE
   if (NARRATIVE_CACHE.has(cacheKey)) {
     return NARRATIVE_CACHE.get(cacheKey)!;
   }
 
+  // 3. ANALYZE
   const stats = analyze(ctx.nodes, ctx.benchmarks);
   if (!stats) return "Calculating...";
 
-  let narrative = "";
   const activeNode = activeKey !== 'default' ? ctx.nodes.find(n => n.pubkey === activeKey) || null : null;
+  let narrative = "";
 
-  if (ctx.tab === 'OVERVIEW') narrative = generateOverview(activeNode, stats, ctx.chartSection || null);
-  else if (ctx.tab === 'MARKET') narrative = generateMarket(activeNode, stats, ctx.metric || 'storage');
-  else if (ctx.tab === 'TOPOLOGY') narrative = generateTopology(activeNode, stats);
+  // 4. ROUTE TO ASSEMBLERS
+  if (ctx.tab === 'OVERVIEW') {
+    // Chart click override
+    if (ctx.chartSection) {
+       narrative = buildMarketSentence(stats, null, ctx.chartSection); // Reuse market logic for chart clicks as they are metric based
+    } else {
+       narrative = buildOverviewSentence(stats, activeNode);
+    }
+  } 
+  else if (ctx.tab === 'MARKET') {
+    narrative = buildMarketSentence(stats, activeNode, metricKey);
+  } 
+  else if (ctx.tab === 'TOPOLOGY') {
+    narrative = buildTopologySentence(stats, activeNode);
+  }
 
+  // 5. SAVE & RETURN
   NARRATIVE_CACHE.set(cacheKey, narrative);
-
   return narrative;
 };
