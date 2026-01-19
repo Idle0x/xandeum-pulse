@@ -24,6 +24,7 @@ import { EmptySlot } from '../components/compare/ComparisonUI';
 
 // --- WATERMARK COMPONENT ---
 const PulseWatermark = () => (
+  // Added 'watermark' class explicitly for the exporter to find
   <div className="watermark hidden items-center justify-center gap-3 py-6 mt-4 w-full border-t border-zinc-800 bg-[#020202]">
      <div className="w-5 h-5 bg-cyan-500 rounded-full shadow-[0_0_15px_#06b6d4] flex items-center justify-center">
         <Zap size={10} className="text-black fill-black" />
@@ -196,7 +197,6 @@ export default function ComparePage() {
   const addNode = (pubkey: string) => { if (!selectedKeys.includes(pubkey) && selectedKeys.length < 30) { const k = [...selectedKeys, pubkey]; setSelectedKeys(k); updateUrl(k); setIsSearchOpen(false); setSearchQuery(''); setIsWatchlistOpen(false); } };
   
   const removeNode = (pubkey: string) => { 
-      // If removing the currently focused node, clear focus
       if (hoveredNodeKey === pubkey) setHoveredNodeKey(null);
       const k = selectedKeys.filter(x => x !== pubkey); 
       setSelectedKeys(k); 
@@ -206,12 +206,10 @@ export default function ComparePage() {
   const clearAllNodes = () => { setSelectedKeys([]); updateUrl([]); setHoveredNodeKey(null); };
 
   const toggleLeaderMetric = (metric: string) => {
-      // Find the node associated with this metric to check if we need to clear focus
       const leader = leaderColumns.find(l => l.metric === metric);
       if (leader && leader.node.pubkey === hoveredNodeKey) {
           setHoveredNodeKey(null);
       }
-
       if (activeLeaderMetrics.includes(metric)) {
           setActiveLeaderMetrics(prev => prev.filter(m => m !== metric));
       } else {
@@ -266,32 +264,55 @@ export default function ComparePage() {
 
   const handleShare = () => { navigator.clipboard.writeText(window.location.href); setToast('Link Copied!'); setTimeout(() => setToast(null), 2000); };
 
+  // --- EXPORT LOGIC ---
   const handleExport = async (targetRef: React.RefObject<HTMLDivElement>, suffix: string) => {
     if (targetRef.current && printRef.current) {
       try {
-        const fullTableWidth = printRef.current.scrollWidth;
-        const finalWidth = Math.max(fullTableWidth, targetRef.current.clientWidth);
+        // 1. CALCULATE TRUE WIDTH
+        // The table (printRef) is likely wider than the screen. We must use its scrollWidth.
+        const tableScrollWidth = printRef.current.scrollWidth;
+        const currentViewWidth = targetRef.current.clientWidth;
+        
+        // The final image width is the larger of the two.
+        const finalWidth = Math.max(tableScrollWidth, currentViewWidth);
+        const finalHeight = targetRef.current.scrollHeight;
 
         const options: any = {
           cacheBust: true,
           backgroundColor: '#020202',
-          pixelRatio: 2,
+          pixelRatio: 2, 
           width: finalWidth,
-          height: targetRef.current.scrollHeight,
+          height: finalHeight,
+          // 2. FORCE STYLE ON ROOT
+          style: { 
+            width: `${finalWidth}px`, 
+            maxWidth: 'none', 
+            height: `${finalHeight}px`,
+            overflow: 'visible' 
+          },
           filter: (node: any) => {
              if (node instanceof HTMLElement && node.classList.contains('print-exclude')) return false;
              return true;
           },
-          style: { 
-            width: `${finalWidth}px`, 
-            maxWidth: 'none', 
-            overflow: 'visible',
-            alignItems: 'center' 
-          },
-          onClone: (clonedNode: any) => {
-             const watermark = clonedNode.querySelector('.watermark');
+          onClone: (clonedNode: HTMLElement) => {
+             // A. UNLOCK MAX-WIDTH
+             clonedNode.style.maxWidth = 'none';
+             clonedNode.style.width = '100%';
+
+             // B. FORCE WATERMARK VISIBILITY
+             const watermark = clonedNode.querySelector('.watermark') as HTMLElement;
              if (watermark) {
                 watermark.style.display = 'flex'; 
+                watermark.style.visibility = 'visible';
+             }
+
+             // C. CENTER THE CHARTS
+             const chartContainer = clonedNode.querySelector('.chart-container') as HTMLElement;
+             if (chartContainer) {
+                 chartContainer.style.maxWidth = 'none';
+                 chartContainer.style.width = '100%';
+                 chartContainer.style.display = 'flex';
+                 chartContainer.style.justifyContent = 'center';
              }
           }
         };
@@ -343,7 +364,6 @@ export default function ComparePage() {
                         <Plus size={14} />
                     </button>
                     <span className="text-[10px] md:text-xs font-mono text-zinc-500 uppercase tracking-widest">
-                        {/* UPDATE: Sum of Users + Leaders */}
                         Selected: <span className="text-zinc-200">{selectedNodes.length + activeLeaderMetrics.length}</span>
                     </span>
                 </div>
@@ -461,7 +481,6 @@ export default function ComparePage() {
                  </div>
              ) : (
                  // TABLE SCROLL CONTAINER (Target for "Table Only")
-                 // UPDATE: Added onClick to background to clear focus
                  <main 
                     ref={printRef} 
                     onClick={() => setHoveredNodeKey(null)}
@@ -469,7 +488,7 @@ export default function ComparePage() {
                  >
                     <ControlRail showNetwork={showNetwork} benchmarks={benchmarks} />
 
-                    {/* LEADER COLUMNS (Rendered First with Specific Theme) */}
+                    {/* LEADER COLUMNS */}
                     {leaderColumns.map((leader, index) => {
                          const isWinner = {
                             health: (leader.node.health || 0) === currentWinners.health,
@@ -482,13 +501,13 @@ export default function ComparePage() {
                                 node={leader.node} 
                                 onRemove={() => toggleLeaderMetric(leader.metric)} 
                                 anchorNode={undefined} 
-                                theme={LEADER_THEME_MAP[leader.metric]} // Apply specific Leader Theme
+                                theme={LEADER_THEME_MAP[leader.metric]} 
                                 winners={isWinner}
                                 overallWinner={leader.node.pubkey === overallWinnerKey}
                                 benchmarks={benchmarks}
                                 showNetwork={showNetwork}
                                 hoveredNodeKey={hoveredNodeKey} 
-                                onFocus={handleNodeFocusToggle} // Pass the click toggle handler
+                                onFocus={handleNodeFocusToggle} 
                                 isLeader={true}      
                                 leaderType={leader.metric}
                             />
@@ -514,7 +533,7 @@ export default function ComparePage() {
                                 benchmarks={benchmarks}
                                 showNetwork={showNetwork}
                                 hoveredNodeKey={hoveredNodeKey} 
-                                onFocus={handleNodeFocusToggle} // Pass the click toggle handler
+                                onFocus={handleNodeFocusToggle} 
                             />
                         );
                     })}
@@ -525,7 +544,8 @@ export default function ComparePage() {
          </div>
 
          {/* ANALYTICS DECK */}
-         <div className="w-full max-w-[1600px] mx-auto">
+         {/* Added 'chart-container' class here for the exporter to target */}
+         <div className="w-full max-w-[1600px] mx-auto chart-container">
             <SynthesisEngine 
                 nodes={[...leaderColumns.map(l => l.node), ...selectedNodes]} 
                 themes={[...leaderColumns.map(l => LEADER_THEME_MAP[l.metric]), ...PLAYER_THEMES]} 
