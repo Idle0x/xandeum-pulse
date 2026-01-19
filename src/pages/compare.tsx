@@ -263,7 +263,7 @@ export default function ComparePage() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#18181b_0%,#020202_100%)] pointer-events-none z-0"></div>
 
       {/* --- GHOST CANVASES (OFF-SCREEN) --- */}
-      <div style={{ position: 'absolute', top: '-10000px', left: '-10000px', visibility: 'hidden' }}>
+      <div style={{ position: 'absolute', top: '-10000px', left: '-10000px', opacity: 0, pointerEvents: 'none' }}>
           {/* Instance 1: Table Only */}
           <div style={{ display: 'block' }}> {/* Wrapper to ensure rendering context */}
              <PulseExportCanvas 
