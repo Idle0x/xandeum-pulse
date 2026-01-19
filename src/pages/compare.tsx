@@ -5,22 +5,22 @@ import Link from 'next/link';
 import { toPng } from 'html-to-image';
 import { 
   ArrowLeft, Search, Plus, X, 
-  Download, CheckCircle, Share2, ChevronDown, Grid, Star, Table, BarChart, Zap
+  Download, CheckCircle, Share2, ChevronDown, Grid, Star, Table, BarChart, Zap, Check
 } from 'lucide-react';
 
 // Hooks & Utils
-import { useNetworkData } from '../hooks/useNetworkData';
-import { useOutsideClick } from '../hooks/useOutsideClick';
-import { getSafeIp } from '../utils/nodeHelpers';
-import { formatBytes } from '../utils/formatters';
-import { formatUptimePrecise, PLAYER_THEMES } from '../components/compare/MicroComponents';
-import { Node } from '../types';
+import { useNetworkData } from '../../hooks/useNetworkData';
+import { useOutsideClick } from '../../hooks/useOutsideClick';
+import { getSafeIp } from '../../utils/nodeHelpers';
+import { formatBytes } from '../../utils/formatters';
+import { formatUptimePrecise, PLAYER_THEMES } from '../../components/compare/MicroComponents';
+import { Node } from '../../types';
 
 // Child Components
-import { ControlRail } from '../components/compare/ControlRail';
-import { NodeColumn } from '../components/compare/NodeColumn';
-import { SynthesisEngine } from '../components/compare/SynthesisEngine';
-import { EmptySlot } from '../components/compare/ComparisonUI';
+import { ControlRail } from '../../components/compare/ControlRail';
+import { NodeColumn } from '../../components/compare/NodeColumn';
+import { SynthesisEngine } from '../../components/compare/SynthesisEngine';
+import { EmptySlot } from '../../components/compare/ComparisonUI';
 
 // --- WATERMARK COMPONENT (Hidden by default, visible on export) ---
 const PulseWatermark = () => (
@@ -35,9 +35,19 @@ const PulseWatermark = () => (
   </div>
 );
 
+// --- LEADER THEME (Gold/Winner Style) ---
+const LEADER_THEME = { 
+  name: 'leader', 
+  hex: '#facc15', // Yellow-400
+  headerBg: 'bg-yellow-900/40', 
+  bodyBg: 'bg-yellow-900/5', 
+  text: 'text-yellow-400', 
+  border: 'border-yellow-500/50' 
+};
+
 export default function ComparePage() {
   const router = useRouter();
-  
+
   // --- REFS for Exporting ---
   const printRef = useRef<HTMLDivElement>(null);      // "Table Only" Target
   const fullPageRef = useRef<HTMLDivElement>(null);   // "With Charts" Target
@@ -48,7 +58,9 @@ export default function ComparePage() {
   const [networkScope, setNetworkScope] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [showNetwork, setShowNetwork] = useState(true);
-  const [leaderMetric, setLeaderMetric] = useState<'STORAGE' | 'CREDITS' | 'HEALTH' | 'UPTIME' | null>(null);
+  
+  // NEW: Multi-select state for leaders
+  const [activeLeaderMetrics, setActiveLeaderMetrics] = useState<string[]>([]);
 
   // Spotlight State (Syncs Table & Charts)
   const [hoveredNodeKey, setHoveredNodeKey] = useState<string | null>(null);
@@ -87,14 +99,25 @@ export default function ComparePage() {
       return selectedKeys.map(key => availableNodes.find(n => n.pubkey === key)).filter((n): n is Node => !!n);
   }, [selectedKeys, availableNodes]);
 
-  const benchmarks = useMemo(() => {
-      if (availableNodes.length === 0) return { network: {}, leader: {}, networkRaw: {}, leaderRaw: {} };
+  // --- DYNAMIC LEADER CALCULATION ---
+  // Returns an array of objects: { metric: 'STORAGE', node: Node }
+  const leaderColumns = useMemo(() => {
+      if (availableNodes.length === 0) return [];
+      
+      return activeLeaderMetrics.map(metric => {
+          let node: Node | null = null;
+          // Logic to find the best node for the specific metric
+          if (metric === 'STORAGE') node = availableNodes.reduce((p, c) => (p.storage_committed || 0) > (c.storage_committed || 0) ? p : c, availableNodes[0]);
+          if (metric === 'CREDITS') node = availableNodes.reduce((p, c) => (p.credits || 0) > (c.credits || 0) ? p : c, availableNodes[0]);
+          if (metric === 'HEALTH') node = availableNodes.reduce((p, c) => (p.health || 0) > (c.health || 0) ? p : c, availableNodes[0]);
+          if (metric === 'UPTIME') node = availableNodes.reduce((p, c) => (p.uptime || 0) > (c.uptime || 0) ? p : c, availableNodes[0]);
+          
+          return node ? { metric, node } : null;
+      }).filter(item => item !== null) as { metric: string, node: Node }[];
+  }, [activeLeaderMetrics, availableNodes]);
 
-      let leaderNode: Node | null = null;
-      if (leaderMetric === 'STORAGE') leaderNode = availableNodes.reduce((p, c) => (p.storage_committed || 0) > (c.storage_committed || 0) ? p : c, availableNodes[0]);
-      else if (leaderMetric === 'CREDITS') leaderNode = availableNodes.reduce((p, c) => (p.credits || 0) > (c.credits || 0) ? p : c, availableNodes[0]);
-      else if (leaderMetric === 'HEALTH') leaderNode = availableNodes.reduce((p, c) => (p.health || 0) > (c.health || 0) ? p : c, availableNodes[0]);
-      else if (leaderMetric === 'UPTIME') leaderNode = availableNodes.reduce((p, c) => (p.uptime || 0) > (c.uptime || 0) ? p : c, availableNodes[0]);
+  const benchmarks = useMemo(() => {
+      if (availableNodes.length === 0) return { network: {}, networkRaw: {} };
 
       const healths = availableNodes.map(n => n.health || 0);
       const storages = availableNodes.map(n => n.storage_committed || 0);
@@ -109,28 +132,37 @@ export default function ComparePage() {
       const netCreditsRaw = getMedian(credits);
       const netVersion = 'v1.2.0'; 
 
-      const leaderRaw = leaderNode ? { health: leaderNode.health || 0, storage: leaderNode.storage_committed || 0, credits: leaderNode.credits || 0, uptime: leaderNode.uptime || 0, version: leaderNode.version || 'N/A' } : { health: 0, storage: 0, credits: 0, uptime: 0, version: 'N/A' };
-
       return {
           network: { health: netHealthRaw.toString(), uptime: formatUptimePrecise(netUptimeRaw), storage: formatBytes(netStorageRaw), credits: netCreditsRaw.toLocaleString(), version: netVersion },
-          leader: { health: leaderRaw.health.toString(), uptime: formatUptimePrecise(leaderRaw.uptime), storage: formatBytes(leaderRaw.storage), credits: leaderRaw.credits.toLocaleString(), version: leaderRaw.version },
           networkRaw: { health: netHealthRaw, storage: netStorageRaw, credits: netCreditsRaw, uptime: netUptimeRaw },
-          leaderRaw
       };
-  }, [availableNodes, leaderMetric]);
+  }, [availableNodes]);
 
   const currentWinners = useMemo(() => {
-      if (selectedNodes.length === 0) return { storage: 0, credits: 0, health: 0 };
-      return { storage: Math.max(...selectedNodes.map(n => n.storage_committed || 0)), credits: Math.max(...selectedNodes.map(n => n.credits || 0)), health: Math.max(...selectedNodes.map(n => n.health || 0)) };
-  }, [selectedNodes]);
+      // Logic includes both selected nodes AND active leader columns for "Winner" check
+      const allVisible = [...selectedNodes, ...leaderColumns.map(l => l.node)];
+      if (allVisible.length === 0) return { storage: 0, credits: 0, health: 0 };
+      return { 
+          storage: Math.max(...allVisible.map(n => n.storage_committed || 0)), 
+          credits: Math.max(...allVisible.map(n => n.credits || 0)), 
+          health: Math.max(...allVisible.map(n => n.health || 0)) 
+      };
+  }, [selectedNodes, leaderColumns]);
 
   const overallWinnerKey = useMemo(() => {
-      if (selectedNodes.length < 2) return null;
+      const allVisible = [...selectedNodes, ...leaderColumns.map(l => l.node)];
+      if (allVisible.length < 2) return null;
       let bestScore = -1; let bestKey = null;
-      const maxH = Math.max(...selectedNodes.map(n => n.health || 1)); const maxS = Math.max(...selectedNodes.map(n => n.storage_committed || 1)); const maxC = Math.max(...selectedNodes.map(n => n.credits || 1));
-      selectedNodes.forEach(n => { const score = ((n.health || 0)/maxH) + ((n.storage_committed || 0)/maxS) + ((n.credits || 0)/maxC); if (score > bestScore) { bestScore = score; bestKey = n.pubkey; } });
+      const maxH = Math.max(...allVisible.map(n => n.health || 1)); 
+      const maxS = Math.max(...allVisible.map(n => n.storage_committed || 1)); 
+      const maxC = Math.max(...allVisible.map(n => n.credits || 1));
+      
+      allVisible.forEach(n => { 
+          const score = ((n.health || 0)/maxH) + ((n.storage_committed || 0)/maxS) + ((n.credits || 0)/maxC); 
+          if (score > bestScore) { bestScore = score; bestKey = n.pubkey; } 
+      });
       return bestKey;
-  }, [selectedNodes]);
+  }, [selectedNodes, leaderColumns]);
 
   // --- EFFECTS & HANDLERS ---
   useEffect(() => { const saved = localStorage.getItem('xandeum_favorites'); if (saved) setFavorites(JSON.parse(saved)); }, []);
@@ -140,6 +172,15 @@ export default function ComparePage() {
   const removeNode = (pubkey: string) => { const k = selectedKeys.filter(x => x !== pubkey); setSelectedKeys(k); updateUrl(k); };
   const clearAllNodes = () => { setSelectedKeys([]); updateUrl([]); };
 
+  // Toggle Logic for Leader Dropdown
+  const toggleLeaderMetric = (metric: string) => {
+      if (activeLeaderMetrics.includes(metric)) {
+          setActiveLeaderMetrics(prev => prev.filter(m => m !== metric));
+      } else {
+          setActiveLeaderMetrics(prev => [...prev, metric]);
+      }
+  };
+
   const removeFavorite = (pubkey: string) => {
       const newFavs = favorites.filter(f => f !== pubkey);
       setFavorites(newFavs);
@@ -147,15 +188,17 @@ export default function ComparePage() {
   };
 
   useEffect(() => {
-    if (selectedKeys.length > prevNodeCount.current) {
+    // Scroll handling for new nodes (user selected OR leaders)
+    const totalCount = selectedKeys.length + activeLeaderMetrics.length;
+    if (totalCount > prevNodeCount.current) {
         if (printRef.current) {
             const maxScroll = printRef.current.scrollWidth - printRef.current.clientWidth;
             const targetScroll = Math.max(0, maxScroll - 70); 
             printRef.current.scrollTo({ left: targetScroll, behavior: 'smooth' });
         }
     }
-    prevNodeCount.current = selectedKeys.length;
-  }, [selectedKeys.length]);
+    prevNodeCount.current = totalCount;
+  }, [selectedKeys.length, activeLeaderMetrics.length]);
 
   const hasProcessedDeepLink = useRef(false);
   useEffect(() => {
@@ -177,14 +220,13 @@ export default function ComparePage() {
 
   const handleShare = () => { navigator.clipboard.writeText(window.location.href); setToast('Link Copied!'); setTimeout(() => setToast(null), 2000); };
 
-  // --- EXPORT HANDLER (FIXED TYPES) ---
+  // --- EXPORT HANDLER ---
   const handleExport = async (targetRef: React.RefObject<HTMLDivElement>, suffix: string) => {
     if (targetRef.current && printRef.current) {
       try {
         const fullTableWidth = printRef.current.scrollWidth;
         const finalWidth = Math.max(fullTableWidth, targetRef.current.clientWidth);
 
-        // FIX: Casting options to 'any' to bypass strict TS check on 'onClone' which exists in library but might be missing in types
         const options: any = {
           cacheBust: true,
           backgroundColor: '#020202',
@@ -259,8 +301,8 @@ export default function ComparePage() {
                         Selected: <span className="text-zinc-200">{selectedNodes.length}</span>
                     </span>
                 </div>
-                {selectedKeys.length > 0 && (
-                    <button onClick={clearAllNodes} className="text-[9px] md:text-[10px] font-black text-red-500/80 hover:text-red-400 uppercase tracking-tighter border-l border-white/10 pl-4 transition">
+                {(selectedKeys.length > 0 || activeLeaderMetrics.length > 0) && (
+                    <button onClick={() => { clearAllNodes(); setActiveLeaderMetrics([]); }} className="text-[9px] md:text-[10px] font-black text-red-500/80 hover:text-red-400 uppercase tracking-tighter border-l border-white/10 pl-4 transition">
                         Clear All
                     </button>
                 )}
@@ -273,22 +315,32 @@ export default function ComparePage() {
         <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3 max-w-5xl">
             <button onClick={() => setShowNetwork(!showNetwork)} className={`flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border w-auto ${showNetwork ? 'bg-white text-black border-white' : 'bg-black/40 text-zinc-400 border-white/5 hover:border-white/20'}`}>{showNetwork ? <CheckCircle size={12} /> : <div className="w-3 h-3 rounded-full border border-zinc-500"></div>} VS NETWORK</button>
 
+            {/* UPDATED LEADER DROPDOWN (Multi-Select) */}
             <div className="relative" ref={leaderRef}>
-                <button onClick={() => setIsLeaderDropdownOpen(!isLeaderDropdownOpen)} className={`flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border w-auto ${leaderMetric ? 'bg-white text-black border-white' : 'bg-black/40 text-zinc-400 border-white/5 hover:border-white/20'}`}>{leaderMetric ? `VS ${leaderMetric} LEADER` : 'VS LEADER'} <ChevronDown size={12} /></button>
+                <button onClick={() => setIsLeaderDropdownOpen(!isLeaderDropdownOpen)} className={`flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border w-auto ${activeLeaderMetrics.length > 0 ? 'bg-white text-black border-white' : 'bg-black/40 text-zinc-400 border-white/5 hover:border-white/20'}`}>
+                    {activeLeaderMetrics.length > 0 ? `VS LEADERS (${activeLeaderMetrics.length})` : 'VS LEADER'} <ChevronDown size={12} />
+                </button>
                 {isLeaderDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-2 w-36 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col">
-                        {['STORAGE', 'CREDITS', 'HEALTH', 'UPTIME', 'NONE'].map(opt => (
-                            <button 
-                                key={opt} 
-                                onClick={() => { 
-                                    setLeaderMetric(opt === 'NONE' ? null : opt as any); 
-                                    setIsLeaderDropdownOpen(false); 
-                                }} 
-                                className={`px-4 py-3 text-[9px] font-bold text-left hover:bg-zinc-800 transition uppercase ${opt === 'NONE' ? 'text-zinc-600 hover:text-zinc-400 border-t border-zinc-800' : 'text-zinc-400 hover:text-white'}`}
-                            >
-                                {opt === 'NONE' ? 'None (Reset)' : opt}
-                            </button>
-                        ))}
+                    <div className="absolute top-full left-0 mt-2 w-40 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col">
+                        {['STORAGE', 'CREDITS', 'HEALTH', 'UPTIME'].map(opt => {
+                            const isSelected = activeLeaderMetrics.includes(opt);
+                            return (
+                                <button 
+                                    key={opt} 
+                                    onClick={() => toggleLeaderMetric(opt)} 
+                                    className={`px-4 py-3 text-[9px] font-bold text-left hover:bg-zinc-800 transition uppercase flex items-center justify-between ${isSelected ? 'text-white bg-zinc-800/50' : 'text-zinc-400'}`}
+                                >
+                                    {opt}
+                                    {isSelected && <Check size={10} className="text-cyan-400" />}
+                                </button>
+                            );
+                        })}
+                         <button 
+                            onClick={() => { setActiveLeaderMetrics([]); setIsLeaderDropdownOpen(false); }} 
+                            className="px-4 py-3 text-[9px] font-bold text-left text-zinc-600 hover:text-red-400 border-t border-zinc-800 uppercase hover:bg-zinc-900 transition"
+                        >
+                            None (Reset)
+                        </button>
                     </div>
                 )}
             </div>
@@ -315,7 +367,7 @@ export default function ComparePage() {
             </div>
 
             <button onClick={handleShare} className="flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border border-zinc-700 w-auto"><Share2 size={12}/> SHARE</button>
-            
+
             {/* EXPORT DROPDOWN */}
             <div className="relative" ref={exportRef}>
                 <button onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)} className="flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[8px] md:text-[10px] font-bold uppercase transition shadow-[0_0_15px_rgba(37,99,235,0.3)] whitespace-nowrap w-auto">
@@ -338,7 +390,7 @@ export default function ComparePage() {
       {/* FULL PAGE EXPORT WRAPPER (Target for "With Charts") */}
       <div ref={fullPageRef} className="flex-1 overflow-hidden relative z-10 px-4 pb-4 md:px-8 md:pb-8 flex flex-col max-w-[1600px] mx-auto w-full bg-[#020202]"> 
          <div className="flex-initial min-h-[400px] flex flex-col bg-[#09090b]/60 backdrop-blur-2xl rounded-xl border border-white/5 shadow-2xl overflow-hidden relative mb-6">
-             {selectedNodes.length === 0 ? (
+             {selectedNodes.length === 0 && activeLeaderMetrics.length === 0 ? (
                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden h-[400px]">
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] scale-[2]">
                         <div className="animate-[spin_60s_linear_infinite]"><Grid size={300} /></div>
@@ -364,7 +416,35 @@ export default function ComparePage() {
              ) : (
                  // TABLE SCROLL CONTAINER (Target for "Table Only")
                  <main ref={printRef} className="flex-1 overflow-x-auto overflow-y-auto bg-transparent relative flex custom-scrollbar snap-x items-start content-start">
-                    <ControlRail showNetwork={showNetwork} leaderMetric={leaderMetric} benchmarks={benchmarks} />
+                    <ControlRail showNetwork={showNetwork} benchmarks={benchmarks} />
+                    
+                    {/* LEADER COLUMNS (Rendered First with Gold Theme) */}
+                    {leaderColumns.map((leader, index) => {
+                         const isWinner = {
+                            health: (leader.node.health || 0) === currentWinners.health,
+                            storage: (leader.node.storage_committed || 0) === currentWinners.storage,
+                            credits: (leader.node.credits || 0) === currentWinners.credits
+                        };
+                        return (
+                            <NodeColumn 
+                                key={`leader-${leader.metric}-${leader.node.pubkey}`} 
+                                node={leader.node} 
+                                onRemove={() => toggleLeaderMetric(leader.metric)} 
+                                anchorNode={undefined} 
+                                theme={LEADER_THEME} 
+                                winners={isWinner}
+                                overallWinner={leader.node.pubkey === overallWinnerKey}
+                                benchmarks={benchmarks}
+                                showNetwork={showNetwork}
+                                hoveredNodeKey={hoveredNodeKey} 
+                                onHover={setHoveredNodeKey}
+                                isLeader={true}      // Flags special styling
+                                leaderType={leader.metric}
+                            />
+                        );
+                    })}
+
+                    {/* USER SELECTED NODES */}
                     {selectedNodes.map((node, index) => {
                         const isWinner = {
                             health: (node.health || 0) === currentWinners.health,
@@ -381,7 +461,6 @@ export default function ComparePage() {
                                 winners={isWinner}
                                 overallWinner={node.pubkey === overallWinnerKey}
                                 benchmarks={benchmarks}
-                                leaderMetric={leaderMetric}
                                 showNetwork={showNetwork}
                                 hoveredNodeKey={hoveredNodeKey} 
                                 onHover={setHoveredNodeKey}
@@ -397,8 +476,8 @@ export default function ComparePage() {
          {/* ANALYTICS DECK */}
          <div className="w-full max-w-[1600px] mx-auto">
             <SynthesisEngine 
-                nodes={selectedNodes} 
-                themes={PLAYER_THEMES} 
+                nodes={[...leaderColumns.map(l => l.node), ...selectedNodes]} 
+                themes={[...leaderColumns.map(() => LEADER_THEME), ...PLAYER_THEMES]} 
                 networkScope={networkScope} 
                 benchmarks={benchmarks} 
                 hoveredNodeKey={hoveredNodeKey} 
