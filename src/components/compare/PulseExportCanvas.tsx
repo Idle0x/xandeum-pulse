@@ -126,11 +126,13 @@ export const PulseExportCanvas = forwardRef<HTMLDivElement, PulseExportCanvasPro
                     <div className="mb-6 text-center">
                         <h2 className="text-lg font-bold text-zinc-300 uppercase tracking-widest">Network Synthesis</h2>
                     </div>
+                    {/* UPDATE: Passing isExport=true to hide tabs and narrative */}
                     <SynthesisEngine 
                         nodes={[...leaders.map(l => l.node), ...nodes]} 
                         themes={[...leaders.map(l => LEADER_THEME_MAP[l.metric]), ...PLAYER_THEMES]} 
                         networkScope={networkScope} 
                         benchmarks={benchmarks}
+                        isExport={true}
                     />
                 </div>
             </div>
