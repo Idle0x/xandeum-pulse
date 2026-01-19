@@ -22,7 +22,7 @@ const StaticWatermark = () => (
      </div>
      <div className="flex flex-col">
         <span className="text-xs font-black uppercase tracking-[0.3em] text-zinc-400">Verified by Pulse</span>
-        <span className="text-[10px] font-mono text-zinc-600">xandeum.network/pulse</span>
+        <span className="text-[10px] font-mono text-zinc-600">xandeum-pulse.vercel.app/</span>
      </div>
   </div>
 );
