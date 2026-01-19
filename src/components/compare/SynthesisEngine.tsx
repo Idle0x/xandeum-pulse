@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup, Line } from 'react-simple-maps';
 import { 
   BarChart3, PieChart, Map as MapIcon, Database, Zap, Activity, Clock, Info,
@@ -13,7 +13,7 @@ import { OverviewLegend, UnifiedLegend } from './ComparisonLegends';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
-// --- MESH COLOR PALETTE (30 Distinct Tech/Earth Tones) ---
+// --- MESH COLOR PALETTE ---
 const MESH_COLORS = [
     "#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899", "#06b6d4", "#f43f5e", "#84cc16",
     "#6366f1", "#14b8a6", "#d946ef", "#eab308", "#f97316", "#a855f7", "#22c55e", "#0ea5e9",
@@ -21,15 +21,15 @@ const MESH_COLORS = [
     "#64748b", "#71717a", "#78716c", "#a1a1aa", "#94a3b8", "#e2e8f0"
 ];
 
-// --- HELPER: Deterministic Color Picker ---
 const getLinkColor = (startLat: number, startLon: number, endLat: number) => {
     const hash = Math.abs((startLat * 1000) + (startLon * 1000) + (endLat * 1000));
     return MESH_COLORS[Math.floor(hash) % MESH_COLORS.length];
 };
 
 // --- SUB-COMPONENTS ---
+// UPDATE: Added 'print-exclude' class to hide this panel during export
 const InterpretationPanel = ({ contextText }: { contextText: string }) => (
-    <div className="px-4 py-3 md:px-6 md:py-4 bg-zinc-900/30 border-t border-white/5 flex items-start gap-3 md:gap-4 transition-all duration-300">
+    <div className="px-4 py-3 md:px-6 md:py-4 bg-zinc-900/30 border-t border-white/5 flex items-start gap-3 md:gap-4 transition-all duration-300 print-exclude">
         <Info size={14} className="text-blue-400 shrink-0 mt-0.5 md:w-4 md:h-4 animate-pulse" />
         <div className="flex flex-col gap-1">
             <p className="text-xs md:text-sm text-zinc-300 leading-relaxed max-w-4xl font-medium">{contextText}</p>
@@ -54,46 +54,33 @@ const ChartCell = ({ title, icon: Icon, children, isFocused, onClick }: any) => 
     </div>
 );
 
-// --- NARRATIVE ENGINE (SPATIAL INTELLIGENCE UPDATED) ---
+// --- NARRATIVE ENGINE ---
 const generateLiveReport = (tab: string, metric: string, focusKey: string | null, focusSection: string | null, nodes: Node[], benchmarks: any, clusters: any[], meshLinks: any[]) => {
     const groupCount = nodes.length;
     if (groupCount === 0) return "Select nodes to generate analysis.";
-
-    // --- TOPOLOGY INTELLIGENCE (NEW) ---
+    
     if (tab === 'TOPOLOGY') {
         const totalStorage = nodes.reduce((a, b) => a + (b.storage_committed || 0), 0);
-
         if (!focusKey) {
-            // Global Network Context
             const uniqueCountries = new Set(nodes.map(n => n.location?.countryName)).size;
             const density = meshLinks.length / Math.max(nodes.length, 1);
             const topologyType = density > 2.5 ? "Dense Mesh" : "Sparse Hub-and-Spoke";
-
             return `Network Topology: Your fleet forms a ${topologyType} spanning ${uniqueCountries} jurisdictions. The decentralized web structure ensures high data availability. A random failure in one region is mitigated by ${meshLinks.length} active redundant paths visible in the map.`;
         }
-
-        // Specific Node Context
         const node = nodes.find(n => n.pubkey === focusKey);
-        const cluster = clusters.find(c => c.id === focusKey); // If focusing a cluster marker
-
-        // Handle Cluster Focus (Marker Click)
+        const cluster = clusters.find(c => c.id === focusKey);
         if (cluster) {
-             const isHub = cluster.nodes.length > 1;
              return `Regional Hub [${cluster.country}]: This location hosts ${cluster.nodes.length} nodes, acting as a critical aggregation point. High concentration here improves local sync speed but introduces jurisdiction risk if local regulations change.`;
         }
-
-        // Handle Single Node Focus (Legend/List Click)
         if (node) {
             const connections = meshLinks.filter(l => l.source === node.pubkey || l.target === node.pubkey).length;
             const storageShare = ((node.storage_committed || 0) / totalStorage) * 100;
             const role = connections > 3 ? "Central Bridge" : "Edge Outpost";
             const impact = connections > 3 ? "critical for routing between clusters" : "extends the network perimeter";
-
             return `Node Intelligence [${getSafeIp(node)}]: Acts as a ${role} with ${connections} active P2P connections. Located in ${node.location?.countryName}, it contributes ${storageShare.toFixed(1)}% to the global storage pool. Its position is ${impact}, enhancing overall decentralization.`;
         }
     }
 
-    // --- OVERVIEW CONTEXT ---
     if (tab === 'OVERVIEW') {
         if (!focusSection) return `Global Overview: You are comparing ${groupCount} nodes. The dashboard highlights relative strengths (Power) versus absolute reliability (Vitality). Click any chart to dive deeper.`;
         if (focusSection === 'health') {
@@ -110,7 +97,6 @@ const generateLiveReport = (tab: string, metric: string, focusKey: string | null
         if (focusSection === 'uptime') return `Longevity Focus: Uptime is the historic footprint of a node. Newer nodes will naturally show smaller bars here, but look for gaps in older nodes which indicate instability.`;
     }
 
-    // --- MARKET CONTEXT ---
     if (tab === 'MARKET') {
         const totalVal = nodes.reduce((a, b) => a + ((b as any)[metric === 'storage' ? 'storage_committed' : metric] || 0), 0);
         if (!focusKey) {
@@ -135,7 +121,17 @@ const generateLiveReport = (tab: string, metric: string, focusKey: string | null
 };
 
 // --- MAIN ENGINE ---
-export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { nodes: Node[], themes: any[], networkScope: string, benchmarks: any }) => {
+interface SynthesisEngineProps {
+  nodes: Node[];
+  themes: any[];
+  networkScope: string;
+  benchmarks: any;
+  // UPDATE: Optional props for external control (Parent-Child Sync)
+  hoveredNodeKey?: string | null;
+  onHover?: (key: string | null) => void;
+}
+
+export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hoveredNodeKey: externalHoverKey, onHover: setExternalHover }: SynthesisEngineProps) => {
   const [tab, setTab] = useState<'OVERVIEW' | 'MARKET' | 'TOPOLOGY'>('OVERVIEW');
   const [marketMetric, setMarketMetric] = useState<'storage' | 'credits' | 'health' | 'uptime'>('storage');
   const [pos, setPos] = useState({ coordinates: [0, 20], zoom: 1 });
@@ -144,7 +140,18 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
   // --- INTERACTION STATE ---
   const [focusedSection, setFocusedSection] = useState<string | null>(null); 
   const [focusedNodeKey, setFocusedNodeKey] = useState<string | null>(null); 
-  const [hoveredNodeKey, setHoveredNodeKey] = useState<string | null>(null);
+  
+  // Internal hover state (fallback if no external prop provided)
+  const [internalHoverKey, setInternalHoverKey] = useState<string | null>(null);
+
+  // Derived Hover State: Prioritize external prop if available
+  const activeHoverKey = externalHoverKey !== undefined ? externalHoverKey : internalHoverKey;
+
+  // Unified Handler
+  const handleHover = (key: string | null) => {
+      setInternalHoverKey(key);
+      if (setExternalHover) setExternalHover(key);
+  };
 
   // --- DATA PREPARATION ---
   const clusters = useMemo(() => {
@@ -162,11 +169,9 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
       return Array.from(map.values());
   }, [nodes]);
 
-  // --- GENERATE MESH (Simulate P2P Web) ---
   const meshLinks = useMemo(() => {
       if (nodes.length < 2) return [];
       const links: any[] = [];
-      // Connect every node to its 2 nearest neighbors to simulate a mesh
       nodes.forEach((sourceNode) => {
           if (!sourceNode.location) return;
           const distances = nodes
@@ -174,14 +179,10 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
             .map(targetNode => {
                 const dx = (sourceNode.location!.lat - targetNode.location!.lat);
                 const dy = (sourceNode.location!.lon - targetNode.location!.lon);
-                return { 
-                    id: targetNode.pubkey, 
-                    dist: Math.sqrt(dx*dx + dy*dy), 
-                    target: targetNode 
-                };
+                return { id: targetNode.pubkey, dist: Math.sqrt(dx*dx + dy*dy), target: targetNode };
             })
             .sort((a, b) => a.dist - b.dist)
-            .slice(0, 2); // Connect to 2 nearest
+            .slice(0, 2);
 
           distances.forEach(d => {
              const linkKey = [sourceNode.pubkey, d.id].sort().join('-');
@@ -200,7 +201,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
       return links;
   }, [nodes]);
 
-  const handleTabChange = (t: any) => { setTab(t); setFocusedSection(null); setFocusedNodeKey(null); setHoveredNodeKey(null); };
+  const handleTabChange = (t: any) => { setTab(t); setFocusedSection(null); setFocusedNodeKey(null); handleHover(null); };
   const handleZoomIn = () => setPos(p => ({ ...p, zoom: Math.min(p.zoom * 1.5, 10) }));
   const handleZoomOut = () => setPos(p => ({ ...p, zoom: Math.max(p.zoom / 1.5, 1) }));
   const handleReset = () => setPos({ coordinates: [0, 20], zoom: 1 });
@@ -226,16 +227,16 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
   const totalCredits = nodes.reduce((sum, n) => sum + (n.credits || 0), 0);
   const totalUptime = nodes.reduce((sum, n) => sum + (n.uptime || 0), 0);
 
-  // --- STYLE HELPERS ---
   const isDense = nodes.length > 10;
   const overviewBarWidth = isDense ? 'flex-1 mx-[1px]' : 'w-2 md:w-3 mx-0.5'; 
   const marketBarWidth = isDense ? 'flex-1' : 'w-24 md:w-32';
 
+  // --- SPOTLIGHT STYLE LOGIC ---
   const getElementStyle = (nodeKey: string | null, sectionType?: string) => {
       if (focusedSection && sectionType && sectionType !== focusedSection) return 'opacity-30 grayscale-[0.5] transition-all duration-500';
-
-      const isActive = hoveredNodeKey === nodeKey || focusedNodeKey === nodeKey;
-      const isBackground = (hoveredNodeKey && hoveredNodeKey !== nodeKey) || (focusedNodeKey && focusedNodeKey !== nodeKey);
+      
+      const isActive = activeHoverKey === nodeKey || focusedNodeKey === nodeKey;
+      const isBackground = (activeHoverKey && activeHoverKey !== nodeKey) || (focusedNodeKey && focusedNodeKey !== nodeKey);
 
       if (isActive) return 'opacity-100 scale-[1.05] z-50 brightness-110 shadow-[0_0_15px_rgba(0,0,0,0.5)] relative transition-all duration-200 ease-out';
       if (isBackground) return 'opacity-40 grayscale-[0.5] scale-95 transition-all duration-300';
@@ -250,8 +251,8 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
         let val = (n as any)[type === 'storage' ? 'storage_committed' : type] || 0;
         const deg = (val / total) * 360;
         const theme = themes[i % themes.length];
-        const isFocusActive = hoveredNodeKey || focusedNodeKey;
-        const isCurrentNode = hoveredNodeKey === n.pubkey || focusedNodeKey === n.pubkey;
+        const isFocusActive = activeHoverKey || focusedNodeKey;
+        const isCurrentNode = activeHoverKey === n.pubkey || focusedNodeKey === n.pubkey;
         const color = isFocusActive ? (isCurrentNode ? theme.hex : '#3f3f46') : theme.hex;
         const stop = `${color} ${currentDeg}deg ${currentDeg + deg}deg`;
         currentDeg += deg;
@@ -261,7 +262,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
 
   return (
     <div className="shrink-0 min-h-[600px] border border-white/5 bg-[#09090b]/40 backdrop-blur-xl flex flex-col relative z-40 rounded-xl mt-6 shadow-2xl overflow-hidden" 
-         onMouseLeave={() => setHoveredNodeKey(null)}
+         onMouseLeave={() => handleHover(null)}
          onClick={() => { setFocusedSection(null); setFocusedNodeKey(null); }}>
 
         {/* TAB CONTROLS */}
@@ -275,8 +276,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
             </div>
         </div>
 
-        {/* Removed onClick={e => e.stopPropagation()} to allow click-outside reset */}
-        <div className="flex-1 overflow-hidden relative flex flex-col pt-24">
+        <div className="flex-1 overflow-hidden relative flex flex-col pt-24" onClick={(e) => e.stopPropagation()}>
             {/* OVERVIEW TAB */}
             {tab === 'OVERVIEW' && (
                 <>
@@ -292,8 +292,8 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                                 {nodes.map((n, i) => (
                                     <div 
                                         key={n.pubkey} 
-                                        onMouseEnter={() => setHoveredNodeKey(n.pubkey || null)}
-                                        onMouseLeave={() => setHoveredNodeKey(null)}
+                                        onMouseEnter={() => handleHover(n.pubkey || null)}
+                                        onMouseLeave={() => handleHover(null)}
                                         className={`${overviewBarWidth} bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end min-w-[2px] transition-all duration-200 ${getElementStyle(n.pubkey || null)}`}
                                     >
                                         <div className="w-full rounded-t-sm transition-all duration-500 relative" style={{ height: `${(((n as any)[sec.key] || 0) / sec.max) * 100}%`, backgroundColor: themes[i % themes.length].hex }}></div>
@@ -304,7 +304,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                         </div>
                     ))}
                 </div>
-                <OverviewLegend nodes={nodes} themes={themes} hoveredKey={hoveredNodeKey} onHover={setHoveredNodeKey} />
+                <OverviewLegend nodes={nodes} themes={themes} hoveredKey={activeHoverKey} onHover={handleHover} />
                 <InterpretationPanel contextText={narrative} />
                 </>
             )}
@@ -314,13 +314,13 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                 <>
                     <div className="relative flex flex-col flex-1">
                         <div className="absolute top-0 right-4 md:right-8 z-20" ref={metricDropdownRef}>
-                            <button onClick={(e) => { e.stopPropagation(); setIsMetricDropdownOpen(!isMetricDropdownOpen); }} className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 rounded-lg text-[10px] md:text-xs font-bold uppercase transition">
+                            <button onClick={() => setIsMetricDropdownOpen(!isMetricDropdownOpen)} className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 rounded-lg text-[10px] md:text-xs font-bold uppercase transition">
                                 <span className="opacity-50">Analyzing:</span> {marketMetric} <ChevronDown size={12} className="md:w-3.5 md:h-3.5" />
                             </button>
                             {isMetricDropdownOpen && (
                                 <div className="absolute top-full right-0 mt-2 w-48 bg-[#09090b] border border-zinc-800 rounded-xl shadow-2xl overflow-hidden flex flex-col z-30">
                                     {['storage', 'credits', 'health', 'uptime'].map(m => (
-                                        <button key={m} onClick={(e) => { e.stopPropagation(); setMarketMetric(m as any); setIsMetricDropdownOpen(false); }} className={`px-4 py-3 text-xs font-bold text-left uppercase hover:bg-zinc-800 transition ${marketMetric === m ? 'text-white bg-zinc-800' : 'text-zinc-400'}`}>
+                                        <button key={m} onClick={() => { setMarketMetric(m as any); setIsMetricDropdownOpen(false); }} className={`px-4 py-3 text-xs font-bold text-left uppercase hover:bg-zinc-800 transition ${marketMetric === m ? 'text-white bg-zinc-800' : 'text-zinc-400'}`}>
                                             {m}
                                         </button>
                                     ))}
@@ -336,14 +336,14 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                                             {marketMetric === 'credits' && <Zap size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
                                             {marketMetric === 'uptime' && <Clock size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
                                             <span className="text-xs md:text-sm font-bold text-zinc-400 tracking-widest uppercase mb-1">{marketMetric} Share</span>
-                                            <span className="text-[10px] md:text-xs text-zinc-600 font-mono text-center">{(hoveredNodeKey || focusedNodeKey) ? getSafeIp(nodes.find(n => n.pubkey === (hoveredNodeKey || focusedNodeKey))!) : 'Aggregated Fleet'}</span>
+                                            <span className="text-[10px] md:text-xs text-zinc-600 font-mono text-center">{(activeHoverKey || focusedNodeKey) ? getSafeIp(nodes.find(n => n.pubkey === (activeHoverKey || focusedNodeKey))!) : 'Aggregated Fleet'}</span>
                                         </div>
                                     </div>
                                 </div>
                             ) : (
                                 <div className="w-full max-w-3xl flex flex-col gap-4 animate-in slide-in-from-bottom-10 duration-500">
                                     {nodes.map((n, i) => (
-                                        <div key={n.pubkey} onMouseEnter={() => setHoveredNodeKey(n.pubkey || null)} onMouseLeave={() => setHoveredNodeKey(null)} className={`flex items-center gap-4 transition-all duration-300 cursor-pointer ${getElementStyle(n.pubkey || null)} ${!isDense ? 'justify-center' : ''}`} onClick={(e) => { e.stopPropagation(); setFocusedNodeKey(n.pubkey || null); }}>
+                                        <div key={n.pubkey} onMouseEnter={() => handleHover(n.pubkey || null)} onMouseLeave={() => handleHover(null)} className={`flex items-center gap-4 transition-all duration-300 cursor-pointer ${getElementStyle(n.pubkey || null)} ${!isDense ? 'justify-center' : ''}`} onClick={(e) => { e.stopPropagation(); setFocusedNodeKey(n.pubkey || null); }}>
                                             <span className="text-xs font-mono font-bold text-zinc-400 w-32 text-right truncate">{getSafeIp(n)}</span>
                                             <div className={`${marketBarWidth} h-8 bg-zinc-900 rounded-full overflow-hidden relative border border-white/5`}><div className="h-full rounded-full transition-all duration-1000" style={{ width: `${n.health}%`, backgroundColor: themes[i % themes.length].hex }}></div></div>
                                             <span className="text-xs font-bold text-white font-mono w-16 text-left">{n.health} / 100</span>
@@ -353,7 +353,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                             )}
                         </div>
                     </div>
-                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="METRIC" specificMetric={marketMetric} hoveredKey={hoveredNodeKey} onHover={setHoveredNodeKey} onNodeClick={(n) => setFocusedNodeKey(n.pubkey || null)} />
+                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="METRIC" specificMetric={marketMetric} hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => setFocusedNodeKey(n.pubkey || null)} />
                     <InterpretationPanel contextText={narrative} />
                 </>
             )}
@@ -362,7 +362,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
             {tab === 'TOPOLOGY' && (
                 <div className="flex flex-col h-full relative group/map">
                     {/* Controls relocated INSIDE map container (Bottom Right) */}
-                    <div className="absolute bottom-6 right-6 z-50 flex flex-col gap-2 opacity-80 hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                    <div className="absolute bottom-6 right-6 z-50 flex flex-col gap-2 opacity-80 hover:opacity-100 transition-opacity">
                         <button onClick={handleZoomIn} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><Plus size={16} /></button>
                         <button onClick={handleReset} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><RotateCcw size={16} /></button>
                         <button onClick={handleZoomOut} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><Minus size={16} /></button>
@@ -372,14 +372,14 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                         <ComposableMap projectionConfig={{ scale: 160 }} className="w-full h-full">
                             <ZoomableGroup zoom={pos.zoom} center={pos.coordinates as [number, number]} maxZoom={10} onMoveEnd={(e: any) => setPos({ coordinates: e.coordinates as [number, number], zoom: e.zoom })}>
                                 <Geographies geography={GEO_URL}>{({ geographies }: { geographies: any[] }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#18181b" stroke="#27272a" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { outline: "none" }, pressed: { outline: "none" } }} />))}</Geographies>
-
+                                
                                 {/* MESH VISUALIZATION (Broken Lines) */}
                                 {meshLinks.map((link: any) => {
                                     // Logic: If highlighting a node, only show its own links strongly. Dim others.
-                                    const isRelevant = !hoveredNodeKey || hoveredNodeKey === link.source || hoveredNodeKey === link.target;
-                                    const opacity = hoveredNodeKey ? (isRelevant ? 0.8 : 0.05) : 0.2;
-                                    const width = hoveredNodeKey && isRelevant ? 2 / pos.zoom : 0.5 / pos.zoom;
-
+                                    const isRelevant = !activeHoverKey || activeHoverKey === link.source || activeHoverKey === link.target;
+                                    const opacity = activeHoverKey ? (isRelevant ? 0.8 : 0.05) : 0.2;
+                                    const width = activeHoverKey && isRelevant ? 2 / pos.zoom : 0.5 / pos.zoom;
+                                    
                                     return (
                                         <Line
                                             key={link.key}
@@ -396,14 +396,14 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
 
                                 {clusters.map((cluster) => {
                                     const theme = themes[cluster.themeIndex % themes.length];
-                                    const isHovered = hoveredNodeKey === cluster.id || (cluster.nodes.some((n: Node) => n.pubkey === hoveredNodeKey));
+                                    const isHovered = activeHoverKey === cluster.id || (cluster.nodes.some((n: Node) => n.pubkey === activeHoverKey));
                                     const isFocused = focusedNodeKey === cluster.id || (cluster.nodes.some((n: Node) => n.pubkey === focusedNodeKey));
-
+                                    
                                     return (
                                         <Marker key={cluster.id} coordinates={[cluster.lon, cluster.lat]} 
                                             onClick={(e: any) => { e.stopPropagation(); handleFocus(cluster.id, { lat: cluster.lat, lon: cluster.lon }); }}
-                                            onMouseEnter={() => setHoveredNodeKey(cluster.nodes.length === 1 ? cluster.nodes[0].pubkey : cluster.id)}
-                                            onMouseLeave={() => setHoveredNodeKey(null)}
+                                            onMouseEnter={() => handleHover(cluster.nodes.length === 1 ? cluster.nodes[0].pubkey : cluster.id)}
+                                            onMouseLeave={() => handleHover(null)}
                                         >
                                             <circle 
                                                 r={(cluster.nodes.length > 1 ? 20 : 10) / pos.zoom} 
@@ -419,7 +419,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                             </ZoomableGroup>
                         </ComposableMap>
                     </div>
-                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="COUNTRY" hoveredKey={hoveredNodeKey} onHover={setHoveredNodeKey} onNodeClick={(n) => handleFocus(n.pubkey || null, n.location ? { lat: n.location.lat, lon: n.location.lon } : undefined)} />
+                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="COUNTRY" hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => handleFocus(n.pubkey || null, n.location ? { lat: n.location.lat, lon: n.location.lon } : undefined)} />
                     <InterpretationPanel contextText={narrative} />
                 </div>
             )}
