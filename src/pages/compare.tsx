@@ -9,18 +9,18 @@ import {
 } from 'lucide-react';
 
 // Hooks & Utils
-import { useNetworkData } from '../../hooks/useNetworkData';
-import { useOutsideClick } from '../../hooks/useOutsideClick';
-import { getSafeIp } from '../../utils/nodeHelpers';
-import { formatBytes } from '../../utils/formatters';
-import { formatUptimePrecise, PLAYER_THEMES } from '../../components/compare/MicroComponents';
-import { Node } from '../../types';
+import { useNetworkData } from '../hooks/useNetworkData';
+import { useOutsideClick } from '../hooks/useOutsideClick';
+import { getSafeIp } from '../utils/nodeHelpers';
+import { formatBytes } from '../utils/formatters';
+import { formatUptimePrecise, PLAYER_THEMES } from '../components/compare/MicroComponents';
+import { Node } from '../types';
 
 // Child Components
-import { ControlRail } from '../../components/compare/ControlRail';
-import { NodeColumn } from '../../components/compare/NodeColumn';
-import { SynthesisEngine } from '../../components/compare/SynthesisEngine';
-import { EmptySlot } from '../../components/compare/ComparisonUI';
+import { ControlRail } from '../components/compare/ControlRail';
+import { NodeColumn } from '../components/compare/NodeColumn';
+import { SynthesisEngine } from '../components/compare/SynthesisEngine';
+import { EmptySlot } from '../components/compare/ComparisonUI';
 
 // --- WATERMARK COMPONENT ---
 const PulseWatermark = () => (
