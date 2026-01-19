@@ -1,438 +1,355 @@
-import { Node } from '../types';
-import { formatBytes } from '../utils/formatters';
-import { getSafeIp } from '../utils/nodeHelpers';
+import { useState, useRef, useMemo } from 'react';
+import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup, Line } from 'react-simple-maps';
+import { 
+  BarChart3, PieChart, Map as MapIcon, Database, Zap, Activity, Clock, Info,
+  ChevronDown, Plus, Minus, RotateCcw
+} from 'lucide-react';
+import { Node } from '../../types';
+import { formatBytes } from '../../utils/formatters';
+import { getSafeIp } from '../../utils/nodeHelpers';
+import { useOutsideClick } from '../../hooks/useOutsideClick';
+import { formatUptimePrecise } from './MicroComponents';
+import { OverviewLegend, UnifiedLegend } from './ComparisonLegends';
+// IMPORT THE NEW ENGINE
+import { generateNarrative } from '../../lib/narrative-engine';
 
-// --- TYPES ---
-export type NarrativeContext = {
-  tab: 'OVERVIEW' | 'MARKET' | 'TOPOLOGY';
-  metric?: string; 
-  focusKey?: string | null; 
-  hoverKey?: string | null; 
+const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+
+// --- MESH COLOR PALETTE ---
+const MESH_COLORS = [
+    "#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899", "#06b6d4", "#f43f5e", "#84cc16",
+    "#6366f1", "#14b8a6", "#d946ef", "#eab308", "#f97316", "#a855f7", "#22c55e", "#0ea5e9",
+    "#fca5a5", "#86efac", "#93c5fd", "#c4b5fd", "#fdba74", "#5eead4", "#fcd34d", "#fda4af",
+    "#64748b", "#71717a", "#78716c", "#a1a1aa", "#94a3b8", "#e2e8f0"
+];
+
+const getLinkColor = (startLat: number, startLon: number, endLat: number) => {
+    const hash = Math.abs((startLat * 1000) + (startLon * 1000) + (endLat * 1000));
+    return MESH_COLORS[Math.floor(hash) % MESH_COLORS.length];
+};
+
+// --- SUB-COMPONENTS ---
+const InterpretationPanel = ({ contextText }: { contextText: string }) => (
+    <div className="px-4 py-3 md:px-6 md:py-4 bg-zinc-900/30 border-t border-white/5 flex items-start gap-3 md:gap-4 transition-all duration-300 print-exclude min-h-[80px]">
+        <Info size={14} className="text-blue-400 shrink-0 mt-0.5 md:w-4 md:h-4 animate-pulse" />
+        <div className="flex flex-col gap-1">
+            {/* key={contextText} ensures the animation replays when text changes */}
+            <p key={contextText} className="text-xs md:text-sm text-zinc-300 leading-relaxed max-w-4xl font-medium animate-in fade-in slide-in-from-bottom-1 duration-300">
+                {contextText}
+            </p>
+        </div>
+    </div>
+);
+
+const ChartCell = ({ title, icon: Icon, children, isFocused, onClick }: any) => (
+    <div 
+        onClick={onClick}
+        className={`rounded-xl p-4 md:p-6 flex flex-col items-center justify-end relative overflow-hidden transition-all duration-300 cursor-pointer 
+        ${isFocused ? 'bg-zinc-900/80 border border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.1)] scale-[1.01] z-10' : 'bg-black/20 border border-white/5 hover:border-white/10 hover:bg-black/40'}
+        `}
+    >
+        <div className={`absolute top-3 left-3 md:top-4 md:left-4 flex items-center gap-2 transition-colors ${isFocused ? 'text-blue-400' : 'text-zinc-500'}`}>
+            <Icon size={10} className="md:w-3.5 md:h-3.5" />
+            <span className="text-[8px] md:text-xs font-bold uppercase tracking-widest">{title}</span>
+        </div>
+        <div className="flex items-end justify-center gap-1 md:gap-3 h-32 md:h-48 w-full px-2 md:px-4 pt-8">
+            {children}
+        </div>
+    </div>
+);
+
+// --- MAIN ENGINE ---
+interface SynthesisEngineProps {
   nodes: Node[];
+  themes: any[];
+  networkScope: string;
   benchmarks: any;
-  chartSection?: string | null;
-};
+  hoveredNodeKey?: string | null;
+  onHover?: (key: string | null) => void;
+  isExport?: boolean;
+}
 
-type AnalysisStats = {
-  count: number;
-  totalStorage: number;
-  avgHealth: number;
-  netAvg: number;
-  delta: number;
-  tier: 'positive' | 'neutral' | 'negative';
-  stdDev: number;
-  gini: number;             // 0 = perfectly equal, 1 = perfectly unequal
-  countries: number;
-  medianHealth: number;     // Better for spotting outliers
-  medianStorage: number;
-  top3Share: number;        // Percentage held by top 3
-  top3Volume: number;       // Raw volume held by top 3
-  isCentralized: boolean;   // Logic flag
-  countryCounts: Record<string, number>;
-  dominantRegion: string;
-  dominanceScore: number;   // % of network in dominant region
-};
+export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hoveredNodeKey: externalHoverKey, onHover: setExternalHover, isExport = false }: SynthesisEngineProps) => {
+  const [tab, setTab] = useState<'OVERVIEW' | 'MARKET' | 'TOPOLOGY'>('OVERVIEW');
+  const [marketMetric, setMarketMetric] = useState<'storage' | 'credits' | 'health' | 'uptime'>('storage');
+  const [pos, setPos] = useState({ coordinates: [0, 20], zoom: 1 });
+  const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false);
 
-type Tone = 'tech' | 'simple' | 'hybrid';
+  // --- INTERACTION STATE ---
+  const [focusedSection, setFocusedSection] = useState<string | null>(null); 
+  const [focusedNodeKey, setFocusedNodeKey] = useState<string | null>(null); 
+  const [internalHoverKey, setInternalHoverKey] = useState<string | null>(null);
 
-// --- SESSION MEMORY (Prevents flickering on re-renders) ---
-const NARRATIVE_CACHE = new Map<string, string>();
+  // Derived Hover State
+  const activeHoverKey = externalHoverKey !== undefined ? externalHoverKey : internalHoverKey;
 
-// --- 1. THE "BIG DATA" LEXICON ---
-// Organized by "Brain" Type to ensure distinct personalities.
-
-const VOCAB = {
-  // BRAIN 1: THE PERFORMANCE EXECUTIVE (Overview)
-  overview: {
-    headlines: [
-      "System Performance Audit:", "Cluster Health Telemetry:", "Operational Efficiency Report:", 
-      "Network Vitality Check:", "Aggregate Status Update:"
-    ],
-    vectors: {
-      positive: [
-        "The group is currently outperforming the global benchmark",
-        "This cluster is operating at higher efficiency than the network average",
-        "Telemetry indicates this group is a net-positive contributor"
-      ],
-      negative: [
-        "The group is trailing behind the global benchmark",
-        "Performance is degraded relative to the wider network",
-        "This cluster is currently a drag on the global average"
-      ]
-    },
-    drivers: {
-      variance: [
-        "Variance is high; inconsistent hardware is causing stability jitter.",
-        "The gap between strong and weak nodes is too wide.",
-        "Standard deviation indicates a mix of high-end and legacy hardware."
-      ],
-      stable: [
-        "Variance is minimal, indicating a highly synchronized fleet.",
-        "Hardware capability appears uniform across the cluster."
-      ]
-    },
-    actions: {
-      fix: ["Recommendation: Isolate underperforming nodes to restore the baseline.", "Action: Investigate the bottom 10% for hardware faults."],
-      praise: ["Recommendation: Maintain current configuration.", "Action: No intervention required. System nominal."]
-    }
-  },
-
-  // BRAIN 2: THE RISK ANALYST (Market)
-  market: {
-    structures: {
-      oligarchy: [
-        "Market Structure Warning: Oligarchy detected.",
-        "High Concentration Risk: A few actors dominate the grid.",
-        "Centralization Alert: Power is heavily skewed to the top."
-      ],
-      democracy: [
-        "Market Structure: Healthy Democratic Distribution.",
-        "Decentralization Status: Optimal. No single point of failure.",
-        "The grid shows a healthy spread of resources."
-      ]
-    },
-    whales: {
-      high: [
-        "Whale activity detected. The top players have oversized influence.",
-        "Significant leverage is held by the top 3 stakeholders."
-      ],
-      low: [
-        "No whales detected. Influence is evenly diluted.",
-        "Market power is fragmented across many small stakeholders."
-      ]
-    },
-    risks: {
-      critical: [
-        "Critical Risk: If the top 3 nodes fail, the network loses consensus capability.",
-        "Fragility Assessment: High. The network relies too heavily on these leaders."
-      ],
-      stable: [
-        "Resiliency Assessment: High. The network can survive the loss of its top actors.",
-        "Robustness Confirmed: Individual failures will not impact global capacity."
-      ]
-    }
-  },
-
-  // BRAIN 3: THE GEOPOLITICAL STRATEGIST (Topology)
-  topology: {
-    spreads: {
-      good: [
-        "Global Footprint: Excellent. The fleet spans diverse jurisdictions.",
-        "Geo-Diversity: High. Nodes are physically resilient to local events."
-      ],
-      bad: [
-        "Global Footprint: Constrained. The fleet is geographically clustered.",
-        "Geo-Diversity: Low. High physical proximity detected."
-      ]
-    },
-    threats: {
-      legal: [
-        "Regulatory Risk: Critical. A single legislative change in this region could halt the network.",
-        "Jurisdictional Trap: Too many assets are bound by the same laws."
-      ],
-      latency: [
-        "Latency Risk: Physical clustering creates speed of light bottlenecks for global users.",
-        "Availability Risk: A regional power outage would devastate availability."
-      ]
-    },
-    assets: {
-      loneWolf: [
-        "Strategic Asset: This is a 'Lone Wolf' node, providing critical bridge access.",
-        "High Value: It is the only gateway in this entire region.",
-        "Edge Anchor: This unit drastically reduces latency for local users."
-      ],
-      redundant: [
-        "Asset Value: Nominal. It is one of many nodes in this region.",
-        "Redundancy: High. Losing this node has minimal impact on regional coverage."
-      ]
-    }
-  }
-};
-
-// --- 2. INTELLIGENCE: THE MATH UPGRADE ---
-const analyze = (nodes: Node[], benchmark: any): AnalysisStats | null => {
-  if (nodes.length === 0) return null;
-  const count = nodes.length;
-  
-  // Basic Sums
-  const totalStorage = nodes.reduce((a, b) => a + (b.storage_committed || 0), 0);
-  const avgHealth = nodes.reduce((a, b) => a + (b.health || 0), 0) / count;
-  const netAvg = benchmark?.networkRaw?.health || 75; 
-  const delta = avgHealth - netAvg;
-
-  // 1. Median Calculation (Better for outliers)
-  const healths = nodes.map(n => n.health || 0).sort((a, b) => a - b);
-  const storages = nodes.map(n => n.storage_committed || 0).sort((a, b) => a - b);
-  const mid = Math.floor(count / 2);
-  const medianHealth = count % 2 !== 0 ? healths[mid] : (healths[mid - 1] + healths[mid]) / 2;
-  const medianStorage = count % 2 !== 0 ? storages[mid] : (storages[mid - 1] + storages[mid]) / 2;
-
-  // 2. Variance & Deviation
-  const variance = nodes.reduce((a, b) => a + Math.pow((b.health || 0) - avgHealth, 2), 0) / count;
-  const stdDev = Math.sqrt(variance);
-
-  // 3. Market Structure (Gini & Whales)
-  // Gini Calculation: 0 = perfect equality, 1 = max inequality
-  let giniNumerator = 0;
-  storages.forEach((val, i) => { giniNumerator += (i + 1) * val; }); // Assuming sorted ascending
-  const gini = (2 * giniNumerator) / (count * totalStorage) - (count + 1) / count;
-
-  const top3Volume = storages.slice(-3).reduce((a, b) => a + b, 0); // Last 3 are largest
-  const top3Share = (top3Volume / totalStorage) * 100;
-
-  // 4. Topology Logic
-  const countryCounts: Record<string, number> = {};
-  nodes.forEach(n => {
-    const c = n.location?.countryName || "Unknown";
-    countryCounts[c] = (countryCounts[c] || 0) + 1;
-  });
-  const countries = Object.keys(countryCounts).length;
-  const dominantRegion = Object.keys(countryCounts).reduce((a, b) => countryCounts[a] > countryCounts[b] ? a : b);
-  const dominanceScore = ((countryCounts[dominantRegion] || 0) / count) * 100;
-
-  let tier: 'positive' | 'neutral' | 'negative' = 'neutral';
-  if (delta > 5) tier = 'positive';
-  if (delta < -5) tier = 'negative';
-
-  return { 
-    count, totalStorage, avgHealth, netAvg, delta, tier, stdDev, 
-    gini, countries, medianHealth, medianStorage, top3Share, top3Volume, 
-    isCentralized: top3Share > 50 || gini > 0.6,
-    countryCounts, dominantRegion, dominanceScore
+  const handleHover = (key: string | null) => {
+      setInternalHoverKey(key);
+      if (setExternalHover) setExternalHover(key);
   };
-};
 
-// Helper: Root Cause Detector
-const findRootCause = (node: Node, groupAvg: number) => {
-  if (!node) return "unknown anomalies";
-  if ((node.uptime || 0) < 50) return "critical uptime instability";
-  if ((node.health || 0) < groupAvg - 15) return "severe hardware degradation";
-  if ((node.credits || 0) === 0) return "zero economic output (misconfiguration)";
-  return "sub-optimal latency or outdated software";
-};
+  // --- DATA PREPARATION ---
+  const clusters = useMemo(() => {
+      const map = new Map();
+      nodes.forEach((node, index) => {
+          if (!node.location) return;
+          const lat = node.location.lat.toFixed(2);
+          const lon = node.location.lon.toFixed(2);
+          const key = `${lat},${lon}`;
+          if (!map.has(key)) {
+              map.set(key, { id: `cluster-${key}`, lat: node.location.lat, lon: node.location.lon, country: node.location.countryName || 'Unknown', nodes: [], themeIndex: index });
+          }
+          map.get(key).nodes.push(node);
+      });
+      return Array.from(map.values());
+  }, [nodes]);
 
-const roll = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+  const meshLinks = useMemo(() => {
+      if (nodes.length < 2) return [];
+      const links: any[] = [];
+      nodes.forEach((sourceNode) => {
+          if (!sourceNode.location) return;
+          const distances = nodes
+            .filter(n => n.pubkey !== sourceNode.pubkey && n.location)
+            .map(targetNode => {
+                const dx = (sourceNode.location!.lat - targetNode.location!.lat);
+                const dy = (sourceNode.location!.lon - targetNode.location!.lon);
+                return { id: targetNode.pubkey, dist: Math.sqrt(dx*dx + dy*dy), target: targetNode };
+            })
+            .sort((a, b) => a.dist - b.dist)
+            .slice(0, 2);
 
+          distances.forEach(d => {
+             const linkKey = [sourceNode.pubkey, d.id].sort().join('-');
+             if (!links.find(l => l.key === linkKey)) {
+                 links.push({
+                     key: linkKey,
+                     source: sourceNode.pubkey,
+                     target: d.id,
+                     start: [sourceNode.location!.lon, sourceNode.location!.lat],
+                     end: [d.target.location!.lon, d.target.location!.lat],
+                     color: getLinkColor(sourceNode.location!.lat, sourceNode.location!.lon, d.target.location!.lat)
+                 });
+             }
+          });
+      });
+      return links;
+  }, [nodes]);
 
-// --- 3. THE 7 STRATEGIC SCENARIOS ---
+  const handleTabChange = (t: any) => { setTab(t); setFocusedSection(null); setFocusedNodeKey(null); handleHover(null); };
+  const handleZoomIn = () => setPos(p => ({ ...p, zoom: Math.min(p.zoom * 1.5, 10) }));
+  const handleZoomOut = () => setPos(p => ({ ...p, zoom: Math.max(p.zoom / 1.5, 1) }));
+  const handleReset = () => setPos({ coordinates: [0, 20], zoom: 1 });
 
-// === SCENARIO 1: OVERVIEW (DEFAULT) ===
-// Logic: Performance Executive -> Aggregate Health Check
-const buildOverviewDefault = (stats: AnalysisStats) => {
-  // 1. Headline (Hard Data)
-  const headline = `${roll(VOCAB.overview.headlines)} Average score is ${stats.avgHealth.toFixed(1)}/100.`;
-  
-  // 2. Context (Relative Performance)
-  const diff = Math.abs(stats.delta).toFixed(1);
-  const vectorText = stats.delta > 0 ? roll(VOCAB.overview.vectors.positive) : roll(VOCAB.overview.vectors.negative);
-  const context = `${vectorText} by ${diff} points.`;
+  const handleFocus = (key: string | null, location?: {lat: number, lon: number}) => {
+    if (location) setPos({ coordinates: [location.lon, location.lat], zoom: 4 });
+    setFocusedNodeKey(focusedNodeKey === key ? null : key);
+  };
 
-  // 3. Deep Dive (Variance/Driver)
-  // Use Standard Deviation to determine if the group is "Wild" or "Tame"
-  const deepDive = stats.stdDev > 15 ? roll(VOCAB.overview.drivers.variance) : roll(VOCAB.overview.drivers.stable);
+  const metricDropdownRef = useRef<HTMLDivElement>(null);
+  useOutsideClick(metricDropdownRef, () => setIsMetricDropdownOpen(false));
 
-  // 4. Action (Recommendation)
-  const action = stats.delta > -5 ? roll(VOCAB.overview.actions.praise) : roll(VOCAB.overview.actions.fix);
+  // --- NARRATIVE ENGINE INTEGRATION ---
+  // The logic is seeded, so re-renders won't cause text flicker unless input data changes
+  const narrative = useMemo(() => {
+      return generateNarrative({
+          tab,
+          metric: tab === 'MARKET' ? marketMetric : undefined,
+          focusKey: focusedNodeKey,
+          hoverKey: activeHoverKey,
+          nodes,
+          benchmarks,
+          chartSection: focusedSection
+      });
+  }, [tab, marketMetric, focusedNodeKey, focusedSection, activeHoverKey, nodes, benchmarks]);
 
-  return `${headline} ${context} ${deepDive} ${action}`;
-};
+  if (nodes.length < 1) return null;
 
-// === SCENARIO 2: OVERVIEW (CHART CLICK) ===
-// Logic: Performance Executive -> Specific Metric Audit
-const buildOverviewChart = (stats: AnalysisStats, section: string) => {
-  const metricName = section.charAt(0).toUpperCase() + section.slice(1);
-  
-  // 1. Headline
-  const headline = `Metric Deep Dive: ${metricName}.`;
-  
-  // 2. Context (Personality based on metric)
-  let context = "";
-  if (section === 'health') context = `This metric represents the composite vitality of the hardware.`;
-  else if (section === 'storage') context = `This metric tracks the raw capacity available for data consensus.`;
-  else if (section === 'uptime') context = `This is the heartbeat of the cluster; consistency is key.`;
-  else context = `This metric directly correlates to economic output.`;
+  const maxStorage = Math.max(...nodes.map(n => n.storage_committed || 0), 1);
+  const maxCredits = Math.max(...nodes.map(n => n.credits || 0), 1);
+  const maxUptime = Math.max(...nodes.map(n => n.uptime || 0), 1);
+  const totalStorage = nodes.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
+  const totalCredits = nodes.reduce((sum, n) => sum + (n.credits || 0), 0);
+  const totalUptime = nodes.reduce((sum, n) => sum + (n.uptime || 0), 0);
 
-  // 3. Deep Dive (Median vs Average check)
-  // If Median is much higher than Average, it means a few bad nodes are dragging us down.
-  const skew = stats.medianHealth - stats.avgHealth;
-  let deepDive = "";
-  if (skew > 5) deepDive = "The median is significantly higher than the average, indicating a few low-performing outliers are skewing the data.";
-  else deepDive = "The data distribution is normal; performance is consistent across the bell curve.";
+  const isDense = nodes.length > 10;
+  const overviewBarWidth = isDense ? 'flex-1 mx-[1px]' : 'w-2 md:w-3 mx-0.5'; 
+  const marketBarWidth = isDense ? 'flex-1' : 'w-24 md:w-32';
 
-  // 4. Action
-  const action = "Review the bottom quartile to optimize this metric.";
+  // --- STYLES ---
+  const getElementStyle = (nodeKey: string | null, sectionType?: string) => {
+      if (focusedSection && sectionType && sectionType !== focusedSection) return 'opacity-30 grayscale-[0.5] transition-all duration-500';
 
-  return `${headline} ${context} ${deepDive} ${action}`;
-};
+      const isActive = activeHoverKey === nodeKey || focusedNodeKey === nodeKey;
+      const isBackground = (activeHoverKey && activeHoverKey !== nodeKey) || (focusedNodeKey && focusedNodeKey !== nodeKey);
 
-// === SCENARIO 3: OVERVIEW (NODE FOCUS) ===
-// Logic: Performance Executive -> Employee Review
-const buildOverviewNode = (stats: AnalysisStats, node: Node) => {
-  const score = node.health || 0;
-  const diff = score - stats.avgHealth;
-  const safeIp = getSafeIp(node).replace('unit ', '');
+      if (isActive) return 'opacity-100 scale-[1.05] z-50 brightness-110 shadow-[0_0_15px_rgba(0,0,0,0.5)] relative transition-all duration-200 ease-out';
+      if (isBackground) return 'opacity-40 grayscale-[0.5] scale-95 transition-all duration-300';
+      return 'opacity-100 scale-100';
+  };
 
-  // 1. Headline
-  const headline = `Node Audit [${safeIp}]: Health Score ${score}/100.`;
+  const getConicGradient = (type: string) => {
+    let currentDeg = 0;
+    let total = type === 'storage' ? totalStorage : type === 'credits' ? totalCredits : totalUptime;
+    if (total === 0) return 'conic-gradient(#333 0deg 360deg)';
+    return `conic-gradient(${nodes.map((n, i) => {
+        let val = (n as any)[type === 'storage' ? 'storage_committed' : type] || 0;
+        const deg = (val / total) * 360;
+        const theme = themes[i % themes.length];
+        const isFocusActive = activeHoverKey || focusedNodeKey;
+        const isCurrentNode = activeHoverKey === n.pubkey || focusedNodeKey === n.pubkey;
+        const color = isFocusActive ? (isCurrentNode ? theme.hex : '#3f3f46') : theme.hex;
+        const stop = `${color} ${currentDeg}deg ${currentDeg + deg}deg`;
+        currentDeg += deg;
+        return stop;
+    }).join(', ')})`;
+  };
 
-  // 2. Context (Vector)
-  let context = "";
-  if (diff < -5) context = `This unit is underperforming relative to its peers (Group Avg: ${stats.avgHealth.toFixed(0)}).`;
-  else if (diff > 5) context = `This unit is a Top Performer, lifting the group average.`;
-  else context = `This unit is performing exactly in line with the group baseline.`;
+  return (
+    <div className="shrink-0 min-h-[600px] border border-white/5 bg-[#09090b]/40 backdrop-blur-xl flex flex-col relative z-40 rounded-xl mt-6 shadow-2xl overflow-hidden" 
+         onMouseLeave={() => handleHover(null)}
+         onClick={() => { setFocusedSection(null); setFocusedNodeKey(null); }}>
 
-  // 3. Deep Dive (Root Cause)
-  let deepDive = "";
-  if (score < 60) {
-      deepDive = `Root Cause Analysis: The low score is likely driven by ${findRootCause(node, stats.avgHealth)}.`;
-  } else {
-      deepDive = "Stability Analysis: No significant anomalies detected in telemetry.";
-  }
+        {/* TAB CONTROLS */}
+        {!isExport && (
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50">
+                <div className="bg-zinc-900/90 backdrop-blur-md p-1.5 rounded-full flex gap-2 border border-white/10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                    {[{ id: 'OVERVIEW', icon: BarChart3, label: 'Overview' }, { id: 'MARKET', icon: PieChart, label: 'Market Share' }, { id: 'TOPOLOGY', icon: MapIcon, label: 'Topology' }].map((t) => (
+                        <button key={t.id} onClick={() => handleTabChange(t.id)} className={`px-4 py-1.5 md:px-6 md:py-2 rounded-full text-[9px] md:text-xs font-bold uppercase transition-all duration-300 flex items-center gap-2 ${tab === t.id ? 'bg-zinc-100 text-black shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'bg-white/5 text-zinc-500 hover:text-zinc-300 hover:bg-white/10'}`}>
+                            <t.icon size={10} className="md:w-3.5 md:h-3.5" /> {t.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        )}
 
-  // 4. Action
-  const action = score < 70 ? "Action: Immediate reboot or reconfiguration recommended." : "Action: Monitor for drift.";
+        <div className={`flex-1 overflow-hidden relative flex flex-col ${isExport ? 'pt-6' : 'pt-24'}`} onClick={() => { setFocusedSection(null); setFocusedNodeKey(null); }}>
 
-  return `${headline} ${context} ${deepDive} ${action}`;
-};
+            {/* OVERVIEW TAB */}
+            {tab === 'OVERVIEW' && (
+                <>
+                <div className="grid grid-cols-2 grid-rows-2 gap-4 md:gap-6 p-4 md:p-6 h-full">
+                    {[
+                        { id: 'storage', title: 'Storage Capacity', icon: Database, max: maxStorage, key: 'storage_committed', unit: (v: number) => formatBytes(v) },
+                        { id: 'credits', title: 'Credits Earned', icon: Zap, max: maxCredits, key: 'credits', unit: (v: number) => v.toLocaleString() },
+                        { id: 'health', title: 'Health Score', icon: Activity, max: 100, key: 'health', unit: (v: number) => `${v}/100` },
+                        { id: 'uptime', title: 'Uptime Duration', icon: Clock, max: maxUptime, key: 'uptime', unit: (v: number) => formatUptimePrecise(v) }
+                    ].map((sec) => (
+                        <div key={sec.id} className={getElementStyle(null, sec.id)}>
+                            <ChartCell title={sec.title} icon={sec.icon} isFocused={focusedSection === sec.id} onClick={(e: any) => { e.stopPropagation(); setFocusedSection(sec.id); }}>
+                                {nodes.map((n, i) => (
+                                    <div 
+                                        key={n.pubkey} 
+                                        onMouseEnter={() => handleHover(n.pubkey || null)}
+                                        onMouseLeave={() => handleHover(null)}
+                                        onClick={(e) => { e.stopPropagation(); setFocusedNodeKey(n.pubkey || null); }}
+                                        className={`${overviewBarWidth} bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end min-w-[2px] transition-all duration-200 cursor-pointer ${getElementStyle(n.pubkey || null)}`}
+                                    >
+                                        <div className="w-full rounded-t-sm transition-all duration-500 relative" style={{ height: `${(((n as any)[sec.key] || 0) / sec.max) * 100}%`, backgroundColor: themes[i % themes.length].hex }}></div>
+                                        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-50 pointer-events-none">
+                                            {sec.unit((n as any)[sec.key] || 0)}
+                                        </div>
+                                    </div>
+                                ))}
+                            </ChartCell>
+                        </div>
+                    ))}
+                </div>
+                <OverviewLegend nodes={nodes} themes={themes} hoveredKey={activeHoverKey} onHover={handleHover} />
+                {!isExport && <InterpretationPanel contextText={narrative} />}
+                </>
+            )}
 
-// === SCENARIO 4: MARKET (DEFAULT) ===
-// Logic: Risk Analyst -> Market Structure Audit
-const buildMarketDefault = (stats: AnalysisStats) => {
-  // 1. Headline (Structure)
-  const isOligarchy = stats.gini > 0.6 || stats.top3Share > 50;
-  const headline = isOligarchy ? roll(VOCAB.market.structures.oligarchy) : roll(VOCAB.market.structures.democracy);
+            {/* MARKET SHARE TAB */}
+            {tab === 'MARKET' && (
+                <>
+                    <div className="relative flex flex-col flex-1">
+                        <div className="absolute top-0 right-4 md:right-8 z-20" ref={metricDropdownRef}>
+                            <button onClick={(e) => { e.stopPropagation(); setIsMetricDropdownOpen(!isMetricDropdownOpen); }} className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 rounded-lg text-[10px] md:text-xs font-bold uppercase transition">
+                                <span className="opacity-50">Analyzing:</span> {marketMetric} <ChevronDown size={12} className="md:w-3.5 md:h-3.5" />
+                            </button>
+                            {isMetricDropdownOpen && (
+                                <div className="absolute top-full right-0 mt-2 w-48 bg-[#09090b] border border-zinc-800 rounded-xl shadow-2xl overflow-hidden flex flex-col z-30">
+                                    {['storage', 'credits', 'health', 'uptime'].map(m => (
+                                        <button key={m} onClick={(e) => { e.stopPropagation(); setMarketMetric(m as any); setIsMetricDropdownOpen(false); }} className={`px-4 py-3 text-xs font-bold text-left uppercase hover:bg-zinc-800 transition ${marketMetric === m ? 'text-white bg-zinc-800' : 'text-zinc-400'}`}>
+                                            {m}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 flex items-center justify-center p-8">
+                            {marketMetric !== 'health' ? (
+                                <div className="flex flex-col items-center gap-6 animate-in zoom-in-50 duration-500">
+                                    <div className="w-56 h-56 md:w-72 md:h-72 rounded-full relative flex items-center justify-center shadow-[0_0_50px_rgba(0,0,0,0.5)] transition-all" style={{ background: getConicGradient(marketMetric) }}>
+                                        <div className="w-44 h-44 md:w-56 md:h-56 bg-[#050505] rounded-full flex flex-col items-center justify-center z-10 shadow-inner border border-white/5 p-4 text-center">
+                                            {marketMetric === 'storage' && <Database size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
+                                            {marketMetric === 'credits' && <Zap size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
+                                            {marketMetric === 'uptime' && <Clock size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
+                                            <span className="text-xs md:text-sm font-bold text-zinc-400 tracking-widest uppercase mb-1">{marketMetric} Share</span>
+                                            <span className="text-[10px] md:text-xs text-zinc-600 font-mono text-center">{(activeHoverKey || focusedNodeKey) ? getSafeIp(nodes.find(n => n.pubkey === (activeHoverKey || focusedNodeKey))!) : 'Aggregated Fleet'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="w-full max-w-3xl flex flex-col gap-4 animate-in slide-in-from-bottom-10 duration-500">
+                                    {nodes.map((n, i) => (
+                                        <div key={n.pubkey} onMouseEnter={() => handleHover(n.pubkey || null)} onMouseLeave={() => handleHover(null)} className={`flex items-center gap-4 transition-all duration-300 cursor-pointer ${getElementStyle(n.pubkey || null)} ${!isDense ? 'justify-center' : ''}`} onClick={(e) => { e.stopPropagation(); setFocusedNodeKey(n.pubkey || null); }}>
+                                            <span className="text-xs font-mono font-bold text-zinc-400 w-32 text-right truncate">{getSafeIp(n)}</span>
+                                            <div className={`${marketBarWidth} h-8 bg-zinc-900 rounded-full overflow-hidden relative border border-white/5`}><div className="h-full rounded-full transition-all duration-1000" style={{ width: `${n.health}%`, backgroundColor: themes[i % themes.length].hex }}></div></div>
+                                            <span className="text-xs font-bold text-white font-mono w-16 text-left">{n.health} / 100</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="METRIC" specificMetric={marketMetric} hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => setFocusedNodeKey(n.pubkey || null)} />
+                    {!isExport && <InterpretationPanel contextText={narrative} />}
+                </>
+            )}
 
-  // 2. Context (Concentration Data)
-  const context = `The top 3 nodes currently control ${stats.top3Share.toFixed(1)}% of the entire network's storage capacity.`;
+            {/* TOPOLOGY TAB */}
+            {tab === 'TOPOLOGY' && (
+                <div className="flex flex-col h-full relative group/map">
+                    {!isExport && (
+                        <div className="absolute bottom-6 right-6 z-50 flex flex-col gap-2 opacity-80 hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={handleZoomIn} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><Plus size={16} /></button>
+                            <button onClick={handleReset} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><RotateCcw size={16} /></button>
+                            <button onClick={handleZoomOut} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><Minus size={16} /></button>
+                        </div>
+                    )}
 
-  // 3. Deep Dive (Simulation - Bus Factor)
-  const lossString = formatBytes(stats.top3Volume);
-  const deepDive = `Simulation: Hypothetically, if these top actors go offline simultaneously, the network loses ${lossString} of capacity instantly.`;
-
-  // 4. Action (Risk Mitigation)
-  const action = isOligarchy 
-    ? "Strategy: Onboarding smaller, distinct nodes is recommended to dilute this centralization risk." 
-    : "Strategy: Maintain current decentralization incentives.";
-
-  return `${headline} ${context} ${deepDive} ${action}`;
-};
-
-// === SCENARIO 5: MARKET (NODE FOCUS) ===
-// Logic: Risk Analyst -> Shareholder Report
-const buildMarketNode = (stats: AnalysisStats, node: Node, metric: string) => {
-  const m = metric === 'storage' ? 'storage_committed' : metric;
-  const val = (node as any)[m] || 0;
-  const total = metric === 'storage' ? stats.totalStorage : 100; // Simplified for non-storage
-  const share = (val / total) * 100;
-  
-  // 1. Headline
-  const headline = `Shareholder Report: Node holds ${share.toFixed(2)}% of market share.`;
-
-  // 2. Context (Vs Median)
-  // Calculate how many times larger this node is than the median
-  const medianVal = stats.medianStorage || 1;
-  const multiple = (val / medianVal).toFixed(1);
-  const context = `This node is ${multiple}x larger than the median node size in this cluster.`;
-
-  // 3. Deep Dive (Leverage)
-  let deepDive = "";
-  if (share > 10) deepDive = "Leverage Assessment: High. This node acts as a 'Market Maker.' Its uptime directly correlates to group stability.";
-  else deepDive = "Leverage Assessment: Low. This node is a minor participant with minimal systemic risk impact.";
-
-  // 4. Action
-  const action = share > 15 ? "Warning: Further accumulation of share by this node would trigger a centralization warning." : "Status: Growth headroom available.";
-
-  return `${headline} ${context} ${deepDive} ${action}`;
-};
-
-// === SCENARIO 6: TOPOLOGY (DEFAULT) ===
-// Logic: Geopolitical Strategist -> Footprint Analysis
-const buildTopologyDefault = (stats: AnalysisStats) => {
-  // 1. Headline (Spread Audit)
-  const isClumped = stats.dominanceScore > 50;
-  const headline = isClumped ? roll(VOCAB.topology.spreads.bad) : roll(VOCAB.topology.spreads.good);
-
-  // 2. Context (Skew Data)
-  const context = `The fleet is distributed across ${stats.countries} jurisdictions, but ${stats.dominanceScore.toFixed(0)}% of resources are clumped within ${stats.dominantRegion}.`;
-
-  // 3. Deep Dive (The Threat)
-  const deepDive = isClumped ? roll(VOCAB.topology.threats.legal) : "No significant regulatory single-points-of-failure detected.";
-
-  // 4. Action
-  const action = isClumped 
-    ? "Advisory: Geographic expansion into under-served regions (APAC/Americas) is advised to improve censorship resistance."
-    : "Advisory: Continue global diversification strategy.";
-
-  return `${headline} ${context} ${deepDive} ${action}`;
-};
-
-// === SCENARIO 7: TOPOLOGY (NODE FOCUS) ===
-// Logic: Geopolitical Strategist -> Asset Valuation
-const buildTopologyNode = (stats: AnalysisStats, node: Node) => {
-  const country = node.location?.countryName || "Unknown";
-  const countInCountry = stats.countryCounts[country] || 1;
-  const isLoneWolf = countInCountry === 1;
-
-  // 1. Headline (Location)
-  const headline = `Asset Deployment: Node is active in ${country}.`;
-
-  // 2. Context (Uniqueness)
-  const context = isLoneWolf 
-    ? `Uniqueness: Critical. It is currently the ONLY node serving this jurisdiction.`
-    : `Uniqueness: Low. It shares this region with ${countInCountry - 1} other peers.`;
-
-  // 3. Deep Dive (Value)
-  const deepDive = isLoneWolf ? roll(VOCAB.topology.assets.loneWolf) : roll(VOCAB.topology.assets.redundant);
-
-  // 4. Action
-  const action = isLoneWolf 
-    ? "Verdict: Maintaining high uptime for this specific unit is critical for global accessibility."
-    : "Verdict: Failure of this node would be easily absorbed by local peers.";
-
-  return `${headline} ${context} ${deepDive} ${action}`;
-};
-
-// --- 4. MAIN EXPORT ---
-export const generateNarrative = (ctx: NarrativeContext): string => {
-  if (!ctx.nodes || ctx.nodes.length === 0) return "Awaiting Telemetry...";
-
-  const activeKey = ctx.focusKey || ctx.hoverKey || 'default';
-  const sectionKey = ctx.chartSection || 'none';
-  const metricKey = ctx.metric || 'storage';
-  
-  // Cache Key to prevent jitter during React re-renders, but allow updates when focus changes
-  const cacheKey = `${ctx.tab}::${activeKey}::${sectionKey}::${metricKey}::${ctx.nodes.length}`;
-
-  if (NARRATIVE_CACHE.has(cacheKey)) {
-    return NARRATIVE_CACHE.get(cacheKey)!;
-  }
-
-  // 1. Run the Math (The Intelligence Layer)
-  const stats = analyze(ctx.nodes, ctx.benchmarks);
-  if (!stats) return "Calculating Cluster Physics...";
-
-  const activeNode = activeKey !== 'default' ? ctx.nodes.find(n => n.pubkey === activeKey) || null : null;
-  let narrative = "";
-
-  // 2. Select the Scenario (The Strategy Layer)
-  switch (ctx.tab) {
-    case 'OVERVIEW':
-      if (activeNode) narrative = buildOverviewNode(stats, activeNode);
-      else if (ctx.chartSection) narrative = buildOverviewChart(stats, ctx.chartSection);
-      else narrative = buildOverviewDefault(stats);
-      break;
-
-    case 'MARKET':
-      if (activeNode) narrative = buildMarketNode(stats, activeNode, metricKey);
-      else narrative = buildMarketDefault(stats);
-      break;
-
-    case 'TOPOLOGY':
-      if (activeNode) narrative = buildTopologyNode(stats, activeNode);
-      else narrative = buildTopologyDefault(stats);
-      break;
-  }
-
-  NARRATIVE_CACHE.set(cacheKey, narrative);
-  return narrative;
+                    <div className="flex-1 rounded-xl overflow-hidden border border-white/5 bg-[#050505] mx-4 md:mx-6 relative shadow-inner">
+                        <ComposableMap projectionConfig={{ scale: 160 }} className="w-full h-full">
+                            <ZoomableGroup zoom={pos.zoom} center={pos.coordinates as [number, number]} maxZoom={10} onMoveEnd={(e: any) => setPos({ coordinates: e.coordinates as [number, number], zoom: e.zoom })}>
+                                <Geographies geography={GEO_URL}>{({ geographies }: { geographies: any[] }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#18181b" stroke="#27272a" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { outline: "none" }, pressed: { outline: "none" } }} />))}</Geographies>
+                                {meshLinks.map((link: any) => {
+                                    const isRelevant = !activeHoverKey || activeHoverKey === link.source || activeHoverKey === link.target;
+                                    const opacity = activeHoverKey ? (isRelevant ? 0.8 : 0.05) : 0.2;
+                                    const width = activeHoverKey && isRelevant ? 2 / pos.zoom : 0.5 / pos.zoom;
+                                    return (
+                                        <Line key={link.key} from={link.start} to={link.end} stroke={link.color} strokeWidth={width} strokeDasharray="4 4" strokeOpacity={opacity} style={{ transition: 'all 0.3s ease' }} />
+                                    );
+                                })}
+                                {clusters.map((cluster) => {
+                                    const theme = themes[cluster.themeIndex % themes.length];
+                                    const isHovered = activeHoverKey === cluster.id || (cluster.nodes.some((n: Node) => n.pubkey === activeHoverKey));
+                                    const isFocused = focusedNodeKey === cluster.id || (cluster.nodes.some((n: Node) => n.pubkey === focusedNodeKey));
+                                    return (
+                                        <Marker key={cluster.id} coordinates={[cluster.lon, cluster.lat]} onClick={(e: any) => { e.stopPropagation(); handleFocus(cluster.id, { lat: cluster.lat, lon: cluster.lon }); }} onMouseEnter={() => handleHover(cluster.nodes.length === 1 ? cluster.nodes[0].pubkey : cluster.id)} onMouseLeave={() => handleHover(null)}>
+                                            <circle r={(cluster.nodes.length > 1 ? 20 : 10) / pos.zoom} fill={theme.hex} fillOpacity={isHovered || isFocused ? 1 : 0.6} stroke="#fff" strokeWidth={(isHovered || isFocused ? 3 : 2)/pos.zoom} className={`transition-all duration-300 ${isHovered || isFocused ? 'drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]' : ''}`} />
+                                        </Marker>
+                                    );
+                                })}
+                            </ZoomableGroup>
+                        </ComposableMap>
+                    </div>
+                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="COUNTRY" hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => handleFocus(n.pubkey || null, n.location ? { lat: n.location.lat, lon: n.location.lon } : undefined)} />
+                    {!isExport && <InterpretationPanel contextText={narrative} />}
+                </div>
+            )}
+        </div>
+    </div>
+  );
 };
