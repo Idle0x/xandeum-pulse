@@ -1,355 +1,173 @@
-import { useState, useRef, useMemo } from 'react';
-import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup, Line } from 'react-simple-maps';
-import { 
-  BarChart3, PieChart, Map as MapIcon, Database, Zap, Activity, Clock, Info,
-  ChevronDown, Plus, Minus, RotateCcw
-} from 'lucide-react';
-import { Node } from '../../types';
-import { formatBytes } from '../../utils/formatters';
-import { getSafeIp } from '../../utils/nodeHelpers';
-import { useOutsideClick } from '../../hooks/useOutsideClick';
-import { formatUptimePrecise } from './MicroComponents';
-import { OverviewLegend, UnifiedLegend } from './ComparisonLegends';
-// IMPORT THE NEW ENGINE
-import { generateNarrative } from '../../lib/narrative-engine';
+import { Node } from '../types';
+import { formatBytes } from '../utils/formatters';
+import { getSafeIp } from '../utils/nodeHelpers';
 
-const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
-
-// --- MESH COLOR PALETTE ---
-const MESH_COLORS = [
-    "#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899", "#06b6d4", "#f43f5e", "#84cc16",
-    "#6366f1", "#14b8a6", "#d946ef", "#eab308", "#f97316", "#a855f7", "#22c55e", "#0ea5e9",
-    "#fca5a5", "#86efac", "#93c5fd", "#c4b5fd", "#fdba74", "#5eead4", "#fcd34d", "#fda4af",
-    "#64748b", "#71717a", "#78716c", "#a1a1aa", "#94a3b8", "#e2e8f0"
-];
-
-const getLinkColor = (startLat: number, startLon: number, endLat: number) => {
-    const hash = Math.abs((startLat * 1000) + (startLon * 1000) + (endLat * 1000));
-    return MESH_COLORS[Math.floor(hash) % MESH_COLORS.length];
+// --- TYPES ---
+export type NarrativeContext = {
+  tab: 'OVERVIEW' | 'MARKET' | 'TOPOLOGY';
+  metric?: string; 
+  focusKey?: string | null; 
+  hoverKey?: string | null; 
+  nodes: Node[];
+  benchmarks: any;
+  chartSection?: string | null;
 };
 
-// --- SUB-COMPONENTS ---
-const InterpretationPanel = ({ contextText }: { contextText: string }) => (
-    <div className="px-4 py-3 md:px-6 md:py-4 bg-zinc-900/30 border-t border-white/5 flex items-start gap-3 md:gap-4 transition-all duration-300 print-exclude min-h-[80px]">
-        <Info size={14} className="text-blue-400 shrink-0 mt-0.5 md:w-4 md:h-4 animate-pulse" />
-        <div className="flex flex-col gap-1">
-            {/* key={contextText} ensures the animation replays when text changes */}
-            <p key={contextText} className="text-xs md:text-sm text-zinc-300 leading-relaxed max-w-4xl font-medium animate-in fade-in slide-in-from-bottom-1 duration-300">
-                {contextText}
-            </p>
-        </div>
-    </div>
-);
+// --- THE LEXICON MATRIX ---
+// Categorized by "Intensity Bands" and "Metric Personalities"
+const POOLS = {
+  connectors: {
+    simple: ["Basically,", "In plain English,", "Essentially,", "What this means is,", "To put it simply,"],
+    tech: ["Telemetry indicates", "Diagnostic analysis confirms", "Algorithmic audit reveals", "Statistical modeling suggests", "Systemic assessment shows"],
+    transition: ["resulting in", "leading to", "which triggers", "effectively creating", "consequently causing"]
+  },
+  intensity: {
+    critical_low: {
+      tech: ["severe degradation", "catastrophic variance", "acute performance collapse", "critical divergence"],
+      simple: ["a major breakdown", "a huge problem", "a dangerous dip", "really bad performance"]
+    },
+    mild_low: {
+      tech: ["minor oscillation", "nominal drift", "sub-optimal throughput", "slight performance lag"],
+      simple: ["a small lag", "a tiny drop", "not quite perfect", "a bit slow"]
+    },
+    mild_high: {
+      tech: ["marginal optimization", "positive drift", "stable throughput", "healthy elevation"],
+      simple: ["a good boost", "looking solid", "doing well", "slightly above average"]
+    },
+    critical_high: {
+      tech: ["elite performance", "optimal synchronization", "superior hardware efficiency", "peak telemetry"],
+      simple: ["perfect performance", "top-tier status", "amazing speed", "the best in the group"]
+    }
+  },
+  personalities: {
+    health: ["vitality", "pulse", "hardware integrity", "system health", "operational life"],
+    storage: ["capacity", "volume", "retention depth", "grid space", "storage density"],
+    credits: ["economic output", "yield", "reward velocity", "financial weight", "earning power"],
+    uptime: ["persistence", "reliability", "heartbeat", "availability", "temporal stability"]
+  },
+  topology: {
+    lone: ["Strategic Edge Anchor", "Critical Bridge", "Unique Jurisdictional Asset", "Gateway Node"],
+    clumped: ["Redundant Asset", "Clustered Peer", "Local Consensus Participant", "High-Density Unit"],
+    risk: ["regulatory single-point-of-failure", "physical proximity bottleneck", "geopolitical concentration", "localized outage risk"]
+  }
+};
 
-const ChartCell = ({ title, icon: Icon, children, isFocused, onClick }: any) => (
-    <div 
-        onClick={onClick}
-        className={`rounded-xl p-4 md:p-6 flex flex-col items-center justify-end relative overflow-hidden transition-all duration-300 cursor-pointer 
-        ${isFocused ? 'bg-zinc-900/80 border border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.1)] scale-[1.01] z-10' : 'bg-black/20 border border-white/5 hover:border-white/10 hover:bg-black/40'}
-        `}
-    >
-        <div className={`absolute top-3 left-3 md:top-4 md:left-4 flex items-center gap-2 transition-colors ${isFocused ? 'text-blue-400' : 'text-zinc-500'}`}>
-            <Icon size={10} className="md:w-3.5 md:h-3.5" />
-            <span className="text-[8px] md:text-xs font-bold uppercase tracking-widest">{title}</span>
-        </div>
-        <div className="flex items-end justify-center gap-1 md:gap-3 h-32 md:h-48 w-full px-2 md:px-4 pt-8">
-            {children}
-        </div>
-    </div>
-);
+// --- THE ANALYTICS ENGINE (Nuance Layer) ---
+const analyze = (nodes: Node[], benchmark: any) => {
+  if (!nodes.length) return null;
+  const count = nodes.length;
+  const healths = nodes.map(n => n.health || 0).sort((a, b) => a - b);
+  const storages = nodes.map(n => n.storage_committed || 0).sort((a, b) => a - b);
+  
+  const avgHealth = healths.reduce((a, b) => a + b, 0) / count;
+  const totalStorage = storages.reduce((a, b) => a + b, 0);
+  const netAvg = benchmark?.networkRaw?.health || 75;
+  const delta = avgHealth - netAvg;
+  
+  // Median (Outlier detection)
+  const mid = Math.floor(count / 2);
+  const medianHealth = count % 2 !== 0 ? healths[mid] : (healths[mid - 1] + healths[mid]) / 2;
+  
+  // Gini (Centralization)
+  let giniNum = 0;
+  storages.forEach((v, i) => { giniNum += (i + 1) * v; });
+  const gini = (2 * giniNum) / (count * totalStorage) - (count + 1) / count;
+  
+  // Topology
+  const countryMap: Record<string, number> = {};
+  nodes.forEach(n => { countryMap[n.location?.countryName || 'Unknown'] = (countryMap[n.location?.countryName || 'Unknown'] || 0) + 1; });
+  const domRegion = Object.keys(countryMap).reduce((a, b) => countryMap[a] > countryMap[b] ? a : b);
+  const domScore = (countryMap[domRegion] / count) * 100;
 
-// --- MAIN ENGINE ---
-interface SynthesisEngineProps {
-  nodes: Node[];
-  themes: any[];
-  networkScope: string;
-  benchmarks: any;
-  hoveredNodeKey?: string | null;
-  onHover?: (key: string | null) => void;
-  isExport?: boolean;
-}
+  return { avgHealth, medianHealth, totalStorage, delta, gini, countryMap, domRegion, domScore, count, top3: storages.slice(-3).reduce((a, b) => a + b, 0) };
+};
 
-export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hoveredNodeKey: externalHoverKey, onHover: setExternalHover, isExport = false }: SynthesisEngineProps) => {
-  const [tab, setTab] = useState<'OVERVIEW' | 'MARKET' | 'TOPOLOGY'>('OVERVIEW');
-  const [marketMetric, setMarketMetric] = useState<'storage' | 'credits' | 'health' | 'uptime'>('storage');
-  const [pos, setPos] = useState({ coordinates: [0, 20], zoom: 1 });
-  const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false);
+// --- COMBINATORIAL GENERATOR ---
+const roll = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
 
-  // --- INTERACTION STATE ---
-  const [focusedSection, setFocusedSection] = useState<string | null>(null); 
-  const [focusedNodeKey, setFocusedNodeKey] = useState<string | null>(null); 
-  const [internalHoverKey, setInternalHoverKey] = useState<string | null>(null);
+const getIntensityKey = (delta: number): 'critical_low' | 'mild_low' | 'mild_high' | 'critical_high' => {
+  if (delta < -15) return 'critical_low';
+  if (delta < 0) return 'mild_low';
+  if (delta < 15) return 'mild_high';
+  return 'critical_high';
+};
 
-  // Derived Hover State
-  const activeHoverKey = externalHoverKey !== undefined ? externalHoverKey : internalHoverKey;
+// --- SCENARIO ASSEMBLERS ---
 
-  const handleHover = (key: string | null) => {
-      setInternalHoverKey(key);
-      if (setExternalHover) setExternalHover(key);
-  };
+const assembleOverview = (stats: any, node?: Node | null, section?: string | null) => {
+  const intensity = getIntensityKey(node ? (node.health || 0) - stats.avgHealth : stats.delta);
+  const p = section || 'health';
+  const person = roll(POOLS.personalities[p as keyof typeof POOLS.personalities] || POOLS.personalities.health);
 
-  // --- DATA PREPARATION ---
-  const clusters = useMemo(() => {
-      const map = new Map();
-      nodes.forEach((node, index) => {
-          if (!node.location) return;
-          const lat = node.location.lat.toFixed(2);
-          const lon = node.location.lon.toFixed(2);
-          const key = `${lat},${lon}`;
-          if (!map.has(key)) {
-              map.set(key, { id: `cluster-${key}`, lat: node.location.lat, lon: node.location.lon, country: node.location.countryName || 'Unknown', nodes: [], themeIndex: index });
-          }
-          map.get(key).nodes.push(node);
-      });
-      return Array.from(map.values());
-  }, [nodes]);
+  // HYBRID WEAVE PATTERN
+  const headline = `${roll(POOLS.connectors.tech)} a ${roll(POOLS.intensity[intensity].tech)} in ${person}.`;
+  const translation = `${roll(POOLS.connectors.simple)} the ${person} is ${roll(POOLS.intensity[intensity].simple)}.`;
+  
+  let deepDive = "";
+  if (node) {
+    const root = node.health && node.health < 50 ? "hardware degradation" : "latency jitter";
+    deepDive = `Specifically, Node [${getSafeIp(node).split(' ')[1]}] is exhibiting ${root}, ${roll(POOLS.connectors.transition)} the current score.`;
+  } else {
+    deepDive = stats.delta > 0 ? "This group is acting as a network stabilizer." : "This cluster is currently a performance bottleneck.";
+  }
 
-  const meshLinks = useMemo(() => {
-      if (nodes.length < 2) return [];
-      const links: any[] = [];
-      nodes.forEach((sourceNode) => {
-          if (!sourceNode.location) return;
-          const distances = nodes
-            .filter(n => n.pubkey !== sourceNode.pubkey && n.location)
-            .map(targetNode => {
-                const dx = (sourceNode.location!.lat - targetNode.location!.lat);
-                const dy = (sourceNode.location!.lon - targetNode.location!.lon);
-                return { id: targetNode.pubkey, dist: Math.sqrt(dx*dx + dy*dy), target: targetNode };
-            })
-            .sort((a, b) => a.dist - b.dist)
-            .slice(0, 2);
+  const action = intensity.includes('low') ? "Recommendation: Optimize hardware configs." : "Status: Maintenance mode sufficient.";
 
-          distances.forEach(d => {
-             const linkKey = [sourceNode.pubkey, d.id].sort().join('-');
-             if (!links.find(l => l.key === linkKey)) {
-                 links.push({
-                     key: linkKey,
-                     source: sourceNode.pubkey,
-                     target: d.id,
-                     start: [sourceNode.location!.lon, sourceNode.location!.lat],
-                     end: [d.target.location!.lon, d.target.location!.lat],
-                     color: getLinkColor(sourceNode.location!.lat, sourceNode.location!.lon, d.target.location!.lat)
-                 });
-             }
-          });
-      });
-      return links;
-  }, [nodes]);
+  return `${headline} ${translation} ${deepDive} ${action}`;
+};
 
-  const handleTabChange = (t: any) => { setTab(t); setFocusedSection(null); setFocusedNodeKey(null); handleHover(null); };
-  const handleZoomIn = () => setPos(p => ({ ...p, zoom: Math.min(p.zoom * 1.5, 10) }));
-  const handleZoomOut = () => setPos(p => ({ ...p, zoom: Math.max(p.zoom / 1.5, 1) }));
-  const handleReset = () => setPos({ coordinates: [0, 20], zoom: 1 });
+const assembleMarket = (stats: any, node?: Node | null) => {
+  const isCentralized = stats.gini > 0.5;
+  const top3Share = (stats.top3 / stats.totalStorage) * 100;
 
-  const handleFocus = (key: string | null, location?: {lat: number, lon: number}) => {
-    if (location) setPos({ coordinates: [location.lon, location.lat], zoom: 4 });
-    setFocusedNodeKey(focusedNodeKey === key ? null : key);
-  };
+  if (node) {
+    const share = ((node.storage_committed || 0) / stats.totalStorage) * 100;
+    const h = `${roll(POOLS.connectors.tech)} a market share of ${share.toFixed(1)}%.`;
+    const s = `${roll(POOLS.connectors.simple)} this node is ${share > 10 ? 'a huge whale' : 'a small participant'}.`;
+    const d = share > 10 ? "Its failure would trigger immediate capacity gaps." : "Its role is redundant and easily absorbed.";
+    return `${h} ${s} ${d}`;
+  }
 
-  const metricDropdownRef = useRef<HTMLDivElement>(null);
-  useOutsideClick(metricDropdownRef, () => setIsMetricDropdownOpen(false));
+  const headline = isCentralized ? "Warning: Market structure is currently an Oligarchy." : "Market structure appears Democratically distributed.";
+  const context = `The top 3 entities control ${top3Share.toFixed(1)}% of total grid power.`;
+  const simulation = `If these entities detach, the network loses ${formatBytes(stats.top3)} of storage.`;
+  const action = isCentralized ? "Strategy: Incentivize smaller nodes to dilute power." : "Strategy: Continue current growth vector.";
+  
+  return `${headline} ${context} ${simulation} ${action}`;
+};
 
-  // --- NARRATIVE ENGINE INTEGRATION ---
-  // The logic is seeded, so re-renders won't cause text flicker unless input data changes
-  const narrative = useMemo(() => {
-      return generateNarrative({
-          tab,
-          metric: tab === 'MARKET' ? marketMetric : undefined,
-          focusKey: focusedNodeKey,
-          hoverKey: activeHoverKey,
-          nodes,
-          benchmarks,
-          chartSection: focusedSection
-      });
-  }, [tab, marketMetric, focusedNodeKey, focusedSection, activeHoverKey, nodes, benchmarks]);
+const assembleTopology = (stats: any, node?: Node | null) => {
+  if (node) {
+    const country = node.location?.countryName || "Unknown";
+    const isLone = stats.countryMap[country] === 1;
+    const h = `${roll(POOLS.connectors.tech)} deployment in ${country}.`;
+    const s = `${roll(POOLS.connectors.simple)} this node is ${isLone ? 'the only one here' : 'one of many'}.`;
+    const d = isLone ? `It acts as a ${roll(POOLS.topology.lone)} for this region.` : `It is a ${roll(POOLS.topology.clumped)} contributing to local density.`;
+    return `${h} ${s} ${d}`;
+  }
 
-  if (nodes.length < 1) return null;
+  const isClumped = stats.domScore > 50;
+  const h = `${roll(POOLS.connectors.tech)} nodes across ${Object.keys(stats.countryMap).length} regions.`;
+  const s = `${roll(POOLS.connectors.simple)} most of the fleet is in ${stats.domRegion}.`;
+  const d = isClumped ? `This creates a ${roll(POOLS.topology.risk)}.` : "This footprint offers excellent censorship resistance.";
+  const a = isClumped ? "Action: Deploy to new jurisdictions to mitigate legal risk." : "Action: Nominal geo-stability confirmed.";
+  
+  return `${h} ${s} ${d} ${a}`;
+};
 
-  const maxStorage = Math.max(...nodes.map(n => n.storage_committed || 0), 1);
-  const maxCredits = Math.max(...nodes.map(n => n.credits || 0), 1);
-  const maxUptime = Math.max(...nodes.map(n => n.uptime || 0), 1);
-  const totalStorage = nodes.reduce((sum, n) => sum + (n.storage_committed || 0), 0);
-  const totalCredits = nodes.reduce((sum, n) => sum + (n.credits || 0), 0);
-  const totalUptime = nodes.reduce((sum, n) => sum + (n.uptime || 0), 0);
+// --- EXPORT ENGINE ---
+export const generateNarrative = (ctx: NarrativeContext): string => {
+  if (!ctx.nodes || ctx.nodes.length === 0) return "Synthesizing...";
+  
+  const stats = analyze(ctx.nodes, ctx.benchmarks);
+  if (!stats) return "Calculating...";
 
-  const isDense = nodes.length > 10;
-  const overviewBarWidth = isDense ? 'flex-1 mx-[1px]' : 'w-2 md:w-3 mx-0.5'; 
-  const marketBarWidth = isDense ? 'flex-1' : 'w-24 md:w-32';
+  const activeNode = (ctx.focusKey || ctx.hoverKey) ? ctx.nodes.find(n => n.pubkey === (ctx.focusKey || ctx.hoverKey)) : null;
 
-  // --- STYLES ---
-  const getElementStyle = (nodeKey: string | null, sectionType?: string) => {
-      if (focusedSection && sectionType && sectionType !== focusedSection) return 'opacity-30 grayscale-[0.5] transition-all duration-500';
-
-      const isActive = activeHoverKey === nodeKey || focusedNodeKey === nodeKey;
-      const isBackground = (activeHoverKey && activeHoverKey !== nodeKey) || (focusedNodeKey && focusedNodeKey !== nodeKey);
-
-      if (isActive) return 'opacity-100 scale-[1.05] z-50 brightness-110 shadow-[0_0_15px_rgba(0,0,0,0.5)] relative transition-all duration-200 ease-out';
-      if (isBackground) return 'opacity-40 grayscale-[0.5] scale-95 transition-all duration-300';
-      return 'opacity-100 scale-100';
-  };
-
-  const getConicGradient = (type: string) => {
-    let currentDeg = 0;
-    let total = type === 'storage' ? totalStorage : type === 'credits' ? totalCredits : totalUptime;
-    if (total === 0) return 'conic-gradient(#333 0deg 360deg)';
-    return `conic-gradient(${nodes.map((n, i) => {
-        let val = (n as any)[type === 'storage' ? 'storage_committed' : type] || 0;
-        const deg = (val / total) * 360;
-        const theme = themes[i % themes.length];
-        const isFocusActive = activeHoverKey || focusedNodeKey;
-        const isCurrentNode = activeHoverKey === n.pubkey || focusedNodeKey === n.pubkey;
-        const color = isFocusActive ? (isCurrentNode ? theme.hex : '#3f3f46') : theme.hex;
-        const stop = `${color} ${currentDeg}deg ${currentDeg + deg}deg`;
-        currentDeg += deg;
-        return stop;
-    }).join(', ')})`;
-  };
-
-  return (
-    <div className="shrink-0 min-h-[600px] border border-white/5 bg-[#09090b]/40 backdrop-blur-xl flex flex-col relative z-40 rounded-xl mt-6 shadow-2xl overflow-hidden" 
-         onMouseLeave={() => handleHover(null)}
-         onClick={() => { setFocusedSection(null); setFocusedNodeKey(null); }}>
-
-        {/* TAB CONTROLS */}
-        {!isExport && (
-            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50">
-                <div className="bg-zinc-900/90 backdrop-blur-md p-1.5 rounded-full flex gap-2 border border-white/10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                    {[{ id: 'OVERVIEW', icon: BarChart3, label: 'Overview' }, { id: 'MARKET', icon: PieChart, label: 'Market Share' }, { id: 'TOPOLOGY', icon: MapIcon, label: 'Topology' }].map((t) => (
-                        <button key={t.id} onClick={() => handleTabChange(t.id)} className={`px-4 py-1.5 md:px-6 md:py-2 rounded-full text-[9px] md:text-xs font-bold uppercase transition-all duration-300 flex items-center gap-2 ${tab === t.id ? 'bg-zinc-100 text-black shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'bg-white/5 text-zinc-500 hover:text-zinc-300 hover:bg-white/10'}`}>
-                            <t.icon size={10} className="md:w-3.5 md:h-3.5" /> {t.label}
-                        </button>
-                    ))}
-                </div>
-            </div>
-        )}
-
-        <div className={`flex-1 overflow-hidden relative flex flex-col ${isExport ? 'pt-6' : 'pt-24'}`} onClick={() => { setFocusedSection(null); setFocusedNodeKey(null); }}>
-
-            {/* OVERVIEW TAB */}
-            {tab === 'OVERVIEW' && (
-                <>
-                <div className="grid grid-cols-2 grid-rows-2 gap-4 md:gap-6 p-4 md:p-6 h-full">
-                    {[
-                        { id: 'storage', title: 'Storage Capacity', icon: Database, max: maxStorage, key: 'storage_committed', unit: (v: number) => formatBytes(v) },
-                        { id: 'credits', title: 'Credits Earned', icon: Zap, max: maxCredits, key: 'credits', unit: (v: number) => v.toLocaleString() },
-                        { id: 'health', title: 'Health Score', icon: Activity, max: 100, key: 'health', unit: (v: number) => `${v}/100` },
-                        { id: 'uptime', title: 'Uptime Duration', icon: Clock, max: maxUptime, key: 'uptime', unit: (v: number) => formatUptimePrecise(v) }
-                    ].map((sec) => (
-                        <div key={sec.id} className={getElementStyle(null, sec.id)}>
-                            <ChartCell title={sec.title} icon={sec.icon} isFocused={focusedSection === sec.id} onClick={(e: any) => { e.stopPropagation(); setFocusedSection(sec.id); }}>
-                                {nodes.map((n, i) => (
-                                    <div 
-                                        key={n.pubkey} 
-                                        onMouseEnter={() => handleHover(n.pubkey || null)}
-                                        onMouseLeave={() => handleHover(null)}
-                                        onClick={(e) => { e.stopPropagation(); setFocusedNodeKey(n.pubkey || null); }}
-                                        className={`${overviewBarWidth} bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end min-w-[2px] transition-all duration-200 cursor-pointer ${getElementStyle(n.pubkey || null)}`}
-                                    >
-                                        <div className="w-full rounded-t-sm transition-all duration-500 relative" style={{ height: `${(((n as any)[sec.key] || 0) / sec.max) * 100}%`, backgroundColor: themes[i % themes.length].hex }}></div>
-                                        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] md:text-[10px] font-bold font-mono text-zinc-400 opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap bg-black/80 px-2 py-1 rounded border border-white/10 z-50 pointer-events-none">
-                                            {sec.unit((n as any)[sec.key] || 0)}
-                                        </div>
-                                    </div>
-                                ))}
-                            </ChartCell>
-                        </div>
-                    ))}
-                </div>
-                <OverviewLegend nodes={nodes} themes={themes} hoveredKey={activeHoverKey} onHover={handleHover} />
-                {!isExport && <InterpretationPanel contextText={narrative} />}
-                </>
-            )}
-
-            {/* MARKET SHARE TAB */}
-            {tab === 'MARKET' && (
-                <>
-                    <div className="relative flex flex-col flex-1">
-                        <div className="absolute top-0 right-4 md:right-8 z-20" ref={metricDropdownRef}>
-                            <button onClick={(e) => { e.stopPropagation(); setIsMetricDropdownOpen(!isMetricDropdownOpen); }} className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 rounded-lg text-[10px] md:text-xs font-bold uppercase transition">
-                                <span className="opacity-50">Analyzing:</span> {marketMetric} <ChevronDown size={12} className="md:w-3.5 md:h-3.5" />
-                            </button>
-                            {isMetricDropdownOpen && (
-                                <div className="absolute top-full right-0 mt-2 w-48 bg-[#09090b] border border-zinc-800 rounded-xl shadow-2xl overflow-hidden flex flex-col z-30">
-                                    {['storage', 'credits', 'health', 'uptime'].map(m => (
-                                        <button key={m} onClick={(e) => { e.stopPropagation(); setMarketMetric(m as any); setIsMetricDropdownOpen(false); }} className={`px-4 py-3 text-xs font-bold text-left uppercase hover:bg-zinc-800 transition ${marketMetric === m ? 'text-white bg-zinc-800' : 'text-zinc-400'}`}>
-                                            {m}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex-1 flex items-center justify-center p-8">
-                            {marketMetric !== 'health' ? (
-                                <div className="flex flex-col items-center gap-6 animate-in zoom-in-50 duration-500">
-                                    <div className="w-56 h-56 md:w-72 md:h-72 rounded-full relative flex items-center justify-center shadow-[0_0_50px_rgba(0,0,0,0.5)] transition-all" style={{ background: getConicGradient(marketMetric) }}>
-                                        <div className="w-44 h-44 md:w-56 md:h-56 bg-[#050505] rounded-full flex flex-col items-center justify-center z-10 shadow-inner border border-white/5 p-4 text-center">
-                                            {marketMetric === 'storage' && <Database size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
-                                            {marketMetric === 'credits' && <Zap size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
-                                            {marketMetric === 'uptime' && <Clock size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
-                                            <span className="text-xs md:text-sm font-bold text-zinc-400 tracking-widest uppercase mb-1">{marketMetric} Share</span>
-                                            <span className="text-[10px] md:text-xs text-zinc-600 font-mono text-center">{(activeHoverKey || focusedNodeKey) ? getSafeIp(nodes.find(n => n.pubkey === (activeHoverKey || focusedNodeKey))!) : 'Aggregated Fleet'}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="w-full max-w-3xl flex flex-col gap-4 animate-in slide-in-from-bottom-10 duration-500">
-                                    {nodes.map((n, i) => (
-                                        <div key={n.pubkey} onMouseEnter={() => handleHover(n.pubkey || null)} onMouseLeave={() => handleHover(null)} className={`flex items-center gap-4 transition-all duration-300 cursor-pointer ${getElementStyle(n.pubkey || null)} ${!isDense ? 'justify-center' : ''}`} onClick={(e) => { e.stopPropagation(); setFocusedNodeKey(n.pubkey || null); }}>
-                                            <span className="text-xs font-mono font-bold text-zinc-400 w-32 text-right truncate">{getSafeIp(n)}</span>
-                                            <div className={`${marketBarWidth} h-8 bg-zinc-900 rounded-full overflow-hidden relative border border-white/5`}><div className="h-full rounded-full transition-all duration-1000" style={{ width: `${n.health}%`, backgroundColor: themes[i % themes.length].hex }}></div></div>
-                                            <span className="text-xs font-bold text-white font-mono w-16 text-left">{n.health} / 100</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="METRIC" specificMetric={marketMetric} hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => setFocusedNodeKey(n.pubkey || null)} />
-                    {!isExport && <InterpretationPanel contextText={narrative} />}
-                </>
-            )}
-
-            {/* TOPOLOGY TAB */}
-            {tab === 'TOPOLOGY' && (
-                <div className="flex flex-col h-full relative group/map">
-                    {!isExport && (
-                        <div className="absolute bottom-6 right-6 z-50 flex flex-col gap-2 opacity-80 hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                            <button onClick={handleZoomIn} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><Plus size={16} /></button>
-                            <button onClick={handleReset} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><RotateCcw size={16} /></button>
-                            <button onClick={handleZoomOut} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><Minus size={16} /></button>
-                        </div>
-                    )}
-
-                    <div className="flex-1 rounded-xl overflow-hidden border border-white/5 bg-[#050505] mx-4 md:mx-6 relative shadow-inner">
-                        <ComposableMap projectionConfig={{ scale: 160 }} className="w-full h-full">
-                            <ZoomableGroup zoom={pos.zoom} center={pos.coordinates as [number, number]} maxZoom={10} onMoveEnd={(e: any) => setPos({ coordinates: e.coordinates as [number, number], zoom: e.zoom })}>
-                                <Geographies geography={GEO_URL}>{({ geographies }: { geographies: any[] }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#18181b" stroke="#27272a" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { outline: "none" }, pressed: { outline: "none" } }} />))}</Geographies>
-                                {meshLinks.map((link: any) => {
-                                    const isRelevant = !activeHoverKey || activeHoverKey === link.source || activeHoverKey === link.target;
-                                    const opacity = activeHoverKey ? (isRelevant ? 0.8 : 0.05) : 0.2;
-                                    const width = activeHoverKey && isRelevant ? 2 / pos.zoom : 0.5 / pos.zoom;
-                                    return (
-                                        <Line key={link.key} from={link.start} to={link.end} stroke={link.color} strokeWidth={width} strokeDasharray="4 4" strokeOpacity={opacity} style={{ transition: 'all 0.3s ease' }} />
-                                    );
-                                })}
-                                {clusters.map((cluster) => {
-                                    const theme = themes[cluster.themeIndex % themes.length];
-                                    const isHovered = activeHoverKey === cluster.id || (cluster.nodes.some((n: Node) => n.pubkey === activeHoverKey));
-                                    const isFocused = focusedNodeKey === cluster.id || (cluster.nodes.some((n: Node) => n.pubkey === focusedNodeKey));
-                                    return (
-                                        <Marker key={cluster.id} coordinates={[cluster.lon, cluster.lat]} onClick={(e: any) => { e.stopPropagation(); handleFocus(cluster.id, { lat: cluster.lat, lon: cluster.lon }); }} onMouseEnter={() => handleHover(cluster.nodes.length === 1 ? cluster.nodes[0].pubkey : cluster.id)} onMouseLeave={() => handleHover(null)}>
-                                            <circle r={(cluster.nodes.length > 1 ? 20 : 10) / pos.zoom} fill={theme.hex} fillOpacity={isHovered || isFocused ? 1 : 0.6} stroke="#fff" strokeWidth={(isHovered || isFocused ? 3 : 2)/pos.zoom} className={`transition-all duration-300 ${isHovered || isFocused ? 'drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]' : ''}`} />
-                                        </Marker>
-                                    );
-                                })}
-                            </ZoomableGroup>
-                        </ComposableMap>
-                    </div>
-                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="COUNTRY" hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => handleFocus(n.pubkey || null, n.location ? { lat: n.location.lat, lon: n.location.lon } : undefined)} />
-                    {!isExport && <InterpretationPanel contextText={narrative} />}
-                </div>
-            )}
-        </div>
-    </div>
-  );
+  switch (ctx.tab) {
+    case 'OVERVIEW': return assembleOverview(stats, activeNode, ctx.chartSection);
+    case 'MARKET': return assembleMarket(stats, activeNode);
+    case 'TOPOLOGY': return assembleTopology(stats, activeNode);
+    default: return "Ready.";
+  }
 };
