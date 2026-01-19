@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Crown, CheckCircle, Trash2, X, Trophy } from 'lucide-react';
+import { Crown, CheckCircle, Trash2, X } from 'lucide-react';
 import { Node } from '../../types';
 import { getSafeIp } from '../../utils/nodeHelpers';
 import { formatBytes } from '../../utils/formatters';
@@ -16,8 +16,8 @@ interface NodeColumnProps {
   showNetwork: boolean;
   hoveredNodeKey?: string | null;
   onHover?: (key: string | null) => void;
-  isLeader?: boolean;        // NEW: Flag to identify this as a generated leader column
-  leaderType?: string;       // NEW: The type of leader (e.g., "STORAGE")
+  isLeader?: boolean;
+  leaderType?: string;
 }
 
 export const NodeColumn = ({ 
@@ -45,7 +45,6 @@ export const NodeColumn = ({
 
   const baselines = useMemo(() => {
       if (showNetwork) return benchmarks.networkRaw;
-      // If we have an anchor node (the first selected user node), use that as baseline
       if (anchorNode) return { 
           health: anchorNode.health || 0,
           storage: anchorNode.storage_committed || 0,
@@ -55,7 +54,7 @@ export const NodeColumn = ({
       return {};
   }, [showNetwork, benchmarks, anchorNode]);
 
-  // Don't show comparative deltas inside the Leader column itself (it IS the standard)
+  // Don't show delta if it's a leader column (it's the standard)
   const showDelta = !isLeader && (showNetwork || (anchorNode && node.pubkey !== anchorNode.pubkey));
 
   // --- SPOTLIGHT LOGIC ---
@@ -73,14 +72,14 @@ export const NodeColumn = ({
                     ? 'opacity-40 grayscale-[0.5] scale-[0.98]' 
                     : `${theme.bodyBg}`
             }
-            ${isLeader ? 'border-yellow-500/20' : 'border-white/5'}
+            ${isLeader ? theme.border : 'border-white/5'}
         `}
     >
       {/* Header */}
       <div className={`h-24 md:h-32 ${isActive ? 'bg-zinc-800' : theme.headerBg} p-2 md:p-4 flex flex-col items-center justify-between relative overflow-hidden group first:rounded-tr-xl transition-colors duration-300`}>
         {overallWinner && <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 animate-in zoom-in duration-500"><Crown size={10} className="md:w-3.5 md:h-3.5 text-yellow-400 fill-yellow-400 drop-shadow-sm" /></div>}
 
-        {/* TOP RIGHT CLOSE BUTTON */}
+        {/* CLOSE BUTTON */}
         <button 
             onClick={(e) => { e.stopPropagation(); onRemove(); }}
             className={`absolute top-1 right-1 p-1 rounded transition-all opacity-0 group-hover/col:opacity-100 z-20 ${isLeader ? 'text-yellow-600 hover:text-yellow-400 hover:bg-yellow-500/20' : 'text-red-500/50 hover:text-red-500 hover:bg-red-500/10'}`}
@@ -88,37 +87,26 @@ export const NodeColumn = ({
             <X size={12} className="md:w-3.5 md:h-3.5" />
         </button>
 
+        {/* Flag / Icon */}
         <div className="mt-1 md:mt-2">
-             {isLeader ? (
-                 // LEADER ICON (Trophy)
-                 <div className="w-6 h-6 md:w-10 md:h-10 rounded-full bg-yellow-500/20 flex items-center justify-center border border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.2)]">
-                     <Trophy size={14} className="text-yellow-400 md:w-5 md:h-5" />
-                 </div>
+             {node.location?.countryCode ? (
+                 <img src={`https://flagcdn.com/w80/${node.location.countryCode.toLowerCase()}.png`} className="w-6 h-4 md:w-10 md:h-7 rounded-[2px] shadow-md object-cover" />
              ) : (
-                 // STANDARD NODE ICON (Flag)
-                 node.location?.countryCode ? (
-                     <img src={`https://flagcdn.com/w80/${node.location.countryCode.toLowerCase()}.png`} className="w-6 h-4 md:w-10 md:h-7 rounded-[2px] shadow-md object-cover" />
-                 ) : (
-                     <div className="w-6 h-4 md:w-10 md:h-7 bg-white/5 rounded-[2px] border border-white/10"></div>
-                 )
+                 <div className="w-6 h-4 md:w-10 md:h-7 bg-white/5 rounded-[2px] border border-white/10"></div>
              )}
         </div>
 
+        {/* Identity Text */}
         <div className="flex flex-col items-center gap-1 w-full text-center">
-            {isLeader ? (
-                // LEADER TEXT
-                <>
-                    <div className="text-[7px] md:text-[9px] font-black text-yellow-500 uppercase tracking-widest">{leaderType} LEADER</div>
-                    <div className="text-[8px] md:text-xs font-bold font-mono text-yellow-200 w-full truncate">{getSafeIp(node)}</div>
-                </>
-            ) : (
-                // STANDARD NODE TEXT
-                <>
-                    <div className={`text-[7px] md:text-[10px] font-mono ${isActive ? 'text-white' : 'text-white/50'}`}>{getSafeIp(node)}</div>
-                    <div className={`text-[8px] md:text-xs font-bold font-mono text-white px-1 py-0.5 md:px-2 md:py-1 rounded border border-white/10 w-full truncate ${isActive ? 'bg-zinc-700' : 'bg-black/20'}`}>
-                        {node.pubkey?.slice(0, 8)}<span className="hidden md:inline">{node.pubkey?.slice(8, 12)}...</span>
-                    </div>
-                </>
+            <div className={`text-[7px] md:text-[10px] font-mono ${isActive ? 'text-white' : 'text-white/50'}`}>{getSafeIp(node)}</div>
+            <div className={`text-[8px] md:text-xs font-bold font-mono text-white px-1 py-0.5 md:px-2 md:py-1 rounded border border-white/10 w-full truncate ${isActive ? 'bg-zinc-700' : 'bg-black/20'}`}>
+                {node.pubkey?.slice(0, 8)}<span className="hidden md:inline">{node.pubkey?.slice(8, 12)}...</span>
+            </div>
+            {/* NEW: Gold Context Label for Leaders */}
+            {isLeader && (
+                <div className="mt-1 text-[7px] md:text-[9px] font-black text-yellow-400 uppercase tracking-widest whitespace-nowrap">
+                   ( {leaderType} LEADER )
+                </div>
             )}
         </div>
       </div>
@@ -184,7 +172,7 @@ export const NodeColumn = ({
         </Row>
         <Row><span className="text-[9px] md:text-base font-mono text-zinc-500">#{node.rank || '-'}</span></Row>
 
-        {/* BOTTOM TRASHCAN / REMOVE BUTTON */}
+        {/* BOTTOM TRASHCAN - Different color hover for Leader vs User */}
         <div className={`h-[28px] md:h-[32px] border-t border-white/5 flex items-center justify-center transition-colors cursor-pointer group/trash ${isLeader ? 'bg-yellow-900/10 hover:bg-yellow-500/20' : 'bg-black/20 hover:bg-red-500/10'}`} onClick={onRemove}>
             {isLeader ? (
                  <X size={10} className="md:w-3 md:h-3 text-yellow-600 group-hover/trash:text-yellow-400 transition-colors" />
