@@ -13,15 +13,22 @@ export type NarrativeContext = {
   chartSection?: string | null;
 };
 
+// NEW: Explicit type for the analysis result to prevent "implicitly any" errors
+type AnalysisStats = {
+  count: number;
+  totalStorage: number;
+  avgHealth: number;
+  netAvg: number;
+  delta: number;
+  tier: 'positive' | 'neutral' | 'negative';
+};
+
 // --- SESSION MEMORY (The "Lock") ---
-// This map persists as long as the page is open. 
-// It guarantees that Node X always gets Description X during this session.
 const NARRATIVE_CACHE = new Map<string, string>();
 
 // --- 1. THE MASSIVE TOKEN LEXICON ---
-// Broken down into grammatical "LEGO bricks" rather than full sentences.
 const VOCAB = {
-  // [OPENERS]: usage: "Interestingly," or "Data indicates"
+  // [OPENERS]
   openers: {
     tech: [
       "Telemetry indicates", "System diagnostics show", "According to the logs,", "Node metrics suggest", 
@@ -35,7 +42,7 @@ const VOCAB = {
     ]
   },
   
-  // [SUBJECTS]: usage: "This node" or "The hardware"
+  // [SUBJECTS]
   subjects: {
     node: [
       "this unit", "the node", "this peer", "the device", "this machine", 
@@ -47,7 +54,7 @@ const VOCAB = {
     ]
   },
 
-  // [VERBS]: usage: "is performing" or "is crushing"
+  // [VERBS]
   verbs: {
     positive: [
       "is crushing", "is dominating", "is outperforming", "is leading", "is driving up",
@@ -63,7 +70,7 @@ const VOCAB = {
     ]
   },
 
-  // [ADJECTIVES]: usage: "robust" or "shaky"
+  // [ADJECTIVES]
   adjectives: {
     positive: [
       "stellar", "robust", "rock-solid", "elite", "prime", "superior", 
@@ -79,7 +86,7 @@ const VOCAB = {
     ]
   },
 
-  // [CONTEXTS]: usage: "compared to the global average"
+  // [CONTEXTS]
   contexts: {
     positive: [
       "by a significant margin", "setting a new standard", "well above the baseline", 
@@ -95,7 +102,7 @@ const VOCAB = {
     ]
   },
 
-  // [IMPLICATIONS]: usage: "which is great." or "so fix it."
+  // [IMPLICATIONS]
   implications: {
     positive: [
       "which is fantastic.", "signaling high reliability.", "making it a key asset.",
@@ -114,39 +121,22 @@ const VOCAB = {
 
 // --- 2. HELPER FUNCTIONS ---
 
-// A simple randomizer that doesn't need seeding because we Cache the result by ID
 const roll = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
-// The "Grammar Assembler"
-// It builds a sentence structure dynamically
 const buildSentence = (sentiment: 'positive' | 'neutral' | 'negative', subjectName: string) => {
-  // 1. Choose Tone (50% chance of mixing simple/tech)
   const tone = Math.random() > 0.5 ? 'tech' : 'simple';
   
-  // 2. Roll Tokens
   const opener = roll(VOCAB.openers[tone]);
-  const subj = roll(VOCAB.subjects.node).replace('[IP]', subjectName); // e.g. "this unit"
+  const subj = roll(VOCAB.subjects.node).replace('[IP]', subjectName); 
   const verb = roll(VOCAB.verbs[sentiment]);
   const adj = roll(VOCAB.adjectives[sentiment]);
   const context = roll(VOCAB.contexts[sentiment]);
   const implication = roll(VOCAB.implications[sentiment]);
 
-  // 3. Choose Structure (Randomize the syntax)
   const structures = [
-    // Structure A: Direct
-    // "Interestingly, this unit is dominating the average by a wide margin."
     () => `${opener} ${subj} ${verb} expectations, ${context}.`,
-    
-    // Structure B: Adjective First
-    // "Robust. That describes this unit, which is operating well above baseline."
     () => `${capitalize(adj)}. That describes ${subj}. It ${verb} the group average ${context}.`,
-    
-    // Structure C: Implication Focus
-    // "This unit is dragging down the average, which is a problem."
     () => `${capitalize(subj)} ${verb} the benchmark, ${implication}`,
-    
-    // Structure D: Short & Punchy
-    // "Data indicates stellar performance. It is leading the pack."
     () => `${opener} ${adj} performance detected. ${capitalize(subj)} ${verb} the rest.`
   ];
 
@@ -156,7 +146,8 @@ const buildSentence = (sentiment: 'positive' | 'neutral' | 'negative', subjectNa
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // --- 3. ANALYTICS ENGINE ---
-const analyze = (nodes: Node[], benchmark: any) => {
+// Explicitly return AnalysisStats so TS knows exactly what 'tier' is
+const analyze = (nodes: Node[], benchmark: any): AnalysisStats | null => {
   if (nodes.length === 0) return null;
   const count = nodes.length;
   const totalStorage = nodes.reduce((a, b) => a + (b.storage_committed || 0), 0);
@@ -164,7 +155,6 @@ const analyze = (nodes: Node[], benchmark: any) => {
   const netAvg = benchmark?.networkRaw?.health || 75;
   const delta = avgHealth - netAvg;
   
-  // Tier Logic
   let tier: 'positive' | 'neutral' | 'negative' = 'neutral';
   if (delta > 5) tier = 'positive';
   if (delta < -5) tier = 'negative';
@@ -173,9 +163,9 @@ const analyze = (nodes: Node[], benchmark: any) => {
 };
 
 // --- 4. SCENARIO GENERATORS ---
+// Updated signatures to use AnalysisStats instead of 'any'
 
-// --- SCENARIO GROUP A: OVERVIEW ---
-const generateOverview = (activeNode: Node | null, stats: any, section: string | null): string => {
+const generateOverview = (activeNode: Node | null, stats: AnalysisStats, section: string | null): string => {
   
   // A1: CHART SECTION CLICKED
   if (section) {
@@ -198,16 +188,15 @@ const generateOverview = (activeNode: Node | null, stats: any, section: string |
   return `${roll(VOCAB.openers.simple)} ${subject} ${verb} the network baseline. We are seeing ${adj} signals, ${roll(VOCAB.contexts[stats.tier])}.`;
 };
 
-// --- SCENARIO GROUP B: MARKET ---
-const generateMarket = (activeNode: Node | null, stats: any, metric: string): string => {
+const generateMarket = (activeNode: Node | null, stats: AnalysisStats, metric: string): string => {
   const m = metric || 'storage';
 
   // B1: SPECIFIC NODE CLICKED
   if (activeNode) {
     const val = (activeNode as any)[m === 'storage' ? 'storage_committed' : m] || 0;
-    const share = (val / (m === 'storage' ? stats.totalStorage : 100)) * 100; // rough approx
-    const sentiment = share > 20 ? 'negative' : 'positive'; // High share = negative (centralization risk) usually, but context depends.
+    const share = (val / (m === 'storage' ? stats.totalStorage : 100)) * 100; 
     
+    // share logic
     if (share > 20) return `Whale Alert: ${getSafeIp(activeNode)} controls a massive chunk of the ${m}. This represents a centralization risk.`;
     return `Small Stakeholder: ${getSafeIp(activeNode)} holds a nominal share. It poses no centralization risk to the cluster.`;
   }
@@ -216,8 +205,7 @@ const generateMarket = (activeNode: Node | null, stats: any, metric: string): st
   return `Market Analysis (${m}): Distribution is ${stats.delta > 0 ? "healthy" : "concerning"}. ${roll(VOCAB.openers.tech)} No single point of failure detected.`;
 };
 
-// --- SCENARIO GROUP C: TOPOLOGY ---
-const generateTopology = (activeNode: Node | null, stats: any): string => {
+const generateTopology = (activeNode: Node | null, stats: AnalysisStats): string => {
   
   // C1: SPECIFIC NODE CLICKED
   if (activeNode) {
@@ -230,24 +218,18 @@ const generateTopology = (activeNode: Node | null, stats: any): string => {
 };
 
 
-// --- 5. MAIN EXPORT (WITH CACHING) ---
+// --- 5. MAIN EXPORT ---
 export const generateNarrative = (ctx: NarrativeContext): string => {
   if (!ctx.nodes || ctx.nodes.length === 0) return "Initializing...";
 
-  // 1. GENERATE A UNIQUE CACHE KEY
-  // The key combines: Tab + Scenario + Focused Item.
-  // This ensures that as long as I am looking at "Node A" in "Overview", the text stays locked.
-  // If I switch to "Node B", new text. If I switch back to "Node A", OLD text (stability).
   const activeKey = ctx.focusKey || ctx.hoverKey || 'default';
   const sectionKey = ctx.chartSection || 'none';
   const cacheKey = `${ctx.tab}::${activeKey}::${sectionKey}::${ctx.metric || 'none'}`;
 
-  // 2. CHECK MEMORY
   if (NARRATIVE_CACHE.has(cacheKey)) {
     return NARRATIVE_CACHE.get(cacheKey)!;
   }
 
-  // 3. GENERATE NEW CONTENT
   const stats = analyze(ctx.nodes, ctx.benchmarks);
   if (!stats) return "Calculating...";
 
@@ -258,7 +240,6 @@ export const generateNarrative = (ctx: NarrativeContext): string => {
   else if (ctx.tab === 'MARKET') narrative = generateMarket(activeNode, stats, ctx.metric || 'storage');
   else if (ctx.tab === 'TOPOLOGY') narrative = generateTopology(activeNode, stats);
 
-  // 4. SAVE TO MEMORY
   NARRATIVE_CACHE.set(cacheKey, narrative);
 
   return narrative;
