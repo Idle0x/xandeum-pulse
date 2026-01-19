@@ -17,6 +17,13 @@ type NarrativeContext = {
 const LEXICON = {
   // OPENERS
   openers: {
+    // RE-ADDED MISSING 'NEUTRAL' CATEGORY
+    neutral: [
+      // Tech
+      "Standard telemetry indicates", "Routine scan shows", "Metric evaluation:", "Data output:", "Baseline check:",
+      // Simple
+      "Looking at the basics,", "Just the facts:", "Here is the data:", "Checking the standard stats:", "Normal check:"
+    ],
     analysis: [
       // Tech
       "Analyzing the dataset,", "Upon review of the cluster,", "Current telemetry indicates", "The data suggests", "Cluster diagnostics reveal", "System scan shows", "Reviewing aggregate logs,",
@@ -131,7 +138,6 @@ const LEXICON = {
       // Simple
       "keeping", "holding", "saving", "helping", "staying", "supporting"
     ],
-    // ADDED THIS MISSING CATEGORY TO FIX THE BUILD ERROR
     driving: [
        "driving", "pushing", "forcing", "pulling", "nudging", "moving", "steering", "tipping"
     ]
@@ -201,7 +207,6 @@ const generateOverviewChart = (s: any, section: string) => {
   if (section === 'health') {
     const t1 = () => `Vitality Deep Dive: The group averages ${s.avgHealth.toFixed(0)}/100. ${s.stdDev > 15 ? "However, this average hides significant disparity between best and worst performers." : "This score is consistent across almost all members."}`;
     
-    // NOTE: This line was causing the error, LEXICON.verbs.driving is now defined above
     const t2 = () => `${pick(LEXICON.openers.analysis)} health is the primary indicator of longevity. This group is ${isGood ? "resilient" : "fragile"}, ${pick(LEXICON.verbs.driving)} the network average ${isGood ? "up" : "down"}.`;
     
     const t3 = () => `Score Breakdown: A ${s.avgHealth.toFixed(0)} avg suggests ${isGood ? "excellent maintenance" : "deferred maintenance"}. ${pick(LEXICON.connectors.addition)} standard deviation is ${s.stdDev.toFixed(1)}.`;
