@@ -15,7 +15,7 @@ interface NodeColumnProps {
   benchmarks: any;
   showNetwork: boolean;
   hoveredNodeKey?: string | null;
-  onHover?: (key: string | null) => void;
+  onFocus?: (key: string | null) => void;
   isLeader?: boolean;
   leaderType?: string;
 }
@@ -30,7 +30,7 @@ export const NodeColumn = ({
     benchmarks, 
     showNetwork,
     hoveredNodeKey,
-    onHover,
+    onFocus, // Renamed / Repurposed handler for Clicking
     isLeader,
     leaderType
 }: NodeColumnProps) => {
@@ -57,15 +57,19 @@ export const NodeColumn = ({
   // Don't show delta if it's a leader column (it's the standard)
   const showDelta = !isLeader && (showNetwork || (anchorNode && node.pubkey !== anchorNode.pubkey));
 
-  // --- SPOTLIGHT LOGIC ---
+  // --- SPOTLIGHT LOGIC (Now Click-Based) ---
   const isActive = hoveredNodeKey === node.pubkey;
   const isDimmed = hoveredNodeKey && hoveredNodeKey !== node.pubkey;
 
   return (
     <div 
-        onMouseEnter={() => onHover?.(node.pubkey || null)}
-        onMouseLeave={() => onHover?.(null)}
-        className={`flex flex-col min-w-[100px] md:min-w-[140px] relative border-r last:rounded-tr-xl last:rounded-br-xl group/col transition-all duration-300
+        onClick={(e) => {
+            // STOP propagation so the "Main" container click (which clears focus) doesn't fire
+            e.stopPropagation();
+            // Toggle focus
+            onFocus?.(node.pubkey || null);
+        }}
+        className={`flex flex-col min-w-[100px] md:min-w-[140px] relative border-r last:rounded-tr-xl last:rounded-br-xl group/col transition-all duration-300 cursor-pointer
             ${isActive 
                 ? 'z-50 scale-[1.02] shadow-[0_0_30px_rgba(0,0,0,0.5)] bg-[#09090b] brightness-110' 
                 : isDimmed 
@@ -172,8 +176,8 @@ export const NodeColumn = ({
         </Row>
         <Row><span className="text-[9px] md:text-base font-mono text-zinc-500">#{node.rank || '-'}</span></Row>
 
-        {/* BOTTOM TRASHCAN - Different color hover for Leader vs User */}
-        <div className={`h-[28px] md:h-[32px] border-t border-white/5 flex items-center justify-center transition-colors cursor-pointer group/trash ${isLeader ? 'bg-yellow-900/10 hover:bg-yellow-500/20' : 'bg-black/20 hover:bg-red-500/10'}`} onClick={onRemove}>
+        {/* BOTTOM TRASHCAN */}
+        <div className={`h-[28px] md:h-[32px] border-t border-white/5 flex items-center justify-center transition-colors cursor-pointer group/trash ${isLeader ? 'bg-yellow-900/10 hover:bg-yellow-500/20' : 'bg-black/20 hover:bg-red-500/10'}`} onClick={(e) => { e.stopPropagation(); onRemove(); }}>
             {isLeader ? (
                  <X size={10} className="md:w-3 md:h-3 text-yellow-600 group-hover/trash:text-yellow-400 transition-colors" />
             ) : (
