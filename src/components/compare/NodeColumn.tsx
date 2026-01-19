@@ -5,6 +5,7 @@ import { getSafeIp } from '../../utils/nodeHelpers';
 import { formatBytes } from '../../utils/formatters';
 import { MicroBar, MetricDelta, formatUptimePrecise } from './MicroComponents';
 
+// --- UPDATED INTERFACE ---
 interface NodeColumnProps {
   node: Node;
   onRemove: () => void;
@@ -15,22 +16,36 @@ interface NodeColumnProps {
   benchmarks: any;
   leaderMetric: string | null;
   showNetwork: boolean;
+  hoveredNodeKey?: string | null; // NEW PROP
+  onHover?: (key: string | null) => void; // NEW PROP
 }
 
-export const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overallWinner, benchmarks, leaderMetric, showNetwork }: NodeColumnProps) => {
+export const NodeColumn = ({ 
+    node, 
+    onRemove, 
+    anchorNode, 
+    theme, 
+    winners, 
+    overallWinner, 
+    benchmarks, 
+    leaderMetric, 
+    showNetwork,
+    hoveredNodeKey,
+    onHover
+}: NodeColumnProps) => {
+
   const Row = ({ children }: { children: React.ReactNode }) => (
     <div className={`h-[36px] md:h-[72px] flex flex-col justify-center px-3 md:px-4 min-w-[100px] md:min-w-[140px] relative`}>
         {children}
     </div>
   );
-  
+
   const SectionSpacer = () => <div className="h-5 md:h-8 bg-transparent border-y border-transparent mt-1"></div>;
 
-  // --- DYNAMIC BASELINE CALCULATION ---
   const baselines = useMemo(() => {
-      if (showNetwork) return benchmarks.networkRaw; // Compare vs Network Average
-      if (leaderMetric) return benchmarks.leaderRaw; // Compare vs The Selected Leader
-      if (anchorNode) return { // Default: Compare vs The First Node (Anchor)
+      if (showNetwork) return benchmarks.networkRaw;
+      if (leaderMetric) return benchmarks.leaderRaw;
+      if (anchorNode) return { 
           health: anchorNode.health || 0,
           storage: anchorNode.storage_committed || 0,
           credits: anchorNode.credits || 0,
@@ -39,16 +54,30 @@ export const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overall
       return {};
   }, [showNetwork, leaderMetric, benchmarks, anchorNode]);
 
-  // Don't show deltas on the Anchor Node itself if comparing against Anchor
   const showDelta = showNetwork || leaderMetric || (anchorNode && node.pubkey !== anchorNode.pubkey);
 
+  // --- SPOTLIGHT LOGIC ---
+  const isActive = hoveredNodeKey === node.pubkey;
+  const isDimmed = hoveredNodeKey && hoveredNodeKey !== node.pubkey;
+
   return (
-    <div className={`flex flex-col min-w-[100px] md:min-w-[140px] ${theme.bodyBg} relative border-r border-white/5 last:rounded-tr-xl last:rounded-br-xl group/col`}>
+    <div 
+        onMouseEnter={() => onHover?.(node.pubkey || null)}
+        onMouseLeave={() => onHover?.(null)}
+        className={`flex flex-col min-w-[100px] md:min-w-[140px] relative border-r border-white/5 last:rounded-tr-xl last:rounded-br-xl group/col transition-all duration-300
+            ${isActive 
+                ? 'z-50 scale-[1.02] shadow-[0_0_30px_rgba(0,0,0,0.5)] bg-[#09090b] brightness-110' 
+                : isDimmed 
+                    ? 'opacity-40 grayscale-[0.5] scale-[0.98]' 
+                    : `${theme.bodyBg}`
+            }
+        `}
+    >
       {/* Header */}
-      <div className={`h-24 md:h-32 ${theme.headerBg} p-2 md:p-4 flex flex-col items-center justify-between relative overflow-hidden group first:rounded-tr-xl`}>
+      <div className={`h-24 md:h-32 ${isActive ? 'bg-zinc-800' : theme.headerBg} p-2 md:p-4 flex flex-col items-center justify-between relative overflow-hidden group first:rounded-tr-xl transition-colors duration-300`}>
         {overallWinner && <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 animate-in zoom-in duration-500"><Crown size={10} className="md:w-3.5 md:h-3.5 text-yellow-400 fill-yellow-400 drop-shadow-sm" /></div>}
 
-        {/* TOP RIGHT CLOSE BUTTON (Red) */}
+        {/* TOP RIGHT CLOSE BUTTON (Red) - KEPT AS IS */}
         <button 
             onClick={(e) => { e.stopPropagation(); onRemove(); }}
             className="absolute top-1 right-1 p-1 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded transition-all opacity-0 group-hover/col:opacity-100 z-20"
@@ -65,8 +94,8 @@ export const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overall
         </div>
 
         <div className="flex flex-col items-center gap-1 w-full text-center">
-            <div className={`text-[7px] md:text-[10px] font-mono text-white/50`}>{getSafeIp(node)}</div>
-            <div className="text-[8px] md:text-xs font-bold font-mono text-white bg-black/20 px-1 py-0.5 md:px-2 md:py-1 rounded border border-white/10 w-full truncate">
+            <div className={`text-[7px] md:text-[10px] font-mono ${isActive ? 'text-white' : 'text-white/50'}`}>{getSafeIp(node)}</div>
+            <div className={`text-[8px] md:text-xs font-bold font-mono text-white px-1 py-0.5 md:px-2 md:py-1 rounded border border-white/10 w-full truncate ${isActive ? 'bg-zinc-700' : 'bg-black/20'}`}>
                 {node.pubkey?.slice(0, 8)}<span className="hidden md:inline">{node.pubkey?.slice(8, 12)}...</span>
             </div>
         </div>
@@ -133,7 +162,7 @@ export const NodeColumn = ({ node, onRemove, anchorNode, theme, winners, overall
         </Row>
         <Row><span className="text-[9px] md:text-base font-mono text-zinc-500">#{node.rank || '-'}</span></Row>
 
-        {/* BOTTOM TRASHCAN (Always Red) */}
+        {/* BOTTOM TRASHCAN - KEPT AS IS */}
         <div className="h-[28px] md:h-[32px] border-t border-white/5 flex items-center justify-center bg-black/20 hover:bg-red-500/10 transition-colors cursor-pointer group/trash" onClick={onRemove}>
             <Trash2 size={10} className="md:w-3 md:h-3 text-red-500/80 group-hover/trash:text-red-500 transition-colors" />
         </div>
