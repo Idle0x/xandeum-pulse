@@ -22,62 +22,26 @@ import { NodeColumn } from '../components/compare/NodeColumn';
 import { SynthesisEngine } from '../components/compare/SynthesisEngine';
 import { EmptySlot } from '../components/compare/ComparisonUI';
 
-// --- WATERMARK COMPONENT ---
-const PulseWatermark = () => (
-  // 'watermark' class added for the exporter to find and force-show
-  <div className="watermark hidden items-center justify-center gap-3 py-6 mt-4 w-full border-t border-zinc-800 bg-[#020202]">
-     <div className="w-5 h-5 bg-cyan-500 rounded-full shadow-[0_0_15px_#06b6d4] flex items-center justify-center">
-        <Zap size={10} className="text-black fill-black" />
-     </div>
-     <div className="flex flex-col">
-        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400">Verified by Pulse</span>
-        <span className="text-[8px] font-mono text-zinc-600">xandeum.network/pulse</span>
-     </div>
-  </div>
-);
+// NEW: Import the Ghost Canvas
+import { PulseExportCanvas } from '../components/compare/PulseExportCanvas';
 
-// --- SPECIFIC LEADER THEMES ---
+// --- SPECIFIC LEADER THEMES (Kept for interactive UI) ---
 const LEADER_THEME_MAP: Record<string, any> = {
-  STORAGE: { 
-    name: 'indigo', 
-    hex: '#818cf8', // Indigo-400
-    headerBg: 'bg-indigo-900/40', 
-    bodyBg: 'bg-indigo-900/5', 
-    text: 'text-indigo-400', 
-    border: 'border-indigo-500/20' 
-  },
-  CREDITS: { 
-    name: 'emerald', 
-    hex: '#34d399', // Emerald-400
-    headerBg: 'bg-emerald-900/40', 
-    bodyBg: 'bg-emerald-900/5', 
-    text: 'text-emerald-400', 
-    border: 'border-emerald-500/20' 
-  },
-  HEALTH: { 
-    name: 'rose', 
-    hex: '#fb7185', // Rose-400
-    headerBg: 'bg-rose-900/40', 
-    bodyBg: 'bg-rose-900/5', 
-    text: 'text-rose-400', 
-    border: 'border-rose-500/20' 
-  },
-  UPTIME: { 
-    name: 'sky', 
-    hex: '#38bdf8', // Sky-400
-    headerBg: 'bg-sky-900/40', 
-    bodyBg: 'bg-sky-900/5', 
-    text: 'text-sky-400', 
-    border: 'border-sky-500/20' 
-  }
+  STORAGE: { name: 'indigo', hex: '#818cf8', headerBg: 'bg-indigo-900/40', bodyBg: 'bg-indigo-900/5', text: 'text-indigo-400', border: 'border-indigo-500/20' },
+  CREDITS: { name: 'emerald', hex: '#34d399', headerBg: 'bg-emerald-900/40', bodyBg: 'bg-emerald-900/5', text: 'text-emerald-400', border: 'border-emerald-500/20' },
+  HEALTH: { name: 'rose', hex: '#fb7185', headerBg: 'bg-rose-900/40', bodyBg: 'bg-rose-900/5', text: 'text-rose-400', border: 'border-rose-500/20' },
+  UPTIME: { name: 'sky', hex: '#38bdf8', headerBg: 'bg-sky-900/40', bodyBg: 'bg-sky-900/5', text: 'text-sky-400', border: 'border-sky-500/20' }
 };
 
 export default function ComparePage() {
   const router = useRouter();
 
-  // --- REFS for Exporting ---
+  // --- REFS for Live UI ---
   const printRef = useRef<HTMLDivElement>(null);      
-  const fullPageRef = useRef<HTMLDivElement>(null);   
+  
+  // --- REFS for Ghost Exports ---
+  const exportTableRef = useRef<HTMLDivElement>(null);
+  const exportFullRef = useRef<HTMLDivElement>(null);
 
   const { nodes, loading } = useNetworkData(); 
 
@@ -197,13 +161,11 @@ export default function ComparePage() {
   const addNode = (pubkey: string) => { if (!selectedKeys.includes(pubkey) && selectedKeys.length < 30) { const k = [...selectedKeys, pubkey]; setSelectedKeys(k); updateUrl(k); setIsSearchOpen(false); setSearchQuery(''); setIsWatchlistOpen(false); } };
   
   const removeNode = (pubkey: string) => { 
-      // If removing the currently focused node, clear focus
       if (hoveredNodeKey === pubkey) setHoveredNodeKey(null);
       const k = selectedKeys.filter(x => x !== pubkey); 
       setSelectedKeys(k); 
       updateUrl(k); 
   };
-
   const clearAllNodes = () => { setSelectedKeys([]); updateUrl([]); setHoveredNodeKey(null); };
 
   const toggleLeaderMetric = (metric: string) => {
@@ -211,7 +173,6 @@ export default function ComparePage() {
       if (leader && leader.node.pubkey === hoveredNodeKey) {
           setHoveredNodeKey(null);
       }
-
       if (activeLeaderMetrics.includes(metric)) {
           setActiveLeaderMetrics(prev => prev.filter(m => m !== metric));
       } else {
@@ -225,12 +186,10 @@ export default function ComparePage() {
       localStorage.setItem('xandeum_favorites', JSON.stringify(newFavs));
   };
 
-  // --- FOCUS TOGGLE HANDLER ---
   const handleNodeFocusToggle = (key: string | null) => {
       setHoveredNodeKey(prev => prev === key ? null : key);
   };
 
-  // --- SMART SCROLL LOGIC ---
   useEffect(() => {
     if (printRef.current) {
         if (activeLeaderMetrics.length > prevLeaderCount.current) {
@@ -266,79 +225,34 @@ export default function ComparePage() {
 
   const handleShare = () => { navigator.clipboard.writeText(window.location.href); setToast('Link Copied!'); setTimeout(() => setToast(null), 2000); };
 
-  // --- EXPORT FUNCTIONALITY (FIXED) ---
-  const handleExport = async (targetRef: React.RefObject<HTMLDivElement>, suffix: string) => {
-    if (targetRef.current && printRef.current) {
-      try {
-        // 1. CALCULATE DIMENSIONS
-        // We use the table's full scrollable width as the baseline for the image width
-        const tableScrollWidth = printRef.current.scrollWidth;
-        const currentViewWidth = targetRef.current.clientWidth;
-        const finalWidth = Math.max(tableScrollWidth, currentViewWidth);
-        const finalHeight = targetRef.current.scrollHeight;
+  // --- NEW EXPORT LOGIC: THE GHOST CANVAS ---
+  const handleExport = async (type: 'TABLE' | 'FULL') => {
+      // 1. Select the correct Ghost Ref
+      const targetRef = type === 'TABLE' ? exportTableRef : exportFullRef;
 
-        const options: any = {
-          cacheBust: true,
-          backgroundColor: '#020202',
-          pixelRatio: 2,
-          width: finalWidth,
-          height: finalHeight,
-          // 2. ROOT CONTAINER STYLES
-          style: { 
-            width: `${finalWidth}px`, 
-            height: `${finalHeight}px`,
-            maxWidth: 'none', 
-            overflow: 'visible' // Ensure the root doesn't clip anything
-          },
-          filter: (node: any) => {
-             if (node instanceof HTMLElement && node.classList.contains('print-exclude')) return false;
-             return true;
-          },
-          onClone: (clonedNode: HTMLElement) => {
-             // A. ROOT UNLOCK
-             clonedNode.style.maxWidth = 'none';
-             clonedNode.style.width = '100%';
-             clonedNode.style.boxSizing = 'border-box';
+      if (targetRef.current) {
+          try {
+              setToast('Generating Report...');
+              // 2. Snapshot the Ghost
+              // Since the ghost is fully expanded in the DOM (offscreen), we don't need complex styling hacks.
+              const dataUrl = await toPng(targetRef.current, {
+                  cacheBust: true,
+                  pixelRatio: 2,
+                  backgroundColor: '#020202',
+              });
 
-             // B. UNLOCK THE SCROLL CONTAINER (The "Main" tag)
-             // We search for the container that has 'overflow-x-auto' (our main tag)
-             // and force it to show everything.
-             const scrollContainer = clonedNode.querySelector('main');
-             if (scrollContainer) {
-                 scrollContainer.style.overflow = 'visible';
-                 scrollContainer.style.overflowX = 'visible';
-                 scrollContainer.style.width = '100%'; 
-                 scrollContainer.style.maxWidth = 'none';
-                 scrollContainer.style.display = 'flex'; // Ensure flex layout persists
-             }
+              const link = document.createElement('a');
+              link.download = `pulse-report-${type.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.png`;
+              link.href = dataUrl;
+              link.click();
 
-             // C. FORCE WATERMARK
-             const watermark = clonedNode.querySelector('.watermark') as HTMLElement;
-             if (watermark) {
-                watermark.style.display = 'flex'; 
-                watermark.style.visibility = 'visible';
-             }
-
-             // D. CENTER THE CHARTS
-             const chartContainer = clonedNode.querySelector('.chart-container') as HTMLElement;
-             if (chartContainer) {
-                 chartContainer.style.maxWidth = 'none';
-                 chartContainer.style.width = '100%';
-                 chartContainer.style.display = 'flex';
-                 chartContainer.style.justifyContent = 'center';
-             }
+              setIsExportDropdownOpen(false);
+              setToast('Download Started'); setTimeout(() => setToast(null), 2000);
+          } catch (err) {
+              console.error("Export Failed", err);
+              setToast('Export Failed'); setTimeout(() => setToast(null), 2000);
           }
-        };
-
-        const dataUrl = await toPng(targetRef.current, options);
-        const link = document.createElement('a');
-        link.download = `pulse-report-${suffix}-${new Date().toISOString().slice(0, 10)}.png`;
-        link.href = dataUrl;
-        link.click();
-        setIsExportDropdownOpen(false);
-        setToast('Download Started'); setTimeout(() => setToast(null), 2000);
-      } catch (err) { console.error("Export failed:", err); setToast('Export Failed'); setTimeout(() => setToast(null), 2000); }
-    }
+      }
   };
 
   const watchlistNodes = availableNodes.filter(n => favorites.includes(n.address || ''));
@@ -347,6 +261,40 @@ export default function ComparePage() {
     <div className="min-h-screen bg-[#020202] text-zinc-100 font-sans selection:bg-blue-500/30 flex flex-col overflow-hidden relative">
       <Head><title>Pulse Compare</title></Head>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#18181b_0%,#020202_100%)] pointer-events-none z-0"></div>
+
+      {/* --- GHOST CANVASES (OFF-SCREEN) --- */}
+      <div style={{ position: 'absolute', top: '-10000px', left: '-10000px', visibility: 'hidden' }}>
+          {/* Instance 1: Table Only */}
+          <div style={{ display: 'block' }}> {/* Wrapper to ensure rendering context */}
+             <PulseExportCanvas 
+                ref={exportTableRef}
+                mode="TABLE"
+                nodes={selectedNodes}
+                leaders={leaderColumns}
+                benchmarks={benchmarks}
+                showNetwork={showNetwork}
+                networkScope={networkScope}
+                currentWinners={currentWinners}
+                overallWinnerKey={overallWinnerKey}
+             />
+          </div>
+          
+          {/* Instance 2: Full Report */}
+          <div style={{ display: 'block' }}>
+             <PulseExportCanvas 
+                ref={exportFullRef}
+                mode="FULL"
+                nodes={selectedNodes}
+                leaders={leaderColumns}
+                benchmarks={benchmarks}
+                showNetwork={showNetwork}
+                networkScope={networkScope}
+                currentWinners={currentWinners}
+                overallWinnerKey={overallWinnerKey}
+             />
+          </div>
+      </div>
+      {/* ----------------------------------- */}
 
       {/* BACK BUTTON */}
       <div className="absolute top-4 left-4 z-[60]">
@@ -454,10 +402,10 @@ export default function ComparePage() {
                 </button>
                 {isExportDropdownOpen && (
                     <div className="absolute top-full right-0 mt-2 w-44 bg-[#09090b] border border-zinc-800 rounded-xl shadow-xl overflow-hidden z-[70] flex flex-col">
-                        <button onClick={() => handleExport(printRef, 'table')} className="px-4 py-3 text-[10px] font-bold text-left text-zinc-300 hover:text-white hover:bg-zinc-800 transition uppercase flex items-center gap-2">
+                        <button onClick={() => handleExport('TABLE')} className="px-4 py-3 text-[10px] font-bold text-left text-zinc-300 hover:text-white hover:bg-zinc-800 transition uppercase flex items-center gap-2">
                             <Table size={12} className="text-zinc-500" /> Table Only
                         </button>
-                        <button onClick={() => handleExport(fullPageRef, 'full')} className="px-4 py-3 text-[10px] font-bold text-left text-zinc-300 hover:text-white hover:bg-zinc-800 transition uppercase flex items-center gap-2 border-t border-white/5">
+                        <button onClick={() => handleExport('FULL')} className="px-4 py-3 text-[10px] font-bold text-left text-zinc-300 hover:text-white hover:bg-zinc-800 transition uppercase flex items-center gap-2 border-t border-white/5">
                             <BarChart size={12} className="text-zinc-500" /> With Charts
                         </button>
                     </div>
@@ -466,8 +414,8 @@ export default function ComparePage() {
         </div>
       </div>
 
-      {/* FULL PAGE EXPORT WRAPPER (Target for "With Charts") */}
-      <div ref={fullPageRef} className="flex-1 overflow-hidden relative z-10 px-4 pb-4 md:px-8 md:pb-8 flex flex-col max-w-[1600px] mx-auto w-full bg-[#020202]"> 
+      {/* INTERACTIVE TABLE */}
+      <div className="flex-1 overflow-hidden relative z-10 px-4 pb-4 md:px-8 md:pb-8 flex flex-col max-w-[1600px] mx-auto w-full bg-[#020202]"> 
          <div className="flex-initial min-h-[400px] flex flex-col bg-[#09090b]/60 backdrop-blur-2xl rounded-xl border border-white/5 shadow-2xl overflow-hidden relative mb-6">
              {selectedNodes.length === 0 && activeLeaderMetrics.length === 0 ? (
                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden h-[400px]">
@@ -493,7 +441,7 @@ export default function ComparePage() {
                     </div>
                  </div>
              ) : (
-                 // TABLE SCROLL CONTAINER (Target for "Table Only")
+                 // TABLE SCROLL CONTAINER
                  <main 
                     ref={printRef} 
                     onClick={() => setHoveredNodeKey(null)}
@@ -501,7 +449,7 @@ export default function ComparePage() {
                  >
                     <ControlRail showNetwork={showNetwork} benchmarks={benchmarks} />
 
-                    {/* LEADER COLUMNS (Rendered First with Specific Theme) */}
+                    {/* LEADER COLUMNS */}
                     {leaderColumns.map((leader, index) => {
                          const isWinner = {
                             health: (leader.node.health || 0) === currentWinners.health,
@@ -514,13 +462,13 @@ export default function ComparePage() {
                                 node={leader.node} 
                                 onRemove={() => toggleLeaderMetric(leader.metric)} 
                                 anchorNode={undefined} 
-                                theme={LEADER_THEME_MAP[leader.metric]} // Apply specific Leader Theme
+                                theme={LEADER_THEME_MAP[leader.metric]} 
                                 winners={isWinner}
                                 overallWinner={leader.node.pubkey === overallWinnerKey}
                                 benchmarks={benchmarks}
                                 showNetwork={showNetwork}
                                 hoveredNodeKey={hoveredNodeKey} 
-                                onFocus={handleNodeFocusToggle} // Click toggle
+                                onFocus={handleNodeFocusToggle} 
                                 isLeader={true}      
                                 leaderType={leader.metric}
                             />
@@ -546,7 +494,7 @@ export default function ComparePage() {
                                 benchmarks={benchmarks}
                                 showNetwork={showNetwork}
                                 hoveredNodeKey={hoveredNodeKey} 
-                                onFocus={handleNodeFocusToggle} // Click toggle
+                                onFocus={handleNodeFocusToggle} 
                             />
                         );
                     })}
@@ -556,9 +504,8 @@ export default function ComparePage() {
              )}
          </div>
 
-         {/* ANALYTICS DECK */}
-         {/* 'chart-container' class added for exporter to target and center */}
-         <div className="w-full max-w-[1600px] mx-auto chart-container">
+         {/* ANALYTICS DECK (INTERACTIVE) */}
+         <div className="w-full max-w-[1600px] mx-auto">
             <SynthesisEngine 
                 nodes={[...leaderColumns.map(l => l.node), ...selectedNodes]} 
                 themes={[...leaderColumns.map(l => LEADER_THEME_MAP[l.metric]), ...PLAYER_THEMES]} 
@@ -568,9 +515,6 @@ export default function ComparePage() {
                 onHover={setHoveredNodeKey}
             />
          </div>
-
-         {/* WATERMARK (Appears only in export) */}
-         <PulseWatermark />
       </div>
 
       {isSearchOpen && (
