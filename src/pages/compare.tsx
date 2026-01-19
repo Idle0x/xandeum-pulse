@@ -84,7 +84,7 @@ export default function ComparePage() {
   const [networkScope, setNetworkScope] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [showNetwork, setShowNetwork] = useState(true);
-  
+
   // Multi-select state for leaders
   const [activeLeaderMetrics, setActiveLeaderMetrics] = useState<string[]>([]);
 
@@ -108,7 +108,9 @@ export default function ComparePage() {
   const networkRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
 
-  const prevNodeCount = useRef(0);
+  // --- SCROLL TRACKING REFS ---
+  const prevSelectedCount = useRef(0);
+  const prevLeaderCount = useRef(0);
 
   useOutsideClick(leaderRef, () => setIsLeaderDropdownOpen(false));
   useOutsideClick(watchlistRef, () => setIsWatchlistOpen(false));
@@ -128,14 +130,14 @@ export default function ComparePage() {
   // --- DYNAMIC LEADER CALCULATION ---
   const leaderColumns = useMemo(() => {
       if (availableNodes.length === 0) return [];
-      
+
       return activeLeaderMetrics.map(metric => {
           let node: Node | null = null;
           if (metric === 'STORAGE') node = availableNodes.reduce((p, c) => (p.storage_committed || 0) > (c.storage_committed || 0) ? p : c, availableNodes[0]);
           if (metric === 'CREDITS') node = availableNodes.reduce((p, c) => (p.credits || 0) > (c.credits || 0) ? p : c, availableNodes[0]);
           if (metric === 'HEALTH') node = availableNodes.reduce((p, c) => (p.health || 0) > (c.health || 0) ? p : c, availableNodes[0]);
           if (metric === 'UPTIME') node = availableNodes.reduce((p, c) => (p.uptime || 0) > (c.uptime || 0) ? p : c, availableNodes[0]);
-          
+
           return node ? { metric, node } : null;
       }).filter(item => item !== null) as { metric: string, node: Node }[];
   }, [activeLeaderMetrics, availableNodes]);
@@ -179,7 +181,7 @@ export default function ComparePage() {
       const maxH = Math.max(...allVisible.map(n => n.health || 1)); 
       const maxS = Math.max(...allVisible.map(n => n.storage_committed || 1)); 
       const maxC = Math.max(...allVisible.map(n => n.credits || 1));
-      
+
       allVisible.forEach(n => { 
           const score = ((n.health || 0)/maxH) + ((n.storage_committed || 0)/maxS) + ((n.credits || 0)/maxC); 
           if (score > bestScore) { bestScore = score; bestKey = n.pubkey; } 
@@ -192,10 +194,24 @@ export default function ComparePage() {
   const updateUrl = (keys: string[]) => router.replace({ pathname: '/compare', query: { nodes: keys.join(',') } }, undefined, { shallow: true });
 
   const addNode = (pubkey: string) => { if (!selectedKeys.includes(pubkey) && selectedKeys.length < 30) { const k = [...selectedKeys, pubkey]; setSelectedKeys(k); updateUrl(k); setIsSearchOpen(false); setSearchQuery(''); setIsWatchlistOpen(false); } };
-  const removeNode = (pubkey: string) => { const k = selectedKeys.filter(x => x !== pubkey); setSelectedKeys(k); updateUrl(k); };
-  const clearAllNodes = () => { setSelectedKeys([]); updateUrl([]); };
+  
+  const removeNode = (pubkey: string) => { 
+      // If removing the currently focused node, clear focus
+      if (hoveredNodeKey === pubkey) setHoveredNodeKey(null);
+      const k = selectedKeys.filter(x => x !== pubkey); 
+      setSelectedKeys(k); 
+      updateUrl(k); 
+  };
+  
+  const clearAllNodes = () => { setSelectedKeys([]); updateUrl([]); setHoveredNodeKey(null); };
 
   const toggleLeaderMetric = (metric: string) => {
+      // Find the node associated with this metric to check if we need to clear focus
+      const leader = leaderColumns.find(l => l.metric === metric);
+      if (leader && leader.node.pubkey === hoveredNodeKey) {
+          setHoveredNodeKey(null);
+      }
+
       if (activeLeaderMetrics.includes(metric)) {
           setActiveLeaderMetrics(prev => prev.filter(m => m !== metric));
       } else {
@@ -209,16 +225,25 @@ export default function ComparePage() {
       localStorage.setItem('xandeum_favorites', JSON.stringify(newFavs));
   };
 
+  // --- FOCUS TOGGLE HANDLER ---
+  const handleNodeFocusToggle = (key: string | null) => {
+      setHoveredNodeKey(prev => prev === key ? null : key);
+  };
+
+  // --- SMART SCROLL LOGIC ---
   useEffect(() => {
-    const totalCount = selectedKeys.length + activeLeaderMetrics.length;
-    if (totalCount > prevNodeCount.current) {
-        if (printRef.current) {
+    if (printRef.current) {
+        if (activeLeaderMetrics.length > prevLeaderCount.current) {
+            printRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+        }
+        else if (selectedKeys.length > prevSelectedCount.current) {
             const maxScroll = printRef.current.scrollWidth - printRef.current.clientWidth;
             const targetScroll = Math.max(0, maxScroll - 70); 
             printRef.current.scrollTo({ left: targetScroll, behavior: 'smooth' });
         }
     }
-    prevNodeCount.current = totalCount;
+    prevSelectedCount.current = selectedKeys.length;
+    prevLeaderCount.current = activeLeaderMetrics.length;
   }, [selectedKeys.length, activeLeaderMetrics.length]);
 
   const hasProcessedDeepLink = useRef(false);
@@ -318,7 +343,8 @@ export default function ComparePage() {
                         <Plus size={14} />
                     </button>
                     <span className="text-[10px] md:text-xs font-mono text-zinc-500 uppercase tracking-widest">
-                        Selected: <span className="text-zinc-200">{selectedNodes.length}</span>
+                        {/* UPDATE: Sum of Users + Leaders */}
+                        Selected: <span className="text-zinc-200">{selectedNodes.length + activeLeaderMetrics.length}</span>
                     </span>
                 </div>
                 {(selectedKeys.length > 0 || activeLeaderMetrics.length > 0) && (
@@ -435,9 +461,14 @@ export default function ComparePage() {
                  </div>
              ) : (
                  // TABLE SCROLL CONTAINER (Target for "Table Only")
-                 <main ref={printRef} className="flex-1 overflow-x-auto overflow-y-auto bg-transparent relative flex custom-scrollbar snap-x items-start content-start">
+                 // UPDATE: Added onClick to background to clear focus
+                 <main 
+                    ref={printRef} 
+                    onClick={() => setHoveredNodeKey(null)}
+                    className="flex-1 overflow-x-auto overflow-y-auto bg-transparent relative flex custom-scrollbar snap-x items-start content-start"
+                 >
                     <ControlRail showNetwork={showNetwork} benchmarks={benchmarks} />
-                    
+
                     {/* LEADER COLUMNS (Rendered First with Specific Theme) */}
                     {leaderColumns.map((leader, index) => {
                          const isWinner = {
@@ -457,7 +488,7 @@ export default function ComparePage() {
                                 benchmarks={benchmarks}
                                 showNetwork={showNetwork}
                                 hoveredNodeKey={hoveredNodeKey} 
-                                onHover={setHoveredNodeKey}
+                                onFocus={handleNodeFocusToggle} // Pass the click toggle handler
                                 isLeader={true}      
                                 leaderType={leader.metric}
                             />
@@ -483,7 +514,7 @@ export default function ComparePage() {
                                 benchmarks={benchmarks}
                                 showNetwork={showNetwork}
                                 hoveredNodeKey={hoveredNodeKey} 
-                                onHover={setHoveredNodeKey}
+                                onFocus={handleNodeFocusToggle} // Pass the click toggle handler
                             />
                         );
                     })}
