@@ -434,7 +434,7 @@ export default function ComparePage() {
                         <div className="flex flex-col items-center gap-1">
                             <h2 className="text-lg md:text-xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-500 uppercase tracking-[0.2em]">Compare Nodes</h2>
                             <p className="text-[10px] md:text-xs text-zinc-500 font-mono tracking-wide max-w-xs text-center leading-relaxed">
-                                Select a minimum of 2 nodes for head-to-head analysis against the network or top performers.
+                                Select a minimum of 1 node for head-to-head analysis against the network or top performers.
                             </p>
                         </div>
                         <div className="text-[9px] uppercase font-bold text-zinc-600">Current Network: <span className="text-zinc-400">{networkScope}</span></div>
