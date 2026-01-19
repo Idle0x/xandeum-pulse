@@ -22,7 +22,6 @@ const MESH_COLORS = [
 ];
 
 // --- HELPER: Deterministic Color Picker ---
-// Ensures the same connection always gets the same color based on coordinates
 const getLinkColor = (startLat: number, startLon: number, endLat: number) => {
     const hash = Math.abs((startLat * 1000) + (startLon * 1000) + (endLat * 1000));
     return MESH_COLORS[Math.floor(hash) % MESH_COLORS.length];
@@ -94,7 +93,7 @@ const generateLiveReport = (tab: string, metric: string, focusKey: string | null
         }
     }
 
-    // --- OVERVIEW CONTEXT (RESTORED) ---
+    // --- OVERVIEW CONTEXT ---
     if (tab === 'OVERVIEW') {
         if (!focusSection) return `Global Overview: You are comparing ${groupCount} nodes. The dashboard highlights relative strengths (Power) versus absolute reliability (Vitality). Click any chart to dive deeper.`;
         if (focusSection === 'health') {
@@ -111,7 +110,7 @@ const generateLiveReport = (tab: string, metric: string, focusKey: string | null
         if (focusSection === 'uptime') return `Longevity Focus: Uptime is the historic footprint of a node. Newer nodes will naturally show smaller bars here, but look for gaps in older nodes which indicate instability.`;
     }
 
-    // --- MARKET CONTEXT (RESTORED) ---
+    // --- MARKET CONTEXT ---
     if (tab === 'MARKET') {
         const totalVal = nodes.reduce((a, b) => a + ((b as any)[metric === 'storage' ? 'storage_committed' : metric] || 0), 0);
         if (!focusKey) {
@@ -185,7 +184,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
             .slice(0, 2); // Connect to 2 nearest
 
           distances.forEach(d => {
-             // Create a unique key for the link so we don't duplicate A->B and B->A visual noise
              const linkKey = [sourceNode.pubkey, d.id].sort().join('-');
              if (!links.find(l => l.key === linkKey)) {
                  links.push({
@@ -375,7 +373,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
                                 <Geographies geography={GEO_URL}>{({ geographies }: { geographies: any[] }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#18181b" stroke="#27272a" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { outline: "none" }, pressed: { outline: "none" } }} />))}</Geographies>
                                 
                                 {/* MESH VISUALIZATION (Broken Lines) */}
-                                {meshLinks.map((link) => {
+                                {meshLinks.map((link: any) => {
                                     // Logic: If highlighting a node, only show its own links strongly. Dim others.
                                     const isRelevant = !hoveredNodeKey || hoveredNodeKey === link.source || hoveredNodeKey === link.target;
                                     const opacity = hoveredNodeKey ? (isRelevant ? 0.8 : 0.05) : 0.2;
@@ -397,8 +395,8 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks }: { n
 
                                 {clusters.map((cluster) => {
                                     const theme = themes[cluster.themeIndex % themes.length];
-                                    const isHovered = hoveredNodeKey === cluster.id || (cluster.nodes.some(n => n.pubkey === hoveredNodeKey));
-                                    const isFocused = focusedNodeKey === cluster.id || (cluster.nodes.some(n => n.pubkey === focusedNodeKey));
+                                    const isHovered = hoveredNodeKey === cluster.id || (cluster.nodes.some((n: Node) => n.pubkey === hoveredNodeKey));
+                                    const isFocused = focusedNodeKey === cluster.id || (cluster.nodes.some((n: Node) => n.pubkey === focusedNodeKey));
                                     
                                     return (
                                         <Marker key={cluster.id} coordinates={[cluster.lon, cluster.lat]} 
