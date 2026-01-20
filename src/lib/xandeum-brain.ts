@@ -33,7 +33,7 @@ let systemState = {
   }
 };
 
-// --- INTERFACES (UNCHANGED) ---
+// --- INTERFACES ---
 
 export interface EnrichedNode {
   address: string;
@@ -66,7 +66,7 @@ export interface EnrichedNode {
   health_rank?: number;
 }
 
-// --- HELPERS (UNCHANGED) ---
+// --- HELPERS ---
 
 export const cleanSemver = (v: string) => {
   if (!v) return '0.0.0';
@@ -267,7 +267,6 @@ async function refreshNetworkPulse() {
       fetchCredits()
     ]);
 
-    // DEBUG LOGGING ADDED HERE
     const validPublicNodes = rawPublicNodes.map((p: any) => {
         const result = RawNodeSchema.safeParse(p);
         if (!result.success) {
@@ -282,6 +281,8 @@ async function refreshNetworkPulse() {
       if (!exists) rawPrivateNodes.unshift(operatorNode);
     }
 
+    // --- SAFETY LOCK (With Explicit Logging) ---
+    // Only return if BOTH sources are empty.
     if (rawPrivateNodes.length === 0 && validPublicNodes.length === 0) {
        console.warn(`[Worker] Safety Lock Triggered: 0 nodes found. Serving STALE data from: ${new Date(systemState.lastUpdated).toISOString()}`);
        return;
@@ -438,6 +439,8 @@ async function refreshNetworkPulse() {
           medianCredits: medianMainnet,
           medianStorage,
           totalNodes: allSorted.length,
+          medianCredits: medianMainnet,
+          medianStorage: medianStorage,
           systemStatus: { credits: isCreditsApiOnline, rpc: true },
           avgBreakdown: {
             total: avgHealth,
