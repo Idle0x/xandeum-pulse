@@ -156,7 +156,7 @@ export const Header = ({
                )}
             </div>
           )}
-           {!zenMode && <style>{` @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } } .animate-marquee { animation: marquee 15s linear infinite; } @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } } .animate-ticker { display: flex; width: max-content; animation: ticker 60s linear infinite; } .mask-linear-fade { mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent); -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent); } `}</style>}
+           {!zenMode && <style>{` @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } } .animate-marquee { animation: marquee 15s linear infinite; } @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } } .animate-ticker { display: flex; width: max-content; animation: ticker 150s linear infinite; } .mask-linear-fade { mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent); -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent); } `}</style>}
         </div>
 
         {/* Right: Zen / Grid Toggle */}
