@@ -1,4 +1,6 @@
 import axios from 'axios';
+import http from 'http';
+import https from 'https';
 
 // --- CONFIGURATION ---
 const PUBLIC_HERO_IP = '173.212.203.145';
@@ -8,17 +10,19 @@ const BACKUP_NODES = [
   '159.195.4.138', '152.53.155.30'
 ];
 
-// --- TUNING KNOBS (RELAXED MODE) ---
-// Increased to 15s because Hero is under heavy load
-const TIMEOUT_RPC = 15000; 
+// --- TUNING KNOBS (MAXIMUM TENACITY) ---
+const TIMEOUT_RPC = 15000; // 15s Patience
 const BACKGROUND_POLL_INTERVAL = 30000;
 const CACHE_TTL = 10000;
 
 // CIRCUIT BREAKER CONFIG
-// Increased to 10 failures before banning
+// We keep this for BACKUPS, but we will ignore it for the HERO.
 const MAX_FAILURES = 10; 
-// Reduced ban time to 10s (retry quickly)
 const COOLDOWN_MS = 10000; 
+
+// Optimised Axios Instance (Keep-Alive)
+const httpAgent = new http.Agent({ keepAlive: true });
+const httpsAgent = new https.Agent({ keepAlive: true });
 
 interface RpcNodeStatus {
   ip: string;
@@ -55,6 +59,13 @@ export class PublicSwarmOrchestrator {
   }
 
   public async fetchNodes(): Promise<any[]> {
+    // 1. Always try to switch back to Hero if it's not the active node
+    // This ensures we don't get stuck on a backup if the Hero is actually fine.
+    if (!this.activeNode.isHero) {
+        // We don't await this, we just ensure the Hero object is ready to be tried next time
+        this.hero.cooldownUntil = 0; 
+    }
+
     if (Date.now() - this.lastFetchTime < CACHE_TTL && this.cachedData.length > 0) {
       return this.mergeWithPassiveDiscovery(this.cachedData);
     }
@@ -74,9 +85,14 @@ export class PublicSwarmOrchestrator {
   }
 
   private async executeFetchStrategy(): Promise<any[]> {
-    if (this.isCoolingDown(this.activeNode)) {
-      console.warn(`[Orchestrator] Active node ${this.activeNode.ip} is cooling down. Forcing failover.`);
-      return this.failoverFetch();
+    // FORCE HERO: If the Active Node is the Hero, ignore cooldowns.
+    // We ALWAYS try the Hero.
+    if (this.activeNode.isHero) {
+        this.activeNode.cooldownUntil = 0; // Force Reset
+    } else if (this.isCoolingDown(this.activeNode)) {
+        // Logic for Backups: If backup is banned, find another.
+        console.warn(`[Orchestrator] Backup node ${this.activeNode.ip} is cooling down. Switching.`);
+        return this.failoverFetch();
     }
 
     try {
@@ -86,13 +102,14 @@ export class PublicSwarmOrchestrator {
       this.cachedData = data;
       this.lastFetchTime = Date.now();
 
+      // If we successfully used a backup, try to promote Hero for next time immediately
       if (!this.activeNode.isHero) this.attemptHeroRecovery();
 
       return this.mergeWithPassiveDiscovery(data);
 
     } catch (e) {
       this.reportFailure(this.activeNode);
-      // Removed "Active node failed" log to reduce noise, logic handles it
+      // Hero failed? Instant failover for THIS request, but Hero stays ready for next.
       return this.failoverFetch();
     }
   }
@@ -117,6 +134,7 @@ export class PublicSwarmOrchestrator {
         this.cachedData = data;
         this.lastFetchTime = Date.now();
 
+        // Check if Hero is back immediately
         this.attemptHeroRecovery(); 
         return this.mergeWithPassiveDiscovery(data);
 
@@ -132,6 +150,7 @@ export class PublicSwarmOrchestrator {
   // --- HELPERS ---
 
   private isCoolingDown(node: RpcNodeStatus): boolean {
+    if (node.isHero) return false; // HERO NEVER COOLS DOWN
     if (node.cooldownUntil > Date.now()) return true;
     return false;
   }
@@ -147,15 +166,22 @@ export class PublicSwarmOrchestrator {
     node.isOnline = false;
     node.consecutiveFails++;
 
-    if (node.consecutiveFails >= MAX_FAILURES) {
-      node.cooldownUntil = Date.now() + COOLDOWN_MS;
-      console.warn(`[Orchestrator] 🛑 CIRCUIT OPENED for ${node.ip}. Banned for 10s.`);
+    if (node.isHero) {
+        // SPECIAL HERO LOGIC: Log warning, but DO NOT BAN.
+        // We reset cooldown so it is eligible immediately for the next tick.
+        console.warn(`[Orchestrator] Hero ${node.ip} failed. Will retry next tick (No Ban).`);
+        node.cooldownUntil = 0; 
+    } else {
+        // Normal Backup Logic: Ban if too many failures
+        if (node.consecutiveFails >= MAX_FAILURES) {
+            node.cooldownUntil = Date.now() + COOLDOWN_MS;
+            console.warn(`[Orchestrator] 🛑 CIRCUIT OPENED for Backup ${node.ip}. Banned for 10s.`);
+        }
     }
   }
 
   private async attemptHeroRecovery() {
-    if (this.isCoolingDown(this.hero)) return; 
-
+    // Always try. Hero is never cooling down.
     try {
       await this.rpcCall(this.hero.ip);
       console.log(`[Orchestrator] HERO RECOVERED. Switching back to ${this.hero.ip}`);
@@ -199,8 +225,12 @@ export class PublicSwarmOrchestrator {
 
   private async rpcCall(ip: string): Promise<any[]> {
     const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
-    // Updated to use the 15s timeout
-    const res = await axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC });
+    const res = await axios.post(`http://${ip}:6000/rpc`, payload, { 
+        timeout: TIMEOUT_RPC,
+        httpAgent,
+        httpsAgent,
+        headers: { 'User-Agent': 'XandeumPulse/1.0' } // Be polite to the RPC
+    });
     return res.data?.result?.pods || [];
   }
 }
