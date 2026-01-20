@@ -8,13 +8,17 @@ const BACKUP_NODES = [
   '159.195.4.138', '152.53.155.30'
 ];
 
-const TIMEOUT_RPC = 5000; // Reduced to 5s for faster failover
+// --- TUNING KNOBS (RELAXED MODE) ---
+// Increased to 15s because Hero is under heavy load
+const TIMEOUT_RPC = 15000; 
 const BACKGROUND_POLL_INTERVAL = 30000;
 const CACHE_TTL = 10000;
 
 // CIRCUIT BREAKER CONFIG
-const MAX_FAILURES = 3; // Trip after 3 fails
-const COOLDOWN_MS = 60000; // Ban for 60s
+// Increased to 10 failures before banning
+const MAX_FAILURES = 10; 
+// Reduced ban time to 10s (retry quickly)
+const COOLDOWN_MS = 10000; 
 
 interface RpcNodeStatus {
   ip: string;
@@ -22,7 +26,7 @@ interface RpcNodeStatus {
   isOnline: boolean;
   lastSeen: number;
   consecutiveFails: number;
-  cooldownUntil: number; // [NEW] Timestamp until this node is allowed to be called again
+  cooldownUntil: number; 
 }
 
 export class PublicSwarmOrchestrator {
@@ -32,12 +36,8 @@ export class PublicSwarmOrchestrator {
 
   private cachedData: any[] = [];
   private lastFetchTime: number = 0;
-  
-  // [NEW] Request Deduplication Lock
-  private fetchPromise: Promise<any[]> | null = null;
 
-  // Storage for nodes found by backups (Passive Discovery)
-  // Note: Will be upgraded to LRU in Batch 3
+  private fetchPromise: Promise<any[]> | null = null;
   private passiveDiscoveryCache: Map<string, any> = new Map();
 
   constructor() {
@@ -54,37 +54,26 @@ export class PublicSwarmOrchestrator {
     return { ip, isHero, isOnline: true, lastSeen: 0, consecutiveFails: 0, cooldownUntil: 0 };
   }
 
-  /**
-   * Main entry point.
-   * Includes Request Deduplication to prevent "Thundering Herd".
-   */
   public async fetchNodes(): Promise<any[]> {
-    // 1. Return fresh cache immediately
     if (Date.now() - this.lastFetchTime < CACHE_TTL && this.cachedData.length > 0) {
       return this.mergeWithPassiveDiscovery(this.cachedData);
     }
 
-    // 2. If a fetch is already running, wait for it (Deduplication)
     if (this.fetchPromise) {
       return this.fetchPromise;
     }
 
-    // 3. Start new fetch
     this.fetchPromise = this.executeFetchStrategy();
-    
+
     try {
       const result = await this.fetchPromise;
       return result;
     } finally {
-      this.fetchPromise = null; // Release lock
+      this.fetchPromise = null; 
     }
   }
 
-  /**
-   * The Strategy: Active Node -> Failover -> Cache Fallback
-   */
   private async executeFetchStrategy(): Promise<any[]> {
-    // Check if Active Node is in cooldown (Circuit Breaker)
     if (this.isCoolingDown(this.activeNode)) {
       console.warn(`[Orchestrator] Active node ${this.activeNode.ip} is cooling down. Forcing failover.`);
       return this.failoverFetch();
@@ -93,35 +82,28 @@ export class PublicSwarmOrchestrator {
     try {
       const data = await this.rpcCall(this.activeNode.ip);
       this.reportSuccess(this.activeNode);
-      
+
       this.cachedData = data;
       this.lastFetchTime = Date.now();
 
-      // If we are on a backup, try to go back to Hero
       if (!this.activeNode.isHero) this.attemptHeroRecovery();
 
       return this.mergeWithPassiveDiscovery(data);
 
     } catch (e) {
       this.reportFailure(this.activeNode);
-      console.warn(`[Orchestrator] Active node ${this.activeNode.ip} failed.`);
+      // Removed "Active node failed" log to reduce noise, logic handles it
       return this.failoverFetch();
     }
   }
 
-  /**
-   * Smart Failover: Only tries nodes that are NOT in cooldown.
-   */
   private async failoverFetch(): Promise<any[]> {
-    // 1. Filter out nodes that are cooling down
     const availableCandidates = this.backups.filter(n => !this.isCoolingDown(n));
-    
-    // 2. Sort by least failures to find the healthiest backup
     const candidates = availableCandidates.sort((a, b) => a.consecutiveFails - b.consecutiveFails);
 
     if (candidates.length === 0) {
       console.error("[Orchestrator] ALL BACKUPS EXHAUSTED OR COOLING DOWN.");
-      return this.cachedData; // Absolute fallback
+      return this.cachedData; 
     }
 
     for (const node of candidates) {
@@ -129,10 +111,9 @@ export class PublicSwarmOrchestrator {
         console.log(`[Orchestrator] Failover Attempt: ${node.ip}`);
         const data = await this.rpcCall(node.ip);
 
-        // Success!
         this.reportSuccess(node);
-        this.activeNode = node; // Promote to Active
-        
+        this.activeNode = node; 
+
         this.cachedData = data;
         this.lastFetchTime = Date.now();
 
@@ -165,16 +146,15 @@ export class PublicSwarmOrchestrator {
   private reportFailure(node: RpcNodeStatus) {
     node.isOnline = false;
     node.consecutiveFails++;
-    
-    // TRIP THE CIRCUIT BREAKER
+
     if (node.consecutiveFails >= MAX_FAILURES) {
       node.cooldownUntil = Date.now() + COOLDOWN_MS;
-      console.warn(`[Orchestrator] 🛑 CIRCUIT OPENED for ${node.ip}. Banned for 60s.`);
+      console.warn(`[Orchestrator] 🛑 CIRCUIT OPENED for ${node.ip}. Banned for 10s.`);
     }
   }
 
   private async attemptHeroRecovery() {
-    if (this.isCoolingDown(this.hero)) return; // Don't bother if Hero is banned
+    if (this.isCoolingDown(this.hero)) return; 
 
     try {
       await this.rpcCall(this.hero.ip);
@@ -188,7 +168,6 @@ export class PublicSwarmOrchestrator {
 
   private startPassiveDiscovery() {
     setInterval(async () => {
-      // Only pick backups that are NOT cooling down
       const validBackups = this.backups.filter(n => !this.isCoolingDown(n));
       const randomBackups = validBackups.sort(() => 0.5 - Math.random()).slice(0, 2);
 
@@ -220,7 +199,7 @@ export class PublicSwarmOrchestrator {
 
   private async rpcCall(ip: string): Promise<any[]> {
     const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
-    // Short timeout (5s) to fail fast
+    // Updated to use the 15s timeout
     const res = await axios.post(`http://${ip}:6000/rpc`, payload, { timeout: TIMEOUT_RPC });
     return res.data?.result?.pods || [];
   }
