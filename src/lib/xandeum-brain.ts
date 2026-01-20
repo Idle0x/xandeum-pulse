@@ -19,6 +19,7 @@ const geoCache = new LRUCache<string, { lat: number; lon: number; country: strin
 
 let privateMainnetCache: { data: any[], timestamp: number } = { data: [], timestamp: 0 };
 
+// --- TYPE FIX APPLIED HERE ---
 let systemState = {
   ready: false,
   lastUpdated: 0,
@@ -28,7 +29,8 @@ let systemState = {
       consensusVersion: '0.0.0',
       totalNodes: 0,
       systemStatus: { rpc: false, credits: false },
-      avgBreakdown: { total: 0, uptime: 0, version: 0, reputation: 0, storage: 0 }
+      // Explicitly cast reputation to 'number | null' so TypeScript accepts null later
+      avgBreakdown: { total: 0, uptime: 0, version: 0, reputation: null as number | null, storage: 0 }
     }
   }
 };
@@ -67,7 +69,6 @@ export interface EnrichedNode {
 }
 
 // --- HELPERS (UNCHANGED) ---
-// (I am keeping these exactly as provided in Batch 1)
 
 export const cleanSemver = (v: string) => {
   if (!v) return '0.0.0';
@@ -228,9 +229,9 @@ async function resolveLocations(ips: string[]) {
         const chunk = missing.slice(i, i + 100);
         // Only run if chunk is valid
         if (chunk.length === 0) continue; 
-        
+
         const res = await axios.post('http://ip-api.com/batch', chunk.map(ip => ({ query: ip, fields: "lat,lon,country,countryCode,city,query" })), { timeout: 3000 });
-        
+
         if (Array.isArray(res.data)) {
             res.data.forEach((d: any) => {
                 if (d.query && d.lat && d.lon) {
@@ -240,7 +241,7 @@ async function resolveLocations(ips: string[]) {
         }
       }
     } catch (e) { /* API Fail */ }
-    
+
     // Fallback logic
     missing.forEach(ip => {
       if (!geoCache.has(ip)) {
