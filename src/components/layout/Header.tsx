@@ -46,11 +46,26 @@ export const Header = ({
   }, []);
 
   const searchTips = [
-    "Search by node IP, public key, version or country",
-    "Click on any node for detailed insights & history",
-    "Use the map view to visualize network topology",
-    "Compare your node metrics against the network leaders",
-    "Copy a node URL to share a direct deep-link"
+    // Updated originals (refined for current features)
+    "Search by IP, public key, version, country, or city",
+    "Click any node for details, diagnostics & proof export",
+    "Switch to map view for global network topology & kings",
+    "Compare your node head-to-head with network leaders",
+    "Share direct deep-links to any node view",
+  
+    // New tips covering core interactions
+    "Cycle networks: ALL / MAINNET / DEVNET with one click",
+    "Hit Refresh for fresh real-time data from RPC",
+    "Sort by uptime, health, committed storage, credits & more",
+    "Toggle grid or list view for your preferred layout",
+  
+    // New tips covering advanced/power-user features
+    "Export the full node registry to CSV anytime",
+    "Enter Zen Mode for clean, distraction-free monitoring",
+    "Check reputation multipliers & earnings simulation",
+    "Generate Proof of Pulse snapshots for any node",
+    "Watch cyclic metric cards for rotating network vitals",
+    "Download Evaluation Reports for any comparison session",
   ];
 
   const ListHeaderCell = ({ label, metric, alignRight = false }: { label: string, metric: any, alignRight?: boolean }) => (
@@ -187,7 +202,6 @@ export const Header = ({
              <div className="hidden md:flex gap-2 relative ml-auto">
                 {['uptime', 'storage', 'storage_used', 'version', 'health', 'credits'].map((opt) => (
                     <button key={opt} onClick={() => onSortChange(opt as any)} className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${sortBy === opt ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
-                        {/* UPDATE 1: Full 'COMMITTED' text here */}
                         {opt === 'storage' ? 'COMMITTED' : opt === 'storage_used' ? 'USED' : opt.toUpperCase()}
                         {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={10} className="ml-1" /> : <ArrowDown size={10} className="ml-1" />)}
                     </button>
@@ -205,7 +219,6 @@ export const Header = ({
                 {opt === 'version' && <Server size={10} />}
                 {opt === 'health' && <HeartPulse size={10} />}
                 {opt === 'credits' && <Coins size={10} />}
-                {/* UPDATE 2: Full 'COMMITTED' text here too */}
                 {opt === 'storage' ? 'COMMITTED' : opt === 'storage_used' ? 'USED' : opt.toUpperCase()}
                 {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={8} className="ml-0.5" /> : <ArrowDown size={8} className="ml-0.5" />)}
                 </button>
@@ -232,7 +245,6 @@ export const Header = ({
                   <ListHeaderCell label="Health" metric="health" />
                   <ListHeaderCell label="Uptime" metric="uptime" alignRight />
                   
-                  {/* UPDATE 3: Full 'Committed' text here */}
                   <ListHeaderCell label="Committed" metric="storage" alignRight />
                   
                   <ListHeaderCell label="Used" metric="storage_used" alignRight />
