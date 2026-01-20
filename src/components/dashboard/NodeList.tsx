@@ -3,7 +3,6 @@ import { Node } from '../../types';
 import { formatBytes } from '../../utils/formatters';
 import { getSafeIp } from '../../utils/nodeHelpers';
 
-// ... (Helpers formatUptime, formatLastSeen unchanged) ...
 const formatUptime = (seconds: number) => {
   if (!seconds) return '0m';
   const h = Math.floor(seconds / 3600);
@@ -59,9 +58,6 @@ export const NodeList = ({
   );
 
   // ALIGNMENT FIX: Synced with Header
-  // 3rd col (Last Seen) shrunk to 1.0fr.
-  // 4th, 5th, 6th, 7th, 8th cols increased to 1.1fr.
-  // 9th col (Credits) fixed at 0.8fr.
   const gridClass = "grid-cols-[auto_2fr_1.0fr_1.1fr_1.1fr_1.1fr_1.0fr_1.0fr_0.8fr_auto]";
 
   return (
@@ -75,11 +71,11 @@ export const NodeList = ({
         <HeaderCell label="Version" metric="version" />
         <HeaderCell label="Health" metric="health" />
         <HeaderCell label="Uptime" metric="uptime" alignRight />
-        
+
         {/* Split Storage Headers */}
         <HeaderCell label="Comm." metric="storage" alignRight />
         <HeaderCell label="Used" metric="storage_used" alignRight />
-        
+
         <HeaderCell label="Credits" metric="credits" alignRight />
         <div className="w-6"></div>
       </div>
@@ -163,10 +159,10 @@ export const NodeList = ({
 
               {/* === MOBILE ROW (RESTRUCTURED + HOVER RESTORED) === */}
               <div className="grid md:hidden grid-cols-[auto_1.5fr_0.8fr_0.5fr_1fr_auto] gap-3 px-4 py-3 items-center border-b border-zinc-800/20">
-                 
+
                  {/* 1. Status Dot */}
                  <div className={`w-1.5 h-1.5 rounded-full ${statusColor} shrink-0`}></div>
-                 
+
                  {/* 2. Identity Stack (RESTORED SLIDING ANIMATION) */}
                  <div className="flex flex-col min-w-0">
                      {/* Row 1: The Swapper (Key <-> Flag/IP) */}
@@ -192,9 +188,10 @@ export const NodeList = ({
                  {/* 3. Time Stack */}
                  <div className="flex flex-col items-start leading-none gap-1">
                     <span className={`font-mono text-[9px] transition-colors duration-300 ${uptimeColor}`}>{formatUptime(node.uptime || 0)}</span>
-                    <span className="font-mono text-[8px] text-zinc-600">{formatLastSeen(node.last_seen_timestamp || 0).replace(' ago', '')}</span>
+                    {/* CHANGED HERE: Removed .replace(' ago', '') */}
+                    <span className="font-mono text-[8px] text-zinc-600">{formatLastSeen(node.last_seen_timestamp || 0)}</span>
                  </div>
-                 
+
                  {/* 4. Health/Credits Stack */}
                  <div className="flex flex-col items-center leading-none gap-1">
                     <div className={`font-mono text-[10px] font-bold transition-colors duration-300 ${healthColor}`}>
@@ -204,13 +201,13 @@ export const NodeList = ({
                         {node.credits !== null ? node.credits.toLocaleString() : '-'}
                     </div>
                  </div>
-                 
+
                  {/* 5. Storage Stack */}
                  <div className="flex flex-col items-end leading-none">
                      <span className={`font-bold text-[10px] font-mono transition-colors duration-300 ${storageColorMain}`}>{formatBytes(node.storage_committed)}</span>
                      <span className={`text-[8px] font-mono mt-0.5 transition-colors duration-300 ${storageColorSub}`}>{formatBytes(node.storage_used)}</span>
                  </div>
-                 
+
                  {/* 6. Star */}
                  <button onClick={(e) => onToggleFavorite(e, node.address || '')} className="pl-1">
                     <Star size={12} className={isFav ? "text-yellow-500" : "text-zinc-700"} fill={isFav ? "currentColor" : "none"} />
