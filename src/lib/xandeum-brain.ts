@@ -1,6 +1,6 @@
 import axios from 'axios';
 import geoip from 'geoip-lite';
-import { publicOrchestrator } from './xandeum-brain/rpc-orchestrator';
+import { publicOrchestrator } from './rpc-orchestrator';
 
 // --- CONFIGURATION ---
 
