@@ -65,24 +65,25 @@ export const Header = ({
     </div>
   );
 
+  // ALIGNMENT NOTE: Matches NodeList.tsx grid
   const gridClass = "grid-cols-[auto_2fr_1.0fr_1.1fr_1.1fr_1.1fr_1.0fr_1.0fr_0.8fr_auto]";
 
   return (
     <header className={`sticky top-0 z-[50] border-b px-4 py-1 md:py-3 flex flex-col gap-1 md:gap-4 transition-all duration-500 overflow-visible ${zenMode ? 'bg-black border-zinc-800' : 'bg-[#09090b]/90 backdrop-blur-md border-zinc-800'}`}>
       <div className="flex justify-between items-start w-full">
-        
+
         {/* Left: Menu & Logo */}
         <div className="flex items-start gap-3 md:gap-4 shrink-0 pt-1"> 
           <button onClick={onToggleMenu} className={`p-2 rounded-xl transition mt-1 ${zenMode ? 'text-zinc-400 border border-zinc-800 hover:text-white' : 'text-zinc-400 bg-zinc-900 border border-zinc-700 hover:text-white hover:bg-zinc-800'}`}>
             <Menu size={20} className="md:w-6 md:h-6" />
           </button>
-          
+
           <div className="flex flex-col">
             {/* Row 1: Big Logo */}
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight flex items-center gap-2 text-white leading-none">
               <Activity className={zenMode ? 'text-zinc-500' : 'text-blue-500'} size={28} /> PULSE
             </h1>
-            
+
             {/* Row 2: Sync Time */}
             <div className="mt-2 md:mt-3 pl-1 flex items-center">
                <span className="text-[9px] md:text-[10px] text-zinc-500 font-mono tracking-wider uppercase">
@@ -94,7 +95,7 @@ export const Header = ({
 
         {/* Center: Search Bar + Feedback Text */}
         <div className="flex-1 mx-4 relative group flex flex-col items-center min-w-0 pt-0.5 md:pt-1">
-          
+
           {/* Search Input */}
           <div className="relative w-full max-w-3xl overflow-hidden rounded-lg">
             <Search className={`absolute left-3 top-2.5 size-4 z-10 ${zenMode ? 'text-zinc-600' : 'text-zinc-500'}`} />
@@ -181,21 +182,19 @@ export const Header = ({
             </button>
         </div>
 
-        {viewMode === 'list' && !zenMode && isScrolled ? (
-             <div className={`hidden md:grid flex-1 ${gridClass} gap-4 px-2 items-center text-[9px] font-bold uppercase tracking-wider`}>
-                <div className="w-2"></div>
-                <div className="pl-1"></div>
-                <div></div>
-                <ListHeaderCell label="Version" metric="version" />
-                <ListHeaderCell label="Health" metric="health" />
-                <ListHeaderCell label="Uptime" metric="uptime" alignRight />
-                <ListHeaderCell label="Comm." metric="storage" alignRight />
-                <ListHeaderCell label="Used" metric="storage_used" alignRight />
-                <ListHeaderCell label="Credits" metric="credits" alignRight />
-                <div className="w-6"></div>
+        {/* Desktop Controls (Grid/Zen mode specific toggles) */}
+        {!zenMode && (!isScrolled || viewMode === 'grid') && (
+             <div className="hidden md:flex gap-2 relative ml-auto">
+                {['uptime', 'storage', 'storage_used', 'version', 'health', 'credits'].map((opt) => (
+                    <button key={opt} onClick={() => onSortChange(opt as any)} className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${sortBy === opt ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
+                        {opt === 'storage' ? 'COMM.' : opt === 'storage_used' ? 'USED' : opt.toUpperCase()}
+                        {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={10} className="ml-1" /> : <ArrowDown size={10} className="ml-1" />)}
+                    </button>
+                ))}
              </div>
-        ) : null}
+        )}
 
+        {/* Mobile Sort Buttons (Fallback) */}
         <div className="flex gap-1 relative ml-auto md:hidden">
              {['uptime', 'storage', 'storage_used', 'version', 'health', 'credits'].map((opt) => (
                 <button key={opt} onClick={() => onSortChange(opt as any)} className={`flex items-center gap-1 px-1.5 h-6 rounded-lg text-[8px] font-bold transition border whitespace-nowrap ${sortBy === opt ? zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-blue-500/10 border-blue-500/50 text-blue-400' : zenMode ? 'bg-black border border-zinc-800 text-zinc-500 hover:text-zinc-300' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
@@ -210,18 +209,28 @@ export const Header = ({
                 </button>
             ))}
         </div>
-
-        {!zenMode && (!isScrolled || viewMode === 'grid') && (
-             <div className="hidden md:flex gap-2 relative ml-auto">
-                {['uptime', 'storage', 'storage_used', 'version', 'health', 'credits'].map((opt) => (
-                    <button key={opt} onClick={() => onSortChange(opt as any)} className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${sortBy === opt ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
-                        {opt === 'storage' ? 'COMM.' : opt === 'storage_used' ? 'USED' : opt.toUpperCase()}
-                        {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={10} className="ml-1" /> : <ArrowDown size={10} className="ml-1" />)}
-                    </button>
-                ))}
-             </div>
-        )}
       </div>
+
+      {/* === DESKTOP LIST VIEW HEADER (STICKY) === */}
+      {/* This new row matches the 'main' container width and 'NodeList' internal padding */}
+      {viewMode === 'list' && !zenMode && isScrolled && (
+         <div className="w-full border-t border-zinc-800/50 pt-2 pb-1 hidden md:block">
+            <div className="max-w-7xl 2xl:max-w-[1800px] mx-auto px-8">
+               <div className={`${gridClass} gap-4 px-5 items-center text-[9px] font-bold uppercase tracking-wider`}>
+                  <div className="w-2"></div>
+                  <div className="pl-1"></div>
+                  <div></div>
+                  <ListHeaderCell label="Version" metric="version" />
+                  <ListHeaderCell label="Health" metric="health" />
+                  <ListHeaderCell label="Uptime" metric="uptime" alignRight />
+                  <ListHeaderCell label="Comm." metric="storage" alignRight />
+                  <ListHeaderCell label="Used" metric="storage_used" alignRight />
+                  <ListHeaderCell label="Credits" metric="credits" alignRight />
+                  <div className="w-6"></div>
+               </div>
+            </div>
+         </div>
+      )}
 
       {/* === MOBILE-ONLY SEARCH DATA STRIP (UPDATED: SLIM & GLASSY) === */}
       {searchQuery && (
