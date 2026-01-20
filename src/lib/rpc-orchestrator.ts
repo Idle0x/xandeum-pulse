@@ -10,27 +10,19 @@ const BACKUP_NODES = [
   '159.195.4.138', '152.53.155.30'
 ];
 
-// --- TUNING KNOBS (MAXIMUM TENACITY) ---
-const TIMEOUT_RPC = 15000; // 15s Patience
+// 15 Seconds: We give the Hero plenty of time to reply.
+const TIMEOUT_RPC = 15000; 
 const BACKGROUND_POLL_INTERVAL = 30000;
 const CACHE_TTL = 10000;
 
-// CIRCUIT BREAKER CONFIG
-// We keep this for BACKUPS, but we will ignore it for the HERO.
-const MAX_FAILURES = 10; 
-const COOLDOWN_MS = 10000; 
-
-// Optimised Axios Instance (Keep-Alive)
+// Optimised Axios for Keep-Alive (Faster repeated connections)
 const httpAgent = new http.Agent({ keepAlive: true });
 const httpsAgent = new https.Agent({ keepAlive: true });
 
 interface RpcNodeStatus {
   ip: string;
   isHero: boolean;
-  isOnline: boolean;
-  lastSeen: number;
   consecutiveFails: number;
-  cooldownUntil: number; 
 }
 
 export class PublicSwarmOrchestrator {
@@ -41,12 +33,13 @@ export class PublicSwarmOrchestrator {
   private cachedData: any[] = [];
   private lastFetchTime: number = 0;
 
+  // Request Deduplication
   private fetchPromise: Promise<any[]> | null = null;
   private passiveDiscoveryCache: Map<string, any> = new Map();
 
   constructor() {
-    this.hero = this.createNodeStatus(PUBLIC_HERO_IP, true);
-    this.backups = BACKUP_NODES.map(ip => this.createNodeStatus(ip, false));
+    this.hero = { ip: PUBLIC_HERO_IP, isHero: true, consecutiveFails: 0 };
+    this.backups = BACKUP_NODES.map(ip => ({ ip, isHero: false, consecutiveFails: 0 }));
     this.activeNode = this.hero;
 
     if (typeof window === 'undefined') {
@@ -54,149 +47,111 @@ export class PublicSwarmOrchestrator {
     }
   }
 
-  private createNodeStatus(ip: string, isHero: boolean): RpcNodeStatus {
-    return { ip, isHero, isOnline: true, lastSeen: 0, consecutiveFails: 0, cooldownUntil: 0 };
-  }
-
   public async fetchNodes(): Promise<any[]> {
-    // 1. Always try to switch back to Hero if it's not the active node
-    // This ensures we don't get stuck on a backup if the Hero is actually fine.
-    if (!this.activeNode.isHero) {
-        // We don't await this, we just ensure the Hero object is ready to be tried next time
-        this.hero.cooldownUntil = 0; 
-    }
-
+    // 1. Serve Cache if fresh (Speed)
     if (Date.now() - this.lastFetchTime < CACHE_TTL && this.cachedData.length > 0) {
       return this.mergeWithPassiveDiscovery(this.cachedData);
     }
 
-    if (this.fetchPromise) {
-      return this.fetchPromise;
-    }
+    // 2. Request Deduplication (Stability)
+    if (this.fetchPromise) return this.fetchPromise;
 
     this.fetchPromise = this.executeFetchStrategy();
-
+    
     try {
       const result = await this.fetchPromise;
       return result;
     } finally {
-      this.fetchPromise = null; 
+      this.fetchPromise = null;
     }
   }
 
   private async executeFetchStrategy(): Promise<any[]> {
-    // FORCE HERO: If the Active Node is the Hero, ignore cooldowns.
-    // We ALWAYS try the Hero.
-    if (this.activeNode.isHero) {
-        this.activeNode.cooldownUntil = 0; // Force Reset
-    } else if (this.isCoolingDown(this.activeNode)) {
-        // Logic for Backups: If backup is banned, find another.
-        console.warn(`[Orchestrator] Backup node ${this.activeNode.ip} is cooling down. Switching.`);
-        return this.failoverFetch();
-    }
+    // STRATEGY: "Obsessive Hero"
+    // We try the Active Node. If it works, great.
+    // If the Active Node is NOT the Hero, we ping the Hero immediately after.
 
     try {
       const data = await this.rpcCall(this.activeNode.ip);
-      this.reportSuccess(this.activeNode);
-
+      
+      // Success!
+      this.activeNode.consecutiveFails = 0;
       this.cachedData = data;
       this.lastFetchTime = Date.now();
 
-      // If we successfully used a backup, try to promote Hero for next time immediately
-      if (!this.activeNode.isHero) this.attemptHeroRecovery();
+      // OBSESSION: If we are using a backup, check if Hero is back.
+      if (!this.activeNode.isHero) {
+         this.attemptHeroRecovery();
+      }
 
       return this.mergeWithPassiveDiscovery(data);
 
     } catch (e) {
-      this.reportFailure(this.activeNode);
-      // Hero failed? Instant failover for THIS request, but Hero stays ready for next.
+      // Failure!
+      this.activeNode.consecutiveFails++;
+      console.warn(`[Orchestrator] Active node ${this.activeNode.ip} failed.`);
+      
+      // Immediate Failover
       return this.failoverFetch();
     }
   }
 
   private async failoverFetch(): Promise<any[]> {
-    const availableCandidates = this.backups.filter(n => !this.isCoolingDown(n));
-    const candidates = availableCandidates.sort((a, b) => a.consecutiveFails - b.consecutiveFails);
-
-    if (candidates.length === 0) {
-      console.error("[Orchestrator] ALL BACKUPS EXHAUSTED OR COOLING DOWN.");
-      return this.cachedData; 
-    }
+    // Sort backups by least failures (find the healthiest one)
+    const candidates = this.backups.sort((a, b) => a.consecutiveFails - b.consecutiveFails);
 
     for (const node of candidates) {
       try {
         console.log(`[Orchestrator] Failover Attempt: ${node.ip}`);
         const data = await this.rpcCall(node.ip);
 
-        this.reportSuccess(node);
-        this.activeNode = node; 
+        // Success - Make this the temporary Active Node
+        this.activeNode = node;
+        node.consecutiveFails = 0;
 
         this.cachedData = data;
         this.lastFetchTime = Date.now();
 
-        // Check if Hero is back immediately
+        // OBSESSION: Check Hero immediately
         this.attemptHeroRecovery(); 
-        return this.mergeWithPassiveDiscovery(data);
 
+        return this.mergeWithPassiveDiscovery(data);
       } catch (e) {
-        this.reportFailure(node);
+        node.consecutiveFails++;
       }
     }
 
-    console.error("[Orchestrator] FAILOVER SEQUENCE FAILED.");
+    console.error("[Orchestrator] ALL PUBLIC RPCS FAILED. Serving Stale Cache.");
     return this.cachedData;
   }
 
-  // --- HELPERS ---
-
-  private isCoolingDown(node: RpcNodeStatus): boolean {
-    if (node.isHero) return false; // HERO NEVER COOLS DOWN
-    if (node.cooldownUntil > Date.now()) return true;
-    return false;
-  }
-
-  private reportSuccess(node: RpcNodeStatus) {
-    node.isOnline = true;
-    node.consecutiveFails = 0;
-    node.cooldownUntil = 0;
-    node.lastSeen = Date.now();
-  }
-
-  private reportFailure(node: RpcNodeStatus) {
-    node.isOnline = false;
-    node.consecutiveFails++;
-
-    if (node.isHero) {
-        // SPECIAL HERO LOGIC: Log warning, but DO NOT BAN.
-        // We reset cooldown so it is eligible immediately for the next tick.
-        console.warn(`[Orchestrator] Hero ${node.ip} failed. Will retry next tick (No Ban).`);
-        node.cooldownUntil = 0; 
-    } else {
-        // Normal Backup Logic: Ban if too many failures
-        if (node.consecutiveFails >= MAX_FAILURES) {
-            node.cooldownUntil = Date.now() + COOLDOWN_MS;
-            console.warn(`[Orchestrator] 🛑 CIRCUIT OPENED for Backup ${node.ip}. Banned for 10s.`);
-        }
-    }
-  }
-
   private async attemptHeroRecovery() {
-    // Always try. Hero is never cooling down.
+    // We silently try the Hero.
     try {
       await this.rpcCall(this.hero.ip);
+      // It worked! Switch back instantly.
       console.log(`[Orchestrator] HERO RECOVERED. Switching back to ${this.hero.ip}`);
       this.activeNode = this.hero;
-      this.reportSuccess(this.hero);
+      this.hero.consecutiveFails = 0;
     } catch (e) {
-      this.reportFailure(this.hero);
+      // Hero still sleeping. We'll try again next time.
     }
   }
 
+  private async rpcCall(ip: string): Promise<any[]> {
+    const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
+    const res = await axios.post(`http://${ip}:6000/rpc`, payload, { 
+        timeout: TIMEOUT_RPC,
+        httpAgent,
+        httpsAgent 
+    });
+    return res.data?.result?.pods || [];
+  }
+
+  // Background Discovery (Unchanged)
   private startPassiveDiscovery() {
     setInterval(async () => {
-      const validBackups = this.backups.filter(n => !this.isCoolingDown(n));
-      const randomBackups = validBackups.sort(() => 0.5 - Math.random()).slice(0, 2);
-
+      const randomBackups = this.backups.sort(() => 0.5 - Math.random()).slice(0, 2);
       for (const node of randomBackups) {
         try {
           const pods = await this.rpcCall(node.ip);
@@ -214,24 +169,10 @@ export class PublicSwarmOrchestrator {
   private mergeWithPassiveDiscovery(heroData: any[]): any[] {
     const combined = [...heroData];
     const heroKeys = new Set(heroData.map(p => p.pubkey || p.public_key));
-
     this.passiveDiscoveryCache.forEach((pod, key) => {
-      if (!heroKeys.has(key)) {
-        combined.push(pod);
-      }
+      if (!heroKeys.has(key)) combined.push(pod);
     });
     return combined;
-  }
-
-  private async rpcCall(ip: string): Promise<any[]> {
-    const payload = { jsonrpc: '2.0', method: 'get-pods-with-stats', params: [], id: 1 };
-    const res = await axios.post(`http://${ip}:6000/rpc`, payload, { 
-        timeout: TIMEOUT_RPC,
-        httpAgent,
-        httpsAgent,
-        headers: { 'User-Agent': 'XandeumPulse/1.0' } // Be polite to the RPC
-    });
-    return res.data?.result?.pods || [];
   }
 }
 
