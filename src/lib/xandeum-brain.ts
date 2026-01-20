@@ -28,12 +28,15 @@ let systemState = {
     stats: {
       consensusVersion: '0.0.0',
       totalNodes: 0,
+      medianCredits: 0,
+      medianStorage: 0,
       systemStatus: { rpc: false, credits: false },
       // Explicitly cast reputation to 'number | null' so TypeScript accepts null later
       avgBreakdown: { total: 0, uptime: 0, version: 0, reputation: null as number | null, storage: 0 }
     }
   }
 };
+
 
 // --- INTERFACES (UNCHANGED) ---
 
