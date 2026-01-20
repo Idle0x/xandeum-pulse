@@ -216,7 +216,11 @@ export const Header = ({
       {viewMode === 'list' && !zenMode && isScrolled && (
          <div className="w-full border-t border-zinc-800/50 pt-2 pb-1 hidden md:block">
             <div className="max-w-7xl 2xl:max-w-[1800px] mx-auto px-8">
-               <div className={`${gridClass} gap-4 px-5 items-center text-[9px] font-bold uppercase tracking-wider`}>
+               {/* FIX APPLIED: Added 'grid' class here. 
+                   Previously I only had {gridClass} which defines columns but not the display type, 
+                   causing them to stack vertically. 
+               */}
+               <div className={`grid ${gridClass} gap-4 px-5 items-center text-[9px] font-bold uppercase tracking-wider`}>
                   <div className="w-2"></div>
                   <div className="pl-1"></div>
                   <div></div>
