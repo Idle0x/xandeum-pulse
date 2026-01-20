@@ -156,7 +156,6 @@ async function fetchPrivateMainnetNodes() {
   const privateUrl = process.env.XANDEUM_PRIVATE_RPC_URL;
   if (!privateUrl) { console.warn("XANDEUM_PRIVATE_RPC_URL missing"); return []; }
 
-  // CACHE CHECK: If cache is fresh (15s), use it.
   if (Date.now() - privateMainnetCache.timestamp < 15000 && privateMainnetCache.data.length > 0) {
       return privateMainnetCache.data;
   }
@@ -167,11 +166,11 @@ async function fetchPrivateMainnetNodes() {
     const rawPods = res.data?.result?.pods;
     
     if (Array.isArray(rawPods)) {
-      // DEBUG LOGGING ADDED HERE
       const validPods = rawPods.map((p: any) => {
         const result = RawNodeSchema.safeParse(p);
         if (!result.success) {
-           console.error("[Zod Error - Private]", result.error.errors); // Log why it failed
+           // FIXED: Use .format() for typesafe error logging
+           console.error("[Zod Error - Private]", result.error.format()); 
            return null;
         }
         return result.data;
@@ -183,7 +182,6 @@ async function fetchPrivateMainnetNodes() {
       }
     }
   } catch (e) {
-    // If fail, return OLD cache if we have it
     if (privateMainnetCache.data.length > 0) return privateMainnetCache.data;
   }
   return [];
@@ -274,8 +272,8 @@ async function refreshNetworkPulse() {
     const validPublicNodes = rawPublicNodes.map((p: any) => {
         const result = RawNodeSchema.safeParse(p);
         if (!result.success) {
-            // Uncomment to see verbose errors
-            // console.error("[Zod Error - Public]", result.error.errors);
+            // FIXED: Use .format() for typesafe error logging
+            console.error("[Zod Error - Public]", result.error.format());
             return null;
         }
         return result.data;
@@ -286,9 +284,6 @@ async function refreshNetworkPulse() {
       if (!exists) rawPrivateNodes.unshift(operatorNode);
     }
 
-    // THE SAFETY LOCK
-    // If everything failed, we print a warning but we DO NOT update state. 
-    // This is why your data is stale.
     if (rawPrivateNodes.length === 0 && validPublicNodes.length === 0) {
        console.warn(`[Worker] Safety Lock Triggered: 0 nodes found. Serving STALE data from: ${new Date(systemState.lastUpdated).toISOString()}`);
        return;
@@ -445,8 +440,8 @@ async function refreshNetworkPulse() {
           medianCredits: medianMainnet,
           medianStorage,
           totalNodes: allSorted.length,
-          medianCredits: medianMainnet, // FIXED TYPO FROM PREVIOUS ERROR
-          medianStorage: medianStorage, // FIXED TYPO FROM PREVIOUS ERROR
+          medianCredits: medianMainnet,
+          medianStorage: medianStorage,
           systemStatus: { credits: isCreditsApiOnline, rpc: true },
           avgBreakdown: {
             total: avgHealth,
