@@ -169,7 +169,6 @@ async function fetchPrivateMainnetNodes() {
       const validPods = rawPods.map((p: any) => {
         const result = RawNodeSchema.safeParse(p);
         if (!result.success) {
-           // FIXED: Use .format() for typesafe error logging
            console.error("[Zod Error - Private]", result.error.format()); 
            return null;
         }
@@ -272,7 +271,6 @@ async function refreshNetworkPulse() {
     const validPublicNodes = rawPublicNodes.map((p: any) => {
         const result = RawNodeSchema.safeParse(p);
         if (!result.success) {
-            // FIXED: Use .format() for typesafe error logging
             console.error("[Zod Error - Public]", result.error.format());
             return null;
         }
@@ -440,8 +438,6 @@ async function refreshNetworkPulse() {
           medianCredits: medianMainnet,
           medianStorage,
           totalNodes: allSorted.length,
-          medianCredits: medianMainnet,
-          medianStorage: medianStorage,
           systemStatus: { credits: isCreditsApiOnline, rpc: true },
           avgBreakdown: {
             total: avgHealth,
