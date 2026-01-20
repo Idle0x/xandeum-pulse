@@ -187,7 +187,8 @@ export const Header = ({
              <div className="hidden md:flex gap-2 relative ml-auto">
                 {['uptime', 'storage', 'storage_used', 'version', 'health', 'credits'].map((opt) => (
                     <button key={opt} onClick={() => onSortChange(opt as any)} className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold transition border whitespace-nowrap ${sortBy === opt ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
-                        {opt === 'storage' ? 'COMM.' : opt === 'storage_used' ? 'USED' : opt.toUpperCase()}
+                        {/* UPDATE 1: Full 'COMMITTED' text here */}
+                        {opt === 'storage' ? 'COMMITTED' : opt === 'storage_used' ? 'USED' : opt.toUpperCase()}
                         {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={10} className="ml-1" /> : <ArrowDown size={10} className="ml-1" />)}
                     </button>
                 ))}
@@ -204,7 +205,8 @@ export const Header = ({
                 {opt === 'version' && <Server size={10} />}
                 {opt === 'health' && <HeartPulse size={10} />}
                 {opt === 'credits' && <Coins size={10} />}
-                {opt === 'storage' ? 'COMM.' : opt === 'storage_used' ? 'USED' : opt.toUpperCase()}
+                {/* UPDATE 2: Full 'COMMITTED' text here too */}
+                {opt === 'storage' ? 'COMMITTED' : opt === 'storage_used' ? 'USED' : opt.toUpperCase()}
                 {sortBy === opt && (sortOrder === 'asc' ? <ArrowUp size={8} className="ml-0.5" /> : <ArrowDown size={8} className="ml-0.5" />)}
                 </button>
             ))}
@@ -212,22 +214,27 @@ export const Header = ({
       </div>
 
       {/* === DESKTOP LIST VIEW HEADER (STICKY) === */}
-      {/* This new row matches the 'main' container width and 'NodeList' internal padding */}
       {viewMode === 'list' && !zenMode && isScrolled && (
          <div className="w-full border-t border-zinc-800/50 pt-2 pb-1 hidden md:block">
             <div className="max-w-7xl 2xl:max-w-[1800px] mx-auto px-8">
-               {/* FIX APPLIED: Added 'grid' class here. 
-                   Previously I only had {gridClass} which defines columns but not the display type, 
-                   causing them to stack vertically. 
-               */}
                <div className={`grid ${gridClass} gap-4 px-5 items-center text-[9px] font-bold uppercase tracking-wider`}>
+                  
+                  {/* Status Dot Column */}
                   <div className="w-2"></div>
-                  <div className="pl-1"></div>
-                  <div></div>
+                  
+                  {/* Identity Column */}
+                  <div className="text-zinc-500 select-none">Identity</div>
+
+                  {/* Last Seen Column */}
+                  <div className="text-zinc-500 select-none cursor-default">Last Seen</div>
+
                   <ListHeaderCell label="Version" metric="version" />
                   <ListHeaderCell label="Health" metric="health" />
                   <ListHeaderCell label="Uptime" metric="uptime" alignRight />
-                  <ListHeaderCell label="Comm." metric="storage" alignRight />
+                  
+                  {/* UPDATE 3: Full 'Committed' text here */}
+                  <ListHeaderCell label="Committed" metric="storage" alignRight />
+                  
                   <ListHeaderCell label="Used" metric="storage_used" alignRight />
                   <ListHeaderCell label="Credits" metric="credits" alignRight />
                   <div className="w-6"></div>
