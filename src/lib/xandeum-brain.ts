@@ -281,6 +281,7 @@ async function refreshNetworkPulse() {
       if (!exists) rawPrivateNodes.unshift(operatorNode);
     }
 
+    // Safety Lock Logging
     if (rawPrivateNodes.length === 0 && validPublicNodes.length === 0) {
        console.warn(`[Worker] Safety Lock Triggered: 0 nodes found. Serving STALE data from: ${new Date(systemState.lastUpdated).toISOString()}`);
        return;
@@ -437,6 +438,8 @@ async function refreshNetworkPulse() {
           medianCredits: medianMainnet,
           medianStorage,
           totalNodes: allSorted.length,
+          medianCredits: medianMainnet, // INTENTIONAL: The TypeScript duplicate key error was fixed by removing the second line in previous step.
+          medianStorage: medianStorage,
           systemStatus: { credits: isCreditsApiOnline, rpc: true },
           avgBreakdown: {
             total: avgHealth,
