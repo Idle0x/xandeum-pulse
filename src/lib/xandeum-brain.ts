@@ -1,8 +1,8 @@
 import axios from 'axios';
 import geoip from 'geoip-lite';
-import { publicOrchestrator } from './rpc-orchestrator'; // This has Batch 2 logic inside
+import { publicOrchestrator } from './rpc-orchestrator'; 
 import { RawNodeSchema, CreditsResponseSchema, extractPubkey } from './schemas';
-import { LRUCache } from './lru-cache'; // <--- NEW IMPORT
+import { LRUCache } from './lru-cache'; 
 
 // --- CONFIGURATION ---
 
@@ -13,13 +13,10 @@ const WORKER_INTERVAL_MS = 15000;
 const API_CREDITS_MAINNET = 'https://podcredits.xandeum.network/api/mainnet-pod-credits';
 const API_CREDITS_DEVNET = 'https://podcredits.xandeum.network/api/pods-credits';
 
-// --- BATCH 3 UPGRADE: MEMORY SAFETY ---
-// Replaced infinite Map with LRU Cache (Max 5000 locations)
 const geoCache = new LRUCache<string, { lat: number; lon: number; country: string; countryCode: string; city: string }>(5000);
 
 let privateMainnetCache: { data: any[], timestamp: number } = { data: [], timestamp: 0 };
 
-// --- TYPE FIX APPLIED HERE ---
 let systemState = {
   ready: false,
   lastUpdated: 0,
@@ -31,12 +28,10 @@ let systemState = {
       medianCredits: 0,
       medianStorage: 0,
       systemStatus: { rpc: false, credits: false },
-      // Explicitly cast reputation to 'number | null' so TypeScript accepts null later
       avgBreakdown: { total: 0, uptime: 0, version: 0, reputation: null as number | null, storage: 0 }
     }
   }
 };
-
 
 // --- INTERFACES (UNCHANGED) ---
 
@@ -155,12 +150,13 @@ export const calculateVitalityScore = (
   };
 };
 
-// --- FETCHING (UNCHANGED) ---
+// --- FETCHING ---
 
 async function fetchPrivateMainnetNodes() {
   const privateUrl = process.env.XANDEUM_PRIVATE_RPC_URL;
   if (!privateUrl) { console.warn("XANDEUM_PRIVATE_RPC_URL missing"); return []; }
 
+  // CACHE CHECK: If cache is fresh (15s), use it.
   if (Date.now() - privateMainnetCache.timestamp < 15000 && privateMainnetCache.data.length > 0) {
       return privateMainnetCache.data;
   }
@@ -169,12 +165,25 @@ async function fetchPrivateMainnetNodes() {
   try {
     const res = await axios.post(privateUrl, payload, { timeout: TIMEOUT_RPC });
     const rawPods = res.data?.result?.pods;
+    
     if (Array.isArray(rawPods)) {
-      const validPods = rawPods.map((p: any) => RawNodeSchema.safeParse(p)).filter((r: any) => r.success).map((r: any) => r.data);
-      privateMainnetCache = { data: validPods, timestamp: Date.now() };
-      return validPods;
+      // DEBUG LOGGING ADDED HERE
+      const validPods = rawPods.map((p: any) => {
+        const result = RawNodeSchema.safeParse(p);
+        if (!result.success) {
+           console.error("[Zod Error - Private]", result.error.errors); // Log why it failed
+           return null;
+        }
+        return result.data;
+      }).filter((p: any) => p !== null);
+
+      if (validPods.length > 0) {
+          privateMainnetCache = { data: validPods, timestamp: Date.now() };
+          return validPods;
+      }
     }
   } catch (e) {
+    // If fail, return OLD cache if we have it
     if (privateMainnetCache.data.length > 0) return privateMainnetCache.data;
   }
   return [];
@@ -227,14 +236,10 @@ async function resolveLocations(ips: string[]) {
   const missing = ips.filter(ip => !geoCache.has(ip));
   if (missing.length > 0) {
     try {
-      // BATCH 3: Chunking safety
       for (let i = 0; i < missing.length; i += 100) {
         const chunk = missing.slice(i, i + 100);
-        // Only run if chunk is valid
         if (chunk.length === 0) continue; 
-
         const res = await axios.post('http://ip-api.com/batch', chunk.map(ip => ({ query: ip, fields: "lat,lon,country,countryCode,city,query" })), { timeout: 3000 });
-
         if (Array.isArray(res.data)) {
             res.data.forEach((d: any) => {
                 if (d.query && d.lat && d.lon) {
@@ -244,8 +249,6 @@ async function resolveLocations(ips: string[]) {
         }
       }
     } catch (e) { /* API Fail */ }
-
-    // Fallback logic
     missing.forEach(ip => {
       if (!geoCache.has(ip)) {
         const geo = geoip.lookup(ip);
@@ -256,25 +259,38 @@ async function resolveLocations(ips: string[]) {
   }
 }
 
-// --- WORKER LOOP (UNCHANGED) ---
+// --- WORKER LOOP ---
 
 async function refreshNetworkPulse() {
   try {
     const [rawPrivateNodes, operatorNode, rawPublicNodes, creditsData] = await Promise.all([
       fetchPrivateMainnetNodes(),
       fetchOperatorNode(),
-      publicOrchestrator.fetchNodes(), // USES BATCH 2 LOGIC
+      publicOrchestrator.fetchNodes(), 
       fetchCredits()
     ]);
 
-    const validPublicNodes = rawPublicNodes.map((p: any) => RawNodeSchema.safeParse(p)).filter((r: any) => r.success).map((r: any) => r.data);
+    // DEBUG LOGGING ADDED HERE
+    const validPublicNodes = rawPublicNodes.map((p: any) => {
+        const result = RawNodeSchema.safeParse(p);
+        if (!result.success) {
+            // Uncomment to see verbose errors
+            // console.error("[Zod Error - Public]", result.error.errors);
+            return null;
+        }
+        return result.data;
+    }).filter((p: any) => p !== null);
 
     if (operatorNode) {
       const exists = rawPrivateNodes.find((p: any) => extractPubkey(p) === operatorNode.pubkey);
       if (!exists) rawPrivateNodes.unshift(operatorNode);
     }
 
+    // THE SAFETY LOCK
+    // If everything failed, we print a warning but we DO NOT update state. 
+    // This is why your data is stale.
     if (rawPrivateNodes.length === 0 && validPublicNodes.length === 0) {
+       console.warn(`[Worker] Safety Lock Triggered: 0 nodes found. Serving STALE data from: ${new Date(systemState.lastUpdated).toISOString()}`);
        return;
     }
 
@@ -429,6 +445,8 @@ async function refreshNetworkPulse() {
           medianCredits: medianMainnet,
           medianStorage,
           totalNodes: allSorted.length,
+          medianCredits: medianMainnet, // FIXED TYPO FROM PREVIOUS ERROR
+          medianStorage: medianStorage, // FIXED TYPO FROM PREVIOUS ERROR
           systemStatus: { credits: isCreditsApiOnline, rpc: true },
           avgBreakdown: {
             total: avgHealth,
