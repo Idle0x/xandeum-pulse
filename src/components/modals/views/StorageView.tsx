@@ -1,6 +1,8 @@
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { Node } from '../../../types';
 import { formatBytes } from '../../../utils/formatters';
+// NEW IMPORTS: History Hook
+import { useNodeHistory } from '../../../hooks/useNodeHistory';
 
 interface StorageViewProps {
   node: Node;
@@ -18,6 +20,9 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
   const avgCommitted = totalStorageCommitted / (nodeCount || 1);
   const diff = nodeCap - median;
   const isPos = diff >= 0;
+
+  // NEW: Fetch History for Reliability Calculation
+  const { reliabilityScore, loading: historyLoading } = useNodeHistory(node.pubkey);
 
   const multiplier = median > 0 ? (nodeCap / median) : 0;
   const multiplierDisplay = multiplier >= 1 ? `${multiplier.toFixed(1)}x` : `${(1/multiplier).toFixed(1)}x`;
@@ -39,6 +44,15 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
       <div className="flex-grow flex flex-col gap-4">
         {/* Network Comparison */}
         <div className={`p-4 rounded-xl border text-center relative overflow-hidden ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900/40 border-zinc-800/60'}`}>
+          
+          {/* NEW: Reliability Badge (Top Right of Card) */}
+          {/* Only shows if reliability is excellent (>90%) to act as a 'Quality Seal' */}
+          {!historyLoading && reliabilityScore > 90 && (
+             <div className="absolute top-2 right-2 flex items-center gap-1 text-[8px] font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20 shadow-lg animate-in zoom-in duration-500">
+                <ShieldCheck size={10} /> {reliabilityScore}% PROVEN
+             </div>
+          )}
+
           <div className="text-[9px] text-zinc-500 uppercase font-bold mb-1 flex items-center justify-center gap-1 tracking-wider">NETWORK COMPARISON</div>
           <div className="text-sm text-zinc-300 relative z-10">
             Storage is 
