@@ -4,6 +4,9 @@ import { Node } from '../../types';
 import { getSafeIp } from '../../utils/nodeHelpers';
 import { formatBytes } from '../../utils/formatters';
 import { MicroBar, MetricDelta, formatUptimePrecise } from './MicroComponents';
+// NEW IMPORTS: History Hook & Ribbon Component
+import { useNodeHistory } from '../../hooks/useNodeHistory';
+import { StabilityRibbon } from '../modals/views/StabilityRibbon';
 
 interface NodeColumnProps {
   node: Node;
@@ -30,10 +33,13 @@ export const NodeColumn = ({
     benchmarks, 
     showNetwork,
     hoveredNodeKey,
-    onFocus, // Renamed / Repurposed handler for Clicking
+    onFocus, 
     isLeader,
     leaderType
 }: NodeColumnProps) => {
+
+  // NEW: Fetch History for this specific column (Compact 15-day view)
+  const { history, loading } = useNodeHistory(node.pubkey, 15);
 
   const Row = ({ children }: { children: React.ReactNode }) => (
     <div className={`h-[36px] md:h-[72px] flex flex-col justify-center px-3 md:px-4 min-w-[100px] md:min-w-[140px] relative`}>
@@ -175,6 +181,14 @@ export const NodeColumn = ({
             </div>
         </Row>
         <Row><span className="text-[9px] md:text-base font-mono text-zinc-500">#{node.rank || '-'}</span></Row>
+
+        {/* NEW: Stability Footer */}
+        <div className="px-3 md:px-4 py-2 bg-black/20 border-t border-white/5">
+           <div className="text-[6px] md:text-[8px] font-bold text-zinc-600 uppercase mb-1 text-center tracking-wider">15-Day Stability</div>
+           <div className="opacity-70 grayscale-[0.3] hover:grayscale-0 transition-all">
+              <StabilityRibbon history={history} loading={loading} days={15} />
+           </div>
+        </div>
 
         {/* BOTTOM TRASHCAN */}
         <div className={`h-[28px] md:h-[32px] border-t border-white/5 flex items-center justify-center transition-colors cursor-pointer group/trash ${isLeader ? 'bg-yellow-900/10 hover:bg-yellow-500/20' : 'bg-black/20 hover:bg-red-500/10'}`} onClick={(e) => { e.stopPropagation(); onRemove(); }}>
