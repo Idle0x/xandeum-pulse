@@ -4,10 +4,9 @@ import { Node } from '../../types';
 import { ControlRail } from './ControlRail';
 import { NodeColumn } from './NodeColumn';
 import { SynthesisEngine } from './SynthesisEngine';
-import { EmptySlot } from './ComparisonUI';
 import { PLAYER_THEMES } from './MicroComponents';
 
-// Re-defining themes locally to ensure they are available to the ghost canvas
+// RE-DEFINE THEMES (Ensures availability for ghost canvas without context)
 const LEADER_THEME_MAP: Record<string, any> = {
   STORAGE: { name: 'indigo', hex: '#818cf8', headerBg: 'bg-indigo-900/40', bodyBg: 'bg-indigo-900/5', text: 'text-indigo-400', border: 'border-indigo-500/20' },
   CREDITS: { name: 'emerald', hex: '#34d399', headerBg: 'bg-emerald-900/40', bodyBg: 'bg-emerald-900/5', text: 'text-emerald-400', border: 'border-emerald-500/20' },
@@ -15,17 +14,22 @@ const LEADER_THEME_MAP: Record<string, any> = {
   UPTIME: { name: 'sky', hex: '#38bdf8', headerBg: 'bg-sky-900/40', bodyBg: 'bg-sky-900/5', text: 'text-sky-400', border: 'border-sky-500/20' }
 };
 
-const StaticWatermark = () => (
-  <div className="flex items-center justify-center gap-3 py-8 w-full border-t border-zinc-800 bg-[#020202] mt-auto">
-     <div className="w-6 h-6 bg-cyan-500 rounded-full shadow-[0_0_15px_#06b6d4] flex items-center justify-center">
-        <Zap size={12} className="text-black fill-black" />
-     </div>
-     <div className="flex flex-col">
-        <span className="text-xs font-black uppercase tracking-[0.3em] text-zinc-400">Verified by Pulse</span>
-        <span className="text-[10px] font-mono text-zinc-600">xandeum-pulse.vercel.app/</span>
-     </div>
-  </div>
-);
+// NEW: Dynamic Watermark Component
+const StaticWatermark = () => {
+  const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  
+  return (
+    <div className="flex items-center justify-center gap-3 py-8 w-full border-t border-zinc-800 bg-[#020202] mt-auto">
+       <div className="w-6 h-6 bg-cyan-500 rounded-full shadow-[0_0_15px_#06b6d4] flex items-center justify-center">
+          <Zap size={12} className="text-black fill-black" />
+       </div>
+       <div className="flex flex-col">
+          <span className="text-xs font-black uppercase tracking-[0.3em] text-zinc-400">Verified by Pulse</span>
+          <span className="text-[10px] font-mono text-zinc-600">Generated {dateStr} • xandeum-pulse.vercel.app</span>
+       </div>
+    </div>
+  );
+};
 
 interface PulseExportCanvasProps {
   mode: 'TABLE' | 'FULL';
@@ -43,22 +47,18 @@ export const PulseExportCanvas = forwardRef<HTMLDivElement, PulseExportCanvasPro
 }, ref) => {
 
   const totalItems = leaders.length + nodes.length;
-
-  // Helper for Title Case (e.g., "MAINNET" -> "Mainnet")
   const formatScope = (scope: string) => scope.charAt(0).toUpperCase() + scope.slice(1).toLowerCase();
 
   return (
     <div ref={ref} className="bg-[#020202] flex flex-col items-start text-zinc-100 font-sans" style={{ width: 'fit-content', minWidth: '100%', minHeight: '100vh' }}>
-        
-        {/* 1. HEADER SECTION (UPDATED) */}
+
+        {/* 1. HEADER SECTION */}
         <div className="w-full flex flex-col items-center justify-center pt-12 pb-8 border-b border-white/5 bg-[#050505]">
             <h1 className="text-2xl font-black text-white uppercase tracking-[0.2em] mb-2">Xandeum Node Performance Report</h1>
             <div className="flex items-center gap-4 text-xs font-mono text-zinc-500 font-medium">
                 <span>Network: <span className="text-zinc-300 font-bold">{formatScope(networkScope)}</span></span>
                 <span className="text-zinc-700">•</span>
                 <span><span className="text-zinc-300 font-bold">{totalItems}</span> Nodes Analyzed</span>
-                <span className="text-zinc-700">•</span>
-                <span>{new Date().toISOString().split('T')[0]}</span>
             </div>
         </div>
 
@@ -67,7 +67,7 @@ export const PulseExportCanvas = forwardRef<HTMLDivElement, PulseExportCanvasPro
             <div className="sticky left-0 z-10">
                  <ControlRail showNetwork={showNetwork} benchmarks={benchmarks} />
             </div>
-            
+
             {/* Render Leaders */}
             {leaders.map((leader) => {
                 const isWinner = {
@@ -115,7 +115,6 @@ export const PulseExportCanvas = forwardRef<HTMLDivElement, PulseExportCanvasPro
                     />
                 );
             })}
-             {/* Spacer for right border aesthetics */}
              <div className="w-12 bg-transparent shrink-0"></div>
         </div>
 
@@ -126,13 +125,14 @@ export const PulseExportCanvas = forwardRef<HTMLDivElement, PulseExportCanvasPro
                     <div className="mb-6 text-center">
                         <h2 className="text-lg font-bold text-zinc-300 uppercase tracking-widest">Network Synthesis</h2>
                     </div>
-                    {/* UPDATE: Passing isExport=true to hide tabs and narrative */}
+                    {/* isExport=true hides the tabs and interactive narrative, showing static view */}
                     <SynthesisEngine 
                         nodes={[...leaders.map(l => l.node), ...nodes]} 
                         themes={[...leaders.map(l => LEADER_THEME_MAP[l.metric]), ...PLAYER_THEMES]} 
                         networkScope={networkScope} 
                         benchmarks={benchmarks}
                         isExport={true}
+                        focusedNodeKey={null} // Default for export
                     />
                 </div>
             </div>
