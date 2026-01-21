@@ -1,4 +1,3 @@
-// src/components/leaderboard/NodeTable.tsx
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { 
@@ -7,6 +6,8 @@ import {
   Wallet, AlertOctagon, Search 
 } from 'lucide-react';
 import { RankedNode } from '../../types/leaderboard';
+// NEW IMPORT: The Shadow Layer Component
+import { ExpandedRowDetails } from './ExpandedRowDetails';
 
 interface NodeTableProps {
   nodes: RankedNode[];
@@ -25,7 +26,7 @@ export default function NodeTable({
   nodes, loading, offline, visibleCount, setVisibleCount,
   expandedNode, setExpandedNode, favorites, onSimulate, networkFilter
 }: NodeTableProps) {
-  
+
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
@@ -120,7 +121,12 @@ export default function NodeTable({
                   {/* EXPANDED DETAILS */}
                   {isExpanded && (
                       <div className="border-t border-zinc-800/50 p-3 md:p-4 animate-in slide-in-from-top-2 duration-200">
-                          <div className="flex flex-col gap-4">
+                          
+                          {/* NEW: THE DATABASE INJECTION POINT */}
+                          {/* This component lazily fetches history only when the row opens */}
+                          <ExpandedRowDetails pubkey={node.pubkey} />
+
+                          <div className="flex flex-col gap-4 mt-4">
                               {/* MOBILE ACTIONS */}
                               <div className="grid grid-cols-6 gap-2 md:hidden">
                                   {node.address && (
@@ -182,7 +188,7 @@ export default function NodeTable({
               </div>
               );
           })}
-          
+
           {/* LOAD MORE */}
           {visibleCount < nodes.length ? (
             <div className="p-4 flex justify-center border-t border-zinc-800">
