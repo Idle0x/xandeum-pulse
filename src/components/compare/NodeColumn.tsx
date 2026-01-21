@@ -4,7 +4,7 @@ import { Node } from '../../types';
 import { getSafeIp } from '../../utils/nodeHelpers';
 import { formatBytes } from '../../utils/formatters';
 import { MicroBar, MetricDelta, formatUptimePrecise } from './MicroComponents';
-// NEW IMPORTS: History Hook & Ribbon Component
+// NEW IMPORTS: History Hook & Ribbon
 import { useNodeHistory } from '../../hooks/useNodeHistory';
 import { StabilityRibbon } from '../modals/views/StabilityRibbon';
 
@@ -38,7 +38,7 @@ export const NodeColumn = ({
     leaderType
 }: NodeColumnProps) => {
 
-  // NEW: Fetch History for this specific column (Compact 15-day view)
+  // 1. Fetch History for the "DNA Strip" (15 days for compactness)
   const { history, loading } = useNodeHistory(node.pubkey, 15);
 
   const Row = ({ children }: { children: React.ReactNode }) => (
@@ -60,19 +60,14 @@ export const NodeColumn = ({
       return {};
   }, [showNetwork, benchmarks, anchorNode]);
 
-  // Don't show delta if it's a leader column (it's the standard)
   const showDelta = !isLeader && (showNetwork || (anchorNode && node.pubkey !== anchorNode.pubkey));
-
-  // --- SPOTLIGHT LOGIC (Now Click-Based) ---
   const isActive = hoveredNodeKey === node.pubkey;
   const isDimmed = hoveredNodeKey && hoveredNodeKey !== node.pubkey;
 
   return (
     <div 
         onClick={(e) => {
-            // STOP propagation so the "Main" container click (which clears focus) doesn't fire
             e.stopPropagation();
-            // Toggle focus
             onFocus?.(node.pubkey || null);
         }}
         className={`flex flex-col min-w-[100px] md:min-w-[140px] relative border-r last:rounded-tr-xl last:rounded-br-xl group/col transition-all duration-300 cursor-pointer
@@ -89,7 +84,6 @@ export const NodeColumn = ({
       <div className={`h-24 md:h-32 ${isActive ? 'bg-zinc-800' : theme.headerBg} p-2 md:p-4 flex flex-col items-center justify-between relative overflow-hidden group first:rounded-tr-xl transition-colors duration-300`}>
         {overallWinner && <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 animate-in zoom-in duration-500"><Crown size={10} className="md:w-3.5 md:h-3.5 text-yellow-400 fill-yellow-400 drop-shadow-sm" /></div>}
 
-        {/* CLOSE BUTTON */}
         <button 
             onClick={(e) => { e.stopPropagation(); onRemove(); }}
             className={`absolute top-1 right-1 p-1 rounded transition-all opacity-0 group-hover/col:opacity-100 z-20 ${isLeader ? 'text-yellow-600 hover:text-yellow-400 hover:bg-yellow-500/20' : 'text-red-500/50 hover:text-red-500 hover:bg-red-500/10'}`}
@@ -97,7 +91,6 @@ export const NodeColumn = ({
             <X size={12} className="md:w-3.5 md:h-3.5" />
         </button>
 
-        {/* Flag / Icon */}
         <div className="mt-1 md:mt-2">
              {node.location?.countryCode ? (
                  <img src={`https://flagcdn.com/w80/${node.location.countryCode.toLowerCase()}.png`} className="w-6 h-4 md:w-10 md:h-7 rounded-[2px] shadow-md object-cover" />
@@ -106,13 +99,11 @@ export const NodeColumn = ({
              )}
         </div>
 
-        {/* Identity Text */}
         <div className="flex flex-col items-center gap-1 w-full text-center">
             <div className={`text-[7px] md:text-[10px] font-mono ${isActive ? 'text-white' : 'text-white/50'}`}>{getSafeIp(node)}</div>
             <div className={`text-[8px] md:text-xs font-bold font-mono text-white px-1 py-0.5 md:px-2 md:py-1 rounded border border-white/10 w-full truncate ${isActive ? 'bg-zinc-700' : 'bg-black/20'}`}>
                 {node.pubkey?.slice(0, 8)}<span className="hidden md:inline">{node.pubkey?.slice(8, 12)}...</span>
             </div>
-            {/* NEW: Gold Context Label for Leaders */}
             {isLeader && (
                 <div className="mt-1 text-[7px] md:text-[9px] font-black text-yellow-400 uppercase tracking-widest whitespace-nowrap">
                    ( {leaderType} LEADER )
@@ -182,10 +173,13 @@ export const NodeColumn = ({
         </Row>
         <Row><span className="text-[9px] md:text-base font-mono text-zinc-500">#{node.rank || '-'}</span></Row>
 
-        {/* NEW: Stability Footer */}
-        <div className="px-3 md:px-4 py-2 bg-black/20 border-t border-white/5">
-           <div className="text-[6px] md:text-[8px] font-bold text-zinc-600 uppercase mb-1 text-center tracking-wider">15-Day Stability</div>
-           <div className="opacity-70 grayscale-[0.3] hover:grayscale-0 transition-all">
+        {/* --- PHASE 2 INTEGRATION: The DNA Strip --- */}
+        <div className="px-3 md:px-4 py-3 bg-black/20 border-t border-white/5 backdrop-blur-sm group-hover/col:bg-black/40 transition-colors">
+           <div className="text-[6px] md:text-[8px] font-bold text-zinc-600 uppercase mb-1.5 text-center tracking-wider opacity-60 group-hover/col:opacity-100 transition-opacity">
+              15-Day Stability
+           </div>
+           {/* We remove grayscale to make it look "live" but dim slightly until hover */}
+           <div className="opacity-80 group-hover/col:opacity-100 transition-opacity">
               <StabilityRibbon history={history} loading={loading} days={15} />
            </div>
         </div>
