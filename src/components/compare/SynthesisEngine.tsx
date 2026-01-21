@@ -10,8 +10,9 @@ import { getSafeIp } from '../../utils/nodeHelpers';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { formatUptimePrecise } from './MicroComponents';
 import { OverviewLegend, UnifiedLegend } from './ComparisonLegends';
-// IMPORT THE NEW ENGINE
 import { generateNarrative } from '../../lib/narrative-engine';
+// NEW IMPORT: History Hook
+import { useNodeHistory } from '../../hooks/useNodeHistory';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -33,7 +34,6 @@ const InterpretationPanel = ({ contextText }: { contextText: string }) => (
     <div className="px-4 py-3 md:px-6 md:py-4 bg-zinc-900/30 border-t border-white/5 flex items-start gap-3 md:gap-4 transition-all duration-300 print-exclude min-h-[80px]">
         <Info size={14} className="text-blue-400 shrink-0 mt-0.5 md:w-4 md:h-4 animate-pulse" />
         <div className="flex flex-col gap-1">
-            {/* key={contextText} ensures the animation replays when text changes */}
             <p key={contextText} className="text-xs md:text-sm text-zinc-300 leading-relaxed max-w-4xl font-medium animate-in fade-in slide-in-from-bottom-1 duration-300">
                 {contextText}
             </p>
@@ -67,9 +67,10 @@ interface SynthesisEngineProps {
   hoveredNodeKey?: string | null;
   onHover?: (key: string | null) => void;
   isExport?: boolean;
+  focusedNodeKey?: string | null;
 }
 
-export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hoveredNodeKey: externalHoverKey, onHover: setExternalHover, isExport = false }: SynthesisEngineProps) => {
+export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hoveredNodeKey: externalHoverKey, onHover: setExternalHover, isExport = false, focusedNodeKey: propFocusedKey }: SynthesisEngineProps) => {
   const [tab, setTab] = useState<'OVERVIEW' | 'MARKET' | 'TOPOLOGY'>('OVERVIEW');
   const [marketMetric, setMarketMetric] = useState<'storage' | 'credits' | 'health' | 'uptime'>('storage');
   const [pos, setPos] = useState({ coordinates: [0, 20], zoom: 1 });
@@ -77,8 +78,15 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
 
   // --- INTERACTION STATE ---
   const [focusedSection, setFocusedSection] = useState<string | null>(null); 
-  const [focusedNodeKey, setFocusedNodeKey] = useState<string | null>(null); 
+  const [localFocusedNodeKey, setLocalFocusedNodeKey] = useState<string | null>(null); 
   const [internalHoverKey, setInternalHoverKey] = useState<string | null>(null);
+
+  // Sync prop focus if provided (prioritize prop for export/parent control, else local)
+  const focusedNodeKey = propFocusedKey !== undefined ? propFocusedKey : localFocusedNodeKey;
+
+  // NEW: Fetch history for the FOCUSED node
+  // We rename 'reliabilityScore' to avoid confusion if we add other metrics later
+  const { reliabilityScore, loading: historyLoading } = useNodeHistory(focusedNodeKey || undefined);
 
   // Derived Hover State
   const activeHoverKey = externalHoverKey !== undefined ? externalHoverKey : internalHoverKey;
@@ -136,21 +144,20 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
       return links;
   }, [nodes]);
 
-  const handleTabChange = (t: any) => { setTab(t); setFocusedSection(null); setFocusedNodeKey(null); handleHover(null); };
+  const handleTabChange = (t: any) => { setTab(t); setFocusedSection(null); setLocalFocusedNodeKey(null); handleHover(null); };
   const handleZoomIn = () => setPos(p => ({ ...p, zoom: Math.min(p.zoom * 1.5, 10) }));
   const handleZoomOut = () => setPos(p => ({ ...p, zoom: Math.max(p.zoom / 1.5, 1) }));
   const handleReset = () => setPos({ coordinates: [0, 20], zoom: 1 });
 
   const handleFocus = (key: string | null, location?: {lat: number, lon: number}) => {
     if (location) setPos({ coordinates: [location.lon, location.lat], zoom: 4 });
-    setFocusedNodeKey(focusedNodeKey === key ? null : key);
+    setLocalFocusedNodeKey(focusedNodeKey === key ? null : key);
   };
 
   const metricDropdownRef = useRef<HTMLDivElement>(null);
   useOutsideClick(metricDropdownRef, () => setIsMetricDropdownOpen(false));
 
   // --- NARRATIVE ENGINE INTEGRATION ---
-  // The logic is seeded, so re-renders won't cause text flicker unless input data changes
   const narrative = useMemo(() => {
       return generateNarrative({
           tab,
@@ -208,7 +215,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
   return (
     <div className="shrink-0 min-h-[600px] border border-white/5 bg-[#09090b]/40 backdrop-blur-xl flex flex-col relative z-40 rounded-xl mt-6 shadow-2xl overflow-hidden" 
          onMouseLeave={() => handleHover(null)}
-         onClick={() => { setFocusedSection(null); setFocusedNodeKey(null); }}>
+         onClick={() => { setFocusedSection(null); setLocalFocusedNodeKey(null); }}>
 
         {/* TAB CONTROLS */}
         {!isExport && (
@@ -223,7 +230,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
             </div>
         )}
 
-        <div className={`flex-1 overflow-hidden relative flex flex-col ${isExport ? 'pt-6' : 'pt-24'}`} onClick={() => { setFocusedSection(null); setFocusedNodeKey(null); }}>
+        <div className={`flex-1 overflow-hidden relative flex flex-col ${isExport ? 'pt-6' : 'pt-24'}`} onClick={() => { setFocusedSection(null); setLocalFocusedNodeKey(null); }}>
 
             {/* OVERVIEW TAB */}
             {tab === 'OVERVIEW' && (
@@ -242,7 +249,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                                         key={n.pubkey} 
                                         onMouseEnter={() => handleHover(n.pubkey || null)}
                                         onMouseLeave={() => handleHover(null)}
-                                        onClick={(e) => { e.stopPropagation(); setFocusedNodeKey(n.pubkey || null); }}
+                                        onClick={(e) => { e.stopPropagation(); setLocalFocusedNodeKey(n.pubkey || null); }}
                                         className={`${overviewBarWidth} bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end min-w-[2px] transition-all duration-200 cursor-pointer ${getElementStyle(n.pubkey || null)}`}
                                     >
                                         <div className="w-full rounded-t-sm transition-all duration-500 relative" style={{ height: `${(((n as any)[sec.key] || 0) / sec.max) * 100}%`, backgroundColor: themes[i % themes.length].hex }}></div>
@@ -256,6 +263,23 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                     ))}
                 </div>
                 <OverviewLegend nodes={nodes} themes={themes} hoveredKey={activeHoverKey} onHover={handleHover} />
+                
+                {/* NEW: Historical Context Panel (Database Shadow Layer) */}
+                {focusedNodeKey && !historyLoading && (
+                   <div className="mt-2 mx-4 md:mx-6 p-3 rounded-lg border border-yellow-500/10 bg-yellow-500/5 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
+                      <div className={`text-xl font-black ${reliabilityScore >= 98 ? 'text-green-500' : reliabilityScore >= 90 ? 'text-yellow-500' : 'text-red-500'}`}>
+                         {reliabilityScore}%
+                      </div>
+                      <div className="flex flex-col">
+                         <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Historical Reliability (30d)</span>
+                         <span className="text-[10px] text-zinc-500 leading-tight">
+                            This node has been online and healthy for <strong>{reliabilityScore}%</strong> of recorded snapshots.
+                            {reliabilityScore < 90 && " Caution recommended for long-term storage."}
+                         </span>
+                      </div>
+                   </div>
+                )}
+
                 {!isExport && <InterpretationPanel contextText={narrative} />}
                 </>
             )}
@@ -294,7 +318,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                             ) : (
                                 <div className="w-full max-w-3xl flex flex-col gap-4 animate-in slide-in-from-bottom-10 duration-500">
                                     {nodes.map((n, i) => (
-                                        <div key={n.pubkey} onMouseEnter={() => handleHover(n.pubkey || null)} onMouseLeave={() => handleHover(null)} className={`flex items-center gap-4 transition-all duration-300 cursor-pointer ${getElementStyle(n.pubkey || null)} ${!isDense ? 'justify-center' : ''}`} onClick={(e) => { e.stopPropagation(); setFocusedNodeKey(n.pubkey || null); }}>
+                                        <div key={n.pubkey} onMouseEnter={() => handleHover(n.pubkey || null)} onMouseLeave={() => handleHover(null)} className={`flex items-center gap-4 transition-all duration-300 cursor-pointer ${getElementStyle(n.pubkey || null)} ${!isDense ? 'justify-center' : ''}`} onClick={(e) => { e.stopPropagation(); setLocalFocusedNodeKey(n.pubkey || null); }}>
                                             <span className="text-xs font-mono font-bold text-zinc-400 w-32 text-right truncate">{getSafeIp(n)}</span>
                                             <div className={`${marketBarWidth} h-8 bg-zinc-900 rounded-full overflow-hidden relative border border-white/5`}><div className="h-full rounded-full transition-all duration-1000" style={{ width: `${n.health}%`, backgroundColor: themes[i % themes.length].hex }}></div></div>
                                             <span className="text-xs font-bold text-white font-mono w-16 text-left">{n.health} / 100</span>
@@ -304,7 +328,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                             )}
                         </div>
                     </div>
-                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="METRIC" specificMetric={marketMetric} hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => setFocusedNodeKey(n.pubkey || null)} />
+                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="METRIC" specificMetric={marketMetric} hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => setLocalFocusedNodeKey(n.pubkey || null)} />
                     {!isExport && <InterpretationPanel contextText={narrative} />}
                 </>
             )}
