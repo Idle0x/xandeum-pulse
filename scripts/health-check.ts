@@ -32,19 +32,29 @@ async function runMonitor() {
     
     // Fetch data
     const pulseResponse = await axios.get(PULSE_API_URL, { timeout: 15000 });
-    
-    // ROBUST HANDLING: Check for { nodes: [...] } OR direct array [...]
     const rawData = pulseResponse.data;
-    const nodes = Array.isArray(rawData) ? rawData : (rawData.nodes || rawData.data);
 
-    // DEBUGGING: If we still don't have nodes, print what we received
-    if (!nodes || !Array.isArray(nodes)) {
-      console.error("❌ INVALID DATA RECEIVED:");
-      console.error(JSON.stringify(rawData).slice(0, 200) + "..."); // Print first 200 chars
-      throw new Error("Failed to fetch enriched nodes: Data format invalid");
+    // --- FIX: HANDLE NESTED "result.pods" STRUCTURE ---
+    let nodes = [];
+    if (Array.isArray(rawData)) {
+        nodes = rawData;
+    } else if (rawData.nodes) {
+        nodes = rawData.nodes;
+    } else if (rawData.data) {
+        nodes = rawData.data;
+    } else if (rawData.result && rawData.result.pods) {
+        // This is the specific case your logs revealed
+        nodes = rawData.result.pods;
     }
 
-    console.log(`📊 Retrieved ${nodes.length} enriched nodes.`);
+    // Validation
+    if (!nodes || !Array.isArray(nodes) || nodes.length === 0) {
+      console.error("❌ INVALID DATA STRUCTURE RECEIVED:");
+      console.error(JSON.stringify(rawData).slice(0, 200) + "..."); 
+      throw new Error("Failed to extract node array from API response");
+    }
+
+    console.log(`📊 Retrieved ${nodes.length} nodes from API.`);
 
     const supabase = getServiceSupabase();
 
@@ -54,6 +64,8 @@ async function runMonitor() {
       // Calculate Network Aggregates
       const totalCapacity = nodes.reduce((acc: number, n: any) => acc + (n.storage_committed || 0), 0);
       const totalUsed = nodes.reduce((acc: number, n: any) => acc + (n.storage_used || 0), 0);
+      
+      // Safety: Ensure health is a number before averaging
       const validHealthNodes = nodes.filter((n: any) => typeof n.health === 'number');
       const avgHealth = validHealthNodes.length > 0 
         ? validHealthNodes.reduce((acc: number, n: any) => acc + n.health, 0) / validHealthNodes.length 
@@ -66,7 +78,7 @@ async function runMonitor() {
           total_capacity: totalCapacity,
           total_used: totalUsed,
           total_nodes: nodes.length,
-          avg_health: Math.round(avgHealth), // Round to integer for cleaner data
+          avg_health: Math.round(avgHealth),
           consensus_score: 0 
         });
 
@@ -98,10 +110,8 @@ async function runMonitor() {
 
   } catch (error: any) {
     console.error("🔥 SYSTEM FAILURE DETECTED");
-    // Show full axios error details if available
     if (error.response) {
        console.error(`Status: ${error.response.status}`);
-       console.error(`Data: ${JSON.stringify(error.response.data).slice(0, 200)}`);
     } else {
        console.error(error.message);
     }
