@@ -16,10 +16,11 @@ export const ConsensusModal = ({ onClose, nodes, mostCommonVersion }: ConsensusM
   const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
 
-  // NEW: Fetch Consensus History for the background chart
+  // 1. DATA FETCHING: Shadow Layer (Consensus Trends)
+  // We want to see if the network is converging (score goes up) or forking (score goes down)
   const { history, loading: historyLoading } = useNetworkHistory('consensus_score');
 
-  // --- 1. DATA ENGINE (Preserved) ---
+  // --- 2. DATA ENGINE ---
   const data = useMemo(() => {
     const filteredNodes = nodes.filter(n => 
       activeTab === 'ALL' ? true : n.network === activeTab
@@ -147,17 +148,17 @@ export const ConsensusModal = ({ onClose, nodes, mostCommonVersion }: ConsensusM
                 </div>
              </div>
 
-             {/* UPDATED: UNITY SCORE CARD WITH SHADOW CHART */}
-             <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative overflow-hidden">
+             {/* UNITY SCORE CARD WITH SHADOW CHART */}
+             <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative overflow-hidden group">
                 <div className={`absolute top-0 bottom-0 left-0 w-1 rounded-l-xl ${activeTheme.bg}`}></div>
-                
-                {/* NEW: SHADOW CHART INJECTION */}
-                <div className="absolute bottom-0 right-0 w-24 h-12 z-0 opacity-30">
+
+                {/* SHADOW CHART: Consensus Trend */}
+                <div className="absolute inset-0 z-0 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none mt-4 px-2">
                     <HistoryChart 
                         data={history} 
                         color={parseFloat(data.agreementScore) > 66 ? '#22c55e' : '#eab308'} 
                         loading={historyLoading} 
-                        height={40} 
+                        height={60} 
                     />
                 </div>
 
