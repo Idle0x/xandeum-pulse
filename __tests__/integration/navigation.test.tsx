@@ -12,6 +12,24 @@ jest.mock('../../src/components/WelcomeCurtain', () => ({
   WelcomeCurtain: () => <div data-testid="curtain-mocked" />
 }));
 
+// Mock the Database History hooks to avoid Supabase connection errors
+jest.mock('../../src/hooks/useNetworkHistory', () => ({
+  useNetworkHistory: () => ({
+    history: [],
+    growth: 5,
+    loading: false
+  })
+}));
+
+jest.mock('../../src/hooks/useNodeHistory', () => ({
+  useNodeHistory: () => ({
+    history: [],
+    reliabilityScore: 100,
+    growth: 0,
+    loading: false
+  })
+}));
+
 const mockPush = jest.fn();
 jest.mock('next/router', () => ({
   useRouter() {
@@ -72,7 +90,7 @@ describe('Xandeum Pulse - Inspector Integration', () => {
     });
 
     await act(async () => { render(<Home />); });
-    
+
     // Find card and open modal
     const nodeCardText = await screen.findByText(/1.2.3.4/);
     fireEvent.click(nodeCardText.closest('div')!);
