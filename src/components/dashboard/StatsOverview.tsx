@@ -3,6 +3,9 @@ import {
 } from 'lucide-react';
 import { NetworkSwitcher } from '../common/NetworkSwitcher';
 import { formatBytes } from '../../utils/formatters';
+// NEW IMPORTS: History Hook & Chart Component
+import { useNetworkHistory } from '../../hooks/useNetworkHistory';
+import { HistoryChart } from '../../common/HistoryChart';
 
 interface StatsOverviewProps {
   stats: {
@@ -14,7 +17,7 @@ interface StatsOverviewProps {
   };
   totalStorageCommitted: number;
   totalNodes: number;
-  displayedCount: number; // <--- NEW PROP ADDED
+  displayedCount: number;
   networkFilter: 'ALL' | 'MAINNET' | 'DEVNET';
   onNetworkChange: (val: 'ALL' | 'MAINNET' | 'DEVNET') => void;
   loading: boolean;
@@ -26,22 +29,39 @@ export const StatsOverview = ({
   stats,
   totalStorageCommitted,
   totalNodes,
-  displayedCount, // <--- DESTRUCTURED HERE
+  displayedCount,
   networkFilter,
   onNetworkChange,
   loading,
   onOpenModal,
   zenMode
 }: StatsOverviewProps) => {
-  if (zenMode) return null; // These cards are hidden in Zen Mode
+  if (zenMode) return null;
 
   const { vitalsStats, consensusStats, displayCommitted, displayUsed, isGlobalView } = stats;
 
+  // 1. DATA FETCHING: The "Shadow Layer" Context
+  // We fetch history for each card to provide the "fourth dimension" (time)
+  const { history: capacityHistory, loading: capLoading } = useNetworkHistory('total_capacity');
+  const { history: healthHistory, loading: healthLoading } = useNetworkHistory('avg_health');
+  const { history: consensusHistory, loading: conLoading } = useNetworkHistory('consensus_score');
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
-      {/* --- 1. CAPACITY CARD --- */}
+      
+      {/* --- 1. CAPACITY CARD (Growth Trend) --- */}
       <div onClick={() => onOpenModal('capacity')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm flex flex-col justify-between cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden h-24 md:h-auto">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        
+        {/* SHADOW LAYER: History Chart */}
+        <div className="absolute inset-0 z-0 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none mt-4">
+           <HistoryChart 
+              data={capacityHistory} 
+              color={isGlobalView ? '#a855f7' : networkFilter === 'MAINNET' ? '#22c55e' : '#3b82f6'} 
+              loading={capLoading} 
+              height={80} // Fill the card
+           />
+        </div>
+
         <div className="relative z-10">
           <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold mb-1 flex items-center gap-1">
              <Database size={10} className={isGlobalView ? 'text-zinc-500' : networkFilter === 'MAINNET' ? 'text-green-500' : 'text-blue-500'} /> 
@@ -61,10 +81,19 @@ export const StatsOverview = ({
         </div>
       </div>
 
-      {/* --- 2. VITALS CARD --- */}
+      {/* --- 2. VITALS CARD (Pulse/EKG) --- */}
       <div onClick={() => onOpenModal('vitals')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform h-24 md:h-auto">
-        <div className="absolute inset-0 bg-gradient-to-br from-green-500/0 to-green-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        <div className="absolute inset-0 opacity-20 pointer-events-none"><div className="ekg-line"></div></div>
+        
+        {/* SHADOW LAYER: History Chart */}
+        <div className="absolute inset-0 z-0 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none mt-4">
+           <HistoryChart 
+              data={healthHistory} 
+              color={networkFilter === 'DEVNET' ? '#3b82f6' : '#22c55e'} 
+              loading={healthLoading} 
+              height={80} 
+           />
+        </div>
+
         <div className="relative z-10">
           <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1">
               <HeartPulse size={12} className={`animate-pulse ${networkFilter === 'DEVNET' ? 'text-blue-500' : 'text-green-500'}`} /> 
@@ -77,12 +106,21 @@ export const StatsOverview = ({
           </div>
         </div>
         <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-green-400 font-bold flex items-center gap-1 z-10"><Maximize2 size={8} /> DETAILS</div>
-        <style jsx>{` @keyframes ekg { 0% { left: -100%; opacity: 0; } 50% { opacity: 1; } 100% { left: 100%; opacity: 0; } } .ekg-line { position: absolute; top: 0; bottom: 0; width: 50%; background: linear-gradient( 90deg, transparent 0%, rgba(34, 197, 94, 0.5) 50%, transparent 100% ); animation: ekg 2s linear infinite; } `}</style>
       </div>
 
-      {/* --- 3. CONSENSUS CARD --- */}
+      {/* --- 3. CONSENSUS CARD (Unity Trend) --- */}
       <div onClick={() => onOpenModal('consensus')} className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm cursor-pointer hover:scale-[1.02] active:scale-95 transition-transform group relative overflow-hidden h-24 md:h-auto">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        
+        {/* SHADOW LAYER: History Chart */}
+        <div className="absolute inset-0 z-0 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none mt-4">
+           <HistoryChart 
+              data={consensusHistory} 
+              color={parseFloat(consensusStats.score) > 66 ? '#22c55e' : '#eab308'} 
+              loading={conLoading} 
+              height={80} 
+           />
+        </div>
+
         <div className="relative z-10">
           <div className="text-[8px] md:text-[10px] text-zinc-500 uppercase tracking-widest font-bold flex items-center gap-1.5">
              <GitBranch size={10} className="text-blue-500"/>
@@ -102,7 +140,7 @@ export const StatsOverview = ({
         <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[8px] text-blue-400 font-bold flex items-center gap-1 z-10"><Maximize2 size={8} /> DETAILS</div>
       </div>
 
-      {/* --- 4. FILTER CARD --- */}
+      {/* --- 4. FILTER CARD (Static Control) --- */}
       <div onClick={() => { const nextFilter = networkFilter === 'ALL' ? 'MAINNET' : networkFilter === 'MAINNET' ? 'DEVNET' : 'ALL'; onNetworkChange(nextFilter); }} className="bg-zinc-900/50 border border-zinc-800 p-3 rounded-xl backdrop-blur-sm flex flex-col justify-between group relative overflow-hidden transition-all duration-300 hover:border-zinc-700 cursor-pointer select-none active:scale-[0.98] h-24 md:h-auto">
         <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
         <div className="flex justify-between items-center relative z-10 mb-2">
@@ -111,7 +149,6 @@ export const StatsOverview = ({
         </div>
         <div className="relative z-10">
           <div className="flex items-baseline gap-1.5">
-            {/* UPDATED: Uses displayedCount prop */}
             <div className="text-3xl font-black text-white tracking-tighter leading-none">{displayedCount}</div>
             <div className="text-[8px] font-mono text-zinc-600 font-bold uppercase tracking-tight">Nodes</div>
           </div>
@@ -120,7 +157,6 @@ export const StatsOverview = ({
             <div className="flex items-center">
                 {!isGlobalView && (
                    <div className="flex items-center gap-1 text-[7px] text-zinc-500 font-mono">
-                      {/* Preserved totalNodes here for context */}
                       <Globe size={8} /> Global: {totalNodes}
                    </div>
                 )}
