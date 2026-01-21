@@ -2,7 +2,7 @@ import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { Node } from '../../../types';
 import { formatBytes } from '../../../utils/formatters';
 import { NodeHistoryPoint } from '../../../hooks/useNodeHistory';
-import { HistoryChart } from '../common/HistoryChart';
+import { HistoryChart } from '../../common/HistoryChart';
 import { useMemo } from 'react';
 
 interface StorageViewProps {
