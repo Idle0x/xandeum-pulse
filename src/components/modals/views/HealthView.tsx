@@ -1,9 +1,9 @@
 import { ArrowLeft, Zap } from 'lucide-react';
 import { Node } from '../../../types';
-// NEW IMPORTS: History Hook & Ribbon & Chart
 import { NodeHistoryPoint } from '../../../hooks/useNodeHistory';
 import { StabilityRibbon } from './StabilityRibbon';
-import { HistoryChart } from '../../common/HistoryChart';
+import { HistoryChart } from '../common/HistoryChart';
+import { useMemo } from 'react';
 
 interface HealthViewProps {
   node: Node;
@@ -12,13 +12,20 @@ interface HealthViewProps {
   avgNetworkHealth: number;
   medianStorage: number;
   networkStats: any;
-  // NEW PROPS
   history?: NodeHistoryPoint[];
   historyLoading?: boolean;
 }
 
 export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStorage, networkStats, history = [], historyLoading = false }: HealthViewProps) => {
   const health = node.health || 0;
+
+  // Transform history for Chart
+  const chartData = useMemo(() => {
+    return history.map(p => ({
+      date: p.date,
+      value: p.health
+    }));
+  }, [history]);
 
   // Safe Accessors
   const bd = node.healthBreakdown || { uptime: health, version: health, reputation: health, storage: health };
@@ -78,7 +85,7 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
           {/* SHADOW CHART: Node Health History */}
           <div className="absolute inset-0 z-0 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none mt-2">
                <HistoryChart 
-                  data={history} 
+                  data={chartData} 
                   color={health >= 80 ? '#22c55e' : health >= 50 ? '#eab308' : '#ef4444'} 
                   loading={historyLoading} 
                   height={80} 
@@ -107,7 +114,7 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
           </div>
         )}
 
-        {/* METRICS & BARS (Preserved) */}
+        {/* METRICS & BARS */}
         <div className="hidden md:flex flex-col gap-5">
           {metrics.map((m) => {
             const rawVal = m.rawVal || 0; 
@@ -142,7 +149,6 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
           })}
         </div>
 
-        {/* Footer Rank */}
         <div className="mt-auto pt-2 flex justify-center text-center">
           <div className={`px-3 py-2 rounded-xl text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center gap-2 border ${zenMode ? 'bg-black border-zinc-600 text-zinc-300' : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500'}`}>
             <Zap size={14} className="shrink-0" /> 
