@@ -17,7 +17,6 @@ import { HealthView } from './views/HealthView';
 import { StorageView } from './views/StorageView';
 import { ShareProof } from './ShareProof';
 import Link from 'next/link';
-// NEW IMPORTS: History Hook & Chart
 import { useNodeHistory } from '../../hooks/useNodeHistory';
 import { HistoryChart } from '../common/HistoryChart';
 
@@ -62,16 +61,22 @@ export const InspectorModal = ({
   const [mode, setMode] = useState<'VIEW' | 'SHARE'>('VIEW');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  // 1. DATA FETCHING: The Living Context
-  // We fetch the history here to "paint" the overview cards and pass it down to views
   const { history, loading: historyLoading } = useNodeHistory(selectedNode.pubkey);
+
+  // Helper to map node history to chart format
+  const chartData = useMemo(() => {
+    if (!history) return [];
+    return history.map(point => ({
+      date: point.date,
+      value: point.health // Mapping health to 'value' for the generic chart
+    }));
+  }, [history]);
 
   useEffect(() => {
     setModalView('overview');
     setMode('VIEW');
   }, [selectedNode.pubkey]);
 
-  // Compute local network stats for accuracy
   const computedNetworkStats = useMemo(() => {
     if (!nodes || nodes.length === 0) return null;
 
@@ -104,7 +109,6 @@ export const InspectorModal = ({
   const isSelectedNodeLatest = checkIsLatest(selectedNode.version, mostCommonVersion);
   const avgNetworkHealth = computedNetworkStats?.avgBreakdown?.total || 0;
 
-  // Siblings & Fleet Logic
   const siblingCount = nodes.filter(n => 
     n.pubkey === selectedNode.pubkey && 
     n.network === selectedNode.network && 
@@ -116,7 +120,6 @@ export const InspectorModal = ({
   const mainnetCount = ownerNodes.filter(n => n.network === 'MAINNET').length;
   const devnetCount = ownerNodes.filter(n => n.network !== 'MAINNET').length;
 
-  // Styles & Calcs
   const healthScore = selectedNode.health || 0;
   const healthStatusLabel = healthScore >= 80 ? 'OPTIMAL' : 'FAIR'; 
 
@@ -139,7 +142,6 @@ export const InspectorModal = ({
   const nodeCap = selectedNode.storage_committed || 0;
   const tankFillPercent = Math.min(100, (nodeCap / (medianCommitted || 1)) * 100);
 
-  // Storage Chart Vars
   const avgCommitted = totalStorageCommitted / (nodes.length || 1);
   const maxValue = Math.max(nodeCap, medianCommitted, avgCommitted) * 1.1; 
   const nodeP = (nodeCap / maxValue) * 100;
@@ -220,7 +222,22 @@ export const InspectorModal = ({
                 <h2 className="text-base font-black font-sans tracking-tight text-white">NODE INSPECTOR</h2>
                 <button onClick={onClose} className="p-1.5 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 hover:bg-red-500 hover:text-white transition"><X size={16} /></button>
              </div>
-             {/* ... Mobile Header Controls (Preserved) ... */}
+             {/* ... Mobile Header Controls ... */}
+             <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono bg-zinc-900/80 px-2 py-1.5 rounded-lg border border-zinc-800">
+                  <span className="text-zinc-400">{selectedNode.pubkey ? `${selectedNode.pubkey.slice(0, 12)}...` : 'Unknown'}</span>
+                  <button onClick={() => copyToClipboard(selectedNode.pubkey || '', 'pubkey')} className="hover:text-white transition">{copiedField === 'pubkey' ? <Check size={10} className="text-green-500" /> : <Copy size={10} />}</button>
+                </div>
+                <button onClick={(e) => onToggleFavorite(e, selectedNode.address || '')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition text-[10px] font-bold uppercase ${favorites.includes(selectedNode.address || '') ? (zenMode ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-yellow-500/10 border-yellow-500 text-yellow-500') : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}>
+                  <Star size={12} className={favorites.includes(selectedNode.address || '') ? 'fill-current' : ''} />
+                  {favorites.includes(selectedNode.address || '') ? 'Saved' : 'Watchlist'}
+                </button>
+             </div>
+             <div className="flex justify-start">
+               <span className={`text-[9px] font-bold px-2 py-0.5 rounded border w-fit ${zenMode ? 'bg-zinc-900 border-zinc-700 text-zinc-400' : (selectedNode.is_public ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-orange-500/10 border-orange-500/30 text-orange-400')}`}>
+                  {selectedNode.is_public ? 'STORAGE LAYER FULLY INDEXED' : 'STORAGE LAYER NOT INDEXED'}
+                </span>
+             </div>
           </div>
 
           {/* DESKTOP HEADER */}
@@ -239,7 +256,11 @@ export const InspectorModal = ({
                   <span className="text-zinc-400">{selectedNode.pubkey ? `${selectedNode.pubkey.slice(0, 12)}...` : 'Unknown'}</span>
                   <button onClick={() => copyToClipboard(selectedNode.pubkey || '', 'pubkey')} className="hover:text-white transition">{copiedField === 'pubkey' ? <Check size={10} className="text-green-500 animate-in zoom-in" /> : <Copy size={10} />}</button>
                 </div>
-                {/* ... Public/Indexed Status (Preserved) ... */}
+                <div className="mt-1">
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${zenMode ? 'bg-zinc-900 border-zinc-700 text-zinc-500' : (selectedNode.is_public ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-orange-500/10 border-orange-500/30 text-orange-400')}`}>
+                    {selectedNode.is_public ? 'STORAGE LAYER FULLY INDEXED' : 'STORAGE LAYER NOT INDEXED'}
+                  </span>
+                </div>
               </div>
             </div>
             <button onClick={onClose} className={`p-3 rounded-xl transition group ${zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white' : 'bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white'}`}><X size={20} className={zenMode ? '' : "group-hover:scale-110 transition-transform"} /></button>
@@ -272,18 +293,14 @@ export const InspectorModal = ({
                        {/* STORAGE HEADER (Expanded) */}
                        {modalView === 'storage' && (
                          <div className={`h-full min-h-[400px] md:min-h-0 rounded-3xl p-6 border flex flex-col justify-between cursor-pointer relative overflow-hidden ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900 border-purple-500 ring-1 ring-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.1)]'}`} onClick={() => handleCardToggle('storage')}>
-                           {/* ... Storage Header Content (Preserved) ... */}
-                           {/* (This section already had complex logic in previous code, keeping it clean for brevity, assuming standard implementation) */}
                            <div className="w-full flex justify-between items-start mb-2 relative z-10">
                                <div className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest">STORAGE</div>
                                <Minimize2 size={14} className="text-zinc-500"/>
                            </div>
                            <div className="flex justify-between items-end px-1 mb-6 relative z-10">
-                                {/* ... Metrics ... */}
                                 <div className="text-left"><div className={`text-2xl font-black ${zenMode ? 'text-white' : 'text-blue-400'}`}>{formatBytes(selectedNode.storage_used || 0)}</div><div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Used Space</div></div>
                                 <div className="text-right"><div className={`text-2xl font-black ${zenMode ? 'text-zinc-300' : 'text-purple-400'}`}>{formatBytes(nodeCap)}</div><div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Committed</div></div>
                            </div>
-                           {/* Chart Container */}
                            <div className="flex-1 w-full flex items-end justify-between gap-4 relative z-10 px-2 pb-2">
                                 <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-zinc-700 to-transparent opacity-50"></div>
                                 {[
@@ -300,10 +317,9 @@ export const InspectorModal = ({
                          </div>
                        )}
 
-                       {/* IDENTITY HEADER (Expanded) - Preserved */}
+                       {/* IDENTITY HEADER (Expanded) */}
                        {modalView === 'identity' && (
                          <div className={`h-full rounded-3xl border flex flex-col justify-between relative overflow-hidden cursor-pointer ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900 border-blue-500 ring-1 ring-blue-500'}`} onClick={() => handleCardToggle('identity')}>
-                           {/* ... Identity Header Content ... */}
                            <div className="p-6 relative z-10"><Shield size={48} className="text-blue-500 mb-3 mx-auto" /><div className="text-center text-xl font-black text-white">{selectedNode.network}</div></div>
                            <div className="absolute bottom-1 w-full text-center pb-1"><div className="text-[8px] font-bold uppercase flex items-center justify-center gap-1"><Minimize2 size={8}/> COLLAPSE</div></div>
                          </div>
@@ -312,7 +328,6 @@ export const InspectorModal = ({
 
                     {/* RIGHT CONTENT: THE VIEWS */}
                     <div className="md:col-span-2 h-full">
-                       {/* Pass the fetched history to the views! */}
                        {modalView === 'health' && (
                            <HealthView 
                                node={selectedNode} 
@@ -321,8 +336,8 @@ export const InspectorModal = ({
                                avgNetworkHealth={avgNetworkHealth}
                                medianStorage={medianCommitted} 
                                networkStats={computedNetworkStats}
-                               history={history} // <--- PASSING HISTORY
-                               historyLoading={historyLoading} // <--- PASSING LOADING STATE
+                               history={history} 
+                               historyLoading={historyLoading}
                             />
                         )}
                        {modalView === 'storage' && (
@@ -333,7 +348,7 @@ export const InspectorModal = ({
                                medianCommitted={medianCommitted} 
                                totalStorageCommitted={totalStorageCommitted} 
                                nodeCount={nodes.length}
-                               history={history} // <--- PASSING HISTORY
+                               history={history}
                            />
                        )}
                        {modalView === 'identity' && (
@@ -351,14 +366,15 @@ export const InspectorModal = ({
                  <div className="flex flex-col gap-3 md:gap-4 h-full">
                     {/* --- MOBILE OVERVIEW GRID --- */}
                     <div className="grid grid-cols-2 gap-2 md:hidden">
-                        {/* ... Mobile Cards (Preserved) ... */}
-                        {/* For brevity, these match the previous implementation but would conceptually receive similar shadow chart updates if space permitted, 
-                            but on mobile we typically keep it cleaner. We focus on the Desktop/Expanded experience for charts. */}
                          <div onClick={() => handleCardToggle('health')} className="col-span-2 p-3 rounded-2xl border flex justify-between items-center bg-zinc-900 border-zinc-800">
-                            {/* ... Content ... */}
                             <RadialProgress score={healthScore} size={54} stroke={6} zenMode={zenMode} />
                          </div>
-                         {/* ... Storage & Identity Mobile Cards ... */}
+                         <div onClick={() => handleCardToggle('storage')} className="aspect-square rounded-2xl border flex flex-col justify-between bg-indigo-950/10 border-zinc-800">
+                             <div className="p-3"><Database size={12} className="text-indigo-300"/><span className="text-[9px] font-bold text-zinc-500">STORAGE</span></div>
+                         </div>
+                         <div onClick={() => handleCardToggle('identity')} className="aspect-square rounded-2xl border flex flex-col justify-between bg-zinc-900 border-zinc-800">
+                             <div className="p-3"><Shield size={12} className="text-blue-500"/><span className="text-[9px] font-bold text-zinc-500">IDENTITY</span></div>
+                         </div>
                     </div>
 
                     {/* --- DESKTOP GRID (THE LIVING OVERVIEW) --- */}
@@ -371,7 +387,7 @@ export const InspectorModal = ({
                          {/* SHADOW CHART: Uptime/Health */}
                          <div className="absolute inset-0 z-0 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none mt-12 px-2">
                             <HistoryChart 
-                                data={history} 
+                                data={chartData} 
                                 color={healthScore >= 80 ? '#22c55e' : '#eab308'} 
                                 loading={historyLoading} 
                                 height={100} 
@@ -389,13 +405,10 @@ export const InspectorModal = ({
                       {/* STORAGE CARD (DESKTOP) */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : 'bg-indigo-950/10 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60 hover:-translate-y-1 transition-all duration-300'}`} onClick={() => handleCardToggle('storage')}>
                          
-                         {/* SHADOW CHART: Storage Growth (Re-using health history for demo, ideally strictly storage history) */}
+                         {/* SHADOW CHART: Storage Growth */}
                          <div className="absolute inset-0 z-0 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none mt-12 px-2">
-                             {/* Note: We use health history as a proxy for activity if storage history specific endpoint isn't separate, 
-                                 or we can use the same hook if it returns a composite. For visual flair, showing the health pulse here is acceptable fallback, 
-                                 but ideally this would be storage_used history. */}
                              <HistoryChart 
-                                data={history} // Using health data as "Activity" proxy for now
+                                data={chartData} 
                                 color="#818cf8" 
                                 loading={historyLoading} 
                                 height={100} 
@@ -407,9 +420,8 @@ export const InspectorModal = ({
                          <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest flex justify-center gap-1 relative z-10 ${zenMode ? 'text-zinc-500' : `text-violet-300/80 ${breatheAnimation}`}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
                       </div>
 
-                      {/* IDENTITY (DESKTOP) - Preserved */}
+                      {/* IDENTITY (DESKTOP) */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : `bg-zinc-900/30 ring-1 ${identityRingColor} hover:-translate-y-1 transition-all duration-300`}`} onClick={() => handleCardToggle('identity')}>
-                         {/* ... Identity Content ... */}
                          <div className="relative z-10 flex flex-col h-full justify-between">
                              <div className="flex justify-between items-start"><div className="flex items-center gap-2"><Server size={18} className="text-zinc-400"/><span className="text-xs font-bold uppercase text-zinc-500">IDENTITY</span></div><div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${zenMode ? 'bg-zinc-900 border-zinc-800 text-zinc-400' : (selectedNode.network === 'MAINNET' ? 'text-green-500 border-green-500/30' : 'text-blue-500 border-blue-500/30')}`}>{selectedNode.network}</div></div>
                              <div className="space-y-2"><div className="text-xl font-mono text-white">{getSafeVersion(selectedNode)}</div><div className="text-xs text-zinc-500 flex items-center gap-1"><Clock size={12}/> Up: {formatUptime(selectedNode.uptime)}</div></div>
@@ -417,7 +429,8 @@ export const InspectorModal = ({
                          </div>
                       </div>
                     </div>
-                    {/* ... Rest of Bottom Row & Footer (Preserved) ... */}
+
+                    {/* Footer Rank & Actions */}
                     <div className="hidden md:grid grid-cols-1 md:grid-cols-2 gap-4">
                        <div onClick={handleLeaderboardNav} className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between ${zenMode ? 'bg-black border-zinc-800' : `bg-zinc-900/50 border-yellow-900/30 hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50`}`}>
                           {!zenMode && <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:10px_10px] pointer-events-none"></div>}
@@ -433,7 +446,25 @@ export const InspectorModal = ({
                              </div>
                           </div>
                        </div>
-                       {/* ... Physical Card ... */}
+                       <Link href={`/map?focus=${getSafeIp(selectedNode)}`}>
+                         <div className={`h-40 p-5 rounded-2xl border group cursor-pointer relative overflow-hidden flex flex-col justify-between ${zenMode ? 'bg-black border-zinc-800' : `bg-zinc-900/50 border-blue-900/30 hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-blue-500/20 hover:ring-blue-500/50`}`}>
+                            {!zenMode && <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#3b82f6_1px,transparent_1px),linear-gradient(to_bottom,#3b82f6_1px,transparent_1px)] bg-[size:20px_20px] origin-center group-hover:scale-[3.0] transition-transform duration-700 ease-in-out pointer-events-none"></div>}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0"><MapPin size={48} className={`${zenMode ? 'text-zinc-800' : 'text-blue-500/20 drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]'}`} /></div>
+                            <div className="flex justify-between items-start relative z-10"><div className="flex items-center gap-2"><Globe size={18} className={zenMode ? 'text-zinc-500' : 'text-blue-500'}/><span className="text-xs font-bold uppercase text-zinc-500">PHYSICAL LAYER</span></div>{!zenMode && <ArrowUpRight size={18} className="text-blue-400 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all"/>}</div>
+                            <div className="relative z-10 mt-auto flex items-end justify-between w-full"><div className="text-xs font-mono text-zinc-400">{getSafeIp(selectedNode)}</div><div className="flex items-center gap-2 text-sm font-bold text-white"><span className={`text-lg ${zenMode ? 'grayscale' : ''}`}>{getFlagEmoji(selectedNode.location?.countryCode)}</span><span>{selectedNode.location?.countryName || 'Unknown'}</span></div></div>
+                         </div>
+                       </Link>
+                    </div>
+
+                    <div className="mt-auto pt-2 md:pt-6 border-t border-zinc-800 flex flex-col gap-2 md:gap-4">
+                      <div className="flex flex-row md:flex-col items-center justify-between md:justify-center gap-2 md:gap-3">
+                        <div className="flex-1 md:flex-none text-[9px] md:text-[10px] text-zinc-500 flex items-center justify-center gap-1.5 bg-black/40 px-3 py-1.5 md:py-1 rounded-full border border-zinc-800/50"><Clock size={10} /> <span className="hidden md:inline">Last Seen:</span> <span className="text-zinc-300 font-mono">{timeAgo}</span></div>
+                        <button onClick={() => copyToClipboard(`${window.location.origin}/?open=${selectedNode.pubkey}`, 'url')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-1.5 md:py-2 rounded-full text-[9px] md:text-[10px] font-bold transition ${zenMode ? 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white' : 'bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/20 text-blue-400'}`}>{copiedField === 'url' ? <Check size={12} /> : <LinkIcon size={12} />} {copiedField === 'url' ? 'COPIED' : 'COPY NODE URL'}</button>
+                      </div>
+                      <div className="flex gap-2 md:gap-4">
+                        <button onClick={handleCompareNav} className={`flex-1 py-3 md:py-4 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border ${zenMode ? 'bg-black border-zinc-700 hover:bg-zinc-900' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700'}`}><Swords size={16} className={zenMode ? 'text-white' : 'text-red-400'} /> <span className="hidden md:inline">COMPARE NODES</span><span className="md:hidden">COMPARE</span></button>
+                        <button onClick={() => setMode('SHARE')} className={`flex-1 py-3 md:py-4 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 ${zenMode ? 'bg-white text-black border-transparent hover:bg-zinc-200' : 'text-white bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20'}`}><Camera size={16} /><span className="hidden md:inline">PROOF OF PULSE</span><span className="md:hidden">PROOF</span></button>
+                      </div>
                     </div>
                  </div>
                )}
