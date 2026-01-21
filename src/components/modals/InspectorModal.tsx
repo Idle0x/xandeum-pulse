@@ -18,7 +18,7 @@ import { StorageView } from './views/StorageView';
 import { ShareProof } from './ShareProof';
 import Link from 'next/link';
 import { useNodeHistory } from '../../hooks/useNodeHistory';
-import { HistoryChart } from '../common/HistoryChart';
+import { HistoryChart } from '../../common/HistoryChart';
 
 interface InspectorModalProps {
   selectedNode: Node;
@@ -127,10 +127,6 @@ export const InspectorModal = ({
     ? 'text-white' 
     : healthScore >= 80 ? 'text-green-500' : healthScore >= 50 ? 'text-yellow-500' : 'text-red-500';
 
-  const healthGlowColor = zenMode 
-    ? '' 
-    : healthScore >= 80 ? 'bg-green-500' : healthScore >= 50 ? 'bg-yellow-500' : 'bg-red-500';
-
   const healthRingColor = zenMode 
     ? 'border border-zinc-800'
     : healthScore >= 80 ? 'ring-green-500/20 hover:ring-green-500/60' : healthScore >= 50 ? 'ring-yellow-500/20 hover:ring-yellow-500/60' : 'ring-red-500/20 hover:ring-red-500/60';
@@ -139,6 +135,7 @@ export const InspectorModal = ({
     ? 'border border-zinc-800'
     : isSelectedNodeLatest ? 'ring-green-500/20 hover:ring-green-500/60' : 'ring-orange-500/20 hover:ring-orange-500/60';
 
+  // --- STORAGE LOGIC FOR SIDEBAR ---
   const nodeCap = selectedNode.storage_committed || 0;
   const tankFillPercent = Math.min(100, (nodeCap / (medianCommitted || 1)) * 100);
 
@@ -147,6 +144,11 @@ export const InspectorModal = ({
   const nodeP = (nodeCap / maxValue) * 100;
   const medP = (medianCommitted / maxValue) * 100;
   const avgP = (avgCommitted / maxValue) * 100;
+
+  const multiplier = medianCommitted > 0 ? (nodeCap / medianCommitted) : 0;
+  const multiplierDisplay = multiplier >= 1 ? `${multiplier.toFixed(1)}x` : `${(1/multiplier).toFixed(1)}x`;
+  const diff = nodeCap - medianCommitted;
+  const isPos = diff >= 0;
 
   const getStorageDisplay = (bytes: number) => {
     const formatted = formatBytes(bytes);
@@ -222,7 +224,7 @@ export const InspectorModal = ({
                 <h2 className="text-base font-black font-sans tracking-tight text-white">NODE INSPECTOR</h2>
                 <button onClick={onClose} className="p-1.5 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 hover:bg-red-500 hover:text-white transition"><X size={16} /></button>
              </div>
-             {/* --- FULL MOBILE CONTROLS --- */}
+             {/* Mobile Header Controls */}
              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono bg-zinc-900/80 px-2 py-1.5 rounded-lg border border-zinc-800">
                   <span className="text-zinc-400">{selectedNode.pubkey ? `${selectedNode.pubkey.slice(0, 12)}...` : 'Unknown'}</span>
@@ -276,8 +278,9 @@ export const InspectorModal = ({
                {modalView !== 'overview' ? (
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
                     
-                    {/* EXPANDED HEADER VIEW (LEFT) */}
+                    {/* EXPANDED HEADER VIEW (LEFT SIDEBAR) */}
                     <div className="md:col-span-1 h-full">
+                       
                        {/* HEALTH HEADER (Expanded) */}
                        {modalView === 'health' && (
                          <div className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between cursor-pointer ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900 border-green-500 ring-1 ring-green-500 shadow-[0_0_30px_rgba(34,197,94,0.1)]'}`} onClick={() => handleCardToggle('health')}>
@@ -291,6 +294,7 @@ export const InspectorModal = ({
                        )}
 
                        {/* STORAGE HEADER (Expanded) */}
+                       {/* This is the Sidebar Card you circled in the first screenshot */}
                        {modalView === 'storage' && (
                          <div className={`h-full min-h-[400px] md:min-h-0 rounded-3xl p-6 border flex flex-col justify-between cursor-pointer relative overflow-hidden ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900 border-purple-500 ring-1 ring-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.1)]'}`} onClick={() => handleCardToggle('storage')}>
                            <div className="w-full flex justify-between items-start mb-2 relative z-10">
@@ -301,19 +305,32 @@ export const InspectorModal = ({
                                 <div className="text-left"><div className={`text-2xl font-black ${zenMode ? 'text-white' : 'text-blue-400'}`}>{formatBytes(selectedNode.storage_used || 0)}</div><div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Used Space</div></div>
                                 <div className="text-right"><div className={`text-2xl font-black ${zenMode ? 'text-zinc-300' : 'text-purple-400'}`}>{formatBytes(nodeCap)}</div><div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Committed</div></div>
                            </div>
+                           
+                           {/* BAR CHART WITH LABELS */}
                            <div className="flex-1 w-full flex items-end justify-between gap-4 relative z-10 px-2 pb-2">
-                                <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-zinc-700 to-transparent opacity-50"></div>
+                                <div className="absolute bottom-6 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-zinc-700 to-transparent opacity-50"></div>
                                 {[
                                     { label: 'YOU', val: nodeP, raw: nodeCap, type: 'MY_NODE' },
                                     { label: 'MEDIAN', val: medP, raw: medianCommitted, type: 'MEDIAN' }, 
-                                    { label: 'AVERAGE', val: avgP, raw: avgCommitted, type: 'AVG' }
+                                    { label: 'AVG', val: avgP, raw: avgCommitted, type: 'AVG' }
                                 ].map((bar, i) => (
                                     <div key={i} className="flex flex-col items-center justify-end h-full w-full group relative">
                                         <div className={`w-full max-w-[40px] md:max-w-[50px] rounded-t-md transition-all duration-1000 relative ${bar.type === 'MY_NODE' ? (zenMode ? 'bg-white' : 'bg-purple-500') : 'bg-zinc-800'}`} style={{ height: `${Math.max(bar.val, 2)}%` }}></div>
+                                        {/* Added Labels below bars */}
+                                        <div className="mt-2 text-[8px] font-bold uppercase tracking-widest text-zinc-500">{bar.label}</div>
                                     </div>
                                 ))}
                            </div>
-                           <div className={`mt-4 text-[9px] font-bold uppercase flex items-center justify-center gap-1 transition ${zenMode ? 'text-zinc-500' : 'text-red-400/80 hover:text-red-400'}`}><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
+
+                           {/* MOVED COMPARISON TEXT TO FOOTER */}
+                           <div className="mt-4 pt-4 border-t border-zinc-800/50 text-center relative z-10">
+                                <div className="text-[10px] text-zinc-400 mb-2">
+                                    Your Commitment is <span className={zenMode ? 'text-white font-bold' : (isPos ? 'text-green-400 font-bold' : 'text-red-400 font-bold')}>{multiplierDisplay} {isPos ? 'Higher' : 'Lower'}</span> than median
+                                </div>
+                                <div className={`text-[9px] font-bold uppercase flex items-center justify-center gap-1 transition ${zenMode ? 'text-zinc-500' : 'text-red-400/80 hover:text-red-400'}`}>
+                                    <Minimize2 size={8}/> CLICK TO COLLAPSE
+                                </div>
+                           </div>
                          </div>
                        )}
 
@@ -334,7 +351,7 @@ export const InspectorModal = ({
                                </div>
                            </div>
 
-                           {/* --- FLEET TOPOLOGY GRID --- */}
+                           {/* Fleet Topology Grid */}
                            <div className={`p-4 border-t grid grid-cols-2 gap-2 relative z-10 ${zenMode ? 'bg-black border-zinc-800' : 'bg-black/40 border-blue-500/20'}`}>
                                <div className={`col-span-2 border rounded-xl p-2.5 flex justify-between items-center ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
                                    <div className="flex items-center gap-2">
@@ -396,10 +413,10 @@ export const InspectorModal = ({
                  </div>
                ) : (
                  <div className="flex flex-col gap-3 md:gap-4 h-full">
-                    {/* --- MOBILE OVERVIEW GRID --- */}
+                    
+                    {/* MOBILE OVERVIEW GRID */}
                     <div className="grid grid-cols-2 gap-2 md:hidden">
-                        
-                        {/* HEALTH CARD (MOBILE) */}
+                        {/* HEALTH CARD */}
                         <div onClick={() => handleCardToggle('health')} className={`col-span-2 p-3 rounded-2xl border flex justify-between items-center relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border-zinc-800' : `bg-zinc-900 border-zinc-800 ring-1 ${healthRingColor}`}`}>
                             {!zenMode && <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>}
                             <div className="relative z-10 flex flex-col justify-between h-full py-1">
@@ -409,7 +426,7 @@ export const InspectorModal = ({
                             <div className="relative z-10 flex flex-col items-center justify-center mr-2"><div className="relative scale-100 group-active:scale-110 transition-transform duration-300 flex items-center justify-center">{!zenMode && <div className={`absolute inset-0 rounded-full blur-xl animate-[slow-pulse_12s_infinite_ease-in-out] ${healthGlowColor}`}></div>}<RadialProgress score={healthScore} size={54} stroke={6} zenMode={zenMode} /></div></div>
                         </div>
 
-                        {/* STORAGE CARD (MOBILE) */}
+                        {/* STORAGE CARD (Mobile) */}
                         <div onClick={() => handleCardToggle('storage')} className={`aspect-square rounded-2xl border flex flex-col justify-between relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border-zinc-800' : 'bg-indigo-950/10 border-zinc-800 hover:scale-[1.02] transition-transform duration-300 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60'}`}>
                             <div className="absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out z-0" style={{ height: `${tankFillPercent}%` }}>
                                 {!zenMode && <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/20 to-transparent"></div>}
@@ -418,7 +435,7 @@ export const InspectorModal = ({
                             <div className="relative z-10 p-3 flex flex-col h-full"><div className="flex justify-between items-start mb-2"><div className="flex items-center gap-1.5"><Database size={12} className={zenMode ? 'text-zinc-500' : 'text-indigo-300/80 drop-shadow-md'}/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">STORAGE</span></div><div className={`px-1.5 py-0.5 rounded-full text-[7px] font-mono border shadow-sm ${zenMode ? 'bg-black border-zinc-800 text-zinc-400' : 'bg-black/40 backdrop-blur-sm text-indigo-200/80 border-indigo-500/20'}`}>{(selectedNode.storage_used || 0).toLocaleString()} B</div></div><div className="mt-auto flex flex-col gap-1.5"><div className="flex justify-between items-end"><div className="flex flex-col items-center"><div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Used</div><div className={`text-sm font-bold drop-shadow-md whitespace-nowrap ${zenMode ? 'text-white' : 'text-blue-400'}`}>{usedDisplay.val}<span className="text-[9px] ml-0.5 opacity-80">{usedDisplay.unit}</span></div></div><div className="w-px h-6 bg-white/20 mx-1"></div><div className="flex flex-col items-center"><div className="text-[8px] font-bold text-zinc-500 uppercase shadow-black drop-shadow-sm">Committed</div><div className={`text-sm font-bold drop-shadow-md whitespace-nowrap ${zenMode ? 'text-zinc-400' : 'text-purple-400'}`}>{committedDisplay.val}<span className="text-[9px] ml-0.5 opacity-80">{committedDisplay.unit}</span></div></div></div></div></div>
                         </div>
 
-                        {/* IDENTITY CARD (MOBILE) */}
+                        {/* IDENTITY CARD (Mobile) */}
                         <div onClick={() => handleCardToggle('identity')} className={`aspect-square rounded-2xl border flex flex-col justify-between relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border-zinc-800' : `bg-zinc-900 border-zinc-800 hover:scale-[1.02] transition-transform duration-300 ring-1 ${identityRingColor}`}`}>
                             {!zenMode && <div className={`absolute inset-0 bg-gradient-to-br opacity-40 ${isSelectedNodeLatest ? 'from-green-900/40 via-transparent to-blue-900/40' : 'from-orange-900/40 via-transparent to-red-900/40'}`}></div>}
                             <div className="relative z-10 p-3 flex flex-col h-full">
@@ -443,7 +460,7 @@ export const InspectorModal = ({
                             </div>
                         </div>
 
-                        {/* REPUTATION CARD (MOBILE) */}
+                        {/* REPUTATION CARD (Mobile) */}
                         <div onClick={handleLeaderboardNav} className={`h-24 p-3 rounded-2xl relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : `bg-zinc-900/80 border border-yellow-900/30 hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50`}`}>
                             {!zenMode && <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:8px_8px] pointer-events-none"></div>}
                             {!zenMode && <div className={`absolute inset-0 bg-gradient-to-r from-transparent ${hoverShimmerGradient} to-transparent -skew-x-12 -translate-x-[150%] pointer-events-none opacity-0 group-hover:opacity-100 ${shimmerOnceAnimation}`}></div>}
@@ -467,7 +484,7 @@ export const InspectorModal = ({
                             </div>
                         </div>
 
-                        {/* PHYSICAL CARD (MOBILE) */}
+                        {/* PHYSICAL CARD (Mobile) */}
                         <Link href={`/map?focus=${getSafeIp(selectedNode)}`} className={`h-24 p-3 rounded-2xl relative overflow-hidden block group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : `bg-zinc-900/80 border border-blue-900/30 ring-1 ring-blue-500/20 hover:ring-blue-500/50 hover:scale-[1.02] transition-transform duration-300`}`}>
                             {!zenMode && <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#3b82f6_1px,transparent_1px),linear-gradient(to_bottom,#3b82f6_1px,transparent_1px)] bg-[size:16px_16px] origin-center group-hover:scale-[3.0] transition-transform duration-700 ease-in-out pointer-events-none"></div>}
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0">
@@ -478,23 +495,15 @@ export const InspectorModal = ({
                         </Link>
                     </div>
 
-                    {/* --- DESKTOP GRID (THE LIVING OVERVIEW) --- */}
+                    {/* DESKTOP GRID (THE LIVING OVERVIEW) */}
                     <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                       
-                      {/* HEALTH CARD (DESKTOP) - KEEPING SHADOW CHART HERE */}
+                      {/* HEALTH CARD (DESKTOP) */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : `bg-zinc-900/30 ring-1 ${healthRingColor} hover:-translate-y-1 transition-all duration-300`}`} onClick={() => handleCardToggle('health')}>
                          {!zenMode && <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>}
-                         
-                         {/* SHADOW CHART: Uptime/Health (HEARTBEAT) */}
                          <div className="absolute inset-0 z-0 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none mt-12 px-2">
-                            <HistoryChart 
-                                data={chartData} 
-                                color={healthScore >= 80 ? '#22c55e' : '#eab308'} 
-                                loading={historyLoading} 
-                                height={100} 
-                            />
+                            <HistoryChart data={chartData} color={healthScore >= 80 ? '#22c55e' : '#eab308'} loading={historyLoading} height={100} />
                          </div>
-
                          <div className="flex justify-between items-start mb-4 relative z-10"><div><h3 className="text-[10px] font-bold tracking-widest uppercase text-zinc-500">SYSTEM DIAGNOSTICS</h3></div><HelpCircle size={14} className="text-zinc-500"/></div>
                          <div className="self-center hidden md:flex flex-col items-center justify-center relative z-10">
                             <RadialProgress score={selectedNode.health || 0} size={115} zenMode={zenMode} />
@@ -503,8 +512,10 @@ export const InspectorModal = ({
                          <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest flex justify-center gap-1 relative z-10 ${zenMode ? 'text-zinc-500' : `text-green-400 ${breatheAnimation}`}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
                       </div>
 
-                      {/* STORAGE CARD (DESKTOP) - REMOVED WEIRD CHART */}
+                      {/* STORAGE CARD (DESKTOP OVERVIEW) */}
+                      {/* Removed shadow chart, added Rank Badge */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : 'bg-indigo-950/10 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60 hover:-translate-y-1 transition-all duration-300'}`} onClick={() => handleCardToggle('storage')}>
+                         <div className="absolute top-4 right-4"><div className={`px-2 py-1 rounded text-[9px] font-bold uppercase border ${zenMode ? 'bg-zinc-900 border-zinc-700 text-zinc-400' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>Rank #{selectedNode.rank || '-'}</div></div>
                          <div className="flex justify-between items-start mb-4 relative z-10"><div className="flex items-center gap-2"><Database size={18} className={zenMode ? 'text-zinc-500' : 'text-indigo-300/80'}/><span className="text-xs font-bold uppercase text-zinc-500">STORAGE</span></div></div>
                          <div className="space-y-4 relative z-10"><div className="flex justify-between items-end"><div><div className={`text-2xl font-bold whitespace-nowrap ${zenMode ? 'text-white' : 'text-blue-400'}`}>{usedDisplay.val}<span className="text-sm ml-1 opacity-80">{usedDisplay.unit}</span></div><div className="text-[9px] font-bold text-zinc-600">USED</div></div><div className="text-right"><div className={`text-2xl font-bold whitespace-nowrap ${zenMode ? 'text-zinc-400' : 'text-purple-400'}`}>{committedDisplay.val}<span className="text-sm ml-1 opacity-80">{committedDisplay.unit}</span></div><div className="text-[9px] font-bold text-zinc-600">COMMITTED</div></div></div><div className="h-2 bg-zinc-800/50 rounded-full overflow-hidden relative"><div className={`h-full relative overflow-hidden ${zenMode ? 'bg-white' : 'bg-gradient-to-r from-transparent to-indigo-500/20'}`} style={{ width: `${Math.min(100, ((selectedNode.storage_used || 0) / (selectedNode.storage_committed || 1)) * 100)}%` }}>{!zenMode && <div className="absolute top-0 bottom-0 right-0 w-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.4)]"></div>}</div></div></div>
                          <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest flex justify-center gap-1 relative z-10 ${zenMode ? 'text-zinc-500' : `text-violet-300/80 ${breatheAnimation}`}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
