@@ -2,7 +2,7 @@ import { ArrowLeft, Zap } from 'lucide-react';
 import { Node } from '../../../types';
 import { NodeHistoryPoint } from '../../../hooks/useNodeHistory';
 import { StabilityRibbon } from './StabilityRibbon';
-import { HistoryChart } from '../common/HistoryChart';
+import { HistoryChart } from '../../common/HistoryChart';
 import { useMemo } from 'react';
 
 interface HealthViewProps {
