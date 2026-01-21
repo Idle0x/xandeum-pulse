@@ -127,6 +127,11 @@ export const InspectorModal = ({
     ? 'text-white' 
     : healthScore >= 80 ? 'text-green-500' : healthScore >= 50 ? 'text-yellow-500' : 'text-red-500';
 
+  // --- FIXED: Restored missing healthGlowColor definition ---
+  const healthGlowColor = zenMode 
+    ? '' 
+    : healthScore >= 80 ? 'bg-green-500' : healthScore >= 50 ? 'bg-yellow-500' : 'bg-red-500';
+
   const healthRingColor = zenMode 
     ? 'border border-zinc-800'
     : healthScore >= 80 ? 'ring-green-500/20 hover:ring-green-500/60' : healthScore >= 50 ? 'ring-yellow-500/20 hover:ring-yellow-500/60' : 'ring-red-500/20 hover:ring-red-500/60';
@@ -294,7 +299,6 @@ export const InspectorModal = ({
                        )}
 
                        {/* STORAGE HEADER (Expanded) */}
-                       {/* This is the Sidebar Card you circled in the first screenshot */}
                        {modalView === 'storage' && (
                          <div className={`h-full min-h-[400px] md:min-h-0 rounded-3xl p-6 border flex flex-col justify-between cursor-pointer relative overflow-hidden ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900 border-purple-500 ring-1 ring-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.1)]'}`} onClick={() => handleCardToggle('storage')}>
                            <div className="w-full flex justify-between items-start mb-2 relative z-10">
@@ -322,7 +326,7 @@ export const InspectorModal = ({
                                 ))}
                            </div>
 
-                           {/* MOVED COMPARISON TEXT TO FOOTER */}
+                           {/* COMPARISON TEXT IN FOOTER */}
                            <div className="mt-4 pt-4 border-t border-zinc-800/50 text-center relative z-10">
                                 <div className="text-[10px] text-zinc-400 mb-2">
                                     Your Commitment is <span className={zenMode ? 'text-white font-bold' : (isPos ? 'text-green-400 font-bold' : 'text-red-400 font-bold')}>{multiplierDisplay} {isPos ? 'Higher' : 'Lower'}</span> than median
@@ -513,7 +517,7 @@ export const InspectorModal = ({
                       </div>
 
                       {/* STORAGE CARD (DESKTOP OVERVIEW) */}
-                      {/* Removed shadow chart, added Rank Badge */}
+                      {/* Added Rank Badge instead of chart */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : 'bg-indigo-950/10 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60 hover:-translate-y-1 transition-all duration-300'}`} onClick={() => handleCardToggle('storage')}>
                          <div className="absolute top-4 right-4"><div className={`px-2 py-1 rounded text-[9px] font-bold uppercase border ${zenMode ? 'bg-zinc-900 border-zinc-700 text-zinc-400' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}>Rank #{selectedNode.rank || '-'}</div></div>
                          <div className="flex justify-between items-start mb-4 relative z-10"><div className="flex items-center gap-2"><Database size={18} className={zenMode ? 'text-zinc-500' : 'text-indigo-300/80'}/><span className="text-xs font-bold uppercase text-zinc-500">STORAGE</span></div></div>
