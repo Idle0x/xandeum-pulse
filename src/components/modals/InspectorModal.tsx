@@ -18,7 +18,7 @@ import { StorageView } from './views/StorageView';
 import { ShareProof } from './ShareProof';
 import Link from 'next/link';
 import { useNodeHistory } from '../../hooks/useNodeHistory';
-import { HistoryChart } from '../common/HistoryChart';
+import { HistoryChart } from '../../common/HistoryChart';
 
 interface InspectorModalProps {
   selectedNode: Node;
@@ -222,7 +222,7 @@ export const InspectorModal = ({
                 <h2 className="text-base font-black font-sans tracking-tight text-white">NODE INSPECTOR</h2>
                 <button onClick={onClose} className="p-1.5 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 hover:bg-red-500 hover:text-white transition"><X size={16} /></button>
              </div>
-             {/* --- RESTORED: Full Mobile Header Controls --- */}
+             {/* --- FULL MOBILE CONTROLS --- */}
              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono bg-zinc-900/80 px-2 py-1.5 rounded-lg border border-zinc-800">
                   <span className="text-zinc-400">{selectedNode.pubkey ? `${selectedNode.pubkey.slice(0, 12)}...` : 'Unknown'}</span>
@@ -334,7 +334,7 @@ export const InspectorModal = ({
                                </div>
                            </div>
 
-                           {/* --- RESTORED: Fleet Topology Grid --- */}
+                           {/* --- FLEET TOPOLOGY GRID --- */}
                            <div className={`p-4 border-t grid grid-cols-2 gap-2 relative z-10 ${zenMode ? 'bg-black border-zinc-800' : 'bg-black/40 border-blue-500/20'}`}>
                                <div className={`col-span-2 border rounded-xl p-2.5 flex justify-between items-center ${zenMode ? 'bg-zinc-900 border-zinc-800' : 'bg-zinc-900/50 border-zinc-800'}`}>
                                    <div className="flex items-center gap-2">
@@ -396,7 +396,7 @@ export const InspectorModal = ({
                  </div>
                ) : (
                  <div className="flex flex-col gap-3 md:gap-4 h-full">
-                    {/* --- RESTORED: MOBILE OVERVIEW GRID --- */}
+                    {/* --- MOBILE OVERVIEW GRID --- */}
                     <div className="grid grid-cols-2 gap-2 md:hidden">
                         
                         {/* HEALTH CARD (MOBILE) */}
@@ -443,7 +443,7 @@ export const InspectorModal = ({
                             </div>
                         </div>
 
-                        {/* REPUTATION CARD (MOBILE) - RESTORED */}
+                        {/* REPUTATION CARD (MOBILE) */}
                         <div onClick={handleLeaderboardNav} className={`h-24 p-3 rounded-2xl relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : `bg-zinc-900/80 border border-yellow-900/30 hover:-translate-y-0.5 transition-all duration-300 ring-1 ring-yellow-500/20 hover:ring-yellow-500/50`}`}>
                             {!zenMode && <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:8px_8px] pointer-events-none"></div>}
                             {!zenMode && <div className={`absolute inset-0 bg-gradient-to-r from-transparent ${hoverShimmerGradient} to-transparent -skew-x-12 -translate-x-[150%] pointer-events-none opacity-0 group-hover:opacity-100 ${shimmerOnceAnimation}`}></div>}
@@ -467,7 +467,7 @@ export const InspectorModal = ({
                             </div>
                         </div>
 
-                        {/* PHYSICAL CARD (MOBILE) - RESTORED */}
+                        {/* PHYSICAL CARD (MOBILE) */}
                         <Link href={`/map?focus=${getSafeIp(selectedNode)}`} className={`h-24 p-3 rounded-2xl relative overflow-hidden block group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : `bg-zinc-900/80 border border-blue-900/30 ring-1 ring-blue-500/20 hover:ring-blue-500/50 hover:scale-[1.02] transition-transform duration-300`}`}>
                             {!zenMode && <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(to_right,#3b82f6_1px,transparent_1px),linear-gradient(to_bottom,#3b82f6_1px,transparent_1px)] bg-[size:16px_16px] origin-center group-hover:scale-[3.0] transition-transform duration-700 ease-in-out pointer-events-none"></div>}
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0">
@@ -481,11 +481,11 @@ export const InspectorModal = ({
                     {/* --- DESKTOP GRID (THE LIVING OVERVIEW) --- */}
                     <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                       
-                      {/* HEALTH CARD (DESKTOP) */}
+                      {/* HEALTH CARD (DESKTOP) - KEEPING SHADOW CHART HERE */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : `bg-zinc-900/30 ring-1 ${healthRingColor} hover:-translate-y-1 transition-all duration-300`}`} onClick={() => handleCardToggle('health')}>
                          {!zenMode && <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>}
                          
-                         {/* SHADOW CHART: Uptime/Health */}
+                         {/* SHADOW CHART: Uptime/Health (HEARTBEAT) */}
                          <div className="absolute inset-0 z-0 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none mt-12 px-2">
                             <HistoryChart 
                                 data={chartData} 
@@ -503,19 +503,8 @@ export const InspectorModal = ({
                          <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest flex justify-center gap-1 relative z-10 ${zenMode ? 'text-zinc-500' : `text-green-400 ${breatheAnimation}`}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
                       </div>
 
-                      {/* STORAGE CARD (DESKTOP) */}
+                      {/* STORAGE CARD (DESKTOP) - REMOVED WEIRD CHART */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : 'bg-indigo-950/10 ring-1 ring-indigo-500/20 hover:ring-indigo-500/60 hover:-translate-y-1 transition-all duration-300'}`} onClick={() => handleCardToggle('storage')}>
-                         
-                         {/* SHADOW CHART: Storage Growth */}
-                         <div className="absolute inset-0 z-0 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none mt-12 px-2">
-                             <HistoryChart 
-                                data={chartData} 
-                                color="#818cf8" 
-                                loading={historyLoading} 
-                                height={100} 
-                            />
-                         </div>
-
                          <div className="flex justify-between items-start mb-4 relative z-10"><div className="flex items-center gap-2"><Database size={18} className={zenMode ? 'text-zinc-500' : 'text-indigo-300/80'}/><span className="text-xs font-bold uppercase text-zinc-500">STORAGE</span></div></div>
                          <div className="space-y-4 relative z-10"><div className="flex justify-between items-end"><div><div className={`text-2xl font-bold whitespace-nowrap ${zenMode ? 'text-white' : 'text-blue-400'}`}>{usedDisplay.val}<span className="text-sm ml-1 opacity-80">{usedDisplay.unit}</span></div><div className="text-[9px] font-bold text-zinc-600">USED</div></div><div className="text-right"><div className={`text-2xl font-bold whitespace-nowrap ${zenMode ? 'text-zinc-400' : 'text-purple-400'}`}>{committedDisplay.val}<span className="text-sm ml-1 opacity-80">{committedDisplay.unit}</span></div><div className="text-[9px] font-bold text-zinc-600">COMMITTED</div></div></div><div className="h-2 bg-zinc-800/50 rounded-full overflow-hidden relative"><div className={`h-full relative overflow-hidden ${zenMode ? 'bg-white' : 'bg-gradient-to-r from-transparent to-indigo-500/20'}`} style={{ width: `${Math.min(100, ((selectedNode.storage_used || 0) / (selectedNode.storage_committed || 1)) * 100)}%` }}>{!zenMode && <div className="absolute top-0 bottom-0 right-0 w-[1px] bg-violet-400/50 shadow-[0_0_8px_rgba(139,92,246,0.4)]"></div>}</div></div></div>
                          <div className={`mt-auto text-center text-[9px] font-bold uppercase tracking-widest flex justify-center gap-1 relative z-10 ${zenMode ? 'text-zinc-500' : `text-violet-300/80 ${breatheAnimation}`}`}><Maximize2 size={8}/> CLICK TO EXPAND</div>
