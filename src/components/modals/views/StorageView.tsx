@@ -1,9 +1,9 @@
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { Node } from '../../../types';
 import { formatBytes } from '../../../utils/formatters';
-// NEW IMPORTS: History Hook & Chart
 import { NodeHistoryPoint } from '../../../hooks/useNodeHistory';
-import { HistoryChart } from '../../common/HistoryChart';
+import { HistoryChart } from '../common/HistoryChart';
+import { useMemo } from 'react';
 
 interface StorageViewProps {
   node: Node;
@@ -12,7 +12,6 @@ interface StorageViewProps {
   medianCommitted: number;
   totalStorageCommitted: number;
   nodeCount: number;
-  // NEW PROPS
   history?: NodeHistoryPoint[];
 }
 
@@ -23,6 +22,14 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
   const avgCommitted = totalStorageCommitted / (nodeCount || 1);
   const diff = nodeCap - median;
   const isPos = diff >= 0;
+
+  // Transform history for Chart
+  const chartData = useMemo(() => {
+    return history.map(p => ({
+      date: p.date,
+      value: p.health // Proxying activity via health if storage history unavailable
+    }));
+  }, [history]);
 
   // Calculate Reliability from history prop for badge
   const reliabilityScore = history.length > 0 
@@ -52,7 +59,7 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
           {/* SHADOW CHART: Activity/Health Proxy */}
           <div className="absolute inset-0 z-0 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none mt-2 px-2">
                <HistoryChart 
-                  data={history} 
+                  data={chartData} 
                   color={isPos ? '#22c55e' : '#ef4444'} 
                   loading={false} 
                   height={80} 
@@ -76,7 +83,7 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
           </div>
         </div>
 
-        {/* Utilization Donut & Status (Preserved) */}
+        {/* Utilization Donut & Status */}
         <div className="flex gap-3">
             <div className={`flex-1 border rounded-xl p-3 flex items-center gap-4 ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900/30 border-zinc-800'}`}>
                 <div className="relative w-12 h-12 shrink-0">
@@ -94,7 +101,7 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
             </div>
         </div>
 
-        {/* Benchmarks (Preserved) */}
+        {/* Benchmarks */}
         <div className={`block p-4 rounded-xl border ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900/30 border-zinc-800'}`}>
           <div className="text-[10px] text-zinc-500 uppercase font-bold mb-3">Network Benchmarks</div>
           <div className="space-y-3">
@@ -103,7 +110,7 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
           </div>
         </div>
 
-        {/* Used Space Info (Preserved) */}
+        {/* Used Space Info */}
         <div className={`border rounded-lg p-3 text-center ${zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/30 border-zinc-800/50'}`}>
              <div className="text-[9px] font-bold text-zinc-500 uppercase mb-1">Actual Used Space</div>
              <div className={`text-xl font-mono font-black leading-none ${zenMode ? 'text-white' : 'text-blue-400'}`}>{formatBytes(nodeUsed)}</div>
