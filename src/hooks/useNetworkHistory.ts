@@ -16,11 +16,12 @@ export const useNetworkHistory = (
 
   useEffect(() => {
     async function fetchHistory() {
-      // 1. Calculate date range (Past 30 Days)
+      // 1. Calculate date range (Default: Past 30 Days)
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      // 2. Query Supabase
+      // 2. Query Supabase (The Shadow Layer)
+      // We explicitly select the ID (timestamp) and the requested metric
       const { data: rows, error } = await supabase
         .from('network_snapshots')
         .select(`id, ${metric}`)
@@ -32,16 +33,18 @@ export const useNetworkHistory = (
         return;
       }
 
-      // 3. Process Data
+      // 3. Process Data for Charts
+      // Converts timestamp to a readable short date (e.g., "Jan 21")
       const processed = rows.map((r: any) => ({
         date: new Date(r.id).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
         value: Number(r[metric] || 0)
       }));
 
-      // 4. Calculate Growth
+      // 4. Calculate Growth (Last Value vs First Value in period)
       if (processed.length > 1) {
         const first = processed[0].value;
         const last = processed[processed.length - 1].value;
+        // Prevent division by zero errors
         const percentChange = first === 0 ? 0 : ((last - first) / first) * 100;
         setGrowth(percentChange);
       }
