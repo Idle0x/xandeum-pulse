@@ -18,7 +18,7 @@ import { StorageView } from './views/StorageView';
 import { ShareProof } from './ShareProof';
 import Link from 'next/link';
 import { useNodeHistory } from '../../hooks/useNodeHistory';
-import { HistoryChart } from '../../common/HistoryChart';
+import { HistoryChart } from '../common/HistoryChart';
 
 interface InspectorModalProps {
   selectedNode: Node;
