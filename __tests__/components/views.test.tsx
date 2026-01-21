@@ -4,6 +4,17 @@ import { HealthView } from '../../src/components/modals/views/HealthView';
 import { StorageView } from '../../src/components/modals/views/StorageView';
 import { IdentityView } from '../../src/components/modals/views/IdentityView';
 
+// --- MOCKS ---
+// Mock the history hook to prevent Supabase connection attempts during test
+jest.mock('../../src/hooks/useNodeHistory', () => ({
+  useNodeHistory: () => ({
+    history: [],
+    reliabilityScore: 95, // Matches the high health in tests
+    growth: 10,
+    loading: false
+  })
+}));
+
 const createMockNode = (overrides = {}) => ({
   pubkey: 'TestNode123',
   address: '1.2.3.4:6000',
@@ -43,7 +54,7 @@ describe('Component Views (Visual Logic)', () => {
         totalStorageCommitted={5000 * (1024**3)} 
         nodeCount={5} 
       />);
-      
+
       expect(screen.getByText(/NETWORK COMPARISON/i)).toBeInTheDocument();
       expect(screen.getByText(/Higher/i)).toBeInTheDocument();
     });
