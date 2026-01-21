@@ -19,7 +19,7 @@ export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted,
   const { growth, loading: historyLoading } = useNetworkHistory('total_capacity');
   const isPositive = growth >= 0;
 
-  // --- 1. DATA ENGINE (Preserved) ---
+  // --- 1. DATA ENGINE ---
   const dashboardData = useMemo(() => {
     const globalCommitted = nodes.reduce((acc, n) => acc + (n.storage_committed || 0), 0);
     const filteredNodes = nodes.filter(n => activeTab === 'ALL' ? true : n.network === activeTab);
@@ -97,6 +97,7 @@ export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted,
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#09090b] border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 fade-in duration-200 overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
 
+        {/* HEADER (FIXED: Toggles Restored) */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div className="flex items-center gap-3">
             <div className={`p-3 rounded-xl border bg-opacity-10 ${activeTab === 'ALL' ? 'bg-purple-500 border-purple-500/20' : activeTab === 'MAINNET' ? 'bg-green-500 border-green-500/20' : 'bg-blue-500 border-blue-500/20'}`}>
@@ -107,7 +108,25 @@ export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted,
               <p className="text-xs text-zinc-500">Storage analytics & distribution</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-full text-zinc-500 hover:text-white transition"><X size={16} /></button>
+
+          <div className="flex items-center gap-2 bg-black/40 p-1 rounded-full border border-zinc-800">
+             {(['ALL', 'MAINNET', 'DEVNET'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-1.5 rounded-full text-[10px] font-bold transition-all duration-300 ${
+                     activeTab === tab 
+                        ? (tab === 'ALL' ? 'bg-zinc-100 text-black shadow-lg' : tab === 'MAINNET' ? 'bg-green-500 text-black shadow-lg' : 'bg-blue-500 text-white shadow-lg')
+                        : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                   {tab}
+                </button>
+             ))}
+             <button onClick={onClose} className="ml-2 p-1.5 rounded-full text-zinc-500 hover:text-white transition">
+                <X size={16} />
+             </button>
+          </div>
         </div>
 
         <div className="space-y-3 md:space-y-4">
@@ -174,7 +193,7 @@ export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted,
                    <TrendingUp size={10} /> Network Benchmark
                 </div>
                 
-                {/* NEW: INJECTED GROWTH BADGE */}
+                {/* GROWTH BADGE */}
                 {!historyLoading && (
                    <div className={`absolute top-4 right-4 text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${isPositive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                       {isPositive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
@@ -217,7 +236,6 @@ export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted,
                    <div className="absolute inset-0 flex items-center justify-center text-yellow-500"><Users size={12} /></div>
                 </div>
              </div>
-             {/* Legends */}
              <div className="grid grid-cols-3 gap-2 border-t border-yellow-500/10 pt-3">
                 <div>
                    <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div><span className="text-[8px] font-bold text-zinc-500 uppercase">Top 10</span></div>
