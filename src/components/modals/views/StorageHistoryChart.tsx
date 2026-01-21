@@ -107,7 +107,7 @@ export const StorageHistoryChart = ({ history, currentUsed, currentCommitted, ze
                 axisLine={false} 
                 tickLine={false} 
                 tick={{ fontSize: 9, fill: '#71717a' }}
-                tickFormatter={(value) => formatBytes(value, 0)} // 0 decimals for y-axis
+                tickFormatter={(value) => formatBytes(value)} 
                 width={45}
             />
             <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#52525b', strokeWidth: 1, strokeDasharray: '4 4' }} />
