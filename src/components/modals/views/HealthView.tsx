@@ -2,6 +2,10 @@ import { ArrowLeft, Zap } from 'lucide-react';
 import { Node } from '../../../types';
 // import { RadialProgress } from '../../RadialProgress'; // UNCOMMENT IF NEEDED
 
+// NEW IMPORTS: History Hook & Ribbon Component
+import { useNodeHistory } from '../../../hooks/useNodeHistory';
+import { StabilityRibbon } from './StabilityRibbon';
+
 interface HealthViewProps {
   node: Node;
   zenMode: boolean;
@@ -13,6 +17,9 @@ interface HealthViewProps {
 
 export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStorage, networkStats }: HealthViewProps) => {
   const health = node.health || 0;
+
+  // NEW: Fetch Node History lazily for the ribbon
+  const { history, loading: historyLoading } = useNodeHistory(node.pubkey);
 
   // Safe Accessors
   const bd = node.healthBreakdown || { uptime: health, version: health, reputation: health, storage: health };
@@ -87,6 +94,14 @@ export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStor
             </div>
           </div>
         </div>
+
+        {/* NEW: STABILITY RIBBON INJECTION */}
+        {/* We hide this in Zen Mode to keep the "OLED Black" aesthetic pure */}
+        {!zenMode && (
+          <div className="px-1 animate-in fade-in slide-in-from-top-2 duration-500">
+             <StabilityRibbon history={history} loading={historyLoading} />
+          </div>
+        )}
 
         {/* --- METRICS GRID (MOBILE) --- */}
         <div className="grid grid-cols-2 gap-2 md:hidden">
