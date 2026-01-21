@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
 import { ArrowLeft, Zap } from 'lucide-react';
 import { Node } from '../../../types';
 import { NodeHistoryPoint } from '../../../hooks/useNodeHistory';
-import { StabilityRibbon } from '../StabilityRibbon';
+import { StabilityRibbon } from './StabilityRibbon';
 import { HistoryChart } from '../../common/HistoryChart';
+import { useMemo } from 'react';
 
 interface HealthViewProps {
   node: Node;
@@ -16,19 +16,10 @@ interface HealthViewProps {
   historyLoading?: boolean;
 }
 
-export const HealthView = ({ 
-  node, 
-  zenMode, 
-  onBack, 
-  avgNetworkHealth, 
-  medianStorage, 
-  networkStats,
-  history = [],
-  historyLoading = false
-}: HealthViewProps) => {
+export const HealthView = ({ node, zenMode, onBack, avgNetworkHealth, medianStorage, networkStats, history = [], historyLoading = false }: HealthViewProps) => {
   const health = node.health || 0;
 
-  // 1. Transform history for the Shadow Chart
+  // Transform history for Chart
   const chartData = useMemo(() => {
     return history.map(p => ({
       date: p.date,
@@ -36,24 +27,20 @@ export const HealthView = ({
     }));
   }, [history]);
 
-  // 2. Safe Data Accessors & Calculations
+  // Safe Accessors
   const bd = node.healthBreakdown || { uptime: health, version: health, reputation: health, storage: health };
   const avgs = networkStats?.avgBreakdown || { uptime: 0, version: 0, reputation: 0, storage: 0 };
-  
   const totalNodes = networkStats?.totalNodes || 1;
   const rank = node.health_rank || node.rank || totalNodes;
   const rankPercentile = (rank / totalNodes) * 100;
   const betterThanPercent = Math.max(0, 100 - rankPercentile);
-  
   const diff = (health - avgNetworkHealth).toFixed(1);
   const diffNum = parseFloat(diff);
 
-  // 3. Status Flags (Crucial for UI logic)
   const isUntracked = (node as any).isUntracked;
   const isApiOffline = node.credits === null;
   const isReputationInvalid = isUntracked || isApiOffline;
 
-  // 4. Weight Logic
   const weights = isReputationInvalid 
       ? { uptime: 0.45, storage: 0.35, reputation: 0, version: 0.20 }
       : { uptime: 0.35, storage: 0.30, reputation: 0.20, version: 0.15 };
@@ -65,7 +52,6 @@ export const HealthView = ({
     { label: 'Consensus', rawVal: bd.version, avgRaw: avgs.version ?? 0, weight: weights.version },
   ];
 
-  // 5. Logic Helpers (Bonus/Base Calculations)
   const getStorageBonusText = (node: Node, median: number) => {
       const usedGB = (node.storage_used || 0) / (1024**3);
       let bonus = 0;
@@ -73,7 +59,6 @@ export const HealthView = ({
       const rounded = Math.round(bonus);
       return rounded > 0 ? `(+${rounded} Bonus)` : '';
   };
-  
   const getStorageBase = (total: number, node: Node) => {
       const usedGB = (node.storage_used || 0) / (1024**3);
       let bonus = 0;
@@ -84,7 +69,7 @@ export const HealthView = ({
   return (
     <div className={`h-full flex flex-col ${zenMode ? '' : 'animate-in fade-in slide-in-from-right-2 duration-300'}`}>
 
-      {/* HEADER: Back Button (Mobile Only) */}
+      {/* HEADER: Back Button */}
       <div className="flex justify-end items-center mb-4 shrink-0 md:hidden">
         <button onClick={onBack} className={`text-[10px] font-bold flex items-center gap-1 px-2.5 py-1.5 rounded-lg border transition ${zenMode ? 'bg-black border-zinc-700 text-white' : 'bg-zinc-900 border-zinc-800 text-red-500 hover:text-red-400 hover:bg-zinc-800'}`}>
           <ArrowLeft size={10} /> BACK
@@ -97,7 +82,7 @@ export const HealthView = ({
         <div className={`p-4 rounded-2xl border flex justify-between items-center relative overflow-hidden group ${zenMode ? 'bg-black border-zinc-600' : 'bg-black border-zinc-800'}`}>
           {!zenMode && <div className="absolute top-0 right-0 p-12 bg-green-500/5 blur-2xl rounded-full pointer-events-none"></div>}
           
-          {/* NEW: SHADOW CHART (History Layer) */}
+          {/* SHADOW CHART: Node Health History */}
           <div className="absolute inset-0 z-0 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none mt-2">
                <HistoryChart 
                   data={chartData} 
@@ -122,21 +107,24 @@ export const HealthView = ({
           </div>
         </div>
 
-        {/* STABILITY RIBBON (DNA Strip) */}
-        {/* Only shown in normal mode to keep Zen mode clean */}
+        {/* STABILITY RIBBON */}
         {!zenMode && (
           <div className="px-1 animate-in fade-in slide-in-from-top-2 duration-500">
              <StabilityRibbon history={history} loading={historyLoading} />
           </div>
         )}
 
-        {/* METRICS GRID (Mobile) */}
+        {/* --- RESTORED: METRICS GRID (MOBILE) --- */}
         <div className="grid grid-cols-2 gap-2 md:hidden">
            {metrics.map((m) => {
               const rawVal = m.rawVal || 0;
               const weightedVal = (rawVal * m.weight).toFixed(1);
               const weightedAvg = (m.avgRaw * m.weight).toFixed(1);
-              const barColor = zenMode ? 'bg-white' : (rawVal >= 80 ? 'bg-green-500' : rawVal >= 50 ? 'bg-yellow-500' : 'bg-red-500');
+
+              const barColor = zenMode 
+                ? 'bg-white'
+                : (rawVal >= 80 ? 'bg-green-500' : rawVal >= 50 ? 'bg-yellow-500' : 'bg-red-500');
+
               const isInvalidRep = m.label === 'Reputation' && isReputationInvalid;
               const baseVal = m.label === 'Storage' ? getStorageBase(rawVal, node) : rawVal;
               const bonusText = m.label === 'Storage' ? getStorageBonusText(node, medianStorage) : '';
@@ -153,14 +141,18 @@ export const HealthView = ({
                    <div className="flex justify-between items-center mb-2">
                       <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">{m.label}</span>
                       <span className={`text-[10px] font-mono font-bold ${isInvalidRep ? 'text-zinc-500' : 'text-white'}`}>
-                        {isInvalidRep ? (isUntracked ? 'NO CREDITS' : 'API OFF') : `${weightedVal} pts`}
+                        {isInvalidRep 
+                          ? (isUntracked ? 'NO CREDITS' : 'API OFF') 
+                          : `${weightedVal} pts`}
                       </span>
                    </div>
+
                    <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-2">
                       {!isInvalidRep && (
                         <div className={`h-full ${barColor}`} style={{ width: `${Math.min(100, rawVal)}%` }}></div>
                       )}
                    </div>
+
                    <div className="text-[8px] text-zinc-600 flex justify-between items-center mt-auto pt-1 border-t border-white/5">
                       <div className="flex items-center gap-1">
                           <span>Base: {isInvalidRep ? 'N/A' : baseVal}</span>
@@ -173,7 +165,7 @@ export const HealthView = ({
            })}
         </div>
 
-        {/* METRICS STACK (Desktop) */}
+        {/* METRICS & BARS (DESKTOP STACK) */}
         <div className="hidden md:flex flex-col gap-5">
           {metrics.map((m) => {
             const rawVal = m.rawVal || 0; 
@@ -189,30 +181,16 @@ export const HealthView = ({
               <div key={m.label} className={isInvalidRep ? 'opacity-50 grayscale' : ''}>
                 <div className="flex justify-between text-xs mb-2">
                   <span className="text-zinc-400 font-bold flex items-center gap-2">
-                      {m.label} 
-                      <span className="text-[9px] font-mono text-zinc-600 font-normal">
-                          (Base: {isInvalidRep ? 'N/A' : baseVal}{bonusText ? ` ${bonusText}` : ''})
-                      </span>
+                      {m.label} <span className="text-[9px] font-mono text-zinc-600 font-normal">(Base: {isInvalidRep ? 'N/A' : baseVal}{bonusText ? ` ${bonusText}` : ''})</span>
                   </span>
                   <div className="font-mono text-[10px]">
-                    {isInvalidRep ? (
-                        <span className="text-zinc-500 font-bold uppercase tracking-wider">
-                            {isUntracked ? 'NO STORAGE CREDITS' : 'API OFFLINE'}
-                        </span>
-                    ) : (
-                        <>
-                            <span className="text-white font-bold">{weightedVal}</span>
-                            <span className="text-zinc-600 mx-1">/</span>
-                            <span className="text-zinc-500">Avg: {weightedAvg}</span>
-                        </>
-                    )}
+                    {isInvalidRep ? <span className="text-zinc-500 font-bold uppercase tracking-wider">{isUntracked ? 'NO STORAGE CREDITS' : 'API OFFLINE'}</span> : <><span className="text-white font-bold">{weightedVal}</span><span className="text-zinc-600 mx-1">/</span><span className="text-zinc-500">Avg: {weightedAvg}</span></>}
                   </div>
                 </div>
                 <div className="h-2 bg-zinc-800 rounded-full overflow-visible relative">
                   {!isInvalidRep && (
                     <>
                         <div className={`h-full rounded-l-full ${barColor} ${zenMode ? '' : 'transition-all duration-1000 shadow-[0_0_10px_rgba(255,255,255,0.1)]'}`} style={{ width: `${Math.min(100, rawVal)}%` }}></div>
-                        {/* Avg Marker */}
                         <div className="absolute top-[-4px] bottom-[-4px] w-0.5 bg-white z-20 shadow-[0_0_5px_black]" style={{ left: `${Math.min(100, rawAvg)}%` }} title={`Network Average: ${rawAvg}`}></div>
                     </>
                   )}
@@ -222,7 +200,6 @@ export const HealthView = ({
           })}
         </div>
 
-        {/* Footer Rank */}
         <div className="mt-auto pt-2 flex justify-center text-center">
           <div className={`px-3 py-2 rounded-xl text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center gap-2 border ${zenMode ? 'bg-black border-zinc-600 text-zinc-300' : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500'}`}>
             <Zap size={14} className="shrink-0" /> 
