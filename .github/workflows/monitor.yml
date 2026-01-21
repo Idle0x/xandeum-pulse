@@ -2,10 +2,8 @@ name: 🏥 Pulse Monitor
 
 on:
   schedule:
-    # Runs at minute 23 of every hour (24 times a day)
-    # This consumes ~360 minutes/month (only 18% of free GitHub quota)
+    # Runs at minute 23 of every hour
     - cron: '23 * * * *'
-  # Allows you to click "Run Now" manually in GitHub
   workflow_dispatch:
 
 jobs:
@@ -14,16 +12,22 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          
+
       - name: Install Dependencies
         run: npm ci
-        
-      - name: Run Smoke Test
-        # Using 'tsx' to auto-compile the TypeScript file without config errors
+
+      - name: Run Monitor & Snapshot
+        # This is the critical addition:
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Optional: Points the script to your production URL explicitly
+          NEXT_PUBLIC_APP_URL: "https://xandeum-pulse.vercel.app" 
         run: npx tsx scripts/health-check.ts
