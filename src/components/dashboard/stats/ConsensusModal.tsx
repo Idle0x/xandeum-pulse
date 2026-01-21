@@ -1,17 +1,23 @@
 import { useState, useMemo } from 'react';
-import { X, Server, GitBranch, CheckCircle, AlertCircle, ArrowUpCircle, Activity, ShieldCheck, Info, HelpCircle } from 'lucide-react';
+import { X, Server, GitBranch, CheckCircle, AlertCircle, ArrowUpCircle, Activity, ShieldCheck, HelpCircle } from 'lucide-react';
 import { Node } from '../../../types';
 import { compareVersions } from '../../../utils/nodeHelpers';
+// NEW IMPORTS: History Hook & Chart Component
+import { useNetworkHistory } from '../../../hooks/useNetworkHistory';
+import { HistoryChart } from '../../common/HistoryChart';
 
 interface ConsensusModalProps {
   onClose: () => void;
   nodes: Node[];
-  mostCommonVersion: string; // Added to satisfy index.tsx
+  mostCommonVersion: string;
 }
 
 export const ConsensusModal = ({ onClose, nodes, mostCommonVersion }: ConsensusModalProps) => {
   const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
+
+  // NEW: Fetch Consensus History for the background chart
+  const { history, loading: historyLoading } = useNetworkHistory('consensus_score');
 
   // --- 1. DATA ENGINE (Preserved) ---
   const data = useMemo(() => {
@@ -55,7 +61,6 @@ export const ConsensusModal = ({ onClose, nodes, mostCommonVersion }: ConsensusM
     };
   }, [nodes, activeTab]);
 
-  // Theme Logic
   const theme = {
     ALL: { text: 'text-purple-400', bg: 'bg-purple-500', border: 'border-purple-500/20' },
     MAINNET: { text: 'text-green-500', bg: 'bg-green-500', border: 'border-green-500/20' },
@@ -63,7 +68,6 @@ export const ConsensusModal = ({ onClose, nodes, mostCommonVersion }: ConsensusM
   };
   const activeTheme = theme[activeTab];
 
-  // --- 2. IMPROVED TOOLTIP COMPONENT ---
   const Tooltip = ({ text, align = 'center' }: { text: string, align?: 'left' | 'center' | 'right' }) => {
     const positionClasses = {
       left: 'left-0 translate-x-0',
@@ -91,7 +95,7 @@ export const ConsensusModal = ({ onClose, nodes, mostCommonVersion }: ConsensusM
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#09090b] border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 fade-in duration-200" onClick={(e) => e.stopPropagation()}>
 
-        {/* --- HEADER --- */}
+        {/* HEADER */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div className="flex items-center gap-3">
             <div className={`p-3 rounded-xl border bg-opacity-10 ${activeTheme.bg} ${activeTheme.border}`}>
@@ -125,7 +129,7 @@ export const ConsensusModal = ({ onClose, nodes, mostCommonVersion }: ConsensusM
 
         <div className="space-y-3">
 
-          {/* --- ROW 1: HERO METRICS --- */}
+          {/* ROW 1: HERO METRICS */}
           <div className="grid grid-cols-2 gap-3">
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative">
                 <div className={`absolute top-0 bottom-0 left-0 w-1 rounded-l-xl ${activeTheme.bg}`}></div>
@@ -143,9 +147,21 @@ export const ConsensusModal = ({ onClose, nodes, mostCommonVersion }: ConsensusM
                 </div>
              </div>
 
-             <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative">
+             {/* UPDATED: UNITY SCORE CARD WITH SHADOW CHART */}
+             <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 relative overflow-hidden">
                 <div className={`absolute top-0 bottom-0 left-0 w-1 rounded-l-xl ${activeTheme.bg}`}></div>
-                <div className="flex justify-between items-start mb-1">
+                
+                {/* NEW: SHADOW CHART INJECTION */}
+                <div className="absolute bottom-0 right-0 w-24 h-12 z-0 opacity-30">
+                    <HistoryChart 
+                        data={history} 
+                        color={parseFloat(data.agreementScore) > 66 ? '#22c55e' : '#eab308'} 
+                        loading={historyLoading} 
+                        height={40} 
+                    />
+                </div>
+
+                <div className="flex justify-between items-start mb-1 relative z-10">
                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest flex items-center gap-1">
                       <ShieldCheck size={10} /> Unity Score
                       <Tooltip text="The percentage of nodes running the consensus version." align="right" />
@@ -156,14 +172,14 @@ export const ConsensusModal = ({ onClose, nodes, mostCommonVersion }: ConsensusM
                       {parseFloat(data.agreementScore) > 66 ? 'STRONG' : 'FRACTURED'}
                    </div>
                 </div>
-                <div className="flex items-baseline gap-2">
+                <div className="flex items-baseline gap-2 relative z-10">
                    <span className="text-2xl font-black tracking-tight text-white">{data.agreementScore}%</span>
                    <span className="text-[9px] text-zinc-600 font-bold uppercase">of Network Synced</span>
                 </div>
              </div>
           </div>
 
-          {/* --- ROW 2: LIFECYCLE BUCKETS --- */}
+          {/* ROW 2: LIFECYCLE BUCKETS */}
           <div className="grid grid-cols-3 gap-2">
              <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex flex-col items-center justify-center text-center relative group">
                 <div className="absolute top-2 right-2"><Tooltip text="Nodes running older versions than consensus." align="left" /></div>
@@ -187,7 +203,7 @@ export const ConsensusModal = ({ onClose, nodes, mostCommonVersion }: ConsensusM
              </div>
           </div>
 
-          {/* --- ROW 3: DETAILED LIST --- */}
+          {/* ROW 3: DETAILED LIST */}
           <div className={`border border-zinc-800 rounded-xl overflow-hidden flex flex-col max-h-60 ${activeTab === 'ALL' ? 'bg-purple-900/5' : activeTab === 'MAINNET' ? 'bg-green-900/5' : 'bg-blue-900/5'}`}>
              <div className="p-3 border-b border-zinc-800 flex justify-between items-center bg-black/20">
                 <span className="text-[9px] text-zinc-500 uppercase font-bold flex items-center gap-1.5">
