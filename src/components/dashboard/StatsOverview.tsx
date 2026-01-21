@@ -5,7 +5,7 @@ import { NetworkSwitcher } from '../common/NetworkSwitcher';
 import { formatBytes } from '../../utils/formatters';
 // NEW IMPORTS: History Hook & Chart Component
 import { useNetworkHistory } from '../../hooks/useNetworkHistory';
-import { HistoryChart } from '../../common/HistoryChart';
+import { HistoryChart } from '../common/HistoryChart';
 
 interface StatsOverviewProps {
   stats: {
