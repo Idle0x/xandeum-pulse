@@ -11,6 +11,7 @@
     "test:ci": "jest --ci"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.91.0",
     "@types/d3-scale": "^4.0.9",
     "@types/react-simple-maps": "^3.0.6",
     "@vercel/analytics": "^1.6.1",
