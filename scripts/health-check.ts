@@ -1,10 +1,5 @@
-import { config } from 'dotenv';
-import { resolve } from 'path';
 import axios from 'axios';
 import { getServiceSupabase } from '../src/lib/supabase'; // Import our new helper
-
-// Load env vars from .env.local for local testing
-config({ path: resolve(__dirname, '../.env.local') });
 
 // --- TYPES (Matching your project types) ---
 interface Node {
@@ -19,7 +14,9 @@ interface Node {
 }
 
 // --- CONSTANTS ---
-const API_URL = 'https://xandeum-pulse.vercel.app/api/stats'; // Or your local dev URL if testing
+// We use the production URL for the API to ensure we are snapshotting the live state
+// If you want to test locally, you can change this to http://localhost:3000/api/stats temporarily
+const API_URL = 'https://xandeum-pulse.vercel.app/api/stats'; 
 const TIMEOUT = 10000;
 
 async function runHealthCheck() {
@@ -41,11 +38,8 @@ async function runHealthCheck() {
     const totalUsed = nodes.reduce((acc, n) => acc + (n.storage_used || 0), 0);
     const avgHealth = nodes.reduce((acc, n) => acc + (n.health || 0), 0) / (totalNodes || 1);
     
-    // Simple consensus calc for snapshot (percentage of nodes on most common version)
-    // You might want to pull the actual logic from your frontend if needed, 
-    // but for a snapshot, a rough approximation or fetching from /stats is fine.
-    // For now, we'll assume the API returns enriched stats or we calc basics.
-    const consensusScore = 0; // Placeholder: If /api/stats calculates this, use it. Otherwise, we can compute.
+    // Consensus calc placeholder
+    const consensusScore = 0; 
 
     console.log(`✅ Fetched ${totalNodes} nodes.`);
     console.log(`📊 Network Capacity: ${(totalCapacity / 1e12).toFixed(2)} TB`);
@@ -56,7 +50,9 @@ async function runHealthCheck() {
     const supabase = getServiceSupabase();
     
     if (!supabase) {
-      console.log('⚠️ Skipping DB Snapshot: No Service Role Key found.');
+      // This might happen during "next build" if the key isn't present, 
+      // but strictly speaking we only need this when the script RUNS, not builds.
+      console.log('⚠️ Skipping DB Snapshot: No Service Role Key found (Check Vercel Env Vars).');
     } else {
       // A. Insert Network Snapshot
       const { error: netError } = await supabase
@@ -66,14 +62,13 @@ async function runHealthCheck() {
           total_used: totalUsed,
           total_nodes: totalNodes,
           avg_health: avgHealth,
-          consensus_score: consensusScore // You can refine this calculation
+          consensus_score: consensusScore 
         });
 
       if (netError) console.error('❌ Network Snapshot Failed:', netError.message);
       else console.log('✅ Network Snapshot Saved.');
 
       // B. Insert Node Snapshots (Batch Insert)
-      // We map the nodes to the DB schema
       const nodeRows = nodes.map(n => ({
         pubkey: n.pubkey,
         network: n.network || 'MAINNET',
@@ -85,7 +80,7 @@ async function runHealthCheck() {
         rank: n.rank || 0
       }));
 
-      // Supabase limits batch inserts, so chunk them if > 1000 nodes (optional safety)
+      // Basic batch insert
       const { error: nodeError } = await supabase
         .from('node_snapshots')
         .insert(nodeRows);
@@ -99,7 +94,7 @@ async function runHealthCheck() {
 
   } catch (error: any) {
     console.error('🚨 Health Check Failed:', error.message);
-    // If it fails, we want GitHub Actions to notify us
+    // If it fails, we want GitHub Actions/Vercel Cron to know
     process.exit(1);
   }
 }
