@@ -30,7 +30,8 @@ export const HistoryChart = ({ data, color, loading, height = 60 }: HistoryChart
             contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', borderRadius: '8px', fontSize: '10px', color: '#fff' }}
             itemStyle={{ color: '#fff' }}
             cursor={{ stroke: '#fff', strokeWidth: 1, opacity: 0.2 }}
-            formatter={(value: number) => [value.toLocaleString(), 'Value']}
+            // FIX: Changed type to 'any' to handle potential undefined values from Recharts
+            formatter={(value: any) => [Number(value).toLocaleString(), 'Value']}
           />
           <Area 
             type="monotone" 
