@@ -3,6 +3,7 @@ import { X, Database, TrendingUp, TrendingDown, Users, PieChart, Globe } from 'l
 import { Node } from '../../../types';
 import { formatBytes } from '../../../utils/formatters';
 import { useNetworkHistory } from '../../../hooks/useNetworkHistory';
+import { HistoryChart } from '../../common/HistoryChart';
 
 interface CapacityModalProps {
   onClose: () => void;
@@ -15,11 +16,11 @@ interface CapacityModalProps {
 export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted, totalUsed }: CapacityModalProps) => {
   const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
 
-  // NEW: Shadow Layer Fetch (30-day Growth)
-  const { growth, loading: historyLoading } = useNetworkHistory('total_capacity');
+  // 1. DATA FETCHING: Shadow Layer (30-day Growth)
+  const { history, growth, loading: historyLoading } = useNetworkHistory('total_capacity');
   const isPositive = growth >= 0;
 
-  // --- 1. DATA ENGINE ---
+  // --- 2. DATA ENGINE ---
   const dashboardData = useMemo(() => {
     const globalCommitted = nodes.reduce((acc, n) => acc + (n.storage_committed || 0), 0);
     const filteredNodes = nodes.filter(n => activeTab === 'ALL' ? true : n.network === activeTab);
@@ -58,7 +59,7 @@ export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted,
     };
   }, [nodes, activeTab]);
 
-  // --- 2. SVG HELPER ---
+  // --- 3. SVG HELPER ---
   const renderPie = (slices: { value: number; color: string }[]) => {
     const total = slices.reduce((acc, s) => acc + s.value, 0) || 1;
     let cumulativePercent = 0;
@@ -97,7 +98,7 @@ export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted,
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#09090b] border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 fade-in duration-200 overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
 
-        {/* HEADER (FIXED: Toggles Restored) */}
+        {/* HEADER */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div className="flex items-center gap-3">
             <div className={`p-3 rounded-xl border bg-opacity-10 ${activeTab === 'ALL' ? 'bg-purple-500 border-purple-500/20' : activeTab === 'MAINNET' ? 'bg-green-500 border-green-500/20' : 'bg-blue-500 border-blue-500/20'}`}>
@@ -130,14 +131,35 @@ export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted,
         </div>
 
         <div className="space-y-3 md:space-y-4">
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 md:p-5 relative overflow-hidden">
+          
+          {/* HERO CARD with SHADOW CHART */}
+          <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 md:p-5 relative overflow-hidden group">
              <div className={`absolute top-0 left-0 w-1 h-full ${activeTab === 'ALL' ? 'bg-purple-500' : themeBg}`}></div>
-             <div className="grid grid-cols-2 gap-8 divide-x divide-zinc-800">
+             
+             {/* SHADOW CHART: Capacity Growth */}
+             <div className="absolute inset-0 z-0 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none px-4 mt-2">
+                <HistoryChart 
+                    data={history} 
+                    color={activeTab === 'ALL' ? '#a855f7' : activeTab === 'MAINNET' ? '#22c55e' : '#3b82f6'} 
+                    loading={historyLoading} 
+                    height={80} 
+                />
+             </div>
+
+             <div className="grid grid-cols-2 gap-8 divide-x divide-zinc-800 relative z-10">
                 <div className="text-center">
                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest mb-1">{activeTab} Committed</div>
                    <div className={`text-2xl md:text-3xl font-black tracking-tight ${activeTab === 'ALL' ? 'text-purple-400' : 'text-white'}`}>
                       {formatBytes(dashboardData.totalCommitted)}
                    </div>
+                   
+                   {/* GROWTH BADGE */}
+                   {!historyLoading && (
+                      <div className={`mt-2 mx-auto w-fit text-[8px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${isPositive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                         {isPositive ? <TrendingUp size={8} /> : <TrendingDown size={8} />}
+                         {growth > 0 ? '+' : ''}{growth.toFixed(1)}% (30d)
+                      </div>
+                   )}
                 </div>
                 <div className="text-center pl-8">
                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest mb-1">{activeTab} Used</div>
@@ -192,15 +214,6 @@ export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted,
                 <div className="text-[9px] text-zinc-500 uppercase font-bold mb-3 tracking-wider flex items-center gap-1.5">
                    <TrendingUp size={10} /> Network Benchmark
                 </div>
-                
-                {/* GROWTH BADGE */}
-                {!historyLoading && (
-                   <div className={`absolute top-4 right-4 text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${isPositive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                      {isPositive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                      {Math.abs(growth).toFixed(1)}% (30d)
-                   </div>
-                )}
-
                 <div className="grid grid-cols-2 gap-4">
                    <div>
                       <div className="text-[9px] text-zinc-500 mb-0.5">Median Node</div>
