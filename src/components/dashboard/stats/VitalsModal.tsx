@@ -1,17 +1,23 @@
 import { useState, useMemo } from 'react';
 import { X, HeartPulse, Activity, Zap, AlertTriangle, CheckCircle, Info, Clock } from 'lucide-react';
 import { Node } from '../../../types';
+// NEW IMPORTS: History Hook & Chart Component
+import { useNetworkHistory } from '../../../hooks/useNetworkHistory';
+import { HistoryChart } from '../../common/HistoryChart';
 
 interface VitalsModalProps {
   onClose: () => void;
   nodes: Node[];
-  avgHealth: number;       // Added
-  consensusPercent: number; // Added
-  consensusVersion: string; // Added
+  avgHealth: number;       
+  consensusPercent: number; 
+  consensusVersion: string; 
 }
 
 export const VitalsModal = ({ onClose, nodes, avgHealth, consensusPercent, consensusVersion }: VitalsModalProps) => {
   const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
+
+  // NEW: Fetch Health History for the background chart
+  const { history, loading: historyLoading } = useNetworkHistory('avg_health');
 
   // --- 1. DATA ENGINE (Preserved) ---
   const data = useMemo(() => {
@@ -88,20 +94,34 @@ export const VitalsModal = ({ onClose, nodes, avgHealth, consensusPercent, conse
 
           {/* --- ROW 1: HERO STATS --- */}
           <div className="grid grid-cols-2 gap-4">
-             <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 md:p-5 relative overflow-hidden">
+             
+             {/* CARD 1: AVG HEALTH (Updated with Shadow Chart) */}
+             <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 md:p-5 relative overflow-hidden group">
                 <div className={`absolute top-0 left-0 w-1 h-full ${activeTheme.bg}`}></div>
-                <div className="flex justify-between items-start mb-2">
+                
+                {/* NEW: SHADOW CHART INJECTION */}
+                <div className="absolute inset-0 z-0 opacity-20 group-hover:opacity-40 transition-opacity pointer-events-none mt-8 px-2">
+                    <HistoryChart 
+                        data={history} 
+                        color={activeTab === 'MAINNET' ? '#22c55e' : activeTab === 'DEVNET' ? '#3b82f6' : '#a855f7'} 
+                        loading={historyLoading} 
+                        height={60} 
+                    />
+                </div>
+
+                <div className="flex justify-between items-start mb-2 relative z-10">
                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest flex items-center gap-1.5">
                       <Activity size={10} /> Avg Health
                    </div>
                    <span className={`text-[9px] font-mono font-bold ${activeTheme.text}`}>{activeTab}</span>
                 </div>
-                <div className="flex items-baseline gap-2">
+                <div className="flex items-baseline gap-2 relative z-10">
                    <span className={`text-3xl font-black tracking-tight ${activeTab === 'ALL' ? 'text-white' : activeTheme.text}`}>{data.avgHealth}</span>
                    <span className="text-xs text-zinc-600 font-bold">/ 100</span>
                 </div>
              </div>
 
+             {/* CARD 2: STABILITY SCORE (Preserved) */}
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 md:p-5 relative overflow-hidden">
                 <div className={`absolute top-0 left-0 w-1 h-full ${activeTheme.bg}`}></div>
                 <div className="flex justify-between items-start mb-2">
