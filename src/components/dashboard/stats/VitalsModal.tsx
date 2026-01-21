@@ -16,10 +16,11 @@ interface VitalsModalProps {
 export const VitalsModal = ({ onClose, nodes, avgHealth, consensusPercent, consensusVersion }: VitalsModalProps) => {
   const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
 
-  // NEW: Fetch Health History for the background chart
+  // 1. DATA FETCHING: Shadow Layer (Health Trends)
+  // Visualize the heartbeat of the network over the last 30 days
   const { history, loading: historyLoading } = useNetworkHistory('avg_health');
 
-  // --- 1. DATA ENGINE (Preserved) ---
+  // --- 2. DATA ENGINE ---
   const data = useMemo(() => {
     const filtered = nodes.filter(n => activeTab === 'ALL' ? true : n.network === activeTab);
     const count = filtered.length || 1;
@@ -94,18 +95,18 @@ export const VitalsModal = ({ onClose, nodes, avgHealth, consensusPercent, conse
 
           {/* --- ROW 1: HERO STATS --- */}
           <div className="grid grid-cols-2 gap-4">
-             
-             {/* CARD 1: AVG HEALTH (Updated with Shadow Chart) */}
+
+             {/* CARD 1: AVG HEALTH with SHADOW CHART */}
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 md:p-5 relative overflow-hidden group">
                 <div className={`absolute top-0 left-0 w-1 h-full ${activeTheme.bg}`}></div>
-                
-                {/* NEW: SHADOW CHART INJECTION */}
-                <div className="absolute inset-0 z-0 opacity-20 group-hover:opacity-40 transition-opacity pointer-events-none mt-8 px-2">
+
+                {/* SHADOW CHART: Health EKG */}
+                <div className="absolute inset-0 z-0 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none mt-4 px-2">
                     <HistoryChart 
                         data={history} 
                         color={activeTab === 'MAINNET' ? '#22c55e' : activeTab === 'DEVNET' ? '#3b82f6' : '#a855f7'} 
                         loading={historyLoading} 
-                        height={60} 
+                        height={80} 
                     />
                 </div>
 
@@ -121,7 +122,7 @@ export const VitalsModal = ({ onClose, nodes, avgHealth, consensusPercent, conse
                 </div>
              </div>
 
-             {/* CARD 2: STABILITY SCORE (Preserved) */}
+             {/* CARD 2: STABILITY SCORE (Preserved Static) */}
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 md:p-5 relative overflow-hidden">
                 <div className={`absolute top-0 left-0 w-1 h-full ${activeTheme.bg}`}></div>
                 <div className="flex justify-between items-start mb-2">
