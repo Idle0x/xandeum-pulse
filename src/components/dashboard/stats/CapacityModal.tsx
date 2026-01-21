@@ -1,27 +1,28 @@
 import { useState, useMemo } from 'react';
-import { X, Database, TrendingUp, Users, PieChart, Globe, Activity, Server, Trophy } from 'lucide-react';
+import { X, Database, TrendingUp, TrendingDown, Users, PieChart, Globe } from 'lucide-react';
 import { Node } from '../../../types';
 import { formatBytes } from '../../../utils/formatters';
+import { useNetworkHistory } from '../../../hooks/useNetworkHistory';
 
 interface CapacityModalProps {
   onClose: () => void;
   nodes: Node[];
-  medianCommitted: number; // Added
-  totalCommitted: number;  // Added
-  totalUsed: number;       // Added
+  medianCommitted: number;
+  totalCommitted: number;
+  totalUsed: number;
 }
 
 export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted, totalUsed }: CapacityModalProps) => {
   const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
 
+  // NEW: Shadow Layer Fetch (30-day Growth)
+  const { growth, loading: historyLoading } = useNetworkHistory('total_capacity');
+  const isPositive = growth >= 0;
+
   // --- 1. DATA ENGINE (Preserved) ---
   const dashboardData = useMemo(() => {
     const globalCommitted = nodes.reduce((acc, n) => acc + (n.storage_committed || 0), 0);
-
-    const filteredNodes = nodes.filter(n => 
-      activeTab === 'ALL' ? true : n.network === activeTab
-    );
-
+    const filteredNodes = nodes.filter(n => activeTab === 'ALL' ? true : n.network === activeTab);
     const tCommitted = filteredNodes.reduce((acc, n) => acc + (n.storage_committed || 0), 0);
     const tUsed = filteredNodes.reduce((acc, n) => acc + (n.storage_used || 0), 0);
     const count = filteredNodes.length || 1;
@@ -106,25 +107,7 @@ export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted,
               <p className="text-xs text-zinc-500">Storage analytics & distribution</p>
             </div>
           </div>
-
-          <div className="flex items-center gap-2 bg-black/40 p-1 rounded-full border border-zinc-800">
-             {(['ALL', 'MAINNET', 'DEVNET'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-1.5 rounded-full text-[10px] font-bold transition-all duration-300 ${
-                     activeTab === tab 
-                        ? (tab === 'ALL' ? 'bg-zinc-100 text-black shadow-lg' : tab === 'MAINNET' ? 'bg-green-500 text-black shadow-lg' : 'bg-blue-500 text-white shadow-lg')
-                        : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
-                >
-                   {tab}
-                </button>
-             ))}
-             <button onClick={onClose} className="ml-2 p-1.5 rounded-full text-zinc-500 hover:text-white transition">
-                <X size={16} />
-             </button>
-          </div>
+          <button onClick={onClose} className="p-1.5 rounded-full text-zinc-500 hover:text-white transition"><X size={16} /></button>
         </div>
 
         <div className="space-y-3 md:space-y-4">
@@ -186,10 +169,19 @@ export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted,
                 </div>
              )}
 
-             <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 flex flex-col justify-center">
+             <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 flex flex-col justify-center relative overflow-hidden">
                 <div className="text-[9px] text-zinc-500 uppercase font-bold mb-3 tracking-wider flex items-center gap-1.5">
                    <TrendingUp size={10} /> Network Benchmark
                 </div>
+                
+                {/* NEW: INJECTED GROWTH BADGE */}
+                {!historyLoading && (
+                   <div className={`absolute top-4 right-4 text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${isPositive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                      {isPositive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                      {Math.abs(growth).toFixed(1)}% (30d)
+                   </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                    <div>
                       <div className="text-[9px] text-zinc-500 mb-0.5">Median Node</div>
@@ -225,6 +217,7 @@ export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted,
                    <div className="absolute inset-0 flex items-center justify-center text-yellow-500"><Users size={12} /></div>
                 </div>
              </div>
+             {/* Legends */}
              <div className="grid grid-cols-3 gap-2 border-t border-yellow-500/10 pt-3">
                 <div>
                    <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div><span className="text-[8px] font-bold text-zinc-500 uppercase">Top 10</span></div>
