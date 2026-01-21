@@ -19,7 +19,7 @@ import { ShareProof } from './ShareProof';
 import Link from 'next/link';
 // NEW IMPORTS: History Hook & Chart
 import { useNodeHistory } from '../../hooks/useNodeHistory';
-import { HistoryChart } from '../../common/HistoryChart';
+import { HistoryChart } from '../common/HistoryChart';
 
 interface InspectorModalProps {
   selectedNode: Node;
