@@ -15,11 +15,13 @@ export interface NetworkHistoryPoint {
 export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
   const [history, setHistory] = useState<NetworkHistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
-  const [growth, setGrowth] = useState(0); // Added growth state
+  const [growth, setGrowth] = useState(0);
 
   useEffect(() => {
     async function fetchHistory() {
       setLoading(true);
+      
+      // 1. Determine Timeframe
       let days = 7;
       let timeGrain = 'hour';
       let rpcMode = false;
@@ -36,64 +38,72 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
       startDate.setDate(startDate.getDate() - days);
 
       let data: any[] | null = null;
+      let error = null;
 
+      // 2. Fetch Data (Try RPC first, then Raw Table)
       if (rpcMode) {
-        const { data: rpcData, error } = await supabase.rpc('get_network_history_bucketed', {
+        const response = await supabase.rpc('get_network_history_bucketed', {
           p_time_grain: timeGrain,
           p_start_date: startDate.toISOString()
         });
-        if (!error) data = rpcData;
+        data = response.data;
+        error = response.error;
       } else {
-        const { data: rawData, error } = await supabase
+        // Fallback: Fetch raw rows if short timeframe
+        const response = await supabase
           .from('network_snapshots')
-          .select('*')
+          .select('*') // Select all columns to be safe
           .gte('created_at', startDate.toISOString())
           .order('created_at', { ascending: true });
         
-        if (!error && rawData) {
-            // Map raw DB columns to our interface
-            data = rawData.map(d => ({
-                bucket: d.created_at,
-                avg_health: d.avg_health,
-                total_nodes: d.total_nodes,
-                total_capacity: d.total_capacity,
-                total_used: d.total_used,
-                consensus_score: d.consensus_score
-            }));
-        }
+        data = response.data;
+        error = response.error;
       }
 
+      if (error) {
+        console.error("Network History Error:", error);
+        setLoading(false);
+        return;
+      }
+
+      // 3. ROBUST MAPPING (The Fix)
+      // We map whatever columns exist in DB to our standard interface
       if (data && data.length > 0) {
         const points = data.map((d: any) => ({
-          date: d.bucket,
-          avg_health: Number(d.avg_health),
-          total_nodes: Number(d.total_nodes),
-          total_capacity: Number(d.total_capacity),
-          total_used: Number(d.total_used),
-          consensus_score: Number(d.consensus_score)
+          // Handle 'bucket' (RPC) vs 'created_at' (Raw) vs 'id' (Legacy)
+          date: d.bucket || d.created_at || d.id, 
+          
+          // Ensure numbers, handle potential nulls
+          avg_health: Number(d.avg_health || 0),
+          total_nodes: Number(d.total_nodes || 0),
+          consensus_score: Number(d.consensus_score || 0),
+
+          // HANDLE COLUMN MISMATCH: Check 'total_capacity' OR 'storage_committed'
+          total_capacity: Number(d.total_capacity ?? d.storage_committed ?? 0),
+          
+          // HANDLE COLUMN MISMATCH: Check 'total_used' OR 'storage_used'
+          total_used: Number(d.total_used ?? d.storage_used ?? 0)
         }));
+
         setHistory(points);
 
-        // CALCULATE GROWTH (Based on Total Capacity by default)
-        const first = points[0];
-        const last = points[points.length - 1];
-        if (first.total_capacity > 0) {
-            const diff = last.total_capacity - first.total_capacity;
-            const percent = (diff / first.total_capacity) * 100;
-            setGrowth(percent);
-        } else {
-            setGrowth(0);
+        // 4. Calculate Growth (based on Capacity)
+        if (points.length > 1) {
+            const first = points[0].total_capacity;
+            const last = points[points.length - 1].total_capacity;
+            if (first > 0) {
+                setGrowth(((last - first) / first) * 100);
+            }
         }
       } else {
         setHistory([]);
-        setGrowth(0);
       }
+      
       setLoading(false);
     }
 
     fetchHistory();
   }, [timeRange]);
 
-  // Return growth included
   return { history, loading, growth };
 };
