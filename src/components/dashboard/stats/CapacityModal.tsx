@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
-import { X, Database, TrendingUp, TrendingDown, Users, PieChart, Globe } from 'lucide-react';
+import { X, Database, TrendingUp, TrendingDown, Users, PieChart, Globe, BarChart3 } from 'lucide-react';
 import { Node } from '../../../types';
 import { formatBytes } from '../../../utils/formatters';
-import { useNetworkHistory } from '../../../hooks/useNetworkHistory';
+import { useNetworkHistory, HistoryTimeRange } from '../../../hooks/useNetworkHistory';
 import { HistoryChart } from '../../common/HistoryChart';
+import { CapacityEvolutionChart } from './CapacityEvolutionChart';
 
 interface CapacityModalProps {
   onClose: () => void;
@@ -13,12 +14,21 @@ interface CapacityModalProps {
   totalUsed: number;
 }
 
-export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted, totalUsed }: CapacityModalProps) => {
+export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
   const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
 
-  // 1. DATA FETCHING: Shadow Layer (30-day Growth)
-  const { history, growth, loading: historyLoading } = useNetworkHistory('total_capacity');
+  // 1. DATA FETCHING
+  // Evolution Chart State (Middle Row)
+  const [timeRange, setTimeRange] = useState<HistoryTimeRange>('7D');
+  const { history: evoHistory, loading: evoLoading } = useNetworkHistory(timeRange);
+
+  // Hero Card State (Bottom-Anchored Trend)
+  // We fix this to 30D to show a solid monthly trend
+  const { history: trendHistory, growth, loading: trendLoading } = useNetworkHistory('30D');
   const isPositive = growth >= 0;
+  
+  // Prepare data for the small Hero chart
+  const heroChartData = trendHistory.map(p => ({ date: p.date, value: p.total_capacity }));
 
   // --- 2. DATA ENGINE ---
   const dashboardData = useMemo(() => {
@@ -86,9 +96,9 @@ export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted,
   };
 
   const getWhaleText = () => {
-     if (activeTab === 'ALL') return <>The top 10 nodes <span className="text-zinc-300 font-bold">across all networks</span> control</>;
-     if (activeTab === 'MAINNET') return <>The top 10 nodes <span className="text-green-500 font-bold">on Mainnet</span> control</>;
-     return <>The top 10 nodes <span className="text-blue-500 font-bold">on Devnet</span> control</>;
+     if (activeTab === 'ALL') return <>Top 10 nodes <span className="text-zinc-300 font-bold">across network</span> control</>;
+     if (activeTab === 'MAINNET') return <>Top 10 nodes <span className="text-green-500 font-bold">on Mainnet</span> control</>;
+     return <>Top 10 nodes <span className="text-blue-500 font-bold">on Devnet</span> control</>;
   };
 
   const themeColor = activeTab === 'MAINNET' ? 'text-green-500' : 'text-blue-500';
@@ -96,7 +106,7 @@ export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted,
 
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#09090b] border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 fade-in duration-200 overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-[#09090b] border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-3xl w-full shadow-2xl animate-in zoom-in-95 fade-in duration-200 overflow-y-auto max-h-[90vh] custom-scrollbar" onClick={(e) => e.stopPropagation()}>
 
         {/* HEADER */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -130,40 +140,44 @@ export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted,
           </div>
         </div>
 
-        <div className="space-y-3 md:space-y-4">
-          
-          {/* HERO CARD with SHADOW CHART */}
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 md:p-5 relative overflow-hidden group">
+        <div className="space-y-4">
+
+          {/* --- ROW 1: HERO CARD (Bottom-Anchored Trend) --- */}
+          <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-5 relative overflow-hidden group h-36 flex flex-col justify-between">
              <div className={`absolute top-0 left-0 w-1 h-full ${activeTab === 'ALL' ? 'bg-purple-500' : themeBg}`}></div>
-             
-             {/* SHADOW CHART: Capacity Growth */}
-             <div className="absolute inset-0 z-0 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none px-4 mt-2">
+
+             {/* BOTTOM-ANCHORED CHART */}
+             {/* Positioned strictly at bottom with partial height to avoid text collision */}
+             <div className="absolute bottom-0 left-0 right-0 h-1/2 opacity-40 group-hover:opacity-50 transition-opacity pointer-events-none">
                 <HistoryChart 
-                    data={history} 
+                    data={heroChartData} 
                     color={activeTab === 'ALL' ? '#a855f7' : activeTab === 'MAINNET' ? '#22c55e' : '#3b82f6'} 
-                    loading={historyLoading} 
-                    height={80} 
+                    loading={trendLoading} 
+                    height={70} 
                 />
              </div>
 
-             <div className="grid grid-cols-2 gap-8 divide-x divide-zinc-800 relative z-10">
-                <div className="text-center">
-                   <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest mb-1">{activeTab} Committed</div>
-                   <div className={`text-2xl md:text-3xl font-black tracking-tight ${activeTab === 'ALL' ? 'text-purple-400' : 'text-white'}`}>
+             <div className="flex justify-between relative z-10 w-full">
+                {/* Committed Side */}
+                <div>
+                   <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest">{activeTab} Committed</span>
+                      {!trendLoading && (
+                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${isPositive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                            {isPositive ? <TrendingUp size={8} /> : <TrendingDown size={8} />}
+                            {growth.toFixed(1)}%
+                        </span>
+                      )}
+                   </div>
+                   <div className={`text-4xl font-black tracking-tight ${activeTab === 'ALL' ? 'text-white' : themeColor}`}>
                       {formatBytes(dashboardData.totalCommitted)}
                    </div>
-                   
-                   {/* GROWTH BADGE */}
-                   {!historyLoading && (
-                      <div className={`mt-2 mx-auto w-fit text-[8px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${isPositive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                         {isPositive ? <TrendingUp size={8} /> : <TrendingDown size={8} />}
-                         {growth > 0 ? '+' : ''}{growth.toFixed(1)}% (30d)
-                      </div>
-                   )}
                 </div>
-                <div className="text-center pl-8">
+
+                {/* Used Side (Right Aligned) */}
+                <div className="text-right">
                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest mb-1">{activeTab} Used</div>
-                   <div className="text-2xl md:text-3xl font-black text-blue-400 tracking-tight">
+                   <div className="text-3xl font-black text-blue-400 tracking-tight">
                       {formatBytes(dashboardData.totalUsed)}
                    </div>
                    <div className="text-[10px] text-zinc-600 font-mono mt-1">
@@ -173,96 +187,84 @@ export const CapacityModal = ({ onClose, nodes, medianCommitted, totalCommitted,
              </div>
           </div>
 
+          {/* --- ROW 2: EVOLUTION CHART --- */}
+          <div className="h-64">
+             <CapacityEvolutionChart 
+                history={evoHistory} 
+                loading={evoLoading} 
+                timeRange={timeRange} 
+                onTimeRangeChange={setTimeRange}
+             />
+          </div>
+
+          {/* --- ROW 3: FOOTER GRIDS --- */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-             {activeTab === 'ALL' ? (
-                 <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex items-center gap-4">
-                    <div className="relative w-14 h-14 shrink-0">
+             
+             {/* LEFT: Composition & Benchmarks */}
+             <div className="flex flex-col gap-3">
+                 {/* Pie Composition */}
+                 <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex items-center gap-4 h-20">
+                    <div className="relative w-12 h-12 shrink-0">
                        {renderPie([
                           { value: dashboardData.mainnetSum, color: '#22c55e' }, 
                           { value: dashboardData.devnetSum, color: '#3b82f6' }
                        ])}
                        <div className="absolute inset-0 flex items-center justify-center text-zinc-600"><PieChart size={12} /></div>
                     </div>
-                    <div className="flex-1 grid grid-cols-2 gap-4">
+                    <div className="flex-1 grid grid-cols-2 gap-2">
                        <div>
-                          <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-green-500"></div><span className="text-[9px] font-bold text-zinc-400 uppercase">Mainnet</span></div>
-                          <div className="text-[10px] font-mono text-white leading-none">{formatBytes(dashboardData.mainnetSum)}</div>
+                          <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-green-500"></div><span className="text-[8px] font-bold text-zinc-400 uppercase">Mainnet</span></div>
+                          <div className="text-[9px] font-mono text-white leading-none">{formatBytes(dashboardData.mainnetSum)}</div>
                        </div>
                        <div>
-                          <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div><span className="text-[9px] font-bold text-zinc-400 uppercase">Devnet</span></div>
-                          <div className="text-[10px] font-mono text-white leading-none">{formatBytes(dashboardData.devnetSum)}</div>
+                          <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div><span className="text-[8px] font-bold text-zinc-400 uppercase">Devnet</span></div>
+                          <div className="text-[9px] font-mono text-white leading-none">{formatBytes(dashboardData.devnetSum)}</div>
                        </div>
                     </div>
                  </div>
-             ) : (
-                <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 flex flex-col justify-between">
-                    <div className="flex justify-between items-start mb-2">
-                        <div className="text-[9px] text-zinc-500 uppercase font-bold flex items-center gap-1.5"><Globe size={10} /> Network Footprint</div>
-                        <span className={`text-[9px] font-mono font-bold ${themeColor}`}>{dashboardData.globalShare.toFixed(1)}% Share</span>
-                    </div>
-                    <div className="flex items-baseline gap-2 mb-2">
-                        <span className="text-xl font-bold text-white tracking-tight">{dashboardData.nodeCount.toLocaleString()}</span>
-                        <span className="text-[10px] text-zinc-500 font-bold uppercase">Active Nodes</span>
-                    </div>
-                    <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
-                        <div className={`h-full ${themeBg}`} style={{ width: `${dashboardData.globalShare}%` }}></div>
-                    </div>
-                </div>
-             )}
 
-             <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 flex flex-col justify-center relative overflow-hidden">
-                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-3 tracking-wider flex items-center gap-1.5">
-                   <TrendingUp size={10} /> Network Benchmark
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                   <div>
-                      <div className="text-[9px] text-zinc-500 mb-0.5">Median Node</div>
-                      <div className="text-sm font-mono font-bold text-white">{formatBytes(dashboardData.median)}</div>
-                   </div>
-                   <div>
-                      <div className="text-[9px] text-zinc-500 mb-0.5">Average Node</div>
-                      <div className="text-sm font-mono font-bold text-zinc-300">{formatBytes(dashboardData.average)}</div>
-                   </div>
-                </div>
+                 {/* Benchmarks Ticker */}
+                 <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex items-center justify-between h-16">
+                    <div className="text-[9px] text-zinc-500 uppercase font-bold flex items-center gap-1.5"><BarChart3 size={12}/> Benchmark</div>
+                    <div className="flex items-center gap-4">
+                        <div className="text-right">
+                            <div className="text-[8px] text-zinc-500">Median</div>
+                            <div className="text-xs font-mono font-bold text-white">{formatBytes(dashboardData.median)}</div>
+                        </div>
+                        <div className="w-px h-6 bg-zinc-800"></div>
+                        <div className="text-right">
+                            <div className="text-[8px] text-zinc-500">Average</div>
+                            <div className="text-xs font-mono font-bold text-zinc-300">{formatBytes(dashboardData.average)}</div>
+                        </div>
+                    </div>
+                 </div>
              </div>
-          </div>
 
-          <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-xl p-4 md:p-5 relative">
-             <div className="flex justify-between items-start mb-4">
-                <div className="max-w-[65%] pr-4">
-                   <div className="flex items-center gap-2 mb-2">
-                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Top 10 Dominance</h4>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-500 font-bold border border-yellow-500/30">
-                         {((dashboardData.top10Sum / (dashboardData.totalCommitted || 1)) * 100).toFixed(2)}%
-                      </span>
-                   </div>
-                   <p className="text-[10px] text-zinc-400 leading-relaxed mb-0">
-                      {getWhaleText()} <span className="text-white font-mono font-bold">{formatBytes(dashboardData.top10Sum)}</span> combined.
-                   </p>
-                </div>
-                <div className="w-16 h-16 shrink-0 relative">
-                   {renderPie([
-                      { value: dashboardData.top10Sum, color: '#eab308' }, 
-                      { value: dashboardData.midTierSum, color: '#06b6d4' },
-                      { value: dashboardData.restSum, color: '#a1a1aa' }   
-                   ])}
-                   <div className="absolute inset-0 flex items-center justify-center text-yellow-500"><Users size={12} /></div>
-                </div>
+             {/* RIGHT: Whale Dominance */}
+             <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-xl p-4 relative flex flex-col justify-between">
+                 <div className="flex justify-between items-start">
+                    <div className="flex flex-col gap-1">
+                       <h4 className="text-[10px] font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                          <Users size={10} className="text-yellow-500"/> Top 10 Dominance
+                       </h4>
+                       <span className="text-2xl font-black text-yellow-500">
+                          {((dashboardData.top10Sum / (dashboardData.totalCommitted || 1)) * 100).toFixed(1)}%
+                       </span>
+                    </div>
+                    {/* Tiny Pie */}
+                    <div className="w-10 h-10 relative opacity-80">
+                        {renderPie([
+                            { value: dashboardData.top10Sum, color: '#eab308' }, 
+                            { value: dashboardData.restSum, color: '#52525b' }   
+                        ])}
+                    </div>
+                 </div>
+                 
+                 <div className="text-[9px] text-zinc-400 mt-2 border-t border-yellow-500/10 pt-2">
+                    {getWhaleText()} <span className="text-white font-mono font-bold">{formatBytes(dashboardData.top10Sum)}</span> combined storage.
+                 </div>
              </div>
-             <div className="grid grid-cols-3 gap-2 border-t border-yellow-500/10 pt-3">
-                <div>
-                   <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div><span className="text-[8px] font-bold text-zinc-500 uppercase">Top 10</span></div>
-                   <div className="text-[9px] font-mono text-zinc-300">{((dashboardData.top10Sum / (dashboardData.totalCommitted || 1)) * 100).toFixed(1)}%</div>
-                </div>
-                <div>
-                   <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-cyan-500"></div><span className="text-[8px] font-bold text-zinc-500 uppercase">11-100</span></div>
-                   <div className="text-[9px] font-mono text-zinc-300">{((dashboardData.midTierSum / (dashboardData.totalCommitted || 1)) * 100).toFixed(1)}%</div>
-                </div>
-                <div>
-                   <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-zinc-400"></div><span className="text-[8px] font-bold text-zinc-500 uppercase">Rest</span></div>
-                   <div className="text-[9px] font-mono text-zinc-300">{((dashboardData.restSum / (dashboardData.totalCommitted || 1)) * 100).toFixed(1)}%</div>
-                </div>
-             </div>
+
           </div>
 
         </div>
