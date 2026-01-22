@@ -6,10 +6,18 @@ import { StabilityRibbon } from '../modals/views/StabilityRibbon';
 import { HistoryChart } from '../common/HistoryChart'; 
 
 export const ExpandedRowDetails = ({ node }: { node: Node }) => {
-  const { history, loading } = useNodeHistory(node);
   const [isOpen, setIsOpen] = useState(false);
 
-  const creditsData = history ? history.map(h => ({ date: h.date, value: h.credits || 0 })) : [];
+  // ⚡ PERFORMANCE TIP: 
+  // By passing 'undefined' when closed, the hook pauses and doesn't fetch.
+  // The moment you click open, it receives 'node' and triggers the fetch.
+  const { history, loading } = useNodeHistory(isOpen ? node : undefined);
+
+  // Safety map: ensures we map the 'credits' from the hook to 'value' for the chart
+  const creditsData = history ? history.map(h => ({ 
+    date: h.date, 
+    value: h.credits || 0 
+  })) : [];
 
   return (
     <div className="border-t border-zinc-800 pt-2 mt-2">
