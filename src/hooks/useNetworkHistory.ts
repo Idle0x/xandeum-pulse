@@ -15,6 +15,7 @@ export interface NetworkHistoryPoint {
 export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
   const [history, setHistory] = useState<NetworkHistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [growth, setGrowth] = useState(0); // Added growth state
 
   useEffect(() => {
     async function fetchHistory() {
@@ -62,7 +63,7 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
         }
       }
 
-      if (data) {
+      if (data && data.length > 0) {
         const points = data.map((d: any) => ({
           date: d.bucket,
           avg_health: Number(d.avg_health),
@@ -72,6 +73,20 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
           consensus_score: Number(d.consensus_score)
         }));
         setHistory(points);
+
+        // CALCULATE GROWTH (Based on Total Capacity by default)
+        const first = points[0];
+        const last = points[points.length - 1];
+        if (first.total_capacity > 0) {
+            const diff = last.total_capacity - first.total_capacity;
+            const percent = (diff / first.total_capacity) * 100;
+            setGrowth(percent);
+        } else {
+            setGrowth(0);
+        }
+      } else {
+        setHistory([]);
+        setGrowth(0);
       }
       setLoading(false);
     }
@@ -79,5 +94,6 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
     fetchHistory();
   }, [timeRange]);
 
-  return { history, loading };
+  // Return growth included
+  return { history, loading, growth };
 };
