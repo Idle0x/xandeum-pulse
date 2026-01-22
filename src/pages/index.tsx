@@ -1,16 +1,21 @@
-import { SupabaseDebug } from '../components/SupabaseDebug'; // Adjust path
+import { useState, useEffect } from 'react';
+// ... other imports ...
+import { SupabaseDebug } from '../components/SupabaseDebug'; // Import the debugger
 
 export default function Dashboard() {
+  // ... your existing state and hooks ...
+
   return (
     <>
-      <SupabaseDebug /> {/* <--- ADD THIS LINE HERE */}
-      
-      {/* Rest of your app... */}
-      <div className="min-h-screen bg-black...">
-         {/* ... */}
+      {/* 1. ADD THE DEBUGGER HERE AT THE VERY TOP */}
+      <SupabaseDebug />
+
+      {/* 2. Your existing dashboard layout starts below */}
+      <div className="min-h-screen bg-black text-white font-sans selection:bg-yellow-500/30">
+         {/* ... the rest of your dashboard code ... */}
       </div>
     </>
-  )
+  );
 }
 
 import { useState, useEffect, useRef } from 'react';
