@@ -64,7 +64,7 @@ export const InspectorModal = ({
   // NEW: Lifted State for Time Range Selection (Defaults to 7 Days)
   const [timeRange, setTimeRange] = useState<HistoryTimeRange>('7D');
 
-  // UPDATED: Pass the FULL node object to generate the Stable ID (Pubkey+Addr+Committed)
+  // UPDATED: Pass the FULL node object to generate the Stable ID
   const { history, loading: historyLoading } = useNodeHistory(selectedNode, timeRange);
 
   // Helper to map node history to chart format (For the overview sparklines)
@@ -132,7 +132,6 @@ export const InspectorModal = ({
     ? 'text-white' 
     : healthScore >= 80 ? 'text-green-500' : healthScore >= 50 ? 'text-yellow-500' : 'text-red-500';
 
-  // --- FIXED: Restored healthGlowColor definition ---
   const healthGlowColor = zenMode 
     ? '' 
     : healthScore >= 80 ? 'bg-green-500' : healthScore >= 50 ? 'bg-yellow-500' : 'bg-red-500';
@@ -234,6 +233,7 @@ export const InspectorModal = ({
                 <h2 className="text-base font-black font-sans tracking-tight text-white">NODE INSPECTOR</h2>
                 <button onClick={onClose} className="p-1.5 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 hover:bg-red-500 hover:text-white transition"><X size={16} /></button>
              </div>
+             {/* Mobile Header Controls */}
              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono bg-zinc-900/80 px-2 py-1.5 rounded-lg border border-zinc-800">
                   <span className="text-zinc-400">{selectedNode.pubkey ? `${selectedNode.pubkey.slice(0, 12)}...` : 'Unknown'}</span>
@@ -287,22 +287,49 @@ export const InspectorModal = ({
                {modalView !== 'overview' ? (
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
                     
-                    {/* EXPANDED HEADER VIEW (LEFT) */}
+                    {/* EXPANDED HEADER VIEW (LEFT SIDEBAR) */}
                     <div className="md:col-span-1 h-full">
                        
-                       {/* HEALTH HEADER (Expanded) */}
+                       {/* HEALTH HEADER (Expanded Sidebar) */}
                        {modalView === 'health' && (
                          <div className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between cursor-pointer ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900 border-green-500 ring-1 ring-green-500 shadow-[0_0_30px_rgba(34,197,94,0.1)]'}`} onClick={() => handleCardToggle('health')}>
-                           <div className="w-full flex justify-between items-start mb-4"><div className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest">DIAGNOSTICS</div><Minimize2 size={14} className="text-zinc-500"/></div>
-                           <div className="relative scale-95">
-                                {!zenMode && <div className="absolute inset-0 bg-green-500/20 blur-2xl rounded-full animate-pulse"></div>}
-                                <RadialProgress score={selectedNode.health || 0} size={115} zenMode={zenMode} />
+                           
+                           {/* Header with Rank Badge */}
+                           <div className="w-full flex justify-between items-start mb-4">
+                               <div className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest">DIAGNOSTICS</div>
+                               <div className={`px-2 py-1 rounded text-[9px] font-bold uppercase border ${zenMode ? 'bg-zinc-900 border-zinc-700 text-zinc-400' : 'bg-green-500/10 border-green-500/20 text-green-400'}`}>Rank #{selectedNode.health_rank || '-'}</div>
                            </div>
-                           <div className={`mt-6 text-[9px] font-bold uppercase flex items-center gap-1 transition ${zenMode ? 'text-zinc-500' : 'text-red-400/80 hover:text-red-400'}`}><Minimize2 size={8}/> CLICK TO COLLAPSE</div>
+
+                           {/* Main Gauge */}
+                           <div className="relative scale-110">
+                                {!zenMode && <div className="absolute inset-0 bg-green-500/20 blur-2xl rounded-full animate-pulse"></div>}
+                                <RadialProgress score={selectedNode.health || 0} size={130} zenMode={zenMode} />
+                           </div>
+
+                           {/* Footer: Comparison Logic (Moved Here) */}
+                           <div className="w-full mt-6 pt-4 border-t border-zinc-800/50 text-center">
+                               <div className="flex justify-between items-center mb-1 text-[10px] font-bold uppercase text-zinc-500">
+                                   <span>Your Score</span>
+                                   <span>Network Avg</span>
+                               </div>
+                               <div className="flex justify-between items-end">
+                                   <span className="text-3xl font-black text-white">{selectedNode.health || 0}</span>
+                                   <div className="flex flex-col items-end">
+                                       <span className="text-xl font-bold text-zinc-400">{avgNetworkHealth.toFixed(0)}</span>
+                                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${zenMode ? 'bg-zinc-800 text-zinc-300' : ((selectedNode.health || 0) >= avgNetworkHealth ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400')}`}>
+                                         {(selectedNode.health || 0) >= avgNetworkHealth ? '+' : ''}{((selectedNode.health || 0) - avgNetworkHealth).toFixed(1)}
+                                       </span>
+                                   </div>
+                               </div>
+                               
+                               <div className={`mt-4 text-[9px] font-bold uppercase flex items-center justify-center gap-1 transition ${zenMode ? 'text-zinc-500' : 'text-red-400/80 hover:text-red-400'}`}>
+                                   <Minimize2 size={8}/> CLICK TO COLLAPSE
+                               </div>
+                           </div>
                          </div>
                        )}
 
-                       {/* STORAGE HEADER (Expanded) */}
+                       {/* STORAGE HEADER (Expanded Sidebar) */}
                        {modalView === 'storage' && (
                          <div className={`h-full min-h-[400px] md:min-h-0 rounded-3xl p-6 border flex flex-col justify-between cursor-pointer relative overflow-hidden ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900 border-purple-500 ring-1 ring-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.1)]'}`} onClick={() => handleCardToggle('storage')}>
                            <div className="w-full flex justify-between items-start mb-2 relative z-10">
@@ -310,8 +337,8 @@ export const InspectorModal = ({
                                <Minimize2 size={14} className="text-zinc-500"/>
                            </div>
                            <div className="flex justify-between items-end px-1 mb-6 relative z-10">
-                                <div className="text-left"><div className={`text-2xl font-black ${zenMode ? 'text-white' : 'text-blue-400'}`}>{formatBytes(selectedNode.storage_used || 0)}</div><div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Used Space</div></div>
-                                <div className="text-right"><div className={`text-2xl font-black ${zenMode ? 'text-zinc-300' : 'text-purple-400'}`}>{formatBytes(nodeCap)}</div><div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Committed</div></div>
+                               <div className="text-left"><div className={`text-2xl font-black ${zenMode ? 'text-white' : 'text-blue-400'}`}>{formatBytes(selectedNode.storage_used || 0)}</div><div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Used Space</div></div>
+                               <div className="text-right"><div className={`text-2xl font-black ${zenMode ? 'text-zinc-300' : 'text-purple-400'}`}>{formatBytes(nodeCap)}</div><div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Committed</div></div>
                            </div>
                            
                            {/* BAR CHART WITH LABELS */}
@@ -394,6 +421,8 @@ export const InspectorModal = ({
                                networkStats={computedNetworkStats}
                                history={history} 
                                historyLoading={historyLoading}
+                               timeRange={timeRange}
+                               onTimeRangeChange={setTimeRange}
                             />
                         )}
                        {modalView === 'storage' && (
@@ -500,7 +529,7 @@ export const InspectorModal = ({
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0">
                                 <MapPin size={24} className={`${zenMode ? 'text-zinc-800' : 'text-blue-500/30'} drop-shadow-none`} />
                             </div>
-                            <div className="flex justify-between items-start relative z-10 w-full"><div className="flex items-center gap-1.5"><Globe size={12} className={`${zenMode ? 'text-zinc-500' : 'text-blue-500'} relative z-10`}/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">PHYSICAL LAYER</span></div></div>
+                            <div className="flex justify-between items-start relative z-10 w-full"><div className="flex items-center gap-1.5"><Globe size={18} className={`${zenMode ? 'text-zinc-500' : 'text-blue-500'} relative z-10`}/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">PHYSICAL LAYER</span></div></div>
                             <div className="relative z-10 flex flex-col h-full justify-between pb-3 pt-2"><div className="text-[10px] font-mono text-zinc-400 truncate w-full">{getSafeIp(selectedNode)}</div><div className="flex items-center gap-2 text-[10px] font-bold text-white leading-none"><span className={`text-lg ${zenMode ? 'grayscale' : ''}`}>{getFlagEmoji(selectedNode.location?.countryCode)}</span><span>{selectedNode.location?.countryName || 'Unknown'}</span></div></div>
                         </Link>
                     </div>
