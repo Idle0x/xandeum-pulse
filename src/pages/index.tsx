@@ -28,9 +28,6 @@ import { LiveWireLoader, PulseGraphLoader } from '../components/common/Loaders';
 import { Node } from '../types';
 import { getSafeIp } from '../utils/nodeHelpers';
 
-// --- DEBUGGER ---
-import { SupabaseDebug } from '../components/SupabaseDebug';
-
 
 export default function Home() {
   const router = useRouter();
@@ -245,9 +242,6 @@ export default function Home() {
   return (
     <Layout zenMode={zenMode} onClick={() => isMenuOpen && setIsMenuOpen(false)}>
       <WelcomeCurtain />
-
-      {/* --- SUPABASE DEBUGGER (REMOVE WHEN FIXED) --- */}
-      <SupabaseDebug />
 
       {loading && <div className="fixed top-0 left-0 right-0 z-50"><LiveWireLoader /></div>}
 
