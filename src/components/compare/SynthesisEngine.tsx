@@ -84,9 +84,13 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
   // Sync prop focus if provided (prioritize prop for export/parent control, else local)
   const focusedNodeKey = propFocusedKey !== undefined ? propFocusedKey : localFocusedNodeKey;
 
-  // NEW: Fetch history for the FOCUSED node
-  // We rename 'reliabilityScore' to avoid confusion if we add other metrics later
-  const { reliabilityScore, loading: historyLoading } = useNodeHistory(focusedNodeKey || undefined);
+  // NEW: Find the full Node object for the hook
+  const focusedNode = useMemo(() => {
+      return nodes.find(n => n.pubkey === focusedNodeKey);
+  }, [nodes, focusedNodeKey]);
+
+  // Pass the FULL node object to the hook
+  const { reliabilityScore, loading: historyLoading } = useNodeHistory(focusedNode || undefined, '30D');
 
   // Derived Hover State
   const activeHoverKey = externalHoverKey !== undefined ? externalHoverKey : internalHoverKey;
@@ -263,7 +267,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                     ))}
                 </div>
                 <OverviewLegend nodes={nodes} themes={themes} hoveredKey={activeHoverKey} onHover={handleHover} />
-                
+
                 {/* NEW: Historical Context Panel (Database Shadow Layer) */}
                 {focusedNodeKey && !historyLoading && (
                    <div className="mt-2 mx-4 md:mx-6 p-3 rounded-lg border border-yellow-500/10 bg-yellow-500/5 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
