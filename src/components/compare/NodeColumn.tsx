@@ -4,7 +4,6 @@ import { Node } from '../../types';
 import { getSafeIp } from '../../utils/nodeHelpers';
 import { formatBytes } from '../../utils/formatters';
 import { MicroBar, MetricDelta, formatUptimePrecise } from './MicroComponents';
-// NEW IMPORTS: History Hook & Ribbon
 import { useNodeHistory } from '../../hooks/useNodeHistory';
 import { StabilityRibbon } from '../modals/views/StabilityRibbon';
 
@@ -38,10 +37,9 @@ export const NodeColumn = ({
     leaderType
 }: NodeColumnProps) => {
 
-  // 1. Fetch History for the "DNA Strip" 
-  // FIXED: Passed '30D' (valid string type) instead of 15 (invalid number)
-  // The ribbon will display whatever data it gets.
-  const { history, loading } = useNodeHistory(node.pubkey, '30D');
+  // 1. Fetch History for the "DNA Strip"
+  // FIXED: Passing full 'node' object and valid '30D' string
+  const { history, loading } = useNodeHistory(node, '30D');
 
   const Row = ({ children }: { children: React.ReactNode }) => (
     <div className={`h-[36px] md:h-[72px] flex flex-col justify-center px-3 md:px-4 min-w-[100px] md:min-w-[140px] relative`}>
