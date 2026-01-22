@@ -6,6 +6,7 @@ import {
   Wallet, AlertOctagon, Search 
 } from 'lucide-react';
 import { RankedNode } from '../../types/leaderboard';
+import { Node } from '../../types'; // Import the full Node type for casting
 // NEW IMPORT: The Shadow Layer Component
 import { ExpandedRowDetails } from './ExpandedRowDetails';
 
@@ -123,8 +124,8 @@ export default function NodeTable({
                       <div className="border-t border-zinc-800/50 p-3 md:p-4 animate-in slide-in-from-top-2 duration-200">
                           
                           {/* NEW: THE DATABASE INJECTION POINT */}
-                          {/* UPDATED: Pass full node object for stable ID generation */}
-                          <ExpandedRowDetails node={node} />
+                          {/* Type casting node to Node to bypass missing lat/lon in RankedNode */}
+                          <ExpandedRowDetails node={node as unknown as Node} />
 
                           <div className="flex flex-col gap-4 mt-4">
                               {/* MOBILE ACTIONS */}
