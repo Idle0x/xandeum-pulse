@@ -9,7 +9,6 @@ export interface NodeHistoryPoint {
   storage_committed: number;
   storage_used: number;
   credits: number;
-  rank: number;
 }
 
 export type HistoryTimeRange = '24H' | '3D' | '7D' | '30D' | 'ALL';
@@ -20,17 +19,18 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
   const [reliabilityScore, setReliabilityScore] = useState(100);
 
   useEffect(() => {
-    // 1. Safety Check
+    // 1. Safety Check: If no node, stop immediately.
     if (!node || !node.pubkey) return;
 
     async function fetchNodeHistory() {
+      // 2. Redundant Safety Check (Required for TypeScript inside async closure)
       if (!node) return;
+
       setLoading(true);
 
-      // --- STABLE ID STRATEGY (STRICT) ---
-      // Format: {PUBKEY}-{ADDRESS}-{VERSION}-{IS_PUBLIC}
-      // This matches your backend snapshot script perfectly.
-      const stableId = `${node.pubkey}-${node.address}-${node.version}-${node.is_public}`;
+      // --- GENERATE STABLE ID ---
+      // Format: {PUBKEY}-{ADDRESS}-{IS_PUBLIC}-{COMMITTED}
+      const stableId = `${node.pubkey}-${node.address}-${node.is_public}-${node.storage_committed}`;
 
       let rpcMode = false;
       let days = 7;
@@ -52,7 +52,6 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
 
       if (rpcMode) {
         // STRATEGY A: RPC (Aggregated)
-        // Ensure your RPC function 'get_node_history_bucketed' expects 'p_node_id'
         const response = await supabase.rpc('get_node_history_bucketed', {
           p_node_id: stableId, 
           p_time_grain: timeGrain,
@@ -66,20 +65,18 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
             uptime: r.avg_uptime,
             storage_committed: r.avg_committed,
             storage_used: r.avg_used,
-            credits: r.avg_credits,
-            rank: r.avg_rank || 0
+            credits: r.avg_credits
           }));
         }
         error = response.error;
       } else {
         // STRATEGY B: Raw Table Fetch
-        // Strictly filter by 'node_id' to prevent data mixing
         const response = await supabase
           .from('node_snapshots')
-          .select('*') 
-          .eq('node_id', stableId) 
-          .gte('id', startDate.toISOString()) // Filter time by ID
-          .order('id', { ascending: true });
+          .select('created_at, health, uptime, storage_committed, storage_used, credits')
+          .eq('node_id', stableId)
+          .gte('created_at', startDate.toISOString())
+          .order('created_at', { ascending: true });
 
         data = response.data;
         error = response.error;
@@ -92,14 +89,12 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
       }
 
       const points = (data || []).map((row: any) => ({
-        // Map 'id' (timestamp) to date
-        date: row.bucket || row.id || row.created_at, 
-        health: Number(row.health || 0),
-        uptime: Number(row.uptime || 0),
-        storage_committed: Number(row.storage_committed || 0),
-        storage_used: Number(row.storage_used || 0),
-        credits: Number(row.credits || 0),
-        rank: Number(row.rank || 0)
+        date: row.created_at,
+        health: Number(row.health),
+        uptime: Number(row.uptime),
+        storage_committed: Number(row.storage_committed),
+        storage_used: Number(row.storage_used),
+        credits: Number(row.credits)
       }));
 
       if (points.length > 0) {
@@ -114,7 +109,7 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
     }
 
     fetchNodeHistory();
-  }, [node, timeRange]); // Dependency on full node ensures updates if version/address changes
+  }, [node, timeRange]);
 
   return { history, reliabilityScore, loading };
 };
