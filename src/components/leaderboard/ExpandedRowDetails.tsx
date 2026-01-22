@@ -4,6 +4,8 @@ import { Node } from '../../types';
 import { useNodeHistory } from '../../hooks/useNodeHistory';
 import { StabilityRibbon } from '../modals/views/StabilityRibbon';
 import { HistoryChart } from '../common/HistoryChart'; 
+// 👇 IMPORT THE DEBUGGER (Make sure this file exists!)
+import { NodeDebugger } from '../debug/NodeDebugger'; 
 
 export const ExpandedRowDetails = ({ node }: { node: Node }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -58,10 +60,16 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                               data={creditsData} 
                               color="#eab308" 
                               loading={loading} 
-                              height={40} 
+                              height={40}
+                              label="Credits" 
                            />
                        </div>
                    </div>
+               </div>
+
+               {/* 👇 DEBUGGER: This will appear at the bottom of the expanded row 👇 */}
+               <div className="col-span-1 md:col-span-2">
+                  <NodeDebugger node={node} />
                </div>
            </div>
        )}
