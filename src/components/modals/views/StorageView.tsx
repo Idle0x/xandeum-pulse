@@ -1,7 +1,7 @@
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { Node } from '../../../types';
 import { formatBytes } from '../../../utils/formatters';
-import { NodeHistoryPoint } from '../../../hooks/useNodeHistory';
+import { NodeHistoryPoint, HistoryTimeRange } from '../../../hooks/useNodeHistory';
 import { StorageHistoryChart } from './StorageHistoryChart';
 
 interface StorageViewProps {
@@ -11,10 +11,25 @@ interface StorageViewProps {
   medianCommitted: number;
   totalStorageCommitted: number;
   nodeCount: number;
-  history?: NodeHistoryPoint[];
+  history: NodeHistoryPoint[];
+  // New Props for State Lifting
+  timeRange: HistoryTimeRange;
+  onTimeRangeChange: (range: HistoryTimeRange) => void;
+  historyLoading: boolean;
 }
 
-export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStorageCommitted, nodeCount, history = [] }: StorageViewProps) => {
+export const StorageView = ({ 
+  node, 
+  zenMode, 
+  onBack, 
+  medianCommitted, 
+  totalStorageCommitted, 
+  nodeCount, 
+  history = [],
+  timeRange,
+  onTimeRangeChange,
+  historyLoading
+}: StorageViewProps) => {
   const nodeCap = node?.storage_committed || 0;
   const nodeUsed = node?.storage_used || 0;
   const median = medianCommitted || 1;
@@ -27,7 +42,7 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
       : 0;
 
   const utilization = nodeCap > 0 ? (nodeUsed / nodeCap) * 100 : 0;
-  const dashArray = 2 * Math.PI * 14; // Reduced radius r=14 (from 18) for compactness
+  const dashArray = 2 * Math.PI * 14; 
   const dashOffset = dashArray - ((utilization / 100) * dashArray);
 
   return (
@@ -42,9 +57,8 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
 
       <div className="flex-grow flex flex-col gap-2 md:gap-3">
         
-        {/* ROW 1: COMPACT METRICS (Height reduced significantly) */}
+        {/* ROW 1: COMPACT METRICS */}
         <div className="flex gap-2 h-16 md:h-20 shrink-0">
-            {/* Donut Chart (Compact) */}
             <div className={`flex-1 border rounded-xl px-3 flex items-center gap-3 relative overflow-hidden ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900/30 border-zinc-800'}`}>
                 {reliabilityScore > 90 && (
                   <div className="absolute top-1.5 right-1.5 flex items-center gap-0.5 text-[6px] font-bold text-green-500 bg-green-500/10 px-1 py-px rounded border border-green-500/20">
@@ -61,14 +75,13 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
                 <div><div className="text-[8px] font-bold text-zinc-500 uppercase leading-tight">Efficiency</div><div className="text-[10px] md:text-xs font-bold text-white leading-tight">Utilization</div></div>
             </div>
 
-            {/* Status Badge (Compact) */}
             <div className={`flex-1 border rounded-xl px-2 flex flex-col justify-center items-center ${zenMode ? 'bg-black border-zinc-700' : (isPos ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30')}`}>
                 <div className={`text-[8px] md:text-[9px] font-black uppercase tracking-wider ${zenMode ? 'text-white' : (isPos ? 'text-green-400' : 'text-red-400')}`}>{isPos ? 'ABOVE' : 'BELOW'}</div>
                 <div className={`text-[8px] md:text-[9px] font-black uppercase tracking-wider ${zenMode ? 'text-zinc-500' : (isPos ? 'text-green-400' : 'text-red-400')}`}>MAJORITY</div>
             </div>
         </div>
 
-        {/* ROW 2: BENCHMARKS (Compressed to single strip) */}
+        {/* ROW 2: COMPACT BENCHMARKS */}
         <div className={`flex items-center justify-between px-4 py-2 rounded-xl border shrink-0 ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900/30 border-zinc-800'}`}>
           <div className="flex flex-col">
               <span className="text-[8px] text-zinc-500 uppercase font-bold">Median</span>
@@ -81,13 +94,16 @@ export const StorageView = ({ node, zenMode, onBack, medianCommitted, totalStora
           </div>
         </div>
 
-        {/* ROW 3: PROFESSIONAL CHART (Takes remaining space) */}
+        {/* ROW 3: PROFESSIONAL CHART */}
         <div className="flex-1 min-h-[250px] overflow-hidden">
             <StorageHistoryChart 
                 history={history} 
                 currentUsed={nodeUsed} 
                 currentCommitted={nodeCap}
                 zenMode={zenMode}
+                timeRange={timeRange}
+                onTimeRangeChange={onTimeRangeChange}
+                loading={historyLoading}
             />
         </div>
 
