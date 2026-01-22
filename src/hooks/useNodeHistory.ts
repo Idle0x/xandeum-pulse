@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Node } from '../types'; // Ensure you import your Node type
+import { Node } from '../types'; 
 
 export interface NodeHistoryPoint {
   date: string;
@@ -13,19 +13,22 @@ export interface NodeHistoryPoint {
 
 export type HistoryTimeRange = '24H' | '3D' | '7D' | '30D' | 'ALL';
 
-// UPDATED: Accepts the full Node object to generate the Stable ID
 export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRange = '7D') => {
   const [history, setHistory] = useState<NodeHistoryPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [reliabilityScore, setReliabilityScore] = useState(100);
 
   useEffect(() => {
+    // 1. Safety Check: If no node, stop immediately.
     if (!node || !node.pubkey) return;
 
     async function fetchNodeHistory() {
+      // 2. Redundant Safety Check (Required for TypeScript inside async closure)
+      if (!node) return;
+
       setLoading(true);
 
-      // --- GENERATE STABLE ID (Must match backend logic exactly) ---
+      // --- GENERATE STABLE ID ---
       // Format: {PUBKEY}-{ADDRESS}-{IS_PUBLIC}-{COMMITTED}
       const stableId = `${node.pubkey}-${node.address}-${node.is_public}-${node.storage_committed}`;
 
@@ -50,7 +53,7 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
       if (rpcMode) {
         // STRATEGY A: RPC (Aggregated)
         const response = await supabase.rpc('get_node_history_bucketed', {
-          p_node_id: stableId, // Pass Stable ID
+          p_node_id: stableId, 
           p_time_grain: timeGrain,
           p_start_date: startDate.toISOString()
         });
@@ -71,20 +74,12 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
         const response = await supabase
           .from('node_snapshots')
           .select('created_at, health, uptime, storage_committed, storage_used, credits')
-          .eq('node_id', stableId) // Filter by Stable ID
+          .eq('node_id', stableId)
           .gte('created_at', startDate.toISOString())
           .order('created_at', { ascending: true });
         
         data = response.data;
         error = response.error;
-      }
-
-      // Fallback: If no data found with stable ID (old data), try falling back to pubkey just in case
-      // (Optional: Remove this block if you want to enforce strict separation immediately)
-      if ((!data || data.length === 0) && !error) {
-         // console.log("Stable ID empty, trying Pubkey fallback...");
-         // You could add logic here to fetch by pubkey if stableId returns nothing, 
-         // but that risks merging data again. Better to start clean.
       }
 
       if (error) {
@@ -114,7 +109,7 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
     }
 
     fetchNodeHistory();
-  }, [node, timeRange]); // Re-run if node identity or time range changes
+  }, [node, timeRange]);
 
   return { history, reliabilityScore, loading };
 };
