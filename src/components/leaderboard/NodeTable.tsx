@@ -122,9 +122,9 @@ export default function NodeTable({
                   {/* EXPANDED DETAILS */}
                   {isExpanded && (
                       <div className="border-t border-zinc-800/50 p-3 md:p-4 animate-in slide-in-from-top-2 duration-200">
-                          
+
                           {/* NEW: THE DATABASE INJECTION POINT */}
-                          {/* Type casting node to Node to bypass missing lat/lon in RankedNode */}
+                          {/* We cast RankedNode -> Node because they are compatible for the history hook's needs (pubkey/network/address) */}
                           <ExpandedRowDetails node={node as unknown as Node} />
 
                           <div className="flex flex-col gap-4 mt-4">
