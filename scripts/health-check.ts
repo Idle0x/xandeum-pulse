@@ -37,14 +37,10 @@ async function runMonitor() {
     const seenFingerprints = new Set<string>();
     const uniqueNodeRows: any[] = [];
 
-    // Calculate Network Totals first (using raw nodes)
-    const totalCapacity = nodes.reduce((acc: number, n: any) => acc + (n.storage_committed || 0), 0);
-    const totalUsed = nodes.reduce((acc: number, n: any) => acc + (n.storage_used || 0), 0);
-    const validHealthNodes = nodes.filter((n: any) => typeof n.health === 'number');
-    const avgHealth = validHealthNodes.length > 0 
-      ? validHealthNodes.reduce((acc: number, n: any) => acc + n.health, 0) / validHealthNodes.length 
-      : 0;
-
+    // Calculate Raw Totals (Pre-Dedup)
+    const rawCapacity = nodes.reduce((acc: number, n: any) => acc + (n.storage_committed || 0), 0);
+    const rawUsed = nodes.reduce((acc: number, n: any) => acc + (n.storage_used || 0), 0);
+    
     // --- NODE PROCESSING LOOP ---
     for (const n of nodes) {
       // 1. Generate Deduplication Fingerprint (7-Point Strict)
@@ -56,13 +52,15 @@ async function runMonitor() {
       }
       seenFingerprints.add(dedupKey);
 
-      // 2. Generate Stable History ID (4-Point Stable)
-      // This ID persists across reboots/updates but separates distinct instances
-      // Format: {PUBKEY}-{ADDRESS}-{IS_PUBLIC}-{COMMITTED}
-      const stableId = `${n.pubkey}-${n.address}-${n.is_public}-${n.storage_committed}`;
+      // 2. Generate Stable History ID (MATCHING FRONTEND)
+      // OLD: {PUBKEY}-{ADDRESS}-{IS_PUBLIC}-{COMMITTED}
+      // NEW: {PUBKEY}-{ADDRESS}-{VERSION}-{IS_PUBLIC}
+      
+      const versionSafe = n.version || '0.0.0'; // Safety Fallback
+      const stableId = `${n.pubkey}-${n.address}-${versionSafe}-${n.is_public}`;
 
       uniqueNodeRows.push({
-        node_id: stableId, // NEW COLUMN
+        node_id: stableId,
         pubkey: n.pubkey,
         network: n.network || 'MAINNET',
         health: n.health || 0,
@@ -70,25 +68,51 @@ async function runMonitor() {
         storage_committed: n.storage_committed || 0,
         storage_used: n.storage_used || 0,
         uptime: n.uptime || 0,
-        rank: n.rank || 0
+        rank: n.rank || 0,
+        // Ensure created_at is explicit if DB defaults fail
+        created_at: new Date().toISOString() 
       });
     }
 
-    // A. Insert Network Snapshot
+    // --- NEW METRIC CALCULATIONS ---
+    
+    // 1. Basic Health/Storage
+    const validHealthNodes = uniqueNodeRows.filter((n: any) => n.health > 0);
+    const avgHealth = validHealthNodes.length > 0 
+      ? validHealthNodes.reduce((acc, n) => acc + n.health, 0) / validHealthNodes.length 
+      : 0;
+
+    // 2. Financial / Leaderboard Metrics
+    const totalCredits = uniqueNodeRows.reduce((acc, n) => acc + (n.credits || 0), 0);
+    const avgCredits = uniqueNodeRows.length > 0 ? totalCredits / uniqueNodeRows.length : 0;
+
+    // 3. Dominance (Top 10 Nodes share of total credits)
+    const sortedByCredits = [...uniqueNodeRows].sort((a, b) => b.credits - a.credits);
+    const top10Sum = sortedByCredits.slice(0, 10).reduce((acc, n) => acc + n.credits, 0);
+    const dominance = totalCredits > 0 ? (top10Sum / totalCredits) * 100 : 0;
+
+    // A. Insert Network Snapshot (Expanded)
     const { error: netError } = await supabase.from('network_snapshots').insert({
-      total_capacity: totalCapacity,
-      total_used: totalUsed,
+      total_capacity: rawCapacity, // Use raw or deduplicated depending on preference
+      total_used: rawUsed,
       total_nodes: uniqueNodeRows.length,
       avg_health: Math.round(avgHealth),
-      consensus_score: 0 
+      consensus_score: 0,
+      
+      // NEW FIELDS
+      total_credits: totalCredits,
+      avg_credits: avgCredits,
+      top10_dominance: parseFloat(dominance.toFixed(2))
     });
+    
     if (netError) console.error('❌ Network Snapshot Failed:', netError.message);
+    else console.log('✅ Network Snapshot Saved (with new metrics).');
 
     // B. Insert Node Snapshots (Batched)
     const { error: nodeError } = await supabase.from('node_snapshots').insert(uniqueNodeRows);
 
     if (nodeError) console.error('❌ Node Snapshots Failed:', nodeError.message);
-    else console.log(`✅ Saved ${uniqueNodeRows.length} Unique Node Snapshots (Filtered from ${nodes.length}).`);
+    else console.log(`✅ Saved ${uniqueNodeRows.length} Unique Node Snapshots.`);
 
     console.log("🚀 MONITORING COMPLETE");
     process.exit(0);
