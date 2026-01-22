@@ -1,153 +1,117 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Node } from '../types';
+import { supabase } from '../lib/supabase';
 
-interface NetworkDataState {
-  nodes: Node[];
-  loading: boolean;
-  isBackgroundSyncing: boolean;
-  error: string;
-  lastSync: string;
-  networkStats: {
-    avgBreakdown: any;
-    totalNodes: number;
-    systemStatus: { credits: boolean; rpc: boolean };
-    consensusVersion: '0.0.0' | string;
-    medianStorage: number;
-  };
-  mostCommonVersion: string;
-  totalStorageCommitted: number;
-  totalStorageUsed: number;
-  medianCommitted: number;
-  networkHealth: string;
-  avgNetworkHealth: number;
-  networkConsensus: number;
+export type HistoryTimeRange = '24H' | '3D' | '7D' | '30D' | 'ALL';
+
+export interface NetworkHistoryPoint {
+  date: string;
+  avg_health: number;
+  total_nodes: number;
+  total_capacity: number;
+  total_used: number;
+  consensus_score: number;
+  // NEW METRICS
+  total_credits: number;
+  avg_credits: number;
+  top10_dominance: number;
 }
 
-export const useNetworkData = (onNewNodes?: (count: number) => void) => {
-  const [data, setData] = useState<NetworkDataState>({
-    nodes: [],
-    loading: true,
-    isBackgroundSyncing: false,
-    error: '',
-    lastSync: 'Syncing...',
-    networkStats: {
-      avgBreakdown: {},
-      totalNodes: 0,
-      systemStatus: { credits: true, rpc: true },
-      consensusVersion: '0.0.0',
-      medianStorage: 0
-    },
-    mostCommonVersion: 'N/A',
-    totalStorageCommitted: 0,
-    totalStorageUsed: 0,
-    medianCommitted: 0,
-    networkHealth: '0.00',
-    avgNetworkHealth: 0,
-    networkConsensus: 0,
-  });
-
-  const fetchData = async (mode: 'fast' | 'swarm' = 'fast') => {
-    if (mode === 'fast') setData(prev => ({ ...prev, loading: true }));
-    else setData(prev => ({ ...prev, isBackgroundSyncing: true }));
-
-    try {
-      const res = await axios.get(`/api/stats?mode=${mode}&t=${Date.now()}`);
-
-      if (res.data.result && res.data.result.pods) {
-        let podList = res.data.result.pods as Node[];
-        const stats = res.data.stats;
-
-        // --- Logic: Rank & Cluster Calculations ---
-        const sortFn = (a: Node, b: Node) => {
-          if ((b.credits || 0) !== (a.credits || 0)) return (b.credits || 0) - (a.credits || 0);
-          if ((b.health || 0) !== (a.health || 0)) return (b.health || 0) - (a.health || 0);
-          return (a.pubkey || '').localeCompare(b.pubkey || '');
-        };
-
-        const clusterMap = new Map<string, { mainnet: number; devnet: number }>();
-        podList.forEach(node => {
-          if (!node.pubkey) return;
-          const current = clusterMap.get(node.pubkey) || { mainnet: 0, devnet: 0 };
-          if (node.network === 'MAINNET') current.mainnet++;
-          if (node.network === 'DEVNET') current.devnet++;
-          clusterMap.set(node.pubkey, current);
-        });
-
-        const mainnetNodes = podList.filter(n => n.network === 'MAINNET').sort(sortFn);
-        const devnetNodes = podList.filter(n => n.network === 'DEVNET').sort(sortFn);
-        const rankMap = new Map<string, number>();
-
-        mainnetNodes.forEach((node, idx) => { if (node.pubkey) rankMap.set(`${node.pubkey}-MAINNET`, idx + 1); });
-        devnetNodes.forEach((node, idx) => { if (node.pubkey) rankMap.set(`${node.pubkey}-DEVNET`, idx + 1); });
-
-        const processedNodes = podList.map(node => {
-          const used = node.storage_used || 0;
-          const cap = node.storage_committed || 0;
-          let percentStr = '0%';
-          let rawPercent = 0;
-          if (cap > 0 && used > 0) {
-            rawPercent = (used / cap) * 100;
-            percentStr = rawPercent < 0.01 ? '< 0.01%' : `${rawPercent.toFixed(2)}%`;
-          }
-          const compositeKey = `${node.pubkey}-${node.network}`;
-          const cluster = clusterMap.get(node.pubkey || '') || { mainnet: 0, devnet: 0 };
-          return {
-            ...node,
-            rank: node.pubkey ? rankMap.get(compositeKey) || 0 : 0,
-            storage_usage_percentage: percentStr,
-            storage_usage_raw: rawPercent,
-            clusterStats: {
-              totalGlobal: cluster.mainnet + cluster.devnet,
-              mainnetCount: cluster.mainnet,
-              devnetCount: cluster.devnet,
-            },
-          };
-        });
-
-        // --- Logic: Notifications ---
-        if (mode === 'swarm' && processedNodes.length > data.nodes.length && data.nodes.length > 0) {
-           if (onNewNodes) onNewNodes(processedNodes.length - data.nodes.length);
-        }
-
-        // --- Logic: Aggregates ---
-        const stableNodes = processedNodes.filter(n => (n.uptime || 0) > 86400).length;
-        const consensusCount = processedNodes.filter(n => (n.version || 'Unknown') === (stats?.consensusVersion || '0.0.0')).length;
-
-        setData({
-          nodes: processedNodes,
-          loading: false,
-          isBackgroundSyncing: false,
-          error: '',
-          lastSync: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-          networkStats: stats || data.networkStats,
-          mostCommonVersion: stats?.consensusVersion || 'N/A',
-          totalStorageCommitted: processedNodes.reduce((sum, n) => sum + (n.storage_committed || 0), 0),
-          totalStorageUsed: processedNodes.reduce((sum, n) => sum + (n.storage_used || 0), 0),
-          medianCommitted: stats?.medianStorage || 0,
-          networkHealth: (processedNodes.length > 0 ? (stableNodes / processedNodes.length) * 100 : 0).toFixed(2),
-          avgNetworkHealth: stats?.avgBreakdown?.total || 0,
-          networkConsensus: (consensusCount / processedNodes.length) * 100,
-        });
-
-        if (mode === 'fast') fetchData('swarm'); // Trigger background immediately after fast
-      }
-    } catch (err: any) {
-      console.error('Fetch error:', err);
-      setData(prev => ({ 
-        ...prev, 
-        loading: false, 
-        isBackgroundSyncing: false,
-        error: mode === 'fast' ? 'Syncing latest network data...' : '' 
-      }));
-    }
-  };
+export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
+  const [history, setHistory] = useState<NetworkHistoryPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Return separate growth stats so Capacity Modal and Leaderboard can both use this hook
+  const [capacityGrowth, setCapacityGrowth] = useState(0); 
+  const [creditGrowth, setCreditGrowth] = useState(0);
 
   useEffect(() => {
-    fetchData('fast');
-    const interval = setInterval(() => fetchData('swarm'), 30000);
-    return () => clearInterval(interval);
-  }, []);
+    async function fetchHistory() {
+      setLoading(true);
 
-  return { ...data, refetch: () => fetchData('fast') };
+      let days = 7;
+      let timeGrain = 'hour';
+      let rpcMode = false;
+
+      switch (timeRange) {
+        case '24H': days = 1; break;
+        case '3D': days = 3; break;
+        case '7D': days = 7; break;
+        case '30D': days = 30; rpcMode = true; timeGrain = 'day'; break;
+        case 'ALL': days = 365; rpcMode = true; timeGrain = 'day'; break;
+      }
+
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      let data: any[] | null = null;
+      let error = null;
+
+      if (rpcMode) {
+        const response = await supabase.rpc('get_network_history_bucketed', {
+          p_time_grain: timeGrain,
+          p_start_date: startDate.toISOString()
+        });
+        data = response.data;
+        error = response.error;
+      } else {
+        // Fallback: Raw Query
+        // We use 'id' as timestamp based on previous debugging
+        const response = await supabase
+          .from('network_snapshots')
+          .select('*')
+          .gte('id', startDate.toISOString()) 
+          .order('id', { ascending: true });
+
+        data = response.data;
+        error = response.error;
+      }
+
+      if (error) {
+        console.error("Network History Error:", error);
+        setLoading(false);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const points = data.map((d: any) => ({
+          date: d.bucket || d.id || d.created_at,
+          avg_health: Number(d.avg_health || 0),
+          total_nodes: Number(d.total_nodes || 0),
+          total_capacity: Number(d.total_capacity ?? d.storage_committed ?? 0),
+          total_used: Number(d.total_used ?? d.storage_used ?? 0),
+          consensus_score: Number(d.consensus_score || 0),
+          total_credits: Number(d.total_credits || 0),
+          avg_credits: Number(d.avg_credits || 0),
+          top10_dominance: Number(d.top10_dominance || 0)
+        }));
+
+        setHistory(points);
+
+        // CALCULATE GROWTH FOR BOTH METRICS
+        if (points.length > 1) {
+            const first = points[0];
+            const last = points[points.length - 1];
+            
+            // Capacity Growth
+            if (first.total_capacity > 0) {
+                setCapacityGrowth(((last.total_capacity - first.total_capacity) / first.total_capacity) * 100);
+            }
+            
+            // Credit Growth
+            if (first.total_credits > 0) {
+                setCreditGrowth(((last.total_credits - first.total_credits) / first.total_credits) * 100);
+            }
+        }
+      } else {
+        setHistory([]);
+      }
+
+      setLoading(false);
+    }
+
+    fetchHistory();
+  }, [timeRange]);
+
+  // Return generic 'growth' as creditGrowth by default, but expose specific ones
+  return { history, loading, growth: creditGrowth, capacityGrowth, creditGrowth };
 };
