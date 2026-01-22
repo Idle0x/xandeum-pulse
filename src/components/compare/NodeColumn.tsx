@@ -4,7 +4,6 @@ import { Node } from '../../types';
 import { getSafeIp } from '../../utils/nodeHelpers';
 import { formatBytes } from '../../utils/formatters';
 import { MicroBar, MetricDelta, formatUptimePrecise } from './MicroComponents';
-// HISTORY INTEGRATION
 import { useNodeHistory } from '../../hooks/useNodeHistory';
 import { StabilityRibbon } from '../modals/views/StabilityRibbon';
 
@@ -38,7 +37,6 @@ export const NodeColumn = ({
     leaderType
 }: NodeColumnProps) => {
 
-  // 1. Fetch History for the "DNA Strip" (30 Days)
   const { history, loading } = useNodeHistory(node, '30D');
 
   const Row = ({ children }: { children: React.ReactNode }) => (
@@ -173,13 +171,10 @@ export const NodeColumn = ({
         </Row>
         <Row><span className="text-[9px] md:text-base font-mono text-zinc-500">#{node.rank || '-'}</span></Row>
 
-        {/* --- INTEGRATION: The DNA Strip --- */}
-        <div className="px-3 md:px-4 py-3 bg-black/20 border-t border-white/5 backdrop-blur-sm group-hover/col:bg-black/40 transition-colors">
-           <div className="text-[6px] md:text-[8px] font-bold text-zinc-600 uppercase mb-1.5 text-center tracking-wider opacity-60 group-hover/col:opacity-100 transition-opacity">
-              30-Day Stability
-           </div>
-           {/* Rendering the Ribbon with Hook Data */}
-           <div className="opacity-80 group-hover/col:opacity-100 transition-opacity">
+        {/* --- FIXED: DNA Strip (Seamless Extension) --- */}
+        {/* We adjusted height to match ControlRail and removed borders/text */}
+        <div className="h-[36px] md:h-[50px] flex items-center justify-center px-3 md:px-4 bg-zinc-900/20 backdrop-blur-sm group-hover/col:bg-zinc-800/40 transition-colors mt-1">
+           <div className="w-full opacity-60 group-hover/col:opacity-100 transition-opacity">
               <StabilityRibbon history={history} loading={loading} />
            </div>
         </div>
