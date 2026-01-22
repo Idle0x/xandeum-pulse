@@ -75,7 +75,8 @@ export const CapacityEvolutionChart = ({ history, loading, timeRange, onTimeRang
                </defs>
                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#71717a'}} minTickGap={40} tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, {day:'numeric'})} />
-               <YAxis yAxisId="left" domain={['auto', 'auto']} axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#71717a'}} width={35} tickFormatter={(val) => formatBytes(val, 0).split(' ')[0]} />
+               {/* FIX: Removed the second argument '0' from formatBytes */}
+               <YAxis yAxisId="left" domain={['auto', 'auto']} axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#71717a'}} width={35} tickFormatter={(val) => formatBytes(val).split(' ')[0]} />
                <Tooltip content={<CustomTooltip />} />
                <Area yAxisId="left" type="monotone" dataKey="total_capacity" stroke="#a855f7" strokeWidth={2} fill="url(#capGrad)" />
                <Line yAxisId="left" type="monotone" dataKey="total_used" stroke="#3b82f6" strokeWidth={2} dot={false} />
