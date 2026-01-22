@@ -9,6 +9,7 @@ export interface NodeHistoryPoint {
   storage_committed: number;
   storage_used: number;
   credits: number;
+  reputation: number; // <--- ADD THIS
   rank: number;
 }
 
@@ -25,11 +26,9 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
     async function fetchNodeHistory() {
       setLoading(true);
 
-      // 1. Generate Stable ID (Matches your Backend Script)
       const versionSafe = node?.version || '0.0.0'; 
       const stableId = `${node?.pubkey}-${node?.address}-${versionSafe}-${node?.is_public}`;
 
-      // 2. Determine Time Range
       let days = 7;
       if (timeRange === '24H') days = 1;
       if (timeRange === '3D') days = 3;
@@ -38,8 +37,6 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      // 3. Fetch Data
-      // SCHEMA MATCH: Filter by 'created_at' because 'id' is a number (bigint)
       const { data, error } = await supabase
         .from('node_snapshots')
         .select('*') 
@@ -53,18 +50,21 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
         return;
       }
 
-      // 4. Map Data
       const points = (data || []).map((row: any) => ({
         date: row.created_at, 
         health: Number(row.health || 0),
         uptime: Number(row.uptime || 0),
         storage_committed: Number(row.storage_committed || 0),
         storage_used: Number(row.storage_used || 0),
-        credits: Number(row.credits || 0), // <--- Matches schema 'credits'
+        
+        // --- THE MAGIC FIX ---
+        // We map the DB column 'credits' to BOTH 'credits' and 'reputation'
+        credits: Number(row.credits || 0), 
+        reputation: Number(row.credits || 0), 
+        
         rank: Number(row.rank || 0)
       }));
 
-      // 5. Calculate Reliability
       if (points.length > 0) {
         const activeCount = points.filter(p => p.health > 0).length;
         setReliabilityScore(Math.floor((activeCount / points.length) * 100));
