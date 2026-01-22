@@ -36,9 +36,7 @@ export const HealthView = ({
   // Safe Accessors
   const bd = node.healthBreakdown || { uptime: health, version: health, reputation: health, storage: health };
   const avgs = networkStats?.avgBreakdown || { uptime: 0, version: 0, reputation: 0, storage: 0 };
-  const diff = (health - avgNetworkHealth).toFixed(1);
-  const diffNum = parseFloat(diff);
-
+  
   const isUntracked = (node as any).isUntracked;
   const isApiOffline = node.credits === null;
   const isReputationInvalid = isUntracked || isApiOffline;
@@ -81,7 +79,7 @@ export const HealthView = ({
       <div className="flex-grow flex flex-col gap-4 overflow-y-auto custom-scrollbar pr-1">
 
         {/* --- ROW 1: METRICS GRID (Top) --- */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2 md:gap-3">
            {metrics.map((m) => {
               const rawVal = m.rawVal || 0;
               const weightedVal = (rawVal * m.weight).toFixed(1);
@@ -98,15 +96,15 @@ export const HealthView = ({
               return (
                 <div 
                   key={m.label} 
-                  className={`border rounded-xl p-4 flex flex-col justify-between h-24 md:h-28 transition-all ${
+                  className={`border rounded-xl p-2.5 md:p-4 flex flex-col justify-between h-[4.5rem] md:h-28 transition-all ${
                     isInvalidRep 
                       ? (zenMode ? 'bg-black border-zinc-700 border-dashed opacity-50' : 'bg-zinc-900/30 border-zinc-800/50 border-dashed opacity-60')
                       : (zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900/40 border-zinc-800/60')
                   }`}
                 >
-                   <div className="flex justify-between items-start mb-2">
-                      <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">{m.label}</span>
-                      <span className={`text-sm font-mono font-bold ${isInvalidRep ? 'text-zinc-500' : 'text-white'}`}>
+                   <div className="flex justify-between items-start mb-1 md:mb-2">
+                      <span className="text-[7px] md:text-[10px] font-bold text-zinc-500 uppercase tracking-wider truncate mr-1">{m.label}</span>
+                      <span className={`text-[10px] md:text-sm font-mono font-bold whitespace-nowrap ${isInvalidRep ? 'text-zinc-500' : 'text-white'}`}>
                         {isInvalidRep 
                           ? 'N/A'
                           : `${weightedVal} pts`}
@@ -114,18 +112,18 @@ export const HealthView = ({
                    </div>
 
                    <div className="mt-auto">
-                       <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-2">
+                       <div className="h-1 md:h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-1.5 md:mb-2">
                           {!isInvalidRep && (
                             <div className={`h-full ${barColor}`} style={{ width: `${Math.min(100, rawVal)}%` }}></div>
                           )}
                        </div>
 
-                       <div className="text-[9px] text-zinc-600 flex justify-between items-center border-t border-white/5 pt-1">
-                          <div className="flex items-center gap-1">
+                       <div className="text-[6px] md:text-[9px] text-zinc-600 flex justify-between items-center border-t border-white/5 pt-1 truncate">
+                          <div className="flex items-center gap-1 truncate">
                               <span>Base: {isInvalidRep ? '-' : baseVal}</span>
-                              {bonusText && <span className="text-zinc-500">{bonusText}</span>}
+                              {bonusText && <span className="text-zinc-500 hidden sm:inline">{bonusText}</span>}
                           </div>
-                          {!isInvalidRep && <span className="opacity-70">vs Avg: {weightedAvg}</span>}
+                          {!isInvalidRep && <span className="opacity-70 ml-1">vs Avg: {weightedAvg}</span>}
                        </div>
                    </div>
                 </div>
@@ -139,17 +137,18 @@ export const HealthView = ({
                 <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Stability Map</span>
                 {!historyLoading && (
                     <span className="text-[9px] font-mono text-zinc-400">
-                        {timeRange === '24H' || timeRange === '7D' ? 'Hourly Resolution' : 'Daily Avg Resolution'}
+                        {/* UPDATED: Added 3D to hourly check */}
+                        {timeRange === '24H' || timeRange === '3D' || timeRange === '7D' ? 'Hourly Resolution' : 'Daily Avg Resolution'}
                     </span>
                 )}
             </div>
-            <div className="h-10 w-full relative">
+            <div className="h-8 md:h-10 w-full relative">
                 <StabilityRibbon history={history} loading={historyLoading} />
             </div>
         </div>
 
         {/* --- ROW 3: HISTORY CHART (Bottom) --- */}
-        <div className="min-h-[250px] shrink-0">
+        <div className="min-h-[250px] shrink-0 pb-2">
             <HealthHistoryChart 
                 history={history} 
                 currentHealth={health}
