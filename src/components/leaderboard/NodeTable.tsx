@@ -6,8 +6,7 @@ import {
   Wallet, AlertOctagon, Search 
 } from 'lucide-react';
 import { RankedNode } from '../../types/leaderboard';
-import { Node } from '../../types'; // Import the full Node type for casting
-// NEW IMPORT: The Shadow Layer Component
+import { Node } from '../../types'; 
 import { ExpandedRowDetails } from './ExpandedRowDetails';
 
 interface NodeTableProps {
@@ -31,7 +30,6 @@ export default function NodeTable({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
-  // Helper for generating the diagnostics link
   const getDashboardLink = (n: RankedNode) => {
     const params = new URLSearchParams();
     params.set('open', n.pubkey);
@@ -67,14 +65,14 @@ export default function NodeTable({
 
   return (
     <div className="max-w-5xl mx-auto bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-visible backdrop-blur-sm relative min-h-[400px]">
-      {/* TABLE HEADER */}
+      {/* HEADER */}
       <div className="grid grid-cols-12 gap-2 md:gap-4 p-3 md:p-4 border-b border-zinc-800 text-[9px] md:text-xs font-bold text-zinc-500 uppercase tracking-widest sticky top-0 bg-zinc-900/95 backdrop-blur-sm z-10 rounded-t-2xl">
         <div className="col-span-2 md:col-span-1 text-center">Rank</div>
         <div className="col-span-6 md:col-span-7">Node Public Key</div>
         <div className="col-span-4 text-right">Credits</div>
       </div>
 
-      {/* STATES */}
+      {/* CONTENT */}
       {loading ? (
         <div className="absolute inset-0 flex items-center justify-center">
            <div className="text-center animate-pulse text-zinc-500 font-mono flex flex-col items-center gap-3">
@@ -122,13 +120,10 @@ export default function NodeTable({
                   {/* EXPANDED DETAILS */}
                   {isExpanded && (
                       <div className="border-t border-zinc-800/50 p-3 md:p-4 animate-in slide-in-from-top-2 duration-200">
-
-                          {/* NEW: THE DATABASE INJECTION POINT */}
-                          {/* We cast RankedNode -> Node because they are compatible for the history hook's needs (pubkey/network/address) */}
-                          <ExpandedRowDetails node={node as unknown as Node} />
-
-                          <div className="flex flex-col gap-4 mt-4">
-                              {/* MOBILE ACTIONS */}
+                          
+                          {/* 1. CONTROLS (Moved to Top) */}
+                          <div className="flex flex-col gap-4 mb-4">
+                              {/* MOBILE CONTROLS */}
                               <div className="grid grid-cols-6 gap-2 md:hidden">
                                   {node.address && (
                                       <Link href={`/map?focus=${node.address.split(':')[0]}`} className="col-span-3">
@@ -153,7 +148,7 @@ export default function NodeTable({
                                   </button>
                               </div>
 
-                              {/* DESKTOP ACTIONS */}
+                              {/* DESKTOP CONTROLS */}
                               <div className="hidden md:flex flex-row gap-4 items-center justify-between">
                                   <div className="flex gap-2 w-full md:w-auto">
                                       {node.address && (
@@ -184,6 +179,10 @@ export default function NodeTable({
                                   </div>
                               </div>
                           </div>
+
+                          {/* 2. CHARTS (Collapsible) */}
+                          <ExpandedRowDetails node={node as unknown as Node} />
+
                       </div>
                   )}
               </div>
