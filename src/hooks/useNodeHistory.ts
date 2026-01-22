@@ -8,7 +8,7 @@ export interface NodeHistoryPoint {
   uptime: number;
   storage_committed: number;
   storage_used: number;
-  credits: number;
+  credits: number; // <--- The UI likely looks for 'credits' or 'reputation'
   rank: number;
 }
 
@@ -26,89 +26,57 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
       if (!node) return;
       setLoading(true);
 
-      // --- CRITICAL CHECK ---
-      // Ensure 'version' exists. If your old DB rows used 'storage_committed', 
-      // you might not see old data until new snapshots accumulate.
-      // If node.version is undefined, this string becomes "undefined", breaking the ID.
+      // --- STABLE ID GENERATION ---
+      // Must match backend script exactly
       const versionSafe = node.version || '0.0.0'; 
-      
-      // Matches your NEW backend script format:
       const stableId = `${node.pubkey}-${node.address}-${versionSafe}-${node.is_public}`;
 
-      let rpcMode = false;
       let days = 7;
-      let timeGrain = 'hour';
-
-      switch (timeRange) {
-        case '24H': days = 1; break;
-        case '3D': days = 3; break;
-        case '7D': days = 7; break;
-        case '30D': days = 30; rpcMode = true; timeGrain = 'day'; break;
-        case 'ALL': days = 3650; rpcMode = true; timeGrain = 'day'; break;
-      }
+      if (timeRange === '24H') days = 1;
+      if (timeRange === '3D') days = 3;
+      if (timeRange === '30D') days = 30;
 
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      let data: any[] | null = null;
-      let error = null;
+      // --- FETCH STRATEGY: DIRECT TABLE READ ---
+      // We skip RPC for now to eliminate complexity variables
+      const { data, error } = await supabase
+        .from('node_snapshots')
+        .select('*') 
+        .eq('node_id', stableId) 
+        .gte('created_at', startDate.toISOString())
+        .order('created_at', { ascending: true });
 
-      try {
-        if (rpcMode) {
-          // RPC Strategy
-          const response = await supabase.rpc('get_node_history_bucketed', {
-            p_node_id: stableId, 
-            p_time_grain: timeGrain,
-            p_start_date: startDate.toISOString()
-          });
-          
-          if (response.data) {
-             // Map RPC result explicitly
-             data = response.data;
-          }
-          error = response.error;
-        } else {
-          // TABLE Strategy
-          // FIX 1: Filter by 'created_at', NOT 'id'. 'id' is likely an Integer/UUID.
-          const response = await supabase
-            .from('node_snapshots')
-            .select('*') 
-            .eq('node_id', stableId) 
-            .gte('created_at', startDate.toISOString()) // <--- CHANGED BACK TO created_at
-            .order('created_at', { ascending: true });  // <--- CHANGED BACK TO created_at
-
-          data = response.data;
-          error = response.error;
-        }
-
-        if (error) throw error;
-
-        // Map data safely
-        const points = (data || []).map((row: any) => ({
-          // Handle both RPC 'bucket' and Table 'created_at'
-          date: row.bucket || row.created_at || new Date().toISOString(), 
-          health: Number(row.health || row.avg_health || 0),
-          uptime: Number(row.uptime || row.avg_uptime || 0),
-          storage_committed: Number(row.storage_committed || row.avg_committed || 0),
-          storage_used: Number(row.storage_used || row.avg_used || 0),
-          credits: Number(row.credits || row.avg_credits || 0),
-          rank: Number(row.rank || row.avg_rank || 0)
-        }));
-
-        if (points.length > 0) {
-          const activeCount = points.filter(p => p.health > 0).length;
-          setReliabilityScore(Math.floor((activeCount / points.length) * 100));
-        } else {
-          setReliabilityScore(0);
-        }
-
-        setHistory(points);
-
-      } catch (err) {
-        console.error("History Fetch Error:", err);
-      } finally {
+      if (error) {
+        console.error("History Fetch Error:", error);
         setLoading(false);
+        return;
       }
+
+      const points = (data || []).map((row: any) => ({
+        date: row.created_at, 
+        health: Number(row.health || 0),
+        uptime: Number(row.uptime || 0),
+        storage_committed: Number(row.storage_committed || 0),
+        storage_used: Number(row.storage_used || 0),
+        
+        // CRITICAL FIX: Ensure 'credits' is mapped. 
+        // If your DB column is named 'reputation', change 'row.credits' to 'row.reputation'
+        credits: Number(row.credits || 0), 
+        rank: Number(row.rank || 0)
+      }));
+
+      // Calculate Reliability (Simple Percentage of Healthy Snapshots)
+      if (points.length > 0) {
+        const activeCount = points.filter(p => p.health > 0).length;
+        setReliabilityScore(Math.floor((activeCount / points.length) * 100));
+      } else {
+        setReliabilityScore(0);
+      }
+
+      setHistory(points);
+      setLoading(false);
     }
 
     fetchNodeHistory();
