@@ -6,16 +6,13 @@ interface HistoryChartProps {
   color: string;
   loading: boolean;
   height?: number;
+  label?: string; // Added label prop
 }
 
-export const HistoryChart = ({ data, color, loading, height = 60 }: HistoryChartProps) => {
-  // 1. Loading State: A subtle pulse skeleton
+export const HistoryChart = ({ data, color, loading, height = 60, label = 'Value' }: HistoryChartProps) => {
   if (loading) return <div className={`w-full h-[${height}px] animate-pulse bg-white/5 rounded-lg opacity-20`} />;
-  
-  // 2. Empty State: Don't break layout, just hide
   if (!data || data.length === 0) return null;
 
-  // 3. Render: "Ghost" Chart (No axes, no grids, just signal)
   return (
     <div style={{ height }} className="w-full relative opacity-40 hover:opacity-100 transition-opacity duration-500">
       <ResponsiveContainer width="100%" height="100%">
@@ -30,8 +27,9 @@ export const HistoryChart = ({ data, color, loading, height = 60 }: HistoryChart
             contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', borderRadius: '8px', fontSize: '10px', color: '#fff' }}
             itemStyle={{ color: '#fff' }}
             cursor={{ stroke: '#fff', strokeWidth: 1, opacity: 0.2 }}
-            // FIX: Changed type to 'any' to handle potential undefined values from Recharts
-            formatter={(value: any) => [Number(value).toLocaleString(), 'Value']}
+            // Use the label prop here
+            formatter={(value: any) => [Number(value).toLocaleString(), label]}
+            labelFormatter={(label) => new Date(label).toLocaleDateString()}
           />
           <Area 
             type="monotone" 
@@ -41,7 +39,7 @@ export const HistoryChart = ({ data, color, loading, height = 60 }: HistoryChart
             fill={`url(#gradient-${color.replace('#', '')})`} 
             strokeWidth={2}
             isAnimationActive={true}
-            animationDuration={1500}
+            animationDuration={1000}
           />
         </AreaChart>
       </ResponsiveContainer>
