@@ -17,7 +17,6 @@ import { HealthView } from './views/HealthView';
 import { StorageView } from './views/StorageView';
 import { ShareProof } from './ShareProof';
 import Link from 'next/link';
-// UPDATED IMPORT: Added HistoryTimeRange type
 import { useNodeHistory, HistoryTimeRange } from '../../hooks/useNodeHistory';
 import { HistoryChart } from '../common/HistoryChart';
 
@@ -62,25 +61,25 @@ export const InspectorModal = ({
   const [mode, setMode] = useState<'VIEW' | 'SHARE'>('VIEW');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  // NEW: Lifted State for Time Range Selection
+  // NEW: Lifted State for Time Range Selection (Defaults to 7 Days)
   const [timeRange, setTimeRange] = useState<HistoryTimeRange>('7D');
 
-  // UPDATED: Hook now uses the selected timeRange
-  const { history, loading: historyLoading } = useNodeHistory(selectedNode.pubkey, timeRange);
+  // UPDATED: Pass the FULL node object to generate the Stable ID (Pubkey+Addr+Committed)
+  const { history, loading: historyLoading } = useNodeHistory(selectedNode, timeRange);
 
   // Helper to map node history to chart format (For the overview sparklines)
   const chartData = useMemo(() => {
     if (!history) return [];
     return history.map(point => ({
       date: point.date,
-      value: point.health 
+      value: point.health // Mapping health to 'value' for the generic chart
     }));
   }, [history]);
 
   useEffect(() => {
     setModalView('overview');
     setMode('VIEW');
-    setTimeRange('7D'); // Reset time range on node switch
+    setTimeRange('7D'); // Reset time range when opening a new node
   }, [selectedNode.pubkey]);
 
   const computedNetworkStats = useMemo(() => {
