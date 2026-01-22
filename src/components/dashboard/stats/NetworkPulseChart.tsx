@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line } from 'recharts';
-import { HistoryTimeRange, NetworkHistoryPoint } from '../../hooks/useNetworkHistory';
+import { HistoryTimeRange, NetworkHistoryPoint } from '../../../hooks/useNetworkHistory';
 import { ChevronDown, Loader2 } from 'lucide-react';
 
 interface NetworkPulseChartProps {
