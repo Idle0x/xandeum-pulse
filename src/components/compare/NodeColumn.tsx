@@ -4,6 +4,7 @@ import { Node } from '../../types';
 import { getSafeIp } from '../../utils/nodeHelpers';
 import { formatBytes } from '../../utils/formatters';
 import { MicroBar, MetricDelta, formatUptimePrecise } from './MicroComponents';
+// HISTORY INTEGRATION
 import { useNodeHistory } from '../../hooks/useNodeHistory';
 import { StabilityRibbon } from '../modals/views/StabilityRibbon';
 
@@ -37,8 +38,7 @@ export const NodeColumn = ({
     leaderType
 }: NodeColumnProps) => {
 
-  // 1. Fetch History for the "DNA Strip"
-  // FIXED: Passing full 'node' object and valid '30D' string
+  // 1. Fetch History for the "DNA Strip" (30 Days)
   const { history, loading } = useNodeHistory(node, '30D');
 
   const Row = ({ children }: { children: React.ReactNode }) => (
@@ -178,13 +178,13 @@ export const NodeColumn = ({
            <div className="text-[6px] md:text-[8px] font-bold text-zinc-600 uppercase mb-1.5 text-center tracking-wider opacity-60 group-hover/col:opacity-100 transition-opacity">
               30-Day Stability
            </div>
-           {/* Passed history directly; removed unsupported 'days' prop */}
+           {/* Rendering the Ribbon with Hook Data */}
            <div className="opacity-80 group-hover/col:opacity-100 transition-opacity">
               <StabilityRibbon history={history} loading={loading} />
            </div>
         </div>
 
-        {/* BOTTOM TRASHCAN */}
+        {/* TRASH */}
         <div className={`h-[28px] md:h-[32px] border-t border-white/5 flex items-center justify-center transition-colors cursor-pointer group/trash ${isLeader ? 'bg-yellow-900/10 hover:bg-yellow-500/20' : 'bg-black/20 hover:bg-red-500/10'}`} onClick={(e) => { e.stopPropagation(); onRemove(); }}>
             {isLeader ? (
                  <X size={10} className="md:w-3 md:h-3 text-yellow-600 group-hover/trash:text-yellow-400 transition-colors" />
