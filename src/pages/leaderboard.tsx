@@ -14,10 +14,11 @@ import StoincSimulator from '../components/leaderboard/StoincSimulator';
 import StatsOverview from '../components/leaderboard/StatsOverview';
 import FilterControls from '../components/leaderboard/FilterControls';
 import NodeTable from '../components/leaderboard/NodeTable';
+import { LeaderboardAnalyticsModal } from '../components/leaderboard/LeaderboardAnalyticsModal'; // NEW IMPORT
 
 export default function Leaderboard() {
   const router = useRouter();
-  
+
   // 1. Fetch Data
   const { allNodes, loading, creditsOffline } = useLeaderboardData();
 
@@ -30,6 +31,9 @@ export default function Leaderboard() {
   const [visibleCount, setVisibleCount] = useState(100);
   const [expandedNode, setExpandedNode] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
+  
+  // NEW: Analytics Modal State
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
 
   // Refs for deep linking to prevent loops
   const lastProcessedHighlight = useRef<string | null>(null);
@@ -47,15 +51,15 @@ export default function Leaderboard() {
   const filteredAndRanked = useMemo(() => {
       // 1. Filter by Network
       const networkList = allNodes.filter(n => (networkFilter === 'COMBINED' || n.network === networkFilter));
-      
+
       // 2. Sort (Credits -> Health -> Pubkey)
       networkList.sort((a, b) => b.credits - a.credits || b.health - a.health || a.pubkey.localeCompare(b.pubkey));
-      
+
       // 3. Re-assign Ranks relative to current view
       const rankedList = networkList.map((n, i) => ({ ...n, rank: i + 1 }));
-      
+
       if (!searchQuery) return rankedList;
-      
+
       // 4. Search Filter
       const searchLower = searchQuery.toLowerCase();
       return rankedList.filter(n => 
@@ -64,23 +68,41 @@ export default function Leaderboard() {
       );
   }, [allNodes, networkFilter, searchQuery]);
 
+  // --- HELPER: Get Current Stats for Modal ---
+  const getCurrentStats = () => {
+     // We calculate stats based on the currently filtered view (e.g. Mainnet only vs Combined)
+     // so the modal matches the cards the user just clicked.
+     const nodes = filteredAndRanked; 
+     const total = nodes.reduce((sum, n) => sum + n.credits, 0);
+     const avg = nodes.length ? Math.round(total / nodes.length) : 0;
+     const top10 = nodes.slice(0, 10).reduce((sum, n) => sum + n.credits, 0);
+     const dom = total > 0 ? ((top10 / total) * 100).toFixed(1) : '0';
+     
+     return { 
+         totalCredits: total, 
+         avgCredits: avg, 
+         dominance: dom, 
+         nodeCount: nodes.length 
+     };
+  };
+
   // --- EFFECT: Deep Link Handler ---
   // Handles URLs like /leaderboard?highlight=PUBKEY
   useEffect(() => {
       if (loading || !router.isReady || !router.query.highlight || allNodes.length === 0) return;
-      
+
       const targetKey = router.query.highlight as string;
       const targetNetwork = router.query.network as string;
       const targetAddr = router.query.focusAddr as string; 
       const requestSignature = `${targetKey}-${targetNetwork}-${targetAddr}`;
-      
+
       if (lastProcessedHighlight.current === requestSignature) return;
 
       const targetNode = allNodes.find(n => n.pubkey === targetKey && (!targetNetwork || n.network === targetNetwork));
 
       if (targetNode) {
           lastProcessedHighlight.current = requestSignature;
-          
+
           // Auto-switch network tab if needed
           if (targetNode.network !== networkFilter && networkFilter !== 'COMBINED') {
               setNetworkFilter(targetNode.network as NetworkType);
@@ -90,13 +112,13 @@ export default function Leaderboard() {
           setTimeout(() => {
               const compositeId = `${targetNode.pubkey}-${targetNode.network}-${targetNode.address || 'no-ip'}`;
               setExpandedNode(compositeId);
-              
+
               // Ensure it's visible in the list (if far down)
               // Calculate rough index
               const currentList = networkFilter === 'COMBINED' 
                 ? [...allNodes].sort((a,b) => b.credits - a.credits)
                 : allNodes.filter(n => n.network === targetNode.network).sort((a,b) => b.credits - a.credits);
-              
+
               const idx = currentList.findIndex(n => n.pubkey === targetNode.pubkey);
               if (idx >= visibleCount) setVisibleCount(idx + 50);
 
@@ -131,9 +153,13 @@ export default function Leaderboard() {
       {/* WIZARD COMPONENT */}
       <StoincSimulator controller={simController} />
 
-      {/* STATS OVERVIEW COMPONENT */}
+      {/* STATS OVERVIEW COMPONENT (Updated with onClick handler) */}
       {!loading && !creditsOffline && (
-        <StatsOverview nodes={filteredAndRanked} networkFilter={networkFilter} />
+        <StatsOverview 
+            nodes={filteredAndRanked} 
+            networkFilter={networkFilter} 
+            onOpenAnalytics={() => setIsAnalyticsOpen(true)}
+        />
       )}
 
       {/* FILTER CONTROLS COMPONENT */}
@@ -175,6 +201,14 @@ export default function Leaderboard() {
             </div>
           </div>
         </footer>
+      )}
+
+      {/* NEW: ANALYTICS MODAL */}
+      {isAnalyticsOpen && (
+          <LeaderboardAnalyticsModal 
+              onClose={() => setIsAnalyticsOpen(false)} 
+              currentStats={getCurrentStats()} 
+          />
       )}
     </div>
   );
