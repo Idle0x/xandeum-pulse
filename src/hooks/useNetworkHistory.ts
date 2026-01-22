@@ -24,11 +24,11 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
   useEffect(() => {
     async function fetchHistory() {
       setLoading(true);
-      
+
       let days = 7;
       let timeGrain = 'hour';
       let rpcMode = false;
-      
+
       switch (timeRange) {
         case '24H': days = 1; break;
         case '3D': days = 3; break;
@@ -44,6 +44,7 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
       let error = null;
 
       if (rpcMode) {
+        // RPC Path (For long timelines)
         const response = await supabase.rpc('get_network_history_bucketed', {
           p_time_grain: timeGrain,
           p_start_date: startDate.toISOString()
@@ -51,12 +52,14 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
         data = response.data;
         error = response.error;
       } else {
+        // Raw Table Path (For detailed short timelines)
+        // Uses 'id' as timestamp based on your DB schema
         const response = await supabase
           .from('network_snapshots')
           .select('*')
-          .gte('id', startDate.toISOString()) // Using ID as timestamp based on your DB
+          .gte('id', startDate.toISOString()) 
           .order('id', { ascending: true });
-        
+
         data = response.data;
         error = response.error;
       }
@@ -69,13 +72,16 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
 
       if (data && data.length > 0) {
         const points = data.map((d: any) => ({
+          // Robust date mapping: checks bucket (RPC), id (Your DB), or created_at (Standard)
           date: d.bucket || d.id || d.created_at,
+          
           avg_health: Number(d.avg_health || 0),
           total_nodes: Number(d.total_nodes || 0),
           total_capacity: Number(d.total_capacity ?? d.storage_committed ?? 0),
           total_used: Number(d.total_used ?? d.storage_used ?? 0),
           consensus_score: Number(d.consensus_score || 0),
-          // NEW MAPPINGS
+          
+          // New Financial Metrics
           total_credits: Number(d.total_credits || 0),
           avg_credits: Number(d.avg_credits || 0),
           top10_dominance: Number(d.top10_dominance || 0)
@@ -83,18 +89,21 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
 
         setHistory(points);
 
-        // Calculate Growth (Defaulting to Credits for the Leaderboard context)
+        // Calculate Growth (Defaulting to Credits for Leaderboard context)
         if (points.length > 1) {
             const first = points[0].total_credits;
             const last = points[points.length - 1].total_credits;
             if (first > 0) {
                 setGrowth(((last - first) / first) * 100);
+            } else {
+                setGrowth(0);
             }
         }
       } else {
         setHistory([]);
+        setGrowth(0);
       }
-      
+
       setLoading(false);
     }
 
