@@ -18,15 +18,27 @@ export const useLeaderboardData = () => {
           axios.get('/api/stats').catch(() => ({ data: { result: { pods: [] } } }))
         ]);
 
-        // 1. Create a Map for quick metadata lookup (Address, IP, Location)
-        const metaMap = new Map<string, { address: string, location?: any, health: number }>();
+        // 1. UPDATED: Map now stores Version and Is_Public too
+        const metaMap = new Map<string, { 
+            address: string, 
+            location?: any, 
+            health: number,
+            version: string,    // <--- NEW
+            is_public: boolean  // <--- NEW
+        }>();
+
         if (statsRes.data?.result?.pods) {
             statsRes.data.result.pods.forEach((node: any) => {
-                metaMap.set(node.pubkey, { 
-                    address: node.address, 
-                    location: node.location,
-                    health: node.health || 0 
-                });
+                // We use the first instance we find for this pubkey
+                if (!metaMap.has(node.pubkey)) {
+                    metaMap.set(node.pubkey, { 
+                        address: node.address, 
+                        location: node.location,
+                        health: node.health || 0,
+                        version: node.version || '0.0.0', // <--- CAPTURE VERSION
+                        is_public: node.is_public ?? false // <--- CAPTURE IS_PUBLIC
+                    });
+                }
             });
         }
 
@@ -38,8 +50,8 @@ export const useLeaderboardData = () => {
              setAllNodes([]); 
         } else {
             setCreditsOffline(false);
-            
-            // 3. Handle Historical Trends (Rank Changes)
+
+            // 3. Handle Historical Trends
             let history: Record<string, number> = {};
             try {
                 const h = localStorage.getItem('xandeum_rank_history');
@@ -49,41 +61,44 @@ export const useLeaderboardData = () => {
             }
             const newHistory: Record<string, number> = {};
 
-            // 4. Merge Data
+            // 4. UPDATED: Merge Data with Version/IsPublic
             const parsedList: RankedNode[] = rawData.map((item: any) => {
                 const pKey = item.pod_id || item.pubkey || 'Unknown';
                 const meta = metaMap.get(pKey);
-                
+
                 return {
                     pubkey: pKey,
                     credits: Number(item.credits || 0),
                     health: meta?.health || 0,
                     network: item.network || 'MAINNET',
-                    rank: 0, // Will be assigned after sort
+                    rank: 0, 
                     address: meta?.address,
                     location: meta?.location,
-                    trend: 0 // Will be calculated below
+                    
+                    // 👇 CRITICAL FIX FOR HISTORY HOOK 👇
+                    version: meta?.version || '0.0.0', 
+                    is_public: meta?.is_public ?? false, 
+
+                    trend: 0 
                 };
             });
 
-            // 5. Sort (Credits High -> Low, then Health High -> Low)
+            // 5. Sort
             parsedList.sort((a, b) => b.credits - a.credits || b.health - a.health);
 
-            // 6. Assign Ranks and Calculate Trends
+            // 6. Assign Ranks
             parsedList.forEach((n, i) => {
                 const currentRank = i + 1;
                 n.rank = currentRank;
-                
+
                 const prevRank = history[n.pubkey];
                 if (prevRank) {
-                    n.trend = prevRank - currentRank; // Positive = moved up, Negative = moved down
+                    n.trend = prevRank - currentRank;
                 }
                 newHistory[n.pubkey] = currentRank;
             });
 
-            // Save new history for next visit
             localStorage.setItem('xandeum_rank_history', JSON.stringify(newHistory));
-            
             setAllNodes(parsedList);
         }
       } catch (err) {
