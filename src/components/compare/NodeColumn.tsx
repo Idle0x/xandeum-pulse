@@ -38,8 +38,10 @@ export const NodeColumn = ({
     leaderType
 }: NodeColumnProps) => {
 
-  // 1. Fetch History for the "DNA Strip" (15 days for compactness)
-  const { history, loading } = useNodeHistory(node.pubkey, 15);
+  // 1. Fetch History for the "DNA Strip" 
+  // FIXED: Passed '30D' (valid string type) instead of 15 (invalid number)
+  // The ribbon will display whatever data it gets.
+  const { history, loading } = useNodeHistory(node.pubkey, '30D');
 
   const Row = ({ children }: { children: React.ReactNode }) => (
     <div className={`h-[36px] md:h-[72px] flex flex-col justify-center px-3 md:px-4 min-w-[100px] md:min-w-[140px] relative`}>
@@ -173,14 +175,14 @@ export const NodeColumn = ({
         </Row>
         <Row><span className="text-[9px] md:text-base font-mono text-zinc-500">#{node.rank || '-'}</span></Row>
 
-        {/* --- PHASE 2 INTEGRATION: The DNA Strip --- */}
+        {/* --- INTEGRATION: The DNA Strip --- */}
         <div className="px-3 md:px-4 py-3 bg-black/20 border-t border-white/5 backdrop-blur-sm group-hover/col:bg-black/40 transition-colors">
            <div className="text-[6px] md:text-[8px] font-bold text-zinc-600 uppercase mb-1.5 text-center tracking-wider opacity-60 group-hover/col:opacity-100 transition-opacity">
-              15-Day Stability
+              30-Day Stability
            </div>
-           {/* We remove grayscale to make it look "live" but dim slightly until hover */}
+           {/* Passed history directly; removed unsupported 'days' prop */}
            <div className="opacity-80 group-hover/col:opacity-100 transition-opacity">
-              <StabilityRibbon history={history} loading={loading} days={15} />
+              <StabilityRibbon history={history} loading={loading} />
            </div>
         </div>
 
