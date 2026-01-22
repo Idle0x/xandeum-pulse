@@ -8,15 +8,14 @@ import { Node } from '../../types';
 import { formatBytes } from '../../utils/formatters';
 import { getSafeIp } from '../../utils/nodeHelpers';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
-import { formatUptimePrecise } from './MicroComponents';
 import { OverviewLegend, UnifiedLegend } from './ComparisonLegends';
 import { generateNarrative } from '../../lib/narrative-engine';
-// NEW IMPORT: History Hook
+// HISTORY INTEGRATION
 import { useNodeHistory } from '../../hooks/useNodeHistory';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
-// --- MESH COLOR PALETTE ---
+// --- MESH COLORS ---
 const MESH_COLORS = [
     "#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899", "#06b6d4", "#f43f5e", "#84cc16",
     "#6366f1", "#14b8a6", "#d946ef", "#eab308", "#f97316", "#a855f7", "#22c55e", "#0ea5e9",
@@ -29,7 +28,6 @@ const getLinkColor = (startLat: number, startLon: number, endLat: number) => {
     return MESH_COLORS[Math.floor(hash) % MESH_COLORS.length];
 };
 
-// --- SUB-COMPONENTS ---
 const InterpretationPanel = ({ contextText }: { contextText: string }) => (
     <div className="px-4 py-3 md:px-6 md:py-4 bg-zinc-900/30 border-t border-white/5 flex items-start gap-3 md:gap-4 transition-all duration-300 print-exclude min-h-[80px]">
         <Info size={14} className="text-blue-400 shrink-0 mt-0.5 md:w-4 md:h-4 animate-pulse" />
@@ -58,7 +56,6 @@ const ChartCell = ({ title, icon: Icon, children, isFocused, onClick }: any) => 
     </div>
 );
 
-// --- MAIN ENGINE ---
 interface SynthesisEngineProps {
   nodes: Node[];
   themes: any[];
@@ -76,7 +73,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
   const [pos, setPos] = useState({ coordinates: [0, 20], zoom: 1 });
   const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false);
 
-  // --- INTERACTION STATE ---
   const [focusedSection, setFocusedSection] = useState<string | null>(null); 
   const [localFocusedNodeKey, setLocalFocusedNodeKey] = useState<string | null>(null); 
   const [internalHoverKey, setInternalHoverKey] = useState<string | null>(null);
@@ -84,15 +80,14 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
   // Sync prop focus if provided (prioritize prop for export/parent control, else local)
   const focusedNodeKey = propFocusedKey !== undefined ? propFocusedKey : localFocusedNodeKey;
 
-  // NEW: Find the full Node object for the hook
+  // 1. FIND FOCUSED NODE OBJECT
   const focusedNode = useMemo(() => {
       return nodes.find(n => n.pubkey === focusedNodeKey);
   }, [nodes, focusedNodeKey]);
 
-  // Pass the FULL node object to the hook
+  // 2. FETCH HISTORY FOR CONTEXT (Using '30D' for reliability)
   const { reliabilityScore, loading: historyLoading } = useNodeHistory(focusedNode || undefined, '30D');
 
-  // Derived Hover State
   const activeHoverKey = externalHoverKey !== undefined ? externalHoverKey : internalHoverKey;
 
   const handleHover = (key: string | null) => {
@@ -100,7 +95,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
       if (setExternalHover) setExternalHover(key);
   };
 
-  // --- DATA PREPARATION ---
   const clusters = useMemo(() => {
       const map = new Map();
       nodes.forEach((node, index) => {
@@ -161,7 +155,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
   const metricDropdownRef = useRef<HTMLDivElement>(null);
   useOutsideClick(metricDropdownRef, () => setIsMetricDropdownOpen(false));
 
-  // --- NARRATIVE ENGINE INTEGRATION ---
   const narrative = useMemo(() => {
       return generateNarrative({
           tab,
@@ -187,7 +180,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
   const overviewBarWidth = isDense ? 'flex-1 mx-[1px]' : 'w-2 md:w-3 mx-0.5'; 
   const marketBarWidth = isDense ? 'flex-1' : 'w-24 md:w-32';
 
-  // --- STYLES ---
   const getElementStyle = (nodeKey: string | null, sectionType?: string) => {
       if (focusedSection && sectionType && sectionType !== focusedSection) return 'opacity-30 grayscale-[0.5] transition-all duration-500';
 
@@ -221,7 +213,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
          onMouseLeave={() => handleHover(null)}
          onClick={() => { setFocusedSection(null); setLocalFocusedNodeKey(null); }}>
 
-        {/* TAB CONTROLS */}
         {!isExport && (
             <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50">
                 <div className="bg-zinc-900/90 backdrop-blur-md p-1.5 rounded-full flex gap-2 border border-white/10 shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -235,8 +226,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
         )}
 
         <div className={`flex-1 overflow-hidden relative flex flex-col ${isExport ? 'pt-6' : 'pt-24'}`} onClick={() => { setFocusedSection(null); setLocalFocusedNodeKey(null); }}>
-
-            {/* OVERVIEW TAB */}
             {tab === 'OVERVIEW' && (
                 <>
                 <div className="grid grid-cols-2 grid-rows-2 gap-4 md:gap-6 p-4 md:p-6 h-full">
@@ -268,7 +257,7 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                 </div>
                 <OverviewLegend nodes={nodes} themes={themes} hoveredKey={activeHoverKey} onHover={handleHover} />
 
-                {/* NEW: Historical Context Panel (Database Shadow Layer) */}
+                {/* HISTORICAL CONTEXT PANEL (Appears when focused) */}
                 {focusedNodeKey && !historyLoading && (
                    <div className="mt-2 mx-4 md:mx-6 p-3 rounded-lg border border-yellow-500/10 bg-yellow-500/5 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
                       <div className={`text-xl font-black ${reliabilityScore >= 98 ? 'text-green-500' : reliabilityScore >= 90 ? 'text-yellow-500' : 'text-red-500'}`}>
@@ -288,7 +277,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                 </>
             )}
 
-            {/* MARKET SHARE TAB */}
             {tab === 'MARKET' && (
                 <>
                     <div className="relative flex flex-col flex-1">
@@ -337,7 +325,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                 </>
             )}
 
-            {/* TOPOLOGY TAB */}
             {tab === 'TOPOLOGY' && (
                 <div className="flex flex-col h-full relative group/map">
                     {!isExport && (
