@@ -1,3 +1,18 @@
+import { SupabaseDebug } from '../components/SupabaseDebug'; // Adjust path
+
+export default function Dashboard() {
+  return (
+    <>
+      <SupabaseDebug /> {/* <--- ADD THIS LINE HERE */}
+      
+      {/* Rest of your app... */}
+      <div className="min-h-screen bg-black...">
+         {/* ... */}
+      </div>
+    </>
+  )
+}
+
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { ArrowUpCircle, AlertTriangle, X, ChevronDown, ChevronUp } from 'lucide-react'; 
