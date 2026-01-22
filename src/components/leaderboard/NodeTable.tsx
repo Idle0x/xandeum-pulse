@@ -123,8 +123,8 @@ export default function NodeTable({
                       <div className="border-t border-zinc-800/50 p-3 md:p-4 animate-in slide-in-from-top-2 duration-200">
                           
                           {/* NEW: THE DATABASE INJECTION POINT */}
-                          {/* This component lazily fetches history only when the row opens */}
-                          <ExpandedRowDetails pubkey={node.pubkey} />
+                          {/* UPDATED: Pass full node object for stable ID generation */}
+                          <ExpandedRowDetails node={node} />
 
                           <div className="flex flex-col gap-4 mt-4">
                               {/* MOBILE ACTIONS */}
