@@ -10,8 +10,10 @@ import { getSafeIp } from '../../utils/nodeHelpers';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { OverviewLegend, UnifiedLegend } from './ComparisonLegends';
 import { generateNarrative } from '../../lib/narrative-engine';
-// HISTORY INTEGRATION
 import { useNodeHistory } from '../../hooks/useNodeHistory';
+
+// FIX: Added this missing import
+import { formatUptimePrecise } from './MicroComponents';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -80,12 +82,11 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
   // Sync prop focus if provided (prioritize prop for export/parent control, else local)
   const focusedNodeKey = propFocusedKey !== undefined ? propFocusedKey : localFocusedNodeKey;
 
-  // 1. FIND FOCUSED NODE OBJECT
   const focusedNode = useMemo(() => {
       return nodes.find(n => n.pubkey === focusedNodeKey);
   }, [nodes, focusedNodeKey]);
 
-  // 2. FETCH HISTORY FOR CONTEXT (Using '30D' for reliability)
+  // FETCH HISTORY FOR CONTEXT (Using '30D' for reliability)
   const { reliabilityScore, loading: historyLoading } = useNodeHistory(focusedNode || undefined, '30D');
 
   const activeHoverKey = externalHoverKey !== undefined ? externalHoverKey : internalHoverKey;
@@ -257,7 +258,6 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                 </div>
                 <OverviewLegend nodes={nodes} themes={themes} hoveredKey={activeHoverKey} onHover={handleHover} />
 
-                {/* HISTORICAL CONTEXT PANEL (Appears when focused) */}
                 {focusedNodeKey && !historyLoading && (
                    <div className="mt-2 mx-4 md:mx-6 p-3 rounded-lg border border-yellow-500/10 bg-yellow-500/5 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
                       <div className={`text-xl font-black ${reliabilityScore >= 98 ? 'text-green-500' : reliabilityScore >= 90 ? 'text-yellow-500' : 'text-red-500'}`}>
