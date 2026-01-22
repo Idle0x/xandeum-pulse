@@ -9,6 +9,7 @@ export interface NodeHistoryPoint {
   storage_committed: number;
   storage_used: number;
   credits: number;
+  rank: number; // Added Rank
 }
 
 export type HistoryTimeRange = '24H' | '3D' | '7D' | '30D' | 'ALL';
@@ -19,84 +20,50 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
   const [reliabilityScore, setReliabilityScore] = useState(100);
 
   useEffect(() => {
-    // 1. Safety Check: If no node, stop immediately.
     if (!node || !node.pubkey) return;
 
     async function fetchNodeHistory() {
-      // 2. Redundant Safety Check (Required for TypeScript inside async closure)
-      if (!node) return;
-
       setLoading(true);
 
-      // --- GENERATE STABLE ID ---
-      // Format: {PUBKEY}-{ADDRESS}-{IS_PUBLIC}-{COMMITTED}
-      const stableId = `${node.pubkey}-${node.address}-${node.is_public}-${node.storage_committed}`;
-
-      let rpcMode = false;
       let days = 7;
-      let timeGrain = 'hour';
-
+      
       switch (timeRange) {
         case '24H': days = 1; break;
         case '3D': days = 3; break;
         case '7D': days = 7; break;
-        case '30D': days = 30; rpcMode = true; timeGrain = 'day'; break;
-        case 'ALL': days = 3650; rpcMode = true; timeGrain = 'day'; break;
+        case '30D': days = 30; break;
+        case 'ALL': days = 365; break;
       }
 
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      let data: any[] | null = null;
-      let error = null;
-
-      if (rpcMode) {
-        // STRATEGY A: RPC (Aggregated)
-        const response = await supabase.rpc('get_node_history_bucketed', {
-          p_node_id: stableId, 
-          p_time_grain: timeGrain,
-          p_start_date: startDate.toISOString()
-        });
-        
-        if (response.data) {
-          data = response.data.map((r: any) => ({
-            created_at: r.bucket,
-            health: r.avg_health,
-            uptime: r.avg_uptime,
-            storage_committed: r.avg_committed,
-            storage_used: r.avg_used,
-            credits: r.avg_credits
-          }));
-        }
-        error = response.error;
-      } else {
-        // STRATEGY B: Raw Table Fetch
-        const response = await supabase
+      // --- FETCH STRATEGY: RAW TABLE ---
+      // We query by 'node_pubkey' and filter time using 'id' (your DB timestamp column)
+      const { data, error } = await supabase
           .from('node_snapshots')
-          .select('created_at, health, uptime, storage_committed, storage_used, credits')
-          .eq('node_id', stableId)
-          .gte('created_at', startDate.toISOString())
-          .order('created_at', { ascending: true });
-        
-        data = response.data;
-        error = response.error;
-      }
+          .select('*')
+          .eq('node_pubkey', node.pubkey) 
+          .gte('id', startDate.toISOString()) 
+          .order('id', { ascending: true });
 
       if (error) {
-        console.error("History Fetch Error:", error);
+        console.error("Node History Fetch Error:", error);
         setLoading(false);
         return;
       }
 
       const points = (data || []).map((row: any) => ({
-        date: row.created_at,
-        health: Number(row.health),
-        uptime: Number(row.uptime),
-        storage_committed: Number(row.storage_committed),
-        storage_used: Number(row.storage_used),
-        credits: Number(row.credits)
+        date: row.id, // Corrected timestamp column
+        health: Number(row.health || 0),
+        uptime: Number(row.uptime || 0),
+        storage_committed: Number(row.storage_committed || 0),
+        storage_used: Number(row.storage_used || 0),
+        credits: Number(row.credits || 0),
+        rank: Number(row.rank || 0)
       }));
 
+      // Calculate Reliability (Percentage of snapshots where health > 0)
       if (points.length > 0) {
         const activeCount = points.filter(p => p.health > 0).length;
         setReliabilityScore(Math.floor((activeCount / points.length) * 100));
@@ -109,7 +76,7 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
     }
 
     fetchNodeHistory();
-  }, [node, timeRange]);
+  }, [node?.pubkey, timeRange]); // Depend on pubkey, not the whole node object
 
   return { history, reliabilityScore, loading };
 };
