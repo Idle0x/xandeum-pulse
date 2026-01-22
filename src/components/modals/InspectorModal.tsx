@@ -17,7 +17,8 @@ import { HealthView } from './views/HealthView';
 import { StorageView } from './views/StorageView';
 import { ShareProof } from './ShareProof';
 import Link from 'next/link';
-import { useNodeHistory } from '../../hooks/useNodeHistory';
+// UPDATED IMPORT: Added HistoryTimeRange type
+import { useNodeHistory, HistoryTimeRange } from '../../hooks/useNodeHistory';
 import { HistoryChart } from '../common/HistoryChart';
 
 interface InspectorModalProps {
@@ -61,20 +62,25 @@ export const InspectorModal = ({
   const [mode, setMode] = useState<'VIEW' | 'SHARE'>('VIEW');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  const { history, loading: historyLoading } = useNodeHistory(selectedNode.pubkey);
+  // NEW: Lifted State for Time Range Selection
+  const [timeRange, setTimeRange] = useState<HistoryTimeRange>('7D');
 
-  // Helper to map node history to chart format
+  // UPDATED: Hook now uses the selected timeRange
+  const { history, loading: historyLoading } = useNodeHistory(selectedNode.pubkey, timeRange);
+
+  // Helper to map node history to chart format (For the overview sparklines)
   const chartData = useMemo(() => {
     if (!history) return [];
     return history.map(point => ({
       date: point.date,
-      value: point.health // Mapping health to 'value' for the generic chart
+      value: point.health 
     }));
   }, [history]);
 
   useEffect(() => {
     setModalView('overview');
     setMode('VIEW');
+    setTimeRange('7D'); // Reset time range on node switch
   }, [selectedNode.pubkey]);
 
   const computedNetworkStats = useMemo(() => {
@@ -127,7 +133,7 @@ export const InspectorModal = ({
     ? 'text-white' 
     : healthScore >= 80 ? 'text-green-500' : healthScore >= 50 ? 'text-yellow-500' : 'text-red-500';
 
-  // --- FIXED: Restored missing healthGlowColor definition ---
+  // --- FIXED: Restored healthGlowColor definition ---
   const healthGlowColor = zenMode 
     ? '' 
     : healthScore >= 80 ? 'bg-green-500' : healthScore >= 50 ? 'bg-yellow-500' : 'bg-red-500';
@@ -229,7 +235,6 @@ export const InspectorModal = ({
                 <h2 className="text-base font-black font-sans tracking-tight text-white">NODE INSPECTOR</h2>
                 <button onClick={onClose} className="p-1.5 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 hover:bg-red-500 hover:text-white transition"><X size={16} /></button>
              </div>
-             {/* Mobile Header Controls */}
              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono bg-zinc-900/80 px-2 py-1.5 rounded-lg border border-zinc-800">
                   <span className="text-zinc-400">{selectedNode.pubkey ? `${selectedNode.pubkey.slice(0, 12)}...` : 'Unknown'}</span>
@@ -283,7 +288,7 @@ export const InspectorModal = ({
                {modalView !== 'overview' ? (
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
                     
-                    {/* EXPANDED HEADER VIEW (LEFT SIDEBAR) */}
+                    {/* EXPANDED HEADER VIEW (LEFT) */}
                     <div className="md:col-span-1 h-full">
                        
                        {/* HEALTH HEADER (Expanded) */}
@@ -320,7 +325,6 @@ export const InspectorModal = ({
                                 ].map((bar, i) => (
                                     <div key={i} className="flex flex-col items-center justify-end h-full w-full group relative">
                                         <div className={`w-full max-w-[40px] md:max-w-[50px] rounded-t-md transition-all duration-1000 relative ${bar.type === 'MY_NODE' ? (zenMode ? 'bg-white' : 'bg-purple-500') : 'bg-zinc-800'}`} style={{ height: `${Math.max(bar.val, 2)}%` }}></div>
-                                        {/* Added Labels below bars */}
                                         <div className="mt-2 text-[8px] font-bold uppercase tracking-widest text-zinc-500">{bar.label}</div>
                                     </div>
                                 ))}
@@ -402,6 +406,9 @@ export const InspectorModal = ({
                                totalStorageCommitted={totalStorageCommitted} 
                                nodeCount={nodes.length}
                                history={history}
+                               timeRange={timeRange}
+                               onTimeRangeChange={setTimeRange}
+                               historyLoading={historyLoading}
                            />
                        )}
                        {modalView === 'identity' && (
