@@ -1,23 +1,3 @@
-import { useState, useEffect } from 'react';
-// ... other imports ...
-import { SupabaseDebug } from '../components/SupabaseDebug'; // Import the debugger
-
-export default function Dashboard() {
-  // ... your existing state and hooks ...
-
-  return (
-    <>
-      {/* 1. ADD THE DEBUGGER HERE AT THE VERY TOP */}
-      <SupabaseDebug />
-
-      {/* 2. Your existing dashboard layout starts below */}
-      <div className="min-h-screen bg-black text-white font-sans selection:bg-yellow-500/30">
-         {/* ... the rest of your dashboard code ... */}
-      </div>
-    </>
-  );
-}
-
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { ArrowUpCircle, AlertTriangle, X, ChevronDown, ChevronUp } from 'lucide-react'; 
@@ -47,6 +27,9 @@ import { InspectorModal } from '../components/modals/InspectorModal';
 import { LiveWireLoader, PulseGraphLoader } from '../components/common/Loaders';
 import { Node } from '../types';
 import { getSafeIp } from '../utils/nodeHelpers';
+
+// --- DEBUGGER ---
+import { SupabaseDebug } from '../components/SupabaseDebug';
 
 
 export default function Home() {
@@ -262,6 +245,9 @@ export default function Home() {
   return (
     <Layout zenMode={zenMode} onClick={() => isMenuOpen && setIsMenuOpen(false)}>
       <WelcomeCurtain />
+
+      {/* --- SUPABASE DEBUGGER (REMOVE WHEN FIXED) --- */}
+      <SupabaseDebug />
 
       {loading && <div className="fixed top-0 left-0 right-0 z-50"><LiveWireLoader /></div>}
 
