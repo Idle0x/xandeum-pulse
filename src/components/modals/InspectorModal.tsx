@@ -114,6 +114,13 @@ export const InspectorModal = ({
   const isSelectedNodeLatest = checkIsLatest(selectedNode.version, mostCommonVersion);
   const avgNetworkHealth = computedNetworkStats?.avgBreakdown?.total || 0;
 
+  // --- PERCENTILE CALCULATION ---
+  const totalNodes = computedNetworkStats?.totalNodes || 1;
+  const healthRank = selectedNode.health_rank || 0;
+  const betterThanPercent = totalNodes > 1 && healthRank > 0 
+    ? ((1 - (healthRank / totalNodes)) * 100).toFixed(0) 
+    : '0';
+
   const siblingCount = nodes.filter(n => 
     n.pubkey === selectedNode.pubkey && 
     n.network === selectedNode.network && 
@@ -294,10 +301,15 @@ export const InspectorModal = ({
                        {modalView === 'health' && (
                          <div className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between cursor-pointer ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900 border-green-500 ring-1 ring-green-500 shadow-[0_0_30px_rgba(34,197,94,0.1)]'}`} onClick={() => handleCardToggle('health')}>
                            
-                           {/* Header with Rank Badge */}
-                           <div className="w-full flex justify-between items-start mb-4">
-                               <div className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest">DIAGNOSTICS</div>
-                               <div className={`px-2 py-1 rounded text-[9px] font-bold uppercase border ${zenMode ? 'bg-zinc-900 border-zinc-700 text-zinc-400' : 'bg-green-500/10 border-green-500/20 text-green-400'}`}>Rank #{selectedNode.health_rank || '-'}</div>
+                           {/* UPDATED: Centered Header & Rank */}
+                           <div className="w-full flex flex-col items-center mb-6">
+                               <div className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest mb-3">DIAGNOSTICS</div>
+                               <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border mb-1 ${zenMode ? 'bg-zinc-900 border-zinc-700 text-zinc-300' : 'bg-green-500/10 border-green-500/20 text-green-400'}`}>
+                                  Global Rank #{healthRank || '-'}
+                               </div>
+                               <div className="text-[9px] font-bold text-zinc-600">
+                                  Better than <span className={zenMode ? 'text-zinc-400' : 'text-green-500'}>{betterThanPercent}%</span> of network
+                               </div>
                            </div>
 
                            {/* Main Gauge */}
@@ -337,8 +349,8 @@ export const InspectorModal = ({
                                <Minimize2 size={14} className="text-zinc-500"/>
                            </div>
                            <div className="flex justify-between items-end px-1 mb-6 relative z-10">
-                               <div className="text-left"><div className={`text-2xl font-black ${zenMode ? 'text-white' : 'text-blue-400'}`}>{formatBytes(selectedNode.storage_used || 0)}</div><div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Used Space</div></div>
-                               <div className="text-right"><div className={`text-2xl font-black ${zenMode ? 'text-zinc-300' : 'text-purple-400'}`}>{formatBytes(nodeCap)}</div><div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Committed</div></div>
+                                <div className="text-left"><div className={`text-2xl font-black ${zenMode ? 'text-white' : 'text-blue-400'}`}>{formatBytes(selectedNode.storage_used || 0)}</div><div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Used Space</div></div>
+                                <div className="text-right"><div className={`text-2xl font-black ${zenMode ? 'text-zinc-300' : 'text-purple-400'}`}>{formatBytes(nodeCap)}</div><div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Committed</div></div>
                            </div>
                            
                            {/* BAR CHART WITH LABELS */}
@@ -530,7 +542,7 @@ export const InspectorModal = ({
                                 <MapPin size={24} className={`${zenMode ? 'text-zinc-800' : 'text-blue-500/30'} drop-shadow-none`} />
                             </div>
                             <div className="flex justify-between items-start relative z-10 w-full"><div className="flex items-center gap-1.5"><Globe size={18} className={`${zenMode ? 'text-zinc-500' : 'text-blue-500'} relative z-10`}/><span className="text-[9px] font-bold uppercase text-zinc-500 leading-tight">PHYSICAL LAYER</span></div></div>
-                            <div className="relative z-10 flex flex-col h-full justify-between pb-3 pt-2"><div className="text-[10px] font-mono text-zinc-400 truncate w-full">{getSafeIp(selectedNode)}</div><div className="flex items-center gap-2 text-[10px] font-bold text-white leading-none"><span className={`text-lg ${zenMode ? 'grayscale' : ''}`}>{getFlagEmoji(selectedNode.location?.countryCode)}</span><span>{selectedNode.location?.countryName || 'Unknown'}</span></div></div>
+                            <div className="relative z-10 flex flex-col h-full justify-between pb-3 pt-2"><div className="text-[10px] font-mono text-zinc-400 truncate w-full">{getSafeIp(selectedNode)}</div><div className="flex items-center gap-2 text-sm font-bold text-white"><span className={`text-lg ${zenMode ? 'grayscale' : ''}`}>{getFlagEmoji(selectedNode.location?.countryCode)}</span><span>{selectedNode.location?.countryName || 'Unknown'}</span></div></div>
                         </Link>
                     </div>
 
