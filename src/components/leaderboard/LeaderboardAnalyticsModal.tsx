@@ -20,7 +20,9 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
 
   // 1. Calculate Ticker Changes (Current vs Start of Timeframe)
   const changes = useMemo(() => {
-      if (!history || history.length < 2) return { credits: 0, avg: 0, dom: 0 };
+      // 👇 FIX: Added 'creditsPct: 0' to this fallback object so it is never undefined
+      if (!history || history.length < 2) return { credits: 0, creditsPct: 0, avg: 0, dom: 0 };
+      
       const start = history[0];
       const end = history[history.length - 1];
       return {
@@ -35,7 +37,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
   const dailyVelocity = useMemo(() => {
       if (!history || history.length < 2) return 0;
       const totalChange = history[history.length - 1].avg_credits - history[0].avg_credits;
-      const days = history.length; // Approximate
+      const days = history.length; 
       return days > 0 ? Math.round(totalChange / days) : 0;
   }, [history]);
 
