@@ -22,28 +22,27 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
   const [reliabilityScore, setReliabilityScore] = useState(100);
 
   useEffect(() => {
-    // 1. Cleanup Flag (Prevents state updates if component unmounts)
+    // 1. Cleanup Flag
     let isMounted = true;
 
     // 2. Safety Check
     if (!node || !node.pubkey || !node.network) return;
 
-    // 3. Capture Immutable Variables (Version is excluded intentionally)
+    // 3. Capture Variables
     const targetNetwork = node.network;
     const targetPubkey = node.pubkey;
     const targetAddress = node.address || '0.0.0.0'; 
-    const targetIsPublic = node.is_public;
+    
+    // Note: We intentionally ignore node.version and node.is_public for the ID
 
     async function fetchNodeHistory() {
       setLoading(true);
 
-      // --- THE FIX: VERSION-AGNOSTIC ID ---
-      // Logic: [PublicKey]-[IP]-[IsPublic]-[Network]
-      // We strip the port (e.g., "1.2.3.4:9000" -> "1.2.3.4") to ensure IP stability
-      const ipOnly = targetAddress.includes(':') ? targetAddress.split(':')[0] : targetAddress;
+      // --- STABLE ID V2 ---
+      // Logic: [PublicKey]-[IP]-[Network]
       
-      // IMPORTANT: This ID format must match exactly what your Database Saver script uses.
-      const stableId = `${targetPubkey}-${ipOnly}-${targetIsPublic}-${targetNetwork}`;
+      const ipOnly = targetAddress.includes(':') ? targetAddress.split(':')[0] : targetAddress;
+      const stableId = `${targetPubkey}-${ipOnly}-${targetNetwork}`;
 
       let days = 7;
       if (timeRange === '24H') days = 1;
@@ -56,7 +55,7 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
       const { data, error } = await supabase
         .from('node_snapshots')
         .select('*') 
-        .eq('node_id', stableId) // Querying by the new stable ID
+        .eq('node_id', stableId)
         .eq('network', targetNetwork)
         .gte('created_at', startDate.toISOString()) 
         .order('created_at', { ascending: true });
@@ -95,7 +94,7 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
     fetchNodeHistory();
 
     return () => { isMounted = false; };
-  }, [node?.pubkey, node?.network, node?.address, node?.is_public, timeRange]);
+  }, [node?.pubkey, node?.network, node?.address, timeRange]);
 
   return { history, reliabilityScore, loading };
 };
