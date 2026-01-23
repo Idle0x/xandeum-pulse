@@ -39,6 +39,8 @@ export default function NodeTable({
   };
 
   const handleRowClick = (node: RankedNode) => {
+    // UI Key: Matches the "Unique Instance" logic.
+    // If IP changes, this ID changes, closing the old row and opening the new one.
     const compositeId = `${node.pubkey}-${node.network}-${node.address || 'no-ip'}`;
     setExpandedNode(expandedNode === compositeId ? null : compositeId);
   };
@@ -91,6 +93,7 @@ export default function NodeTable({
         <div className="divide-y-0 px-2 pb-2">
           {nodes.slice(0, visibleCount).map((node) => {
               const isMyNode = node.address && favorites.includes(node.address);
+              // Ensure uniqueness by PubKey + Network + Address
               const compositeId = `${node.pubkey}-${node.network}-${node.address || 'no-ip'}`;
               const isExpanded = expandedNode === compositeId; 
               const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
@@ -120,7 +123,7 @@ export default function NodeTable({
                   {/* EXPANDED DETAILS */}
                   {isExpanded && (
                       <div className="border-t border-zinc-800/50 p-3 md:p-4 animate-in slide-in-from-top-2 duration-200">
-                          
+
                           {/* 1. CONTROLS (Moved to Top) */}
                           <div className="flex flex-col gap-4 mb-4">
                               {/* MOBILE CONTROLS */}
