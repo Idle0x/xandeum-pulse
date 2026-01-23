@@ -73,8 +73,9 @@ export const DualAxisGrowthChart = ({ history, loading }: Props) => {
             contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }}
             itemStyle={{ padding: 0 }}
             labelFormatter={(label) => new Date(label).toLocaleDateString()}
-            formatter={(val: number, name: string) => [
-                name === 'earned' ? `+${val.toLocaleString()} Credits` : `#${val}`,
+            // FIX: Use 'any' to handle Recharts strict typing logic safely
+            formatter={(val: any, name: any) => [
+                name === 'earned' ? `+${Number(val).toLocaleString()} Credits` : `#${val}`,
                 name === 'earned' ? 'Daily Earnings' : 'Global Rank'
             ]}
           />
