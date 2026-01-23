@@ -5,7 +5,7 @@ import { useNodeHistory } from '../../hooks/useNodeHistory';
 import { DualAxisGrowthChart } from './DualAxisGrowthChart';
 
 const TIME_OPTIONS = [
-    { label: '24H', value: '24H' }, // Shortened labels for compact fit
+    { label: '24H', value: '24H' },
     { label: '3 Days', value: '3D' },
     { label: '7 Days', value: '7D' },
     { label: '30 Days', value: '30D' },
@@ -14,7 +14,8 @@ const TIME_OPTIONS = [
 
 export const ExpandedRowDetails = ({ node }: { node: Node }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [timeRange, setTimeRange] = useState<typeof TIME_OPTIONS[number]['value']>('30D');
+  // FIX: Default to 24H as requested
+  const [timeRange, setTimeRange] = useState<typeof TIME_OPTIONS[number]['value']>('24H');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const { history, loading } = useNodeHistory(isOpen ? node : undefined, timeRange);
@@ -49,7 +50,6 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
 
   return (
     <div className="border-t border-zinc-800/50 pt-0.5 mt-0.5 bg-gradient-to-b from-zinc-900/10 to-zinc-900/30">
-       {/* TOGGLE BUTTON: Reduced Height & Font */}
        <button 
          onClick={() => setIsOpen(!isOpen)} 
          className={`w-full flex items-center justify-center gap-2 py-1.5 text-[9px] font-bold uppercase tracking-widest transition-colors ${isOpen ? 'text-zinc-300' : 'text-zinc-600 hover:text-zinc-400'}`}
@@ -61,11 +61,8 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
        {isOpen && (
            <div className="px-2 pb-2 pt-1 animate-in slide-in-from-top-1 duration-200">
                
-               {/* TOP ROW: Dropdown & Ribbon Title */}
                <div className="flex justify-between items-center mb-1 relative z-20">
                    <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Consistency Map</span>
-                   
-                   {/* COMPACT DROPDOWN */}
                    <div className="relative">
                         <button 
                             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -91,17 +88,14 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                    </div>
                </div>
 
-               {/* BARCODE RIBBON: Tight Spacing */}
                <div className="h-4 w-full bg-black/40 rounded-sm border border-zinc-800/30 overflow-hidden mb-2">
                    <Ribbon />
                </div>
 
-               {/* CHART CONTAINER: Reduced Height (h-32 = 128px) */}
                <div className="h-32 border border-zinc-800/40 rounded-lg bg-black/20 p-2 relative">
                    <DualAxisGrowthChart history={history} loading={loading} />
                </div>
 
-               {/* FOOTER: NET POSITION CHANGE (Single Row, Bottom) */}
                <div className="flex items-center justify-between mt-2 pt-2 border-t border-zinc-800/30 px-1">
                     <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Net Position Change</span>
                     <div className="flex items-center gap-2">
