@@ -10,7 +10,7 @@ interface StatsOverviewProps {
 }
 
 export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }: StatsOverviewProps) {
-  // 1. Strict 24H Context for the "Live Ticker" feel
+  // 1. Strict 24H Context
   const { history, loading } = useNetworkHistory('24H');
 
   // 2. Current "Live" Stats
@@ -28,8 +28,8 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
       return (history && history.length > 0) ? history[0] : null; 
   }, [history]);
 
-  // --- SUB-COMPONENT: TICKER CARD ---
-  const TickerCard = ({ icon: Icon, label, value, subValue, deltaType, rawValue }: any) => {
+  // --- SUB-COMPONENT: COMPACT TICKER CARD ---
+  const TickerCard = ({ icon: Icon, label, value, subValue, deltaType, rawValue, valueColor = "text-white" }: any) => {
       let delta = 0;
       let pct = 0;
 
@@ -39,7 +39,6 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
           if (deltaType === 'AVG') delta = rawValue - (baseline.avg_credits || 0);
           if (deltaType === 'DOM') delta = rawValue - (baseline.top10_dominance || 0);
 
-          // Calculate Percentage Change
           const base = deltaType === 'COUNT' ? baseline.total_nodes : 
                        deltaType === 'CREDITS' ? baseline.total_credits :
                        deltaType === 'AVG' ? baseline.avg_credits :
@@ -50,42 +49,42 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
 
       const isPos = delta > 0;
       const isNeg = delta < 0;
-      const color = isPos ? 'text-green-500' : isNeg ? 'text-red-500' : 'text-zinc-500';
+      // UNIFIED COLOR: Entire ticker string uses this color
+      const trendColor = isPos ? 'text-green-500' : isNeg ? 'text-red-500' : 'text-zinc-500';
       const Arrow = isPos ? TrendingUp : isNeg ? TrendingDown : Minus;
 
       return (
         <div 
             onClick={onOpenAnalytics}
-            className="bg-zinc-900/40 border border-zinc-800/60 p-4 rounded-xl backdrop-blur-md cursor-pointer group hover:bg-zinc-900 hover:border-zinc-700 transition-all relative flex flex-col justify-between h-28"
+            className="bg-zinc-900/40 border border-zinc-800/60 p-3 rounded-lg backdrop-blur-md cursor-pointer group hover:bg-zinc-900 hover:border-zinc-700 transition-all flex flex-col justify-center min-h-[60px]"
         >
-            {/* Header: Label */}
-            <div className="flex items-center gap-2 mb-2">
-                <div className={`p-1.5 rounded-md bg-zinc-800/50 text-zinc-400 group-hover:text-white transition-colors`}>
-                    <Icon size={12} />
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">{label}</span>
+            {/* LABEL ROW */}
+            <div className="flex items-center gap-1.5 mb-0.5">
+                <Icon size={10} className="text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+                <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 group-hover:text-zinc-400 transition-colors">
+                    {label}
+                </span>
             </div>
 
-            {/* Body: Grid Layout for Value vs Ticker */}
-            <div className="mt-auto">
-                <div className="text-2xl font-black tracking-tight text-white font-mono">
+            {/* VALUE & TICKER ROW (Baseline Aligned) */}
+            <div className="flex items-baseline gap-2">
+                {/* Main Value */}
+                <div className={`text-lg font-black tracking-tight font-mono ${valueColor}`}>
                     {value}
                 </div>
                 
-                {/* Ticker Row */}
-                <div className="flex items-center gap-2 mt-1">
-                    {loading ? (
-                        <div className="h-3 w-12 bg-zinc-800 rounded animate-pulse"/>
-                    ) : (
+                {/* Ticker (Same Line) */}
+                <div className={`flex items-center gap-1 text-[9px] font-mono font-bold ${trendColor}`}>
+                    {!loading ? (
                         <>
-                            <div className={`flex items-center gap-1 text-[10px] font-bold ${color} bg-zinc-950/30 px-1.5 py-0.5 rounded border border-zinc-800/50`}>
-                                <Arrow size={10} strokeWidth={3} />
-                                <span>{Math.abs(pct).toFixed(2)}%</span>
-                            </div>
-                            <span className="text-[10px] text-zinc-600 font-mono">
-                                {delta > 0 ? '+' : ''}{subValue(delta)} (24h)
+                            <Arrow size={8} strokeWidth={3} />
+                            <span>{Math.abs(pct).toFixed(1)}%</span>
+                            <span className="opacity-60 font-medium">
+                                ({delta > 0 ? '+' : ''}{subValue(delta)})
                             </span>
                         </>
+                    ) : (
+                        <div className="h-2 w-8 bg-zinc-800 rounded animate-pulse"/>
                     )}
                 </div>
             </div>
@@ -95,39 +94,46 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
 
   if (nodes.length === 0) return null;
 
+  // Format Network Name for Label
+  const networkLabel = networkFilter === 'COMBINED' ? 'ALL' : networkFilter;
+
   return (
-    <div className="max-w-5xl mx-auto mb-6 grid grid-cols-2 md:grid-cols-4 gap-3 animate-in fade-in slide-in-from-top-4 duration-500">
+    <div className="max-w-5xl mx-auto mb-6 grid grid-cols-2 md:grid-cols-4 gap-2 animate-in fade-in slide-in-from-top-4 duration-500">
       <TickerCard 
           icon={Users} 
-          label="Active Nodes" 
+          label={`Nodes (${networkLabel})`} 
           value={current.count.toLocaleString()} 
           rawValue={current.count}
           deltaType="COUNT"
           subValue={(d: number) => d}
+          valueColor="text-white"
       />
       <TickerCard 
           icon={Wallet} 
-          label="Total Liquidity" 
+          label="Total Credits" 
           value={(current.totalCredits / 1_000_000).toFixed(2) + "M"} 
           rawValue={current.totalCredits}
           deltaType="CREDITS"
           subValue={(d: number) => (Math.abs(d)/1000).toFixed(1) + 'k'}
+          valueColor="text-yellow-500" // GOLD
       />
       <TickerCard 
           icon={Activity} 
-          label="Avg Wealth" 
+          label="Average Credits" 
           value={(current.avgCredits / 1000).toFixed(1) + "k"} 
           rawValue={current.avgCredits}
           deltaType="AVG"
           subValue={(d: number) => Math.abs(d).toLocaleString()}
+          valueColor="text-white"
       />
       <TickerCard 
           icon={BarChart3} 
-          label="Market Dominance" 
+          label="Top 10 Dominance" 
           value={current.dominance.toFixed(1) + "%"} 
           rawValue={current.dominance}
           deltaType="DOM"
-          subValue={(d: number) => Math.abs(d).toFixed(2) + '%'}
+          subValue={(d: number) => Math.abs(d).toFixed(1) + '%'}
+          valueColor="text-blue-500" // BLUE
       />
     </div>
   );
