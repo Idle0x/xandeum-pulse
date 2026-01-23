@@ -135,7 +135,6 @@ export const MarketHistoryChart = ({ nodes, themes, metric, hoveredNodeKey, onHo
                         itemStyle={{ padding: 0 }}
                         labelStyle={{ color: '#a1a1aa', marginBottom: '4px' }}
                         labelFormatter={(label) => new Date(label).toLocaleString()}
-                        // 👇 FIX: Changed 'name' to 'any' to handle undefined from Recharts types
                         formatter={(value: any, name: any) => {
                             const node = nodes.find(n => n.pubkey === name);
                             return [
@@ -145,6 +144,9 @@ export const MarketHistoryChart = ({ nodes, themes, metric, hoveredNodeKey, onHo
                         }}
                     />
                     {nodes.map((node, i) => {
+                        // 👇 SAFETY GUARD: If pubkey is missing, skip rendering this line
+                        if (!node.pubkey) return null;
+
                         const theme = themes[i % themes.length];
                         const isActive = hoveredNodeKey === node.pubkey;
                         const isDimmed = hoveredNodeKey && hoveredNodeKey !== node.pubkey;
