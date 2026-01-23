@@ -13,25 +13,26 @@ export const NodeDebugger = ({ node }: { node: Node }) => {
       if (!node) return;
       setLoading(true);
 
-      // 1. REPLICATE THE NEW ID LOGIC EXACTLY
-      // Logic: [PublicKey]-[IP]-[IsPublic]-[Network]
+      // 1. REPLICATE THE V2 ID LOGIC EXACTLY
+      // Logic: [PublicKey]-[IP]-[Network]
+      
       const ipOnly = node.address && node.address.includes(':') 
         ? node.address.split(':')[0] 
         : (node.address || '0.0.0.0');
       
       const network = node.network || 'MAINNET';
       
-      // Note: We intentionally exclude Version here
-      const stableId = `${node.pubkey}-${ipOnly}-${node.is_public}-${network}`;
+      // Removed: Version and IsPublic
+      const stableId = `${node.pubkey}-${ipOnly}-${network}`;
       setGeneratedId(stableId);
 
-      // 2. FETCH DATA (Strict Check)
+      // 2. FETCH DATA
       const response = await supabase
         .from('node_snapshots')
-        .select('created_at, credits, health, node_id') // Select specific fields
+        .select('created_at, credits, health, node_id') 
         .eq('node_id', stableId)
         .eq('network', network)
-        .order('created_at', { ascending: false }) // Get latest first
+        .order('created_at', { ascending: false }) 
         .limit(5);
 
       if (response.error) {
@@ -47,7 +48,7 @@ export const NodeDebugger = ({ node }: { node: Node }) => {
   return (
     <div className="mt-2 mb-2 p-3 bg-black/80 border border-fuchsia-500/50 rounded-lg text-[10px] font-mono shadow-xl animate-in fade-in slide-in-from-top-2">
       <div className="flex justify-between items-center mb-2 border-b border-zinc-800 pb-1">
-        <h3 className="text-fuchsia-400 font-bold">🕵️ ID MATCH DEBUGGER</h3>
+        <h3 className="text-fuchsia-400 font-bold">🕵️ ID MATCH DEBUGGER (V2)</h3>
         {loading && <span className="text-zinc-500 animate-pulse">Running Diagnostics...</span>}
       </div>
 
@@ -63,9 +64,9 @@ export const NodeDebugger = ({ node }: { node: Node }) => {
            <div className="grid grid-cols-2 gap-1 text-zinc-300">
              <span>IP: <span className="text-white">{node.address?.split(':')[0]}</span></span>
              <span>Net: <span className="text-white">{node.network}</span></span>
-             <span>Public: <span className={node.is_public ? 'text-green-400' : 'text-red-400'}>{String(node.is_public)}</span></span>
-             {/* Show Version just to prove we aren't using it for ID */}
-             <span className="opacity-50 strike-through decoration-zinc-500">Ver: {node.version} (Ignored)</span>
+             {/* Ignored Variables Struck Through */}
+             <span className="opacity-40 decoration-zinc-500 line-through">Public: {String(node.is_public)}</span>
+             <span className="opacity-40 decoration-zinc-500 line-through">Ver: {node.version}</span>
            </div>
         </div>
       </div>
@@ -96,11 +97,7 @@ export const NodeDebugger = ({ node }: { node: Node }) => {
              <div className="bg-red-900/10 border border-red-500/30 p-2 rounded text-red-400">
                <strong>❌ NO MATCH FOUND</strong>
                <p className="text-zinc-500 mt-1">
-                 The database contains 0 rows for this ID.
-                 <br/>
-                 1. Check if the backend script has run since the ID logic update.
-                 <br/>
-                 2. Verify if the database `node_id` column includes the version or port.
+                 Waiting for the next 30m Monitor Run to populate data with the new ID format.
                </p>
              </div>
           )}
