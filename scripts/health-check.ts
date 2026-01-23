@@ -7,7 +7,7 @@ const PULSE_API_URL = process.env.NEXT_PUBLIC_APP_URL
   : 'https://xandeum-pulse.vercel.app/api/stats';
 
 async function runMonitor() {
-  console.log("🏥 Starting Pulse Monitor...");
+  console.log("🏥 Starting Pulse Monitor (30m Interval)...");
 
   try {
     console.log(`2️⃣ Connecting to Pulse API: ${PULSE_API_URL}`);
@@ -43,29 +43,30 @@ async function runMonitor() {
 
     // --- NODE PROCESSING LOOP ---
     for (const n of nodes) {
-      // 1. Generate Deduplication Fingerprint (7-Point Strict)
-      // This is just to prevent adding the exact same node twice in the same batch
+      // 1. Generate Deduplication Fingerprint
+      // This ensures we don't save the exact same node twice in the SAME batch run
       const dedupKey = `${n.pubkey}|${n.address}|${n.is_public}|${n.storage_committed}|${n.storage_used}|${n.version}|${n.credits}`;
 
       if (seenFingerprints.has(dedupKey)) {
-        continue; // Skip exact duplicate
+        continue; 
       }
       seenFingerprints.add(dedupKey);
 
-      // 2. Generate Stable History ID (MATCHING FRONTEND)
-      // LOGIC: [PublicKey]-[IP]-[IsPublic]-[Network]
-      
-      // A. Strip Port from Address (ensure IP stability)
+      // 2. Generate Stable History ID (STRICT V2)
+      // LOGIC: [PublicKey]-[IP]-[Network]
+      // REMOVED: Version (Volatile), IsPublic (Volatile)
+
+      // A. Strip Port from Address to ensure IP stability
       const ipOnly = n.address ? n.address.split(':')[0] : '0.0.0.0';
-      
-      // B. Define Network (ensure it exists)
+
+      // B. Define Network
       const network = n.network || 'MAINNET';
 
-      // C. Construct ID (Must match useNodeHistory.ts exactly)
-      const stableId = `${n.pubkey}-${ipOnly}-${n.is_public}-${network}`;
+      // C. Construct ID
+      const stableId = `${n.pubkey}-${ipOnly}-${network}`;
 
       uniqueNodeRows.push({
-        node_id: stableId,
+        node_id: stableId, // <--- SAVING NEW STABLE FORMAT
         pubkey: n.pubkey,
         network: network,
         health: n.health || 0,
@@ -74,7 +75,6 @@ async function runMonitor() {
         storage_used: n.storage_used || 0,
         uptime: n.uptime || 0,
         rank: n.rank || 0,
-        // Ensure created_at is explicit
         created_at: new Date().toISOString() 
       });
     }
@@ -96,24 +96,22 @@ async function runMonitor() {
     const top10Sum = sortedByCredits.slice(0, 10).reduce((acc, n) => acc + n.credits, 0);
     const dominance = totalCredits > 0 ? (top10Sum / totalCredits) * 100 : 0;
 
-    // A. Insert Network Snapshot (Expanded)
+    // A. Insert Network Snapshot
     const { error: netError } = await supabase.from('network_snapshots').insert({
       total_capacity: rawCapacity, 
       total_used: rawUsed,
       total_nodes: uniqueNodeRows.length,
       avg_health: Math.round(avgHealth),
       consensus_score: 0,
-
-      // NEW FIELDS
       total_credits: totalCredits,
       avg_credits: avgCredits,
       top10_dominance: parseFloat(dominance.toFixed(2))
     });
 
     if (netError) console.error('❌ Network Snapshot Failed:', netError.message);
-    else console.log('✅ Network Snapshot Saved (with new metrics).');
+    else console.log('✅ Network Snapshot Saved.');
 
-    // B. Insert Node Snapshots (Batched)
+    // B. Insert Node Snapshots
     const { error: nodeError } = await supabase.from('node_snapshots').insert(uniqueNodeRows);
 
     if (nodeError) console.error('❌ Node Snapshots Failed:', nodeError.message);
