@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line } from 'recharts';
+import { useState, useMemo } from 'react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { HistoryTimeRange, NetworkHistoryPoint } from '../../../hooks/useNetworkHistory';
 import { ChevronDown, Loader2 } from 'lucide-react';
 import { formatBytes } from '../../../utils/formatters';
@@ -17,20 +17,37 @@ export const CapacityEvolutionChart = ({
   history, loading, timeRange, onTimeRangeChange, capacityKey, usedKey 
 }: CapacityEvolutionChartProps) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'COMMITTED' | 'USED'>('COMMITTED');
+
+  // Configuration based on active view
+  const config = useMemo(() => {
+    return viewMode === 'COMMITTED' 
+      ? { 
+          key: capacityKey, 
+          color: '#a855f7', // Purple
+          label: 'Capacity', 
+          gradientId: 'gradCommitted',
+          bg: 'bg-purple-500',
+          text: 'text-purple-400'
+        }
+      : { 
+          key: usedKey, 
+          color: '#3b82f6', // Blue
+          label: 'Used', 
+          gradientId: 'gradUsed',
+          bg: 'bg-blue-500',
+          text: 'text-blue-400'
+        };
+  }, [viewMode, capacityKey, usedKey]);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
         <div className="px-2 py-1.5 rounded bg-zinc-950 border border-zinc-800 shadow-xl text-[10px] backdrop-blur-md z-50">
           <div className="text-zinc-500 mb-1 font-mono">{new Date(label).toLocaleDateString(undefined, {month:'short', day:'numeric', hour:'numeric'})}</div>
-          <div className="flex flex-col gap-0.5">
-             {/* We need to safely find the correct payload based on dataKey since order might vary */}
-             {payload.map((p: any) => (
-                <div key={p.dataKey} className={`font-bold font-mono flex items-center gap-1.5 ${p.dataKey === capacityKey ? 'text-purple-400' : 'text-blue-400'}`}>
-                  <div className={`w-1.5 h-1.5 rounded-full ${p.dataKey === capacityKey ? 'bg-purple-500' : 'bg-blue-500'}`}></div>
-                  {formatBytes(p.value)} {p.dataKey === capacityKey ? 'Capacity' : 'Used'}
-                </div>
-             ))}
+          <div className={`font-bold font-mono flex items-center gap-1.5 ${config.text}`}>
+             <div className={`w-1.5 h-1.5 rounded-full ${config.bg}`}></div>
+             {formatBytes(payload[0].value)} {config.label}
           </div>
         </div>
       );
@@ -39,12 +56,30 @@ export const CapacityEvolutionChart = ({
   };
 
   return (
-    <div className="w-full h-full flex flex-col rounded-xl border border-zinc-800 bg-black/40 p-3 relative">
-      {/* Compact Header */}
+    <div className="w-full h-full flex flex-col rounded-xl border border-zinc-800 bg-black/40 p-3 relative transition-all duration-500">
+      {/* Header with Slick Toggle */}
       <div className="flex justify-between items-center mb-1 relative z-20 h-6 shrink-0">
-         <div className="flex items-center gap-2">
+         <div className="flex items-center gap-3">
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Evolution</span>
+            
+            {/* The Slick Toggle */}
+            <div className="flex bg-zinc-900/80 rounded border border-zinc-800/50 p-0.5">
+               <button 
+                  onClick={() => setViewMode('COMMITTED')}
+                  className={`px-2 py-0.5 text-[9px] font-bold rounded transition-all duration-300 ${viewMode === 'COMMITTED' ? 'bg-purple-500/20 text-purple-400 shadow-[0_0_10px_-4px_rgba(168,85,247,0.5)]' : 'text-zinc-600 hover:text-zinc-400'}`}
+               >
+                  Committed
+               </button>
+               <button 
+                  onClick={() => setViewMode('USED')}
+                  className={`px-2 py-0.5 text-[9px] font-bold rounded transition-all duration-300 ${viewMode === 'USED' ? 'bg-blue-500/20 text-blue-400 shadow-[0_0_10px_-4px_rgba(59,130,246,0.5)]' : 'text-zinc-600 hover:text-zinc-400'}`}
+               >
+                  Used
+               </button>
+            </div>
          </div>
+
+         {/* Time Range Dropdown */}
          <div className="relative">
             <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="flex items-center gap-1 px-2 py-0.5 rounded border border-zinc-800 bg-zinc-900/50 text-[9px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all">
                {timeRange === 'ALL' ? 'MAX' : timeRange}
@@ -68,9 +103,15 @@ export const CapacityEvolutionChart = ({
          <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={history} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
                <defs>
-                  <linearGradient id="capGrad" x1="0" y1="0" x2="0" y2="1">
-                     <stop offset="5%" stopColor="#a855f7" stopOpacity={0.2}/>
+                  {/* Purple Gradient (Committed) */}
+                  <linearGradient id="gradCommitted" x1="0" y1="0" x2="0" y2="1">
+                     <stop offset="5%" stopColor="#a855f7" stopOpacity={0.4}/>
                      <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
+                  </linearGradient>
+                  {/* Blue Gradient (Used) */}
+                  <linearGradient id="gradUsed" x1="0" y1="0" x2="0" y2="1">
+                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                   </linearGradient>
                </defs>
                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.5} />
@@ -86,25 +127,11 @@ export const CapacityEvolutionChart = ({
                   height={15}
                />
 
-               {/* LEFT Y-Axis: USED (Blue) */}
+               {/* Single Y Axis (Adapts to data) */}
                <YAxis 
-                  yAxisId="left"
-                  orientation="left"
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{fontSize: 9, fill: '#60a5fa', fontWeight: 600}} // Blue-400
-                  width={35} 
-                  tickFormatter={(val) => formatBytes(val).split(' ')[0]} 
-                  domain={['auto', 'auto']}
-               />
-
-               {/* RIGHT Y-Axis: CAPACITY (Purple) */}
-               <YAxis 
-                  yAxisId="right" 
-                  orientation="right" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fontSize: 9, fill: '#c084fc', fontWeight: 600}} // Purple-400
+                  tick={{fontSize: 9, fill: config.color, fontWeight: 600}} 
                   width={35} 
                   tickFormatter={(val) => formatBytes(val).split(' ')[0]} 
                   domain={['auto', 'auto']}
@@ -112,26 +139,16 @@ export const CapacityEvolutionChart = ({
 
                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3f3f46', strokeWidth: 1 }} />
                
-               {/* Capacity Area (Right Axis) */}
+               {/* Fluid Area Chart */}
                <Area 
-                  yAxisId="right" 
                   type="monotone" 
-                  dataKey={capacityKey} 
-                  stroke="#a855f7" 
+                  dataKey={config.key} 
+                  stroke={config.color} 
                   strokeWidth={1.5} 
-                  fill="url(#capGrad)" 
-                  isAnimationActive={false} 
-               />
-               
-               {/* Used Line (Left Axis) */}
-               <Line 
-                  yAxisId="left" 
-                  type="monotone" 
-                  dataKey={usedKey} 
-                  stroke="#3b82f6" 
-                  strokeWidth={1.5} 
-                  dot={false} 
-                  isAnimationActive={false} 
+                  fill={`url(#${config.gradientId})`} 
+                  isAnimationActive={true}
+                  animationDuration={1000}
+                  animationEasing="ease-in-out"
                />
             </AreaChart>
          </ResponsiveContainer>
