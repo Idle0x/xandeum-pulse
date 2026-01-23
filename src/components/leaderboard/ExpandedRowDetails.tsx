@@ -1,88 +1,131 @@
 import { useState, useMemo } from 'react';
-import { ChevronDown, ChevronUp, LineChart, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Node } from '../../types';
 import { useNodeHistory } from '../../hooks/useNodeHistory';
-import { VelocityRibbon } from './VelocityRibbon';
 import { DualAxisGrowthChart } from './DualAxisGrowthChart';
+
+const TIME_OPTIONS = [
+    { label: '24 Hours', value: '24H' },
+    { label: '3 Days', value: '3D' },
+    { label: '7 Days', value: '7D' },
+    { label: '30 Days', value: '30D' },
+    { label: 'All Time', value: 'ALL' },
+] as const;
 
 export const ExpandedRowDetails = ({ node }: { node: Node }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [timeRange, setTimeRange] = useState<'7D' | '30D' | 'ALL'>('30D'); // Default to 30D for better context
+  const [timeRange, setTimeRange] = useState<typeof TIME_OPTIONS[number]['value']>('30D');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const { history, loading } = useNodeHistory(isOpen ? node : undefined, timeRange);
 
-  // --- RIVALRY CALC (Rank Change) ---
-  const rankChange = useMemo(() => {
+  const netPositionChange = useMemo(() => {
       if (!history || history.length < 2) return 0;
-      const first = history[0].rank;
-      const last = history[history.length - 1].rank;
-      return first - last; // Positive means rank went down (improved), e.g. 50 -> 40 = +10
+      return history[0].rank - history[history.length - 1].rank; 
   }, [history]);
 
+  // BARCODE RENDERER (Clean, no gaps)
+  const Ribbon = () => {
+      if (loading) return <div className="w-full h-full bg-zinc-900/50 animate-pulse" />;
+      if (!history || history.length < 2) return <div className="w-full h-full bg-zinc-900/30" />;
+
+      return (
+        <div className="flex items-center justify-start h-full w-full overflow-hidden">
+            {history.slice(1).map((day, i) => {
+                const prev = history[i];
+                const earnedDelta = day.credits - prev.credits;
+                const earnedMore = earnedDelta > 0;
+                return (
+                    <div 
+                        key={i} 
+                        className={`flex-1 max-w-[4px] h-full ${earnedMore ? 'bg-emerald-500 opacity-80' : 'bg-zinc-800 opacity-50'} border-r border-black/20`}
+                        title={`${new Date(day.date).toLocaleDateString()}: +${earnedDelta}`}
+                    />
+                );
+            })}
+        </div>
+      );
+  };
+
   return (
-    <div className="border-t border-zinc-800 pt-2 mt-2">
-       {/* TOGGLE BUTTON */}
+    <div className="border-t border-zinc-800/50 pt-1 mt-1 bg-gradient-to-b from-zinc-900/10 to-zinc-900/30">
        <button 
          onClick={() => setIsOpen(!isOpen)} 
-         className={`w-full flex items-center justify-center gap-2 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors ${isOpen ? 'bg-zinc-800 text-white' : 'bg-transparent text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300'}`}
+         className={`w-full flex items-center justify-center gap-2 py-3 text-[10px] font-bold uppercase tracking-widest transition-colors ${isOpen ? 'text-zinc-300' : 'text-zinc-600 hover:text-zinc-400'}`}
        >
-          <LineChart size={12} />
-          {isOpen ? 'Hide Performance' : 'Show Performance & Rivalry'}
+          {isOpen ? 'Close Analysis' : 'Expand Performance Metrics'}
           {isOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
        </button>
 
        {isOpen && (
-           <div className="mt-4 animate-in slide-in-from-top-2 duration-300">
+           <div className="px-4 pb-6 pt-2 animate-in slide-in-from-top-2 duration-300">
                
-               {/* 1. HEADER & CONTROLS */}
-               <div className="flex justify-between items-end mb-4">
-                   {/* RIVALRY INDICATOR */}
-                   <div className="flex items-center gap-3">
-                       <div className={`text-2xl font-black ${rankChange > 0 ? 'text-green-500' : rankChange < 0 ? 'text-red-500' : 'text-zinc-500'}`}>
-                           {rankChange > 0 ? '+' : ''}{rankChange}
-                       </div>
-                       <div className="flex flex-col">
-                           <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Rivalry Index</span>
-                           <span className="text-[10px] text-zinc-500">
-                               {rankChange > 0 ? 'Positions Gained' : rankChange < 0 ? 'Positions Lost' : 'No Change'} in {timeRange}
-                           </span>
+               {/* CONTROLS HEADER */}
+               <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-6 border-b border-zinc-800/50 pb-4">
+                   
+                   {/* NET POSITION (Financial Metric) */}
+                   <div>
+                       <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Net Position Change</div>
+                       <div className="flex items-baseline gap-3">
+                           <div className={`text-2xl font-mono font-bold ${netPositionChange > 0 ? 'text-emerald-400' : netPositionChange < 0 ? 'text-rose-400' : 'text-zinc-500'}`}>
+                               {netPositionChange > 0 ? '+' : ''}{netPositionChange}
+                           </div>
+                           <div className="text-[10px] font-medium text-zinc-500">
+                               {netPositionChange > 0 ? 'Positions Gained' : netPositionChange < 0 ? 'Positions Lost' : 'Unchanged'}
+                           </div>
                        </div>
                    </div>
 
-                   {/* TIME SELECTOR */}
-                   <div className="flex bg-zinc-900 rounded-lg p-0.5 border border-zinc-800">
-                       {['7D', '30D', 'ALL'].map((t) => (
-                           <button 
-                               key={t}
-                               onClick={() => setTimeRange(t as any)}
-                               className={`px-3 py-1 text-[9px] font-bold uppercase rounded-md transition ${timeRange === t ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-                           >
-                               {t}
-                           </button>
-                       ))}
+                   {/* TIMEFRAME DROPDOWN (UI Component) */}
+                   <div className="relative z-20">
+                        <button 
+                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                            className="flex items-center justify-between gap-3 px-3 py-2 bg-zinc-950 border border-zinc-800 hover:border-zinc-600 text-[10px] font-bold text-zinc-300 rounded transition-all min-w-[140px] uppercase tracking-wider"
+                        >
+                            <span>{TIME_OPTIONS.find(o => o.value === timeRange)?.label}</span>
+                            <ChevronDown size={12} className={`transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}/>
+                        </button>
+                        
+                        {isDropdownOpen && (
+                            <div className="absolute right-0 top-full mt-1 w-full bg-zinc-950 border border-zinc-800 rounded shadow-xl overflow-hidden py-1">
+                                {TIME_OPTIONS.map((opt) => (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => { setTimeRange(opt.value); setIsDropdownOpen(false); }}
+                                        className={`w-full text-left px-3 py-2 text-[10px] font-bold uppercase tracking-wider hover:bg-zinc-900 ${timeRange === opt.value ? 'text-white bg-zinc-900' : 'text-zinc-500'}`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                    </div>
                </div>
 
-               {/* 2. VELOCITY RIBBON (Subtle Background Style) */}
+               {/* BARCODE RIBBON */}
                <div className="mb-6">
-                   <div className="flex justify-between items-center mb-1.5 px-1">
-                       <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Earning Velocity (Daily)</span>
-                       <span className="text-[9px] text-zinc-600 font-mono">Heatmap</span>
+                   <div className="flex justify-between items-center mb-2">
+                       <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Earning Consistency (Heatmap)</span>
                    </div>
-                   <div className="h-6 w-full opacity-80 hover:opacity-100 transition-opacity">
-                       <VelocityRibbon history={history} loading={loading} />
+                   <div className="h-5 w-full bg-black/40 rounded-sm border border-zinc-800/30 overflow-hidden">
+                       <Ribbon />
                    </div>
                </div>
 
-               {/* 3. DUAL AXIS CHART (Tall) */}
-               <div className="h-48 md:h-56 border border-zinc-800 rounded-xl bg-black/20 p-3 relative">
-                   <div className="absolute top-3 left-3 text-[9px] font-bold text-zinc-500 uppercase tracking-wider z-10 flex gap-4">
-                       <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-yellow-500"></div> Earnings</span>
-                       <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500"></div> Rank</span>
+               {/* DUAL AXIS CHART */}
+               <div className="h-64 border border-zinc-800/40 rounded-lg bg-black/20 p-4 relative">
+                   <div className="absolute top-4 left-4 flex gap-6 z-10">
+                       <div className="flex items-center gap-2">
+                           <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                           <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Yield</span>
+                       </div>
+                       <div className="flex items-center gap-2">
+                           <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                           <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Rank</span>
+                       </div>
                    </div>
                    <DualAxisGrowthChart history={history} loading={loading} />
                </div>
-
            </div>
        )}
     </div>
