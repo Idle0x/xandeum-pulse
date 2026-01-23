@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, Eye, EyeOff, Bug } from 'lucide-react';
 import { Node } from '../../types';
 import { useNodeHistory } from '../../hooks/useNodeHistory';
 import { DualAxisGrowthChart } from './DualAxisGrowthChart';
-import { NodeDebugger } from './NodeDebugger'; // <--- IMPORT THE DEBUGGER
+import { NodeDebugger } from '../debug/NodeDebugger';
 
 const TIME_OPTIONS = [
     { label: '24H', value: '24H' },
