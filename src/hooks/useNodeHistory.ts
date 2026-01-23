@@ -22,20 +22,28 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
   const [reliabilityScore, setReliabilityScore] = useState(100);
 
   useEffect(() => {
-    // 1. Safety Check & Capture Variables
+    // 1. Cleanup Flag (Prevents state updates if component unmounts)
+    let isMounted = true;
+
+    // 2. Safety Check
     if (!node || !node.pubkey || !node.network) return;
-    
-    // Capture these locally so the async function knows they are defined
+
+    // 3. Capture Immutable Variables (Version is excluded intentionally)
     const targetNetwork = node.network;
-    const targetVersion = node.version || '0.0.0';
     const targetPubkey = node.pubkey;
-    const targetAddress = node.address;
+    const targetAddress = node.address || '0.0.0.0'; 
     const targetIsPublic = node.is_public;
 
     async function fetchNodeHistory() {
       setLoading(true);
 
-      const stableId = `${targetPubkey}-${targetAddress}-${targetVersion}-${targetIsPublic}`;
+      // --- THE FIX: VERSION-AGNOSTIC ID ---
+      // Logic: [PublicKey]-[IP]-[IsPublic]-[Network]
+      // We strip the port (e.g., "1.2.3.4:9000" -> "1.2.3.4") to ensure IP stability
+      const ipOnly = targetAddress.includes(':') ? targetAddress.split(':')[0] : targetAddress;
+      
+      // IMPORTANT: This ID format must match exactly what your Database Saver script uses.
+      const stableId = `${targetPubkey}-${ipOnly}-${targetIsPublic}-${targetNetwork}`;
 
       let days = 7;
       if (timeRange === '24H') days = 1;
@@ -48,10 +56,12 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
       const { data, error } = await supabase
         .from('node_snapshots')
         .select('*') 
-        .eq('node_id', stableId)
-        .eq('network', targetNetwork) // <--- FIX: Use the captured local variable
+        .eq('node_id', stableId) // Querying by the new stable ID
+        .eq('network', targetNetwork)
         .gte('created_at', startDate.toISOString()) 
         .order('created_at', { ascending: true });
+
+      if (!isMounted) return;
 
       if (error) {
         console.error("Node History Error:", error);
@@ -83,7 +93,9 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
     }
 
     fetchNodeHistory();
-  }, [node, timeRange]);
+
+    return () => { isMounted = false; };
+  }, [node?.pubkey, node?.network, node?.address, node?.is_public, timeRange]);
 
   return { history, reliabilityScore, loading };
 };
