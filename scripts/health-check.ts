@@ -40,11 +40,11 @@ async function runMonitor() {
     // Calculate Raw Totals (Pre-Dedup)
     const rawCapacity = nodes.reduce((acc: number, n: any) => acc + (n.storage_committed || 0), 0);
     const rawUsed = nodes.reduce((acc: number, n: any) => acc + (n.storage_used || 0), 0);
-    
+
     // --- NODE PROCESSING LOOP ---
     for (const n of nodes) {
       // 1. Generate Deduplication Fingerprint (7-Point Strict)
-      // If two nodes match this exactly, they are duplicates.
+      // This is just to prevent adding the exact same node twice in the same batch
       const dedupKey = `${n.pubkey}|${n.address}|${n.is_public}|${n.storage_committed}|${n.storage_used}|${n.version}|${n.credits}`;
 
       if (seenFingerprints.has(dedupKey)) {
@@ -53,29 +53,34 @@ async function runMonitor() {
       seenFingerprints.add(dedupKey);
 
       // 2. Generate Stable History ID (MATCHING FRONTEND)
-      // OLD: {PUBKEY}-{ADDRESS}-{IS_PUBLIC}-{COMMITTED}
-      // NEW: {PUBKEY}-{ADDRESS}-{VERSION}-{IS_PUBLIC}
+      // LOGIC: [PublicKey]-[IP]-[IsPublic]-[Network]
       
-      const versionSafe = n.version || '0.0.0'; // Safety Fallback
-      const stableId = `${n.pubkey}-${n.address}-${versionSafe}-${n.is_public}`;
+      // A. Strip Port from Address (ensure IP stability)
+      const ipOnly = n.address ? n.address.split(':')[0] : '0.0.0.0';
+      
+      // B. Define Network (ensure it exists)
+      const network = n.network || 'MAINNET';
+
+      // C. Construct ID (Must match useNodeHistory.ts exactly)
+      const stableId = `${n.pubkey}-${ipOnly}-${n.is_public}-${network}`;
 
       uniqueNodeRows.push({
         node_id: stableId,
         pubkey: n.pubkey,
-        network: n.network || 'MAINNET',
+        network: network,
         health: n.health || 0,
         credits: n.credits || 0,
         storage_committed: n.storage_committed || 0,
         storage_used: n.storage_used || 0,
         uptime: n.uptime || 0,
         rank: n.rank || 0,
-        // Ensure created_at is explicit if DB defaults fail
+        // Ensure created_at is explicit
         created_at: new Date().toISOString() 
       });
     }
 
     // --- NEW METRIC CALCULATIONS ---
-    
+
     // 1. Basic Health/Storage
     const validHealthNodes = uniqueNodeRows.filter((n: any) => n.health > 0);
     const avgHealth = validHealthNodes.length > 0 
@@ -93,18 +98,18 @@ async function runMonitor() {
 
     // A. Insert Network Snapshot (Expanded)
     const { error: netError } = await supabase.from('network_snapshots').insert({
-      total_capacity: rawCapacity, // Use raw or deduplicated depending on preference
+      total_capacity: rawCapacity, 
       total_used: rawUsed,
       total_nodes: uniqueNodeRows.length,
       avg_health: Math.round(avgHealth),
       consensus_score: 0,
-      
+
       // NEW FIELDS
       total_credits: totalCredits,
       avg_credits: avgCredits,
       top10_dominance: parseFloat(dominance.toFixed(2))
     });
-    
+
     if (netError) console.error('❌ Network Snapshot Failed:', netError.message);
     else console.log('✅ Network Snapshot Saved (with new metrics).');
 
