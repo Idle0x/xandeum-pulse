@@ -11,9 +11,10 @@ import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { OverviewLegend, UnifiedLegend } from './ComparisonLegends';
 import { generateNarrative } from '../../lib/narrative-engine';
 import { useNodeHistory } from '../../hooks/useNodeHistory';
-
-// FIX: Added this missing import
 import { formatUptimePrecise } from './MicroComponents';
+
+// 👇 NEW IMPORT: The History Chart Component
+import { MarketHistoryChart } from './MarketHistoryChart';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -227,6 +228,8 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
         )}
 
         <div className={`flex-1 overflow-hidden relative flex flex-col ${isExport ? 'pt-6' : 'pt-24'}`} onClick={() => { setFocusedSection(null); setLocalFocusedNodeKey(null); }}>
+            
+            {/* OVERVIEW TAB */}
             {tab === 'OVERVIEW' && (
                 <>
                 <div className="grid grid-cols-2 grid-rows-2 gap-4 md:gap-6 p-4 md:p-6 h-full">
@@ -277,15 +280,17 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                 </>
             )}
 
+            {/* MARKET SHARE TAB (UPDATED WITH SPLIT VIEW) */}
             {tab === 'MARKET' && (
                 <>
-                    <div className="relative flex flex-col flex-1">
-                        <div className="absolute top-0 right-4 md:right-8 z-20" ref={metricDropdownRef}>
-                            <button onClick={(e) => { e.stopPropagation(); setIsMetricDropdownOpen(!isMetricDropdownOpen); }} className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 rounded-lg text-[10px] md:text-xs font-bold uppercase transition">
-                                <span className="opacity-50">Analyzing:</span> {marketMetric} <ChevronDown size={12} className="md:w-3.5 md:h-3.5" />
+                    <div className="relative flex flex-col flex-1 h-full">
+                        {/* METRIC SELECTOR (Moved to top-left for better hierarchy) */}
+                        <div className="absolute top-4 left-4 z-20" ref={metricDropdownRef}>
+                             <button onClick={(e) => { e.stopPropagation(); setIsMetricDropdownOpen(!isMetricDropdownOpen); }} className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 rounded-lg text-[10px] md:text-xs font-bold uppercase transition shadow-xl">
+                                <span className="opacity-50">Metric:</span> {marketMetric} <ChevronDown size={12} className="md:w-3.5 md:h-3.5" />
                             </button>
                             {isMetricDropdownOpen && (
-                                <div className="absolute top-full right-0 mt-2 w-48 bg-[#09090b] border border-zinc-800 rounded-xl shadow-2xl overflow-hidden flex flex-col z-30">
+                                <div className="absolute top-full left-0 mt-2 w-48 bg-[#09090b] border border-zinc-800 rounded-xl shadow-2xl overflow-hidden flex flex-col z-30">
                                     {['storage', 'credits', 'health', 'uptime'].map(m => (
                                         <button key={m} onClick={(e) => { e.stopPropagation(); setMarketMetric(m as any); setIsMetricDropdownOpen(false); }} className={`px-4 py-3 text-xs font-bold text-left uppercase hover:bg-zinc-800 transition ${marketMetric === m ? 'text-white bg-zinc-800' : 'text-zinc-400'}`}>
                                             {m}
@@ -294,37 +299,61 @@ export const SynthesisEngine = ({ nodes, themes, networkScope, benchmarks, hover
                                 </div>
                             )}
                         </div>
-                        <div className="flex-1 flex items-center justify-center p-8">
-                            {marketMetric !== 'health' ? (
-                                <div className="flex flex-col items-center gap-6 animate-in zoom-in-50 duration-500">
-                                    <div className="w-56 h-56 md:w-72 md:h-72 rounded-full relative flex items-center justify-center shadow-[0_0_50px_rgba(0,0,0,0.5)] transition-all" style={{ background: getConicGradient(marketMetric) }}>
+
+                        {/* SPLIT VIEW LAYOUT */}
+                        <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-4 lg:p-8 gap-8 h-full">
+                            
+                            {/* LEFT: PIE CHART (Current State) */}
+                            <div className="w-full lg:w-[40%] flex items-center justify-center relative">
+                                {marketMetric !== 'health' ? (
+                                    <div className="w-56 h-56 md:w-72 md:h-72 rounded-full relative flex items-center justify-center shadow-[0_0_50px_rgba(0,0,0,0.3)] transition-all animate-in zoom-in-50 duration-500" style={{ background: getConicGradient(marketMetric) }}>
                                         <div className="w-44 h-44 md:w-56 md:h-56 bg-[#050505] rounded-full flex flex-col items-center justify-center z-10 shadow-inner border border-white/5 p-4 text-center">
                                             {marketMetric === 'storage' && <Database size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
                                             {marketMetric === 'credits' && <Zap size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
                                             {marketMetric === 'uptime' && <Clock size={24} className="md:w-8 md:h-8 text-zinc-600 mb-2" />}
                                             <span className="text-xs md:text-sm font-bold text-zinc-400 tracking-widest uppercase mb-1">{marketMetric} Share</span>
-                                            <span className="text-[10px] md:text-xs text-zinc-600 font-mono text-center">{(activeHoverKey || focusedNodeKey) ? getSafeIp(nodes.find(n => n.pubkey === (activeHoverKey || focusedNodeKey))!) : 'Aggregated Fleet'}</span>
+                                            <span className="text-[10px] md:text-xs text-zinc-600 font-mono text-center">
+                                                {(activeHoverKey || focusedNodeKey) 
+                                                    ? getSafeIp(nodes.find(n => n.pubkey === (activeHoverKey || focusedNodeKey))!) 
+                                                    : 'Aggregated Fleet'}
+                                            </span>
                                         </div>
                                     </div>
-                                </div>
-                            ) : (
-                                <div className="w-full max-w-3xl flex flex-col gap-4 animate-in slide-in-from-bottom-10 duration-500">
-                                    {nodes.map((n, i) => (
-                                        <div key={n.pubkey} onMouseEnter={() => handleHover(n.pubkey || null)} onMouseLeave={() => handleHover(null)} className={`flex items-center gap-4 transition-all duration-300 cursor-pointer ${getElementStyle(n.pubkey || null)} ${!isDense ? 'justify-center' : ''}`} onClick={(e) => { e.stopPropagation(); setLocalFocusedNodeKey(n.pubkey || null); }}>
-                                            <span className="text-xs font-mono font-bold text-zinc-400 w-32 text-right truncate">{getSafeIp(n)}</span>
-                                            <div className={`${marketBarWidth} h-8 bg-zinc-900 rounded-full overflow-hidden relative border border-white/5`}><div className="h-full rounded-full transition-all duration-1000" style={{ width: `${n.health}%`, backgroundColor: themes[i % themes.length].hex }}></div></div>
-                                            <span className="text-xs font-bold text-white font-mono w-16 text-left">{n.health} / 100</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                                ) : (
+                                    <div className="w-full max-w-sm flex flex-col gap-3 animate-in slide-in-from-bottom-10 duration-500 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
+                                        {nodes.map((n, i) => (
+                                            <div key={n.pubkey} onMouseEnter={() => handleHover(n.pubkey || null)} onMouseLeave={() => handleHover(null)} className={`flex items-center gap-3 transition-all duration-300 cursor-pointer ${getElementStyle(n.pubkey || null)}`} onClick={(e) => { e.stopPropagation(); setLocalFocusedNodeKey(n.pubkey || null); }}>
+                                                <span className="text-[10px] font-mono font-bold text-zinc-400 w-24 text-right truncate">{getSafeIp(n)}</span>
+                                                <div className="flex-1 h-6 bg-zinc-900 rounded-full overflow-hidden relative border border-white/5">
+                                                    <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${n.health}%`, backgroundColor: themes[i % themes.length].hex }}></div>
+                                                </div>
+                                                <span className="text-[10px] font-bold text-white font-mono w-12 text-left">{n.health}%</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* RIGHT: HISTORY CHART (New Timeline) */}
+                            <div className="w-full lg:w-[60%] h-[300px] lg:h-full min-h-[300px] animate-in slide-in-from-right-4 duration-500">
+                                <MarketHistoryChart 
+                                    nodes={nodes} 
+                                    themes={themes} 
+                                    metric={marketMetric} 
+                                    hoveredNodeKey={activeHoverKey}
+                                    onHover={handleHover}
+                                />
+                            </div>
+
                         </div>
                     </div>
+                    
                     <UnifiedLegend nodes={nodes} themes={themes} metricMode="METRIC" specificMetric={marketMetric} hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => setLocalFocusedNodeKey(n.pubkey || null)} />
                     {!isExport && <InterpretationPanel contextText={narrative} />}
                 </>
             )}
 
+            {/* TOPOLOGY TAB */}
             {tab === 'TOPOLOGY' && (
                 <div className="flex flex-col h-full relative group/map">
                     {!isExport && (
