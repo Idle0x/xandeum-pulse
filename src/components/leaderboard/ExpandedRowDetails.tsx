@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
-import { ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, Bug } from 'lucide-react';
 import { Node } from '../../types';
 import { useNodeHistory } from '../../hooks/useNodeHistory';
 import { DualAxisGrowthChart } from './DualAxisGrowthChart';
+import { NodeDebugger } from './NodeDebugger'; // <--- IMPORT THE DEBUGGER
 
 const TIME_OPTIONS = [
     { label: '24H', value: '24H' },
@@ -16,11 +17,14 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [timeRange, setTimeRange] = useState<typeof TIME_OPTIONS[number]['value']>('24H');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  
-  // 1. CHANGE: Default 'showRank' to false
+
+  // Chart Controls
   const [chartMode, setChartMode] = useState<'ACCUMULATION' | 'VELOCITY'>('ACCUMULATION');
   const [isModeDropdownOpen, setIsModeDropdownOpen] = useState(false);
   const [showRank, setShowRank] = useState(false); 
+  
+  // Debug State
+  const [showDebug, setShowDebug] = useState(false);
 
   const { history, loading } = useNodeHistory(isOpen ? node : undefined, timeRange);
 
@@ -72,10 +76,23 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
 
        {isOpen && (
            <div className="px-2 pb-2 pt-1 animate-in slide-in-from-top-1 duration-200">
-               
+
+               {/* DEBUGGER INJECTION */}
+               {showDebug && <NodeDebugger node={node} />}
+
                {/* TOP CONTROLS */}
                <div className="flex justify-between items-center mb-1 relative z-30">
-                   <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Consistency Map</span>
+                   <div className="flex items-center gap-2">
+                       <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Consistency Map</span>
+                       <button 
+                         onClick={() => setShowDebug(!showDebug)}
+                         className={`p-0.5 rounded hover:bg-zinc-800 transition ${showDebug ? 'text-fuchsia-500' : 'text-zinc-700'}`}
+                         title="Toggle ID Debugger"
+                       >
+                         <Bug size={10} />
+                       </button>
+                   </div>
+                   
                    <div className="relative">
                         <button 
                             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -120,7 +137,6 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                             onClick={() => setIsModeDropdownOpen(!isModeDropdownOpen)}
                             className="flex items-center gap-1 text-[8px] font-bold uppercase tracking-widest text-zinc-500 hover:text-yellow-500 transition-colors"
                        >
-                            {/* 2. CHANGE: Label Update */}
                             {chartMode === 'ACCUMULATION' ? 'Total Accumulation' : 'Yield Velocity'}
                             <ChevronDown size={10} className={`transition-transform duration-200 ${isModeDropdownOpen ? 'rotate-180' : ''}`}/>
                        </button>
