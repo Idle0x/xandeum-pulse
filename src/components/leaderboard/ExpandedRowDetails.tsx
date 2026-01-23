@@ -17,20 +17,18 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
   const [timeRange, setTimeRange] = useState<typeof TIME_OPTIONS[number]['value']>('24H');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
-  // NEW STATES FOR CHART CONTROLS
+  // 1. CHANGE: Default 'showRank' to false
   const [chartMode, setChartMode] = useState<'ACCUMULATION' | 'VELOCITY'>('ACCUMULATION');
   const [isModeDropdownOpen, setIsModeDropdownOpen] = useState(false);
-  const [showRank, setShowRank] = useState(true);
+  const [showRank, setShowRank] = useState(false); 
 
   const { history, loading } = useNodeHistory(isOpen ? node : undefined, timeRange);
 
-  // 1. NETWORK FILTER
   const cleanHistory = useMemo(() => {
       if (!history) return [];
       return history.filter((h: any) => h.network ? h.network === node.network : true);
   }, [history, node.network]);
 
-  // 2. CALCULATE NET CHANGES
   const stats = useMemo(() => {
       if (!cleanHistory || cleanHistory.length < 2) return { rankChange: 0, creditChange: 0 };
       const first = cleanHistory[0];
@@ -107,24 +105,23 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                    <Ribbon />
                </div>
 
-               {/* NEW: CHART CONTROLS (Above Chart) */}
+               {/* CHART CONTROLS */}
                <div className="flex justify-between items-center mb-1 px-1 relative z-20">
-                   {/* Left: Hide Rank Toggle */}
                    <button 
                        onClick={() => setShowRank(!showRank)}
-                       className="flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest text-zinc-500 hover:text-blue-400 transition-colors"
+                       className={`flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest transition-colors ${showRank ? 'text-blue-400' : 'text-zinc-600 hover:text-zinc-400'}`}
                    >
                        {showRank ? <Eye size={10} /> : <EyeOff size={10} />}
-                       {showRank ? 'Rank Visible' : 'Rank Hidden'}
+                       {showRank ? 'Rank Visible' : 'Show Rank'}
                    </button>
 
-                   {/* Right: Mode Dropdown */}
                    <div className="relative">
                        <button 
                             onClick={() => setIsModeDropdownOpen(!isModeDropdownOpen)}
                             className="flex items-center gap-1 text-[8px] font-bold uppercase tracking-widest text-zinc-500 hover:text-yellow-500 transition-colors"
                        >
-                            {chartMode === 'ACCUMULATION' ? 'Total Accumulation' : 'Daily Velocity'}
+                            {/* 2. CHANGE: Label Update */}
+                            {chartMode === 'ACCUMULATION' ? 'Total Accumulation' : 'Yield Velocity'}
                             <ChevronDown size={10} className={`transition-transform duration-200 ${isModeDropdownOpen ? 'rotate-180' : ''}`}/>
                        </button>
 
@@ -134,24 +131,22 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                                    Total Accumulation
                                </button>
                                <button onClick={() => { setChartMode('VELOCITY'); setIsModeDropdownOpen(false); }} className={`w-full text-left px-2 py-1.5 text-[8px] font-bold uppercase tracking-wider hover:bg-zinc-900 ${chartMode === 'VELOCITY' ? 'text-yellow-500 bg-zinc-900' : 'text-zinc-500'}`}>
-                                   Daily Velocity
+                                   Yield Velocity
                                </button>
                            </div>
                        )}
                    </div>
                </div>
 
-               {/* CHART CONTAINER */}
                <div className="h-32 border border-zinc-800/40 rounded-lg bg-black/20 p-1 relative">
                    <DualAxisGrowthChart 
                         history={cleanHistory} 
                         loading={loading} 
-                        mode={chartMode}    // Pass Mode
-                        showRank={showRank} // Pass Visibility
+                        mode={chartMode}    
+                        showRank={showRank} 
                     />
                </div>
 
-               {/* FOOTER */}
                <div className="flex items-center justify-between mt-2 pt-2 border-t border-zinc-800/30 px-1">
                     <div className="flex items-center gap-2">
                         <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">({timeRange}) Rank Change</span>
