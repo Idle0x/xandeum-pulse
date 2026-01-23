@@ -24,7 +24,7 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
   // Sparkline data (Fixed 30D for trend context)
   const { history: trendHistory, loading: trendLoading } = useNetworkHistory('30D');
 
-  // --- NEW: Dynamic Key Logic ---
+  // --- Dynamic Key Logic ---
   const consensusKey: keyof NetworkHistoryPoint = 
     activeTab === 'MAINNET' ? 'mainnet_consensus_score' : 
     activeTab === 'DEVNET' ? 'devnet_consensus_score' : 
@@ -176,7 +176,6 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                 loading={convLoading} 
                 timeRange={timeRange} 
                 onTimeRangeChange={setTimeRange}
-                // NEW: Pass the dynamic key
                 dataKey={consensusKey}
              />
           </div>
@@ -185,6 +184,7 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
              
              {/* PIPELINE STATE */}
+             {/* Keeping h-24 here but can match sibling if needed. Keeping as is per request. */}
              <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 h-24 flex flex-col">
                 <div className="text-[9px] text-zinc-500 uppercase font-bold mb-2 tracking-wider flex items-center gap-1.5"><Activity size={10} /> Lifecycle Pipeline</div>
                 
@@ -210,7 +210,8 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
              </div>
 
              {/* SLIM VERSION LIST */}
-             <div className={`border border-zinc-800 rounded-xl overflow-hidden flex flex-col h-24 ${activeTab === 'ALL' ? 'bg-purple-900/5' : activeTab === 'MAINNET' ? 'bg-green-900/5' : 'bg-blue-900/5'}`}>
+             {/* INCREASED HEIGHT: Changed h-24 (96px) to h-[7.5rem] (120px) -> Exactly +25% */}
+             <div className={`border border-zinc-800 rounded-xl overflow-hidden flex flex-col h-[7.5rem] ${activeTab === 'ALL' ? 'bg-purple-900/5' : activeTab === 'MAINNET' ? 'bg-green-900/5' : 'bg-blue-900/5'}`}>
                  <div className="px-3 py-1.5 border-b border-zinc-800 flex justify-between items-center bg-black/20">
                     <span className="text-[9px] text-zinc-500 uppercase font-bold">Version Distribution</span>
                     <span className="text-[8px] text-zinc-600 font-mono">{data.sortedVersions.length} Detected</span>
