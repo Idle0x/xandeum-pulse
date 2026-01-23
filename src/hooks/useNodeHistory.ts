@@ -9,8 +9,9 @@ export interface NodeHistoryPoint {
   storage_committed: number;
   storage_used: number;
   credits: number;
-  reputation: number; // <--- ADD THIS
+  reputation: number;
   rank: number;
+  network: string; // <--- 1. ADD THIS so frontend filtering works
 }
 
 export type HistoryTimeRange = '24H' | '3D' | '7D' | '30D' | 'ALL';
@@ -21,11 +22,13 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
   const [reliabilityScore, setReliabilityScore] = useState(100);
 
   useEffect(() => {
-    if (!node || !node.pubkey) return;
+    // Safety check for required node data
+    if (!node || !node.pubkey || !node.network) return;
 
     async function fetchNodeHistory() {
       setLoading(true);
 
+      // Legacy ID generation (Kept for compatibility, but the network filter below is the real fix)
       const versionSafe = node?.version || '0.0.0'; 
       const stableId = `${node?.pubkey}-${node?.address}-${versionSafe}-${node?.is_public}`;
 
@@ -33,14 +36,16 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
       if (timeRange === '24H') days = 1;
       if (timeRange === '3D') days = 3;
       if (timeRange === '30D') days = 30;
-      
+
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
+      // 2. QUERY UPDATE
       const { data, error } = await supabase
         .from('node_snapshots')
         .select('*') 
-        .eq('node_id', stableId) 
+        .eq('node_id', stableId)
+        .eq('network', node.network) // <--- CRITICAL FIX: Enforce Network Separation in DB
         .gte('created_at', startDate.toISOString()) 
         .order('created_at', { ascending: true });
 
@@ -56,13 +61,12 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
         uptime: Number(row.uptime || 0),
         storage_committed: Number(row.storage_committed || 0),
         storage_used: Number(row.storage_used || 0),
-        
-        // --- THE MAGIC FIX ---
-        // We map the DB column 'credits' to BOTH 'credits' and 'reputation'
         credits: Number(row.credits || 0), 
         reputation: Number(row.credits || 0), 
+        rank: Number(row.rank || 0),
         
-        rank: Number(row.rank || 0)
+        // 3. MAPPING UPDATE
+        network: row.network || node.network // Ensure network is passed to UI
       }));
 
       if (points.length > 0) {
