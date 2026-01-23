@@ -6,6 +6,7 @@ import { Database, Zap, Activity, Clock, Layers, Maximize2 } from 'lucide-react'
 import { Node } from '../../types';
 import { useMultiNodeHistory, HistoryTimeRange } from '../../hooks/useMultiNodeHistory';
 import { formatBytes } from '../../utils/formatters';
+import { getSafeIp } from '../../utils/nodeHelpers'; // Added import for safety if not already present
 
 interface MarketHistoryChartProps {
   nodes: Node[];
@@ -19,29 +20,24 @@ export const MarketHistoryChart = ({ nodes, themes, metric, hoveredNodeKey, onHo
   const [timeRange, setTimeRange] = useState<HistoryTimeRange>('7D');
   const [storageMode, setStorageMode] = useState<'USED' | 'COMMITTED'>('USED');
 
-  // 1. Fetch Data for ALL nodes at once (Lazy loaded by parent mounting this component)
+  // 1. Fetch Data
   const { historyMap, loading } = useMultiNodeHistory(nodes, timeRange);
 
-  // 2. Transform Data for Recharts
-  // We need a single array of objects where each object represents a timestamp,
-  // and has keys for every node (e.g., { date: '...', nodeA: 10, nodeB: 20 })
+  // 2. Transform Data
   const chartData = useMemo(() => {
       if (loading || Object.keys(historyMap).length === 0) return [];
 
-      // Find the node with the most history points to use as the "Master Timeline"
       const masterPubkey = Object.keys(historyMap).reduce((a, b) => 
           historyMap[a].length > historyMap[b].length ? a : b
       );
       const masterTimeline = historyMap[masterPubkey] || [];
 
-      // Map timeline to data points
       return masterTimeline.map((snap, index) => {
           const point: any = { date: snap.created_at };
           
           nodes.forEach(node => {
               if (!node.pubkey) return;
               const nodeHistory = historyMap[node.pubkey];
-              // Try to find a matching snapshot near this time, or fallback to index
               const nodeSnap = nodeHistory?.[index] || {}; 
 
               let val = 0;
@@ -59,7 +55,7 @@ export const MarketHistoryChart = ({ nodes, themes, metric, hoveredNodeKey, onHo
       });
   }, [historyMap, nodes, metric, storageMode, loading]);
 
-  // 3. Chart Configuration
+  // 3. Chart Config
   const isStacked = metric === 'credits' || metric === 'storage';
   const ChartComponent = isStacked ? AreaChart : LineChart;
 
@@ -139,10 +135,11 @@ export const MarketHistoryChart = ({ nodes, themes, metric, hoveredNodeKey, onHo
                         itemStyle={{ padding: 0 }}
                         labelStyle={{ color: '#a1a1aa', marginBottom: '4px' }}
                         labelFormatter={(label) => new Date(label).toLocaleString()}
-                        formatter={(value: number, name: string) => {
+                        // 👇 FIX: Changed 'value: number' to 'value: any' to handle undefined/array types from Recharts
+                        formatter={(value: any, name: string) => {
                             const node = nodes.find(n => n.pubkey === name);
                             return [
-                                metric === 'storage' ? formatBytes(value) : value.toLocaleString(), 
+                                metric === 'storage' ? formatBytes(Number(value)) : Number(value).toLocaleString(), 
                                 node ? getSafeIp(node) : name.slice(0,8)
                             ];
                         }}
@@ -155,7 +152,6 @@ export const MarketHistoryChart = ({ nodes, themes, metric, hoveredNodeKey, onHo
                         // Visual Logic
                         const opacity = isDimmed ? 0.1 : 1;
                         const strokeWidth = isActive ? 3 : 1.5;
-                        const zIndex = isActive ? 100 : 1;
 
                         if (isStacked) {
                             return (
