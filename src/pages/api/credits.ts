@@ -1,3 +1,5 @@
+// pages/api/credits.ts
+
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
@@ -11,23 +13,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         axios.get(API_DEVNET, { timeout: 8000 })
     ]);
 
-    const allCredits: any[] = [];
-
-    // Helper to push tagged data
-    const pushData = (res: PromiseSettledResult<any>, net: string) => {
+    // Helper to extract data safely
+    const extractData = (res: PromiseSettledResult<any>) => {
         if (res.status === 'fulfilled') {
             const data = res.value.data?.pods_credits || res.value.data;
-            if (Array.isArray(data)) {
-                data.forEach((c: any) => allCredits.push({ ...c, network: net }));
-            }
+            if (Array.isArray(data)) return data;
         }
+        return [];
     };
 
-    pushData(mainnetRes, 'MAINNET');
-    pushData(devnetRes, 'DEVNET');
+    const mainnetData = extractData(mainnetRes);
+    const devnetData = extractData(devnetRes);
 
-    res.status(200).json({ pods_credits: allCredits });
+    // Return segregated data structure
+    res.status(200).json({ 
+        mainnet: mainnetData, 
+        devnet: devnetData 
+    });
+
   } catch (error) {
+    console.error("Credits API Error:", error);
     res.status(503).json({ error: 'Credits System Offline' });
   }
 }
