@@ -29,18 +29,16 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
   }, [history]);
 
   // --- SUB-COMPONENT: COMPACT TICKER CARD ---
-  const TickerCard = ({ icon: Icon, label, value, subValue, deltaType, rawValue, valueColor = "text-white" }: any) => {
+  const TickerCard = ({ icon: Icon, label, value, subValue, deltaType, rawValue, valueColor = "text-white", hideTrend = false }: any) => {
       let delta = 0;
       let pct = 0;
 
-      if (baseline) {
-          if (deltaType === 'COUNT') delta = rawValue - (baseline.total_nodes || 0);
+      if (baseline && !hideTrend) {
           if (deltaType === 'CREDITS') delta = rawValue - (baseline.total_credits || 0);
           if (deltaType === 'AVG') delta = rawValue - (baseline.avg_credits || 0);
           if (deltaType === 'DOM') delta = rawValue - (baseline.top10_dominance || 0);
 
-          const base = deltaType === 'COUNT' ? baseline.total_nodes : 
-                       deltaType === 'CREDITS' ? baseline.total_credits :
+          const base = deltaType === 'CREDITS' ? baseline.total_credits :
                        deltaType === 'AVG' ? baseline.avg_credits :
                        baseline.top10_dominance;
                        
@@ -49,7 +47,6 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
 
       const isPos = delta > 0;
       const isNeg = delta < 0;
-      // UNIFIED COLOR: Entire ticker string uses this color
       const trendColor = isPos ? 'text-green-500' : isNeg ? 'text-red-500' : 'text-zinc-500';
       const Arrow = isPos ? TrendingUp : isNeg ? TrendingDown : Minus;
 
@@ -66,27 +63,29 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
                 </span>
             </div>
 
-            {/* VALUE & TICKER ROW (Baseline Aligned) */}
+            {/* VALUE & TICKER ROW */}
             <div className="flex items-baseline gap-2">
                 {/* Main Value */}
                 <div className={`text-lg font-black tracking-tight font-mono ${valueColor}`}>
                     {value}
                 </div>
                 
-                {/* Ticker (Same Line) */}
-                <div className={`flex items-center gap-1 text-[9px] font-mono font-bold ${trendColor}`}>
-                    {!loading ? (
-                        <>
-                            <Arrow size={8} strokeWidth={3} />
-                            <span>{Math.abs(pct).toFixed(1)}%</span>
-                            <span className="opacity-60 font-medium">
-                                ({delta > 0 ? '+' : ''}{subValue(delta)})
-                            </span>
-                        </>
-                    ) : (
-                        <div className="h-2 w-8 bg-zinc-800 rounded animate-pulse"/>
-                    )}
-                </div>
+                {/* Ticker (Same Line) - Conditional Render */}
+                {!hideTrend && (
+                    <div className={`flex items-center gap-1 text-[9px] font-mono font-bold ${trendColor}`}>
+                        {!loading ? (
+                            <>
+                                <Arrow size={8} strokeWidth={3} />
+                                <span>{Math.abs(pct).toFixed(1)}%</span>
+                                <span className="opacity-60 font-medium">
+                                    ({delta > 0 ? '+' : ''}{subValue(delta)})
+                                </span>
+                            </>
+                        ) : (
+                            <div className="h-2 w-8 bg-zinc-800 rounded animate-pulse"/>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
       );
@@ -94,47 +93,56 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
 
   if (nodes.length === 0) return null;
 
-  // Format Network Name for Label
   const networkLabel = networkFilter === 'COMBINED' ? 'ALL' : networkFilter;
 
   return (
-    <div className="max-w-5xl mx-auto mb-6 grid grid-cols-2 md:grid-cols-4 gap-2 animate-in fade-in slide-in-from-top-4 duration-500">
-      <TickerCard 
-          icon={Users} 
-          label={`Nodes (${networkLabel})`} 
-          value={current.count.toLocaleString()} 
-          rawValue={current.count}
-          deltaType="COUNT"
-          subValue={(d: number) => d}
-          valueColor="text-white"
-      />
-      <TickerCard 
-          icon={Wallet} 
-          label="Total Credits" 
-          value={(current.totalCredits / 1_000_000).toFixed(2) + "M"} 
-          rawValue={current.totalCredits}
-          deltaType="CREDITS"
-          subValue={(d: number) => (Math.abs(d)/1000).toFixed(1) + 'k'}
-          valueColor="text-yellow-500" // GOLD
-      />
-      <TickerCard 
-          icon={Activity} 
-          label="Average Credits" 
-          value={(current.avgCredits / 1000).toFixed(1) + "k"} 
-          rawValue={current.avgCredits}
-          deltaType="AVG"
-          subValue={(d: number) => Math.abs(d).toLocaleString()}
-          valueColor="text-white"
-      />
-      <TickerCard 
-          icon={BarChart3} 
-          label="Top 10 Dominance" 
-          value={current.dominance.toFixed(1) + "%"} 
-          rawValue={current.dominance}
-          deltaType="DOM"
-          subValue={(d: number) => Math.abs(d).toFixed(1) + '%'}
-          valueColor="text-blue-500" // BLUE
-      />
+    <div className="max-w-5xl mx-auto mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <TickerCard 
+                icon={Users} 
+                label={`Nodes (${networkLabel})`} 
+                value={current.count.toLocaleString()} 
+                rawValue={current.count}
+                deltaType="COUNT"
+                subValue={(d: number) => d}
+                valueColor="text-white"
+                hideTrend={true} // HIDDEN AS REQUESTED
+            />
+            <TickerCard 
+                icon={Wallet} 
+                label="Total Credits" 
+                value={(current.totalCredits / 1_000_000).toFixed(2) + "M"} 
+                rawValue={current.totalCredits}
+                deltaType="CREDITS"
+                subValue={(d: number) => (Math.abs(d)/1000).toFixed(1) + 'k'}
+                valueColor="text-yellow-500"
+            />
+            <TickerCard 
+                icon={Activity} 
+                label="Average Credits" 
+                value={(current.avgCredits / 1000).toFixed(1) + "k"} 
+                rawValue={current.avgCredits}
+                deltaType="AVG"
+                subValue={(d: number) => Math.abs(d).toLocaleString()}
+                valueColor="text-white"
+            />
+            <TickerCard 
+                icon={BarChart3} 
+                label="Top 10 Dominance" 
+                value={current.dominance.toFixed(1) + "%"} 
+                rawValue={current.dominance}
+                deltaType="DOM"
+                subValue={(d: number) => Math.abs(d).toFixed(1) + '%'}
+                valueColor="text-blue-500"
+            />
+        </div>
+        
+        {/* FOOTER LEGEND */}
+        <div className="flex justify-end mt-1.5 px-1">
+            <span className="text-[9px] text-zinc-600 font-medium uppercase tracking-widest opacity-80">
+                Values reflect 24h change
+            </span>
+        </div>
     </div>
   );
 }
