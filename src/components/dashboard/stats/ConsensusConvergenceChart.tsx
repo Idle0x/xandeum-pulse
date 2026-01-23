@@ -8,7 +8,6 @@ interface ConsensusConvergenceChartProps {
   loading: boolean;
   timeRange: HistoryTimeRange;
   onTimeRangeChange: (r: HistoryTimeRange) => void;
-  // NEW: Dynamic key to support specific network data
   dataKey: keyof NetworkHistoryPoint;
 }
 
@@ -63,18 +62,22 @@ export const ConsensusConvergenceChart = ({
       <div className="flex-1 w-full min-h-0 relative">
          {loading && <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/10 backdrop-blur-[1px]"><Loader2 className="w-4 h-4 animate-spin text-zinc-600"/></div>}
          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={history} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+            {/* Added margin to minimize whitespace since axes are hidden */}
+            <AreaChart data={history} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
                <defs>
                   <linearGradient id="unityGrad" x1="0" y1="0" x2="0" y2="1">
                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.2}/>
                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
                   </linearGradient>
                </defs>
-               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-               <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 8, fill: '#52525b'}} minTickGap={40} tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, {day:'numeric'})} height={12} />
-               <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{fontSize: 8, fill: '#52525b'}} width={25} />
+               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.5} />
+               
+               {/* HIDING AXES to match screenshot/space requirements */}
+               <XAxis dataKey="date" hide />
+               <YAxis domain={[0, 100]} hide />
+               
                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3f3f46', strokeWidth: 1 }} />
-               {/* DYNAMIC KEY USAGE */}
+               
                <Area 
                   type="monotone" 
                   dataKey={dataKey} 
