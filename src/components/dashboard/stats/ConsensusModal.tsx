@@ -17,8 +17,11 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
 
   // 1. DATA FETCHING
+  // Default to 24H for immediate tactical context
   const [timeRange, setTimeRange] = useState<HistoryTimeRange>('24H');
   const { history: convHistory, loading: convLoading } = useNetworkHistory(timeRange);
+
+  // Sparkline data (Fixed 30D for trend context)
   const { history: trendHistory, loading: trendLoading } = useNetworkHistory('30D');
 
   // --- Dynamic Key Logic ---
@@ -27,9 +30,10 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
     activeTab === 'DEVNET' ? 'devnet_consensus_score' : 
     'consensus_score';
 
+  // Map sparkline data based on active tab
   const sparkData = trendHistory.map(p => ({ 
     date: p.date, 
-    value: p[consensusKey] 
+    value: p[consensusKey] // Dynamic access
   }));
 
   // --- 2. DATA ENGINE ---
@@ -75,6 +79,8 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
   }, [nodes, activeTab]);
 
   const isStrong = parseFloat(data.agreementScore) > 66;
+
+  // Dynamic Theme for "Status" Border
   const statusBorder = isStrong 
      ? 'border-green-500/20 shadow-[0_0_15px_-3px_rgba(34,197,94,0.1)]' 
      : 'border-yellow-500/20 shadow-[0_0_15px_-3px_rgba(234,179,8,0.1)]';
@@ -110,6 +116,7 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                     </button>
                  ))}
              </div>
+             {/* RED CLOSE BUTTON */}
              <button onClick={onClose} className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20">
                 <X size={16} />
              </button>
@@ -117,8 +124,11 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
         </div>
 
         <div className="space-y-3">
-          {/* ROW 1: HERO METRICS */}
+
+          {/* ROW 1: COMPACT HERO METRICS */}
           <div className="grid grid-cols-2 gap-3">
+
+             {/* CARD 1: CONSENSUS TARGET (Dynamic Border) */}
              <div className={`bg-zinc-900/50 border ${statusBorder} rounded-xl p-3 relative flex flex-col justify-between h-20 transition-all duration-300`}>
                 <div className="flex justify-between items-center mb-1">
                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5"><GitBranch size={10} /> Target Version</div>
@@ -132,7 +142,9 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                 </div>
              </div>
 
+             {/* CARD 2: UNITY SCORE (Sparkline Background) */}
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 relative overflow-hidden group h-20 flex flex-col justify-between">
+                {/* Background Chart (Dynamic Data) */}
                 <div className="absolute inset-0 z-0 opacity-10 transition-opacity pointer-events-none px-2 mt-4">
                     <HistoryChart 
                         data={sparkData} 
@@ -141,6 +153,7 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                         height={60} 
                     />
                 </div>
+
                 <div className="flex justify-between items-center mb-1 relative z-10">
                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5"><ShieldCheck size={10} /> Unity Score</div>
                    <div className={`text-[8px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-1 ${
@@ -156,7 +169,7 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
              </div>
           </div>
 
-          {/* ROW 2: CONVERGENCE CHART */}
+          {/* ROW 2: CONVERGENCE CHART (Expanded Area) */}
           <div className="h-60">
              <ConsensusConvergenceChart 
                 history={convHistory} 
@@ -169,23 +182,18 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
 
           {/* ROW 3: DETAILED DISTRIBUTION */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-             {/* BUCKETS STRIP (Polish: Hero Target & Dimmed Others) */}
-             <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex flex-col justify-between h-[7.5rem]">
+             {/* BUCKETS STRIP */}
+             <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex flex-col justify-between">
                 <div className="text-[9px] text-zinc-500 uppercase font-bold mb-3 tracking-wider flex items-center gap-1.5"><Activity size={10} /> Lifecycle State</div>
                 <div className="grid grid-cols-3 gap-2 text-center h-full items-center">
-                   {/* Lagging - Dimmed */}
                    <div className="border-r border-zinc-800 last:border-0 opacity-60">
                       <div className="text-lg font-black text-white leading-none mb-1">{data.buckets.lagging}</div>
                       <div className="text-[7px] font-bold text-red-400 uppercase tracking-wider flex justify-center items-center gap-1"><AlertCircle size={8}/> Lagging</div>
                    </div>
-                   {/* Synced - HERO */}
-                   <div className="border-r border-zinc-800 last:border-0 px-1 scale-110">
-                      <div className={`text-2xl font-black leading-none mb-1 drop-shadow-[0_0_10px_rgba(255,255,255,0.1)] ${activeTheme.text}`}>{data.buckets.target}</div>
-                      <div className={`text-[7px] font-extrabold uppercase tracking-wider flex justify-center items-center gap-1 bg-zinc-800 py-0.5 rounded-sm text-white`}>
-                         <CheckCircle size={8} className="text-green-500"/> Synced
-                      </div>
+                   <div className={`py-1 rounded-lg border ${isStrong ? 'border-green-500/30 shadow-[0_0_10px_-2px_rgba(34,197,94,0.1)]' : 'border-zinc-700'} bg-zinc-900/40`}>
+                      <div className="text-lg font-black text-white leading-none mb-1">{data.buckets.target}</div>
+                      <div className={`text-[7px] font-bold uppercase tracking-wider flex justify-center items-center gap-1 ${activeTheme.text}`}><CheckCircle size={8}/> Synced</div>
                    </div>
-                   {/* Leading - Dimmed */}
                    <div className="opacity-60">
                       <div className="text-lg font-black text-white leading-none mb-1">{data.buckets.leading}</div>
                       <div className="text-[7px] font-bold text-cyan-400 uppercase tracking-wider flex justify-center items-center gap-1"><ArrowUpCircle size={8}/> Leading</div>
@@ -193,21 +201,21 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                 </div>
              </div>
 
-             {/* VERSION LIST (Polish: Compact & Clean) */}
-             <div className={`border border-zinc-800 rounded-xl overflow-hidden flex flex-col h-[7.5rem] ${activeTab === 'ALL' ? 'bg-purple-900/5' : activeTab === 'MAINNET' ? 'bg-green-900/5' : 'bg-blue-900/5'}`}>
-                 <div className="px-3 py-1.5 border-b border-zinc-800 flex justify-between items-center bg-black/20">
+             {/* VERSION LIST */}
+             <div className={`border border-zinc-800 rounded-xl overflow-hidden flex flex-col max-h-40 ${activeTab === 'ALL' ? 'bg-purple-900/5' : activeTab === 'MAINNET' ? 'bg-green-900/5' : 'bg-blue-900/5'}`}>
+                 <div className="p-2 border-b border-zinc-800 flex justify-between items-center bg-black/20">
                     <span className="text-[9px] text-zinc-500 uppercase font-bold">Version List</span>
                     <span className="text-[8px] text-zinc-600 font-mono">{data.sortedVersions.length} Active</span>
                  </div>
-                 <div className="overflow-y-auto p-1.5 space-y-1 scrollbar-thin scrollbar-thumb-zinc-800">
+                 <div className="overflow-y-auto p-2 space-y-1.5 scrollbar-thin scrollbar-thumb-zinc-800">
                     {data.sortedVersions.map(([ver, count]) => {
                        const isConsensus = ver === data.consensusVer;
                        const percent = ((count / data.count) * 100).toFixed(1);
                        const isExpanded = expandedVersion === ver;
                        return (
-                          <div key={ver} className={`grid grid-cols-[1fr_auto_auto] items-center gap-3 p-1.5 rounded text-[9px] transition-colors ${isConsensus ? 'bg-zinc-800/50 border border-zinc-700' : 'hover:bg-zinc-800/30 border border-transparent'}`}>
+                          <div key={ver} className={`grid grid-cols-[1fr_auto_auto] items-center gap-4 p-1.5 rounded text-[9px] ${isConsensus ? 'bg-zinc-800/50 border border-zinc-700' : 'hover:bg-zinc-800/30 border border-transparent'}`}>
                              <div 
-                                className={`font-mono font-bold truncate cursor-pointer hover:text-white relative ${isConsensus ? 'text-white' : 'text-zinc-400'}`}
+                                className={`font-mono font-bold truncate cursor-pointer hover:text-white transition-colors relative ${isConsensus ? 'text-white' : 'text-zinc-400'}`}
                                 onClick={() => setExpandedVersion(isExpanded ? null : ver)}
                              >
                                 {ver}
@@ -216,16 +224,14 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                              <div className="w-12 h-1 bg-zinc-800 rounded-full overflow-hidden">
                                 <div className={`h-full ${isConsensus ? activeTheme.bg : 'bg-zinc-600'}`} style={{ width: `${percent}%` }}></div>
                              </div>
-                             <div className="text-right font-mono text-zinc-500 w-16 tabular-nums">
-                                <span className="mr-1.5 text-zinc-400">{count}</span>
-                                <span className={isConsensus ? activeTheme.text : 'text-zinc-600'}>{percent}%</span>
-                             </div>
+                             <div className="text-right font-mono text-zinc-500 w-12"><span className="mr-1 text-zinc-400">{count}</span><span>{percent}%</span></div>
                           </div>
                        );
                     })}
                  </div>
              </div>
           </div>
+
         </div>
       </div>
     </div>
