@@ -3,31 +3,46 @@ import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
 
+// 1. UPDATE INTERFACE TO ACCEPT NEW PROPS
 interface Props {
   history: any[];
   loading: boolean;
+  mode: 'ACCUMULATION' | 'VELOCITY'; 
+  showRank: boolean;                 
 }
 
-export const DualAxisGrowthChart = ({ history, loading }: Props) => {
+export const DualAxisGrowthChart = ({ history, loading, mode, showRank }: Props) => {
   if (loading) return <div className="w-full h-full animate-pulse bg-zinc-900/30 rounded-xl" />;
   if (!history || history.length < 2) return <div className="flex items-center justify-center h-full text-zinc-600 text-[9px] font-mono">Insufficient Data</div>;
 
-  // Transform Data
+  // 2. TRANSFORM DATA BASED ON MODE
   const data = history.map((curr, i) => {
       const prev = history[i - 1];
-      const earned = prev ? Math.max(0, curr.credits - prev.credits) : 0;
+      let creditValue = 0;
+
+      if (mode === 'ACCUMULATION') {
+          creditValue = curr.credits; // Total Wealth
+      } else {
+          // Daily Velocity (Delta)
+          // Skip index 0 for velocity because we need a previous value
+          creditValue = prev ? Math.max(0, curr.credits - prev.credits) : 0;
+      }
+
       return {
           date: curr.date,
-          earned, 
+          credits: creditValue,
           rank: curr.rank || 0
       };
-  }).slice(1);
+  });
+
+  // Slice the first element if in Velocity mode (since delta is 0/undefined)
+  const chartData = mode === 'VELOCITY' ? data.slice(1) : data;
 
   return (
     <div className="w-full h-full">
       <ResponsiveContainer width="100%" height="100%">
-        {/* Adjusted margins to fit the axes comfortably */}
-        <ComposedChart data={data} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+        {/* 3. INCREASED MARGINS FOR AXIS LABELS */}
+        <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
           <defs>
             <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#eab308" stopOpacity={0.4}/> 
@@ -37,7 +52,6 @@ export const DualAxisGrowthChart = ({ history, loading }: Props) => {
           
           <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.3} />
           
-          {/* X AXIS */}
           <XAxis 
             dataKey="date" 
             axisLine={false} 
@@ -48,30 +62,31 @@ export const DualAxisGrowthChart = ({ history, loading }: Props) => {
             dy={5}
           />
 
-          {/* LEFT AXIS: RANK (Blue, Integers Only) */}
-          <YAxis 
-            yAxisId="left"
-            orientation="left"
-            reversed={true} // Rank 1 is top
-            allowDecimals={false} // Prevent 36.6
-            axisLine={false} 
-            tickLine={false} 
-            tick={{fontSize: 8, fill: '#3b82f6', fontFamily: 'monospace'}} 
-            width={30}
-            // Add padding to domain so it doesn't look zoomed in on 1 rank change
-            domain={['auto', 'auto']}
-          />
+          {/* LEFT AXIS: RANK (Conditionally Rendered) */}
+          {showRank && (
+              <YAxis 
+                yAxisId="left"
+                orientation="left"
+                reversed={true} 
+                allowDecimals={false}
+                axisLine={false} 
+                tickLine={false} 
+                tick={{fontSize: 8, fill: '#3b82f6', fontFamily: 'monospace'}} 
+                width={35} 
+                domain={['auto', 'auto']}
+              />
+          )}
 
-          {/* RIGHT AXIS: EARNINGS (Yellow, Compact K notation) */}
+          {/* RIGHT AXIS: CREDITS (Accumulation or Velocity) */}
           <YAxis 
             yAxisId="right"
             orientation="right"
             axisLine={false} 
             tickLine={false} 
             tick={{fontSize: 8, fill: '#71717a', fontFamily: 'monospace'}} 
-            width={35}
-            domain={['auto', 'auto']}
-            tickFormatter={(val) => val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}
+            width={45} 
+            domain={['auto', 'auto']} 
+            tickFormatter={(val) => val >= 1000 ? (val/1000).toFixed(1) + 'k' : val}
           />
 
           <Tooltip 
@@ -87,9 +102,13 @@ export const DualAxisGrowthChart = ({ history, loading }: Props) => {
                         </div>
                         {payload.map((p: any, i) => (
                             <div key={i} className="flex items-center justify-between gap-3 mb-0.5">
-                                <span className="text-zinc-400 capitalize">{p.name === 'earned' ? 'Yield' : 'Rank'}</span>
-                                <span className={`font-mono font-bold ${p.name === 'earned' ? 'text-yellow-500' : 'text-blue-500'}`}>
-                                    {p.name === 'earned' ? `+${Number(p.value).toLocaleString()}` : `#${p.value}`}
+                                <span className="text-zinc-400 capitalize">
+                                    {p.name === 'credits' 
+                                        ? (mode === 'ACCUMULATION' ? 'Total Credits' : 'Daily Yield') 
+                                        : 'Rank'}
+                                </span>
+                                <span className={`font-mono font-bold ${p.name === 'credits' ? 'text-yellow-500' : 'text-blue-500'}`}>
+                                    {p.name === 'credits' ? Number(p.value).toLocaleString() : `#${p.value}`}
                                 </span>
                             </div>
                         ))}
@@ -98,30 +117,32 @@ export const DualAxisGrowthChart = ({ history, loading }: Props) => {
             }}
           />
 
-          {/* EARNINGS AREA (Right Axis) */}
+          {/* CREDITS AREA */}
           <Area 
             yAxisId="right" 
             type="monotone" 
-            dataKey="earned" 
+            dataKey="credits" 
             stroke="#eab308" 
             strokeWidth={1.5}
             fill="url(#areaGradient)" 
-            animationDuration={800}
+            animationDuration={500}
           />
 
-          {/* RANK LINE (Left Axis) */}
-          <Line 
-            yAxisId="left" 
-            type="monotone" 
-            dataKey="rank" 
-            stroke="#3b82f6" 
-            strokeWidth={1.5} 
-            strokeDasharray="4 4" 
-            opacity={0.6}
-            dot={false} 
-            activeDot={{ r: 3, fill: '#3b82f6' }}
-            animationDuration={800}
-          />
+          {/* RANK LINE (Conditionally Rendered) */}
+          {showRank && (
+              <Line 
+                yAxisId="left" 
+                type="monotone" 
+                dataKey="rank" 
+                stroke="#3b82f6" 
+                strokeWidth={1.5} 
+                strokeDasharray="4 4" 
+                opacity={0.6}
+                dot={false} 
+                activeDot={{ r: 3, fill: '#3b82f6' }}
+                animationDuration={500}
+              />
+          )}
 
         </ComposedChart>
       </ResponsiveContainer>
