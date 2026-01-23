@@ -2,8 +2,8 @@ name: 🏥 Pulse Monitor
 
 on:
   schedule:
-    # Runs at minute 23 of every hour
-    - cron: '23 * * * *'
+    # Runs every 30 minutes
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
