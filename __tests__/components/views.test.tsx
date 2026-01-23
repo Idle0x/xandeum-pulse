@@ -4,12 +4,20 @@ import { HealthView } from '../../src/components/modals/views/HealthView';
 import { StorageView } from '../../src/components/modals/views/StorageView';
 import { IdentityView } from '../../src/components/modals/views/IdentityView';
 
+// --- POLYFILLS ---
+// Fixes Recharts "width(0)" warnings in Jest/JSDOM
+global.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
 // --- MOCKS ---
 // Mock the history hook to prevent Supabase connection attempts during test
 jest.mock('../../src/hooks/useNodeHistory', () => ({
   useNodeHistory: () => ({
     history: [],
-    reliabilityScore: 95, // Matches the high health in tests
+    reliabilityScore: 95,
     growth: 10,
     loading: false
   })
@@ -39,9 +47,17 @@ const MOCK_STATS = {
 describe('Component Views (Visual Logic)', () => {
 
   describe('<HealthView />', () => {
-    test('VISUALS: High health (>=80) should render GREEN elements', () => {
+    test('VISUALS: High health (>=80) should render breakdown elements', () => {
       render(<HealthView node={createMockNode({ health: 95 })} zenMode={false} onBack={jest.fn()} avgNetworkHealth={80} medianStorage={1000} networkStats={MOCK_STATS} />);
-      expect(screen.getByText('95')).toBeInTheDocument();
+      
+      // Updated: The new UI doesn't show a giant "95" text. 
+      // It shows weighted points or "Base: 95" for specific categories (like Uptime).
+      // Checking for the Uptime base score which is 95 in our mock.
+      expect(screen.getByText(/Base: 95/i)).toBeInTheDocument();
+      
+      // Optional: Check for category labels to ensure render
+      expect(screen.getByText(/STORAGE/i)).toBeInTheDocument();
+      expect(screen.getByText(/UPTIME/i)).toBeInTheDocument();
     });
   });
 
@@ -53,10 +69,16 @@ describe('Component Views (Visual Logic)', () => {
         medianCommitted={1000 * (1024**3)} 
         totalStorageCommitted={5000 * (1024**3)} 
         nodeCount={5} 
+        timeRange="30D" // Added missing prop
+        onTimeRangeChange={jest.fn()} // Added missing prop
+        historyLoading={false} // Added missing prop
+        history={[]} // Added missing prop
       />);
 
-      expect(screen.getByText(/NETWORK COMPARISON/i)).toBeInTheDocument();
-      expect(screen.getByText(/Higher/i)).toBeInTheDocument();
+      // Updated: "NETWORK COMPARISON" text was removed. 
+      // New UI uses "Median" / "Average" labels and "ABOVE" / "MAJORITY" badges.
+      expect(screen.getByText(/Median/i)).toBeInTheDocument();
+      expect(screen.getByText(/ABOVE/i)).toBeInTheDocument();
     });
 
     test('VISUALS: Calculates Utilization Efficiency percentage', () => {
@@ -64,6 +86,10 @@ describe('Component Views (Visual Logic)', () => {
             node={createMockNode({ storage_committed: 1000, storage_used: 500 })} 
             zenMode={false} onBack={jest.fn()} medianCommitted={1000} 
             totalStorageCommitted={5000} nodeCount={5} 
+            timeRange="30D" // Added missing prop
+            onTimeRangeChange={jest.fn()} // Added missing prop
+            historyLoading={false} // Added missing prop
+            history={[]} // Added missing prop
         />);
 
         expect(screen.getByText('50%')).toBeInTheDocument();
