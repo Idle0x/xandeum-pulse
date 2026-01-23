@@ -6,7 +6,7 @@ import { Database, Zap, Activity, Clock, Layers, Maximize2 } from 'lucide-react'
 import { Node } from '../../types';
 import { useMultiNodeHistory, HistoryTimeRange } from '../../hooks/useMultiNodeHistory';
 import { formatBytes } from '../../utils/formatters';
-import { getSafeIp } from '../../utils/nodeHelpers'; // Added import for safety if not already present
+import { getSafeIp } from '../../utils/nodeHelpers';
 
 interface MarketHistoryChartProps {
   nodes: Node[];
@@ -135,12 +135,12 @@ export const MarketHistoryChart = ({ nodes, themes, metric, hoveredNodeKey, onHo
                         itemStyle={{ padding: 0 }}
                         labelStyle={{ color: '#a1a1aa', marginBottom: '4px' }}
                         labelFormatter={(label) => new Date(label).toLocaleString()}
-                        // 👇 FIX: Changed 'value: number' to 'value: any' to handle undefined/array types from Recharts
-                        formatter={(value: any, name: string) => {
+                        // 👇 FIX: Changed 'name' to 'any' to handle undefined from Recharts types
+                        formatter={(value: any, name: any) => {
                             const node = nodes.find(n => n.pubkey === name);
                             return [
                                 metric === 'storage' ? formatBytes(Number(value)) : Number(value).toLocaleString(), 
-                                node ? getSafeIp(node) : name.slice(0,8)
+                                node ? getSafeIp(node) : (name ? String(name).slice(0,8) : 'Unknown')
                             ];
                         }}
                     />
