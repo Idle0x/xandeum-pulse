@@ -14,7 +14,7 @@ import StoincSimulator from '../components/leaderboard/StoincSimulator';
 import StatsOverview from '../components/leaderboard/StatsOverview';
 import FilterControls from '../components/leaderboard/FilterControls';
 import NodeTable from '../components/leaderboard/NodeTable';
-import { LeaderboardAnalyticsModal } from '../components/leaderboard/LeaderboardAnalyticsModal'; // NEW IMPORT
+import { LeaderboardAnalyticsModal } from '../components/leaderboard/LeaderboardAnalyticsModal'; 
 
 export default function Leaderboard() {
   const router = useRouter();
@@ -31,7 +31,7 @@ export default function Leaderboard() {
   const [visibleCount, setVisibleCount] = useState(100);
   const [expandedNode, setExpandedNode] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
-  
+
   // NEW: Analytics Modal State
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
 
@@ -76,8 +76,10 @@ export default function Leaderboard() {
      const total = nodes.reduce((sum, n) => sum + n.credits, 0);
      const avg = nodes.length ? Math.round(total / nodes.length) : 0;
      const top10 = nodes.slice(0, 10).reduce((sum, n) => sum + n.credits, 0);
-     const dom = total > 0 ? ((top10 / total) * 100).toFixed(1) : '0';
      
+     // FIX: Return a number, not a string. The Modal handles the .toFixed formatting.
+     const dom = total > 0 ? (top10 / total) * 100 : 0;
+
      return { 
          totalCredits: total, 
          avgCredits: avg, 
