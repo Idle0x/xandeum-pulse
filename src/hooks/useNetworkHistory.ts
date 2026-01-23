@@ -5,11 +5,27 @@ export type HistoryTimeRange = '24H' | '3D' | '7D' | '30D' | 'ALL';
 
 export interface NetworkHistoryPoint {
   date: string;
+  // Global
   avg_health: number;
   total_nodes: number;
   total_capacity: number;
   total_used: number;
   consensus_score: number;
+  
+  // Mainnet
+  mainnet_nodes: number;
+  mainnet_capacity: number;
+  mainnet_used: number;
+  mainnet_avg_health: number;
+  mainnet_consensus_score: number;
+
+  // Devnet
+  devnet_nodes: number;
+  devnet_capacity: number;
+  devnet_used: number;
+  devnet_avg_health: number;
+  devnet_consensus_score: number;
+
   total_credits: number;
   avg_credits: number;
   top10_dominance: number;
@@ -32,10 +48,6 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      // SCHEMA MATCH: 
-      // Table 'network_snapshots' has NO 'created_at'.
-      // Column 'id' is defined as 'timestamp with time zone'.
-      // Therefore, we MUST filter and sort by 'id'.
       const { data, error } = await supabase
         .from('network_snapshots')
         .select('*')
@@ -50,15 +62,30 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
 
       if (data && data.length > 0) {
         const points = data.map((d: any) => ({
-          date: d.id, // 'id' is the timestamp here
+          date: d.id,
           
+          // Global
           avg_health: Number(d.avg_health || 0),
           total_nodes: Number(d.total_nodes || 0),
           total_capacity: Number(d.total_capacity || 0),
           total_used: Number(d.total_used || 0),
           consensus_score: Number(d.consensus_score || 0),
-          
-          // Schema matches exactly:
+
+          // Mainnet
+          mainnet_nodes: Number(d.mainnet_nodes || 0),
+          mainnet_capacity: Number(d.mainnet_capacity || 0),
+          mainnet_used: Number(d.mainnet_used || 0),
+          mainnet_avg_health: Number(d.mainnet_avg_health || 0),
+          mainnet_consensus_score: Number(d.mainnet_consensus_score || 0),
+
+          // Devnet
+          devnet_nodes: Number(d.devnet_nodes || 0),
+          devnet_capacity: Number(d.devnet_capacity || 0),
+          devnet_used: Number(d.devnet_used || 0),
+          devnet_avg_health: Number(d.devnet_avg_health || 0),
+          devnet_consensus_score: Number(d.devnet_consensus_score || 0),
+
+          // Financials
           total_credits: Number(d.total_credits || 0),
           avg_credits: Number(d.avg_credits || 0),
           top10_dominance: Number(d.top10_dominance || 0)
@@ -66,10 +93,10 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
 
         setHistory(points);
 
-        // Growth Calculation (based on total_credits)
+        // Calculate Growth (Total Capacity as example)
         if (points.length > 1) {
-            const first = points[0].total_credits;
-            const last = points[points.length - 1].total_credits;
+            const first = points[0].total_capacity;
+            const last = points[points.length - 1].total_capacity;
             if (first > 0) {
                 setGrowth(((last - first) / first) * 100);
             } else {
