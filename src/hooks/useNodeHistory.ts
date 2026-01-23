@@ -11,7 +11,7 @@ export interface NodeHistoryPoint {
   credits: number;
   reputation: number;
   rank: number;
-  network: string; // <--- 1. ADD THIS so frontend filtering works
+  network: string; 
 }
 
 export type HistoryTimeRange = '24H' | '3D' | '7D' | '30D' | 'ALL';
@@ -22,15 +22,20 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
   const [reliabilityScore, setReliabilityScore] = useState(100);
 
   useEffect(() => {
-    // Safety check for required node data
+    // 1. Safety Check & Capture Variables
     if (!node || !node.pubkey || !node.network) return;
+    
+    // Capture these locally so the async function knows they are defined
+    const targetNetwork = node.network;
+    const targetVersion = node.version || '0.0.0';
+    const targetPubkey = node.pubkey;
+    const targetAddress = node.address;
+    const targetIsPublic = node.is_public;
 
     async function fetchNodeHistory() {
       setLoading(true);
 
-      // Legacy ID generation (Kept for compatibility, but the network filter below is the real fix)
-      const versionSafe = node?.version || '0.0.0'; 
-      const stableId = `${node?.pubkey}-${node?.address}-${versionSafe}-${node?.is_public}`;
+      const stableId = `${targetPubkey}-${targetAddress}-${targetVersion}-${targetIsPublic}`;
 
       let days = 7;
       if (timeRange === '24H') days = 1;
@@ -40,12 +45,11 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      // 2. QUERY UPDATE
       const { data, error } = await supabase
         .from('node_snapshots')
         .select('*') 
         .eq('node_id', stableId)
-        .eq('network', node.network) // <--- CRITICAL FIX: Enforce Network Separation in DB
+        .eq('network', targetNetwork) // <--- FIX: Use the captured local variable
         .gte('created_at', startDate.toISOString()) 
         .order('created_at', { ascending: true });
 
@@ -64,9 +68,7 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
         credits: Number(row.credits || 0), 
         reputation: Number(row.credits || 0), 
         rank: Number(row.rank || 0),
-        
-        // 3. MAPPING UPDATE
-        network: row.network || node.network // Ensure network is passed to UI
+        network: row.network || targetNetwork
       }));
 
       if (points.length > 0) {
