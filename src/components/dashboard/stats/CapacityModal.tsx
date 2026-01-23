@@ -18,11 +18,9 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
   const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
 
   // 1. DATA FETCHING
-  // Evolution Chart State (Default 24H)
   const [timeRange, setTimeRange] = useState<HistoryTimeRange>('24H');
   const { history: evoHistory, loading: evoLoading } = useNetworkHistory(timeRange);
 
-  // Hero Card State (Fixed 30D for trend context)
   const { history: trendHistory, growth, loading: trendLoading } = useNetworkHistory('30D');
   const isPositive = growth >= 0;
 
@@ -37,10 +35,9 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
     activeTab === 'DEVNET' ? 'devnet_used' : 
     'total_used';
 
-  // Map hero chart based on active tab
   const heroChartData = trendHistory.map(p => ({ 
     date: p.date, 
-    value: p[capacityKey] // Dynamic access
+    value: p[capacityKey]
   }));
 
   // --- 2. DATA ENGINE ---
@@ -79,17 +76,16 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
       mainnetSum, devnetSum,
       nodeCount: filteredNodes.length,
       globalShare: globalCommitted > 0 ? (tCommitted / globalCommitted) * 100 : 0,
-      globalCommitted // Exporting this for calculation
+      globalCommitted
     };
   }, [nodes, activeTab]);
 
-  // Usage Alert Logic
   const usagePercent = (dashboardData.totalUsed / (dashboardData.totalCommitted || 1)) * 100;
   const usageBorderClass = usagePercent > 80 
-     ? 'border-red-500/20 shadow-[0_0_15px_-3px_rgba(239,68,68,0.1)]' // High Load
+     ? 'border-red-500/20 shadow-[0_0_15px_-3px_rgba(239,68,68,0.1)]' 
      : 'border-zinc-800';
 
-  // --- 3. SVG HELPER (Only used for Whale Dominance now) ---
+  // --- 3. SVG HELPER (Pie Chart) ---
   const renderPie = (slices: { value: number; color: string }[]) => {
     const total = slices.reduce((acc, s) => acc + s.value, 0) || 1;
     let cumulativePercent = 0;
@@ -124,54 +120,32 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
   const themeColor = activeTab === 'MAINNET' ? 'text-green-500' : 'text-blue-500';
   const themeBg = activeTab === 'MAINNET' ? 'bg-green-500' : 'bg-blue-500';
 
-  // --- 4. COMPOSITION BAR HELPERS ---
+  // --- 4. COMPOSITION HELPERS ---
   const getCompositionData = () => {
-    if (activeTab === 'ALL') {
-      const total = dashboardData.mainnetSum + dashboardData.devnetSum || 1;
-      return {
-        label: "Network Split",
-        icon: <PieChart size={12} />,
-        primary: { 
-            label: "Mainnet", 
-            val: dashboardData.mainnetSum, 
-            pct: (dashboardData.mainnetSum / total) * 100, 
-            color: "bg-green-500", 
-            text: "text-green-500" 
-        },
-        secondary: { 
-            label: "Devnet", 
-            val: dashboardData.devnetSum, 
-            pct: (dashboardData.devnetSum / total) * 100, 
-            color: "bg-blue-500", 
-            text: "text-blue-500" 
-        }
-      };
-    } else {
-      // Specific Network -> Show Global Share
-      const isMain = activeTab === 'MAINNET';
-      const globalTotal = dashboardData.globalCommitted || 1;
-      const currentVal = dashboardData.totalCommitted;
-      const restVal = globalTotal - currentVal;
-      
-      return {
-        label: "Global Share",
-        icon: <Globe size={12} />,
-        primary: { 
-            label: activeTab, 
-            val: currentVal, 
-            pct: (currentVal / globalTotal) * 100, 
-            color: isMain ? "bg-green-500" : "bg-blue-500",
-            text: isMain ? "text-green-500" : "text-blue-500"
-        },
-        secondary: { 
-            label: "Others", 
-            val: restVal, 
-            pct: (restVal / globalTotal) * 100, 
-            color: "bg-zinc-700", 
-            text: "text-zinc-500" 
-        }
-      };
-    }
+    // Logic for Single Network (Global Share) - Stacked Bar
+    const isMain = activeTab === 'MAINNET';
+    const globalTotal = dashboardData.globalCommitted || 1;
+    const currentVal = dashboardData.totalCommitted;
+    const restVal = globalTotal - currentVal;
+    
+    return {
+      label: "Global Share",
+      icon: <Globe size={12} />,
+      primary: { 
+          label: activeTab, 
+          val: currentVal, 
+          pct: (currentVal / globalTotal) * 100, 
+          color: isMain ? "bg-green-500" : "bg-blue-500",
+          text: isMain ? "text-green-500" : "text-blue-500"
+      },
+      secondary: { 
+          label: "Others", 
+          val: restVal, 
+          pct: (restVal / globalTotal) * 100, 
+          color: "bg-zinc-700", 
+          text: "text-zinc-500" 
+      }
+    };
   };
 
   const compData = getCompositionData();
@@ -200,7 +174,6 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
                     </button>
                  ))}
              </div>
-             {/* RED CLOSE BUTTON */}
              <button onClick={onClose} className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20">
                 <X size={16} />
              </button>
@@ -209,12 +182,10 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
 
         <div className="space-y-3">
 
-          {/* --- ROW 1: SPLIT HERO CARDS (High Density) --- */}
+          {/* ROW 1: SPLIT HERO CARDS */}
           <div className="grid grid-cols-2 gap-3">
-             {/* CARD 1: NETWORK CAPACITY (Committed) */}
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 relative overflow-hidden group h-20 flex flex-col justify-between">
                  <div className={`absolute top-0 left-0 w-0.5 h-full ${activeTab === 'ALL' ? 'bg-purple-500' : themeBg}`}></div>
-                 {/* Background Sparkline */}
                  <div className="absolute inset-0 z-0 opacity-10 transition-opacity pointer-events-none px-2 mt-4">
                     <HistoryChart 
                         data={heroChartData} 
@@ -237,7 +208,6 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
                  </div>
              </div>
 
-             {/* CARD 2: NETWORK LOAD (Used) */}
              <div className={`bg-zinc-900/50 border ${usageBorderClass} rounded-xl p-3 relative h-20 flex flex-col justify-between transition-colors duration-300`}>
                  <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5"><CloudLightning size={10} /> Load State</div>
                  <div>
@@ -251,7 +221,7 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
              </div>
           </div>
 
-          {/* --- ROW 2: EVOLUTION CHART (Dual Axis, Colored Legends) --- */}
+          {/* ROW 2: EVOLUTION CHART */}
           <div className="h-60">
              <CapacityEvolutionChart 
                 history={evoHistory} 
@@ -263,44 +233,61 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
              />
           </div>
 
-          {/* --- ROW 3: FOOTER GRIDS --- */}
+          {/* ROW 3: FOOTER GRIDS */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
              {/* LEFT: Composition & Benchmarks */}
              <div className="flex flex-col gap-3">
                  
-                 {/* 1. COMPOSITION BAR (STACKED) - REPLACED PIE CHART */}
-                 <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex flex-col justify-center h-20 gap-2">
-                    {/* Header */}
-                    <div className="flex justify-between items-center">
-                       <div className="text-[9px] text-zinc-500 uppercase font-bold flex items-center gap-1.5">
-                          {compData.icon} {compData.label}
-                       </div>
-                       <div className="text-[9px] font-mono text-white opacity-50">
-                          {compData.primary.pct.toFixed(1)}% {activeTab !== 'ALL' ? 'Share' : ''}
-                       </div>
-                    </div>
-                    
-                    {/* Stacked Bar */}
-                    <div className="w-full h-2 bg-zinc-800/40 rounded-full overflow-hidden flex">
-                       <div style={{ width: `${compData.primary.pct}%` }} className={`h-full ${compData.primary.color} shadow-[0_0_10px_-2px_rgba(255,255,255,0.3)]`}></div>
-                       <div style={{ width: `${compData.secondary.pct}%` }} className={`h-full ${compData.secondary.color}`}></div>
-                    </div>
-
-                    {/* Legend Labels */}
-                    <div className="flex justify-between items-center">
-                       <div className="flex items-center gap-1.5">
-                          <div className={`w-1.5 h-1.5 rounded-full ${compData.primary.color}`}></div>
-                          <span className="text-[8px] font-bold text-zinc-400 uppercase">{compData.primary.label}</span>
-                          <span className="text-[9px] font-mono font-bold text-white">{formatBytes(compData.primary.val)}</span>
-                       </div>
-                       <div className="flex items-center gap-1.5">
-                          <div className={`w-1.5 h-1.5 rounded-full ${compData.secondary.color}`}></div>
-                          <span className="text-[8px] font-bold text-zinc-500 uppercase">{compData.secondary.label}</span>
-                          <span className="text-[9px] font-mono font-bold text-zinc-500">{formatBytes(compData.secondary.val)}</span>
-                       </div>
-                    </div>
-                 </div>
+                 {/* 1. COMPOSITION CARD (Dynamic: Pie for ALL, Stacked Bar for Networks) */}
+                 {activeTab === 'ALL' ? (
+                   /* RESTORED PIE CHART FOR 'ALL' TAB */
+                   <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex items-center gap-4 h-20">
+                      <div className="relative w-12 h-12 shrink-0">
+                         {renderPie([
+                            { value: dashboardData.mainnetSum, color: '#22c55e' }, 
+                            { value: dashboardData.devnetSum, color: '#3b82f6' }
+                         ])}
+                         <div className="absolute inset-0 flex items-center justify-center text-zinc-600"><PieChart size={12} /></div>
+                      </div>
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                         <div>
+                            <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-green-500"></div><span className="text-[8px] font-bold text-zinc-400 uppercase">Mainnet</span></div>
+                            <div className="text-[9px] font-mono text-white leading-none">{formatBytes(dashboardData.mainnetSum)}</div>
+                         </div>
+                         <div>
+                            <div className="flex items-center gap-1.5 mb-0.5"><div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div><span className="text-[8px] font-bold text-zinc-400 uppercase">Devnet</span></div>
+                            <div className="text-[9px] font-mono text-white leading-none">{formatBytes(dashboardData.devnetSum)}</div>
+                         </div>
+                      </div>
+                   </div>
+                 ) : (
+                   /* STACKED BAR FOR SPECIFIC NETWORKS */
+                   <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex flex-col justify-center h-20 gap-2">
+                      <div className="flex justify-between items-center">
+                         <div className="text-[9px] text-zinc-500 uppercase font-bold flex items-center gap-1.5">
+                            {compData.icon} {compData.label}
+                         </div>
+                         <div className="text-[9px] font-mono text-white opacity-50">
+                            {compData.primary.pct.toFixed(1)}% Share
+                         </div>
+                      </div>
+                      <div className="w-full h-2 bg-zinc-800/40 rounded-full overflow-hidden flex">
+                         <div style={{ width: `${compData.primary.pct}%` }} className={`h-full ${compData.primary.color} shadow-[0_0_10px_-2px_rgba(255,255,255,0.3)]`}></div>
+                         <div style={{ width: `${compData.secondary.pct}%` }} className={`h-full ${compData.secondary.color}`}></div>
+                      </div>
+                      <div className="flex justify-between items-center">
+                         <div className="flex items-center gap-1.5">
+                            <div className={`w-1.5 h-1.5 rounded-full ${compData.primary.color}`}></div>
+                            <span className="text-[8px] font-bold text-zinc-400 uppercase">{compData.primary.label}</span>
+                         </div>
+                         <div className="flex items-center gap-1.5">
+                            <div className={`w-1.5 h-1.5 rounded-full ${compData.secondary.color}`}></div>
+                            <span className="text-[8px] font-bold text-zinc-500 uppercase">{compData.secondary.label}</span>
+                         </div>
+                      </div>
+                   </div>
+                 )}
 
                  {/* Benchmarks Ticker */}
                  <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex items-center justify-between h-16">
@@ -319,35 +306,35 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
                  </div>
              </div>
 
-             {/* RIGHT: Whale Dominance (SPLIT LAYOUT) - UNTOUCHED */}
-             <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-xl p-4 relative flex flex-col justify-between">
-                 {/* Top Section */}
-                 <div className="flex flex-col gap-0.5">
+             {/* RIGHT: Whale Dominance (SPLIT LAYOUT) */}
+             <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-xl p-4 relative flex items-center h-full">
+                 
+                 {/* LEFT SIDE: HEADER & % */}
+                 <div className="flex flex-col gap-0.5 shrink-0 pr-4">
                     <h4 className="text-[10px] font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                        <Users size={10} className="text-yellow-500"/> Top 10 Dominance
                     </h4>
-                    <span className="text-2xl font-black text-yellow-500">
+                    <span className="text-3xl font-black text-yellow-500 tracking-tight">
                        {((dashboardData.top10Sum / (dashboardData.totalCommitted || 1)) * 100).toFixed(1)}%
                     </span>
                  </div>
 
-                 {/* Bottom Section: Split Row (No horizontal top border) */}
-                 <div className="flex items-center gap-3 mt-1 pt-1">
-                    {/* Left: Text Description */}
-                    <div className="flex-1 flex flex-col justify-center text-[9px] leading-tight text-zinc-400">
-                       <span className="mb-0.5">{getWhaleText()}</span>
-                       <span className="text-white font-mono font-bold">{formatBytes(dashboardData.top10Sum)} combined.</span>
-                    </div>
+                 {/* VERTICAL DIVIDER (RED MARK) */}
+                 <div className="w-px h-12 bg-yellow-500/20"></div>
 
-                    {/* Divider: Vertical Line (The Red Mark) */}
-                    <div className="w-px h-8 bg-yellow-500/10"></div>
-
-                    {/* Right: Pie Chart (Moved Up, Compact) */}
-                    <div className="w-14 h-14 relative opacity-90 shrink-0">
+                 {/* RIGHT SIDE: PIE & TEXT (Moved Up, No horizontal lines) */}
+                 <div className="flex-1 flex items-center gap-3 pl-4">
+                    {/* Tiny Pie */}
+                    <div className="w-10 h-10 relative opacity-90 shrink-0">
                         {renderPie([
                             { value: dashboardData.top10Sum, color: '#eab308' }, 
                             { value: dashboardData.restSum, color: '#52525b' }   
                         ])}
+                    </div>
+                    {/* Text */}
+                    <div className="flex flex-col justify-center text-[9px] leading-tight text-zinc-400">
+                       <span className="mb-0.5">{getWhaleText()}</span>
+                       <span className="text-white font-mono font-bold">{formatBytes(dashboardData.top10Sum)} storage.</span>
                     </div>
                  </div>
              </div>
