@@ -73,16 +73,19 @@ export const DualAxisGrowthChart = ({ history, loading }: Props) => {
             cursor={{ fill: '#ffffff05' }}
             content={({ active, payload, label }) => {
                 if (!active || !payload || !payload.length) return null;
+                // FIX: Check if label exists before passing to Date
+                const dateStr = label ? new Date(label).toLocaleDateString() : '';
+
                 return (
                     <div className="bg-zinc-950 border border-zinc-800 p-3 rounded-lg shadow-xl text-xs">
                         <div className="text-zinc-500 font-mono mb-2 border-b border-zinc-900 pb-1">
-                            {new Date(label).toLocaleDateString()}
+                            {dateStr}
                         </div>
                         {payload.map((p: any, i) => (
                             <div key={i} className="flex items-center justify-between gap-4 mb-1">
                                 <span className="text-zinc-400 capitalize">{p.name === 'earned' ? 'Daily Yield' : 'Global Rank'}</span>
                                 <span className={`font-mono font-bold ${p.name === 'earned' ? 'text-yellow-500' : 'text-blue-500'}`}>
-                                    {p.name === 'earned' ? `+${p.value.toLocaleString()}` : `#${p.value}`}
+                                    {p.name === 'earned' ? `+${Number(p.value).toLocaleString()}` : `#${p.value}`}
                                 </span>
                             </div>
                         ))}
