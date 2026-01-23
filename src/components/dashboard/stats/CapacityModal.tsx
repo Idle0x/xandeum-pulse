@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
-import { X, Database, TrendingUp, TrendingDown, Users, PieChart, Globe, BarChart3 } from 'lucide-react';
+import { X, Database, TrendingUp, TrendingDown, Users, PieChart, BarChart3, HardDrive, CloudLightning } from 'lucide-react';
 import { Node } from '../../../types';
 import { formatBytes } from '../../../utils/formatters';
-import { useNetworkHistory, HistoryTimeRange } from '../../../hooks/useNetworkHistory';
+import { useNetworkHistory, HistoryTimeRange, NetworkHistoryPoint } from '../../../hooks/useNetworkHistory';
 import { HistoryChart } from '../../common/HistoryChart';
 import { CapacityEvolutionChart } from './CapacityEvolutionChart';
 
@@ -18,17 +18,30 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
   const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
 
   // 1. DATA FETCHING
-  // Evolution Chart State (Middle Row)
-  const [timeRange, setTimeRange] = useState<HistoryTimeRange>('7D');
+  // Evolution Chart State (Default 24H)
+  const [timeRange, setTimeRange] = useState<HistoryTimeRange>('24H');
   const { history: evoHistory, loading: evoLoading } = useNetworkHistory(timeRange);
 
-  // Hero Card State (Bottom-Anchored Trend)
-  // We fix this to 30D to show a solid monthly trend
+  // Hero Card State (Fixed 30D for trend context)
   const { history: trendHistory, growth, loading: trendLoading } = useNetworkHistory('30D');
   const isPositive = growth >= 0;
-  
-  // Prepare data for the small Hero chart
-  const heroChartData = trendHistory.map(p => ({ date: p.date, value: p.total_capacity }));
+
+  // --- NEW: Dynamic Key Logic ---
+  const capacityKey: keyof NetworkHistoryPoint = 
+    activeTab === 'MAINNET' ? 'mainnet_capacity' : 
+    activeTab === 'DEVNET' ? 'devnet_capacity' : 
+    'total_capacity';
+
+  const usedKey: keyof NetworkHistoryPoint = 
+    activeTab === 'MAINNET' ? 'mainnet_used' : 
+    activeTab === 'DEVNET' ? 'devnet_used' : 
+    'total_used';
+
+  // Map hero chart based on active tab
+  const heroChartData = trendHistory.map(p => ({ 
+    date: p.date, 
+    value: p[capacityKey] // Dynamic access
+  }));
 
   // --- 2. DATA ENGINE ---
   const dashboardData = useMemo(() => {
@@ -69,6 +82,12 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
     };
   }, [nodes, activeTab]);
 
+  // Usage Alert Logic
+  const usagePercent = (dashboardData.totalUsed / (dashboardData.totalCommitted || 1)) * 100;
+  const usageBorderClass = usagePercent > 80 
+     ? 'border-red-500/20 shadow-[0_0_15px_-3px_rgba(239,68,68,0.1)]' // High Load
+     : 'border-zinc-800';
+
   // --- 3. SVG HELPER ---
   const renderPie = (slices: { value: number; color: string }[]) => {
     const total = slices.reduce((acc, s) => acc + s.value, 0) || 1;
@@ -106,101 +125,99 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
 
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#09090b] border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-3xl w-full shadow-2xl animate-in zoom-in-95 fade-in duration-200 overflow-y-auto max-h-[90vh] custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-[#09090b] border border-zinc-800 rounded-3xl p-5 md:p-6 max-w-3xl w-full shadow-2xl animate-in zoom-in-95 fade-in duration-200 overflow-y-auto max-h-[90vh] custom-scrollbar" onClick={(e) => e.stopPropagation()}>
 
         {/* HEADER */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-4">
           <div className="flex items-center gap-3">
-            <div className={`p-3 rounded-xl border bg-opacity-10 ${activeTab === 'ALL' ? 'bg-purple-500 border-purple-500/20' : activeTab === 'MAINNET' ? 'bg-green-500 border-green-500/20' : 'bg-blue-500 border-blue-500/20'}`}>
-              <Database size={24} className={activeTab === 'ALL' ? 'text-purple-500' : themeColor} />
+            <div className={`p-2.5 rounded-lg border bg-opacity-10 border-zinc-800 ${activeTab === 'ALL' ? 'bg-purple-500 border-purple-500/20' : themeBg.replace('bg-', 'bg-opacity-10 bg-')}`}>
+              <Database size={20} className={activeTab === 'ALL' ? 'text-purple-500' : themeColor} />
             </div>
             <div>
-              <h3 className="text-xl font-black text-white">Network Capacity</h3>
-              <p className="text-xs text-zinc-500">Storage analytics & distribution</p>
+              <h3 className="text-lg font-black text-white leading-tight">Network Capacity</h3>
+              <p className="text-[10px] text-zinc-500 font-medium">Storage analytics & distribution</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 bg-black/40 p-1 rounded-full border border-zinc-800">
-             {(['ALL', 'MAINNET', 'DEVNET'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-1.5 rounded-full text-[10px] font-bold transition-all duration-300 ${
-                     activeTab === tab 
-                        ? (tab === 'ALL' ? 'bg-zinc-100 text-black shadow-lg' : tab === 'MAINNET' ? 'bg-green-500 text-black shadow-lg' : 'bg-blue-500 text-white shadow-lg')
-                        : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
-                >
-                   {tab}
-                </button>
-             ))}
-             <button onClick={onClose} className="ml-2 p-1.5 rounded-full text-zinc-500 hover:text-white transition">
+          <div className="flex items-center gap-2 w-full md:w-auto">
+             <div className="flex-1 md:flex-none flex items-center bg-zinc-900 p-1 rounded-lg border border-zinc-800">
+                 {(['ALL', 'MAINNET', 'DEVNET'] as const).map((tab) => (
+                    <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 md:flex-none px-4 py-1.5 rounded-md text-[10px] font-bold transition-all duration-300 ${activeTab === tab ? (tab === 'ALL' ? 'bg-zinc-100 text-black shadow-sm' : tab === 'MAINNET' ? 'bg-green-500 text-black shadow-sm' : 'bg-blue-500 text-white shadow-sm') : 'text-zinc-500 hover:text-zinc-300'}`}>
+                       {tab}
+                    </button>
+                 ))}
+             </div>
+             {/* RED CLOSE BUTTON */}
+             <button onClick={onClose} className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20">
                 <X size={16} />
              </button>
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
 
-          {/* --- ROW 1: HERO CARD (Bottom-Anchored Trend) --- */}
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-5 relative overflow-hidden group h-36 flex flex-col justify-between">
-             <div className={`absolute top-0 left-0 w-1 h-full ${activeTab === 'ALL' ? 'bg-purple-500' : themeBg}`}></div>
+          {/* --- ROW 1: SPLIT HERO CARDS (High Density) --- */}
+          <div className="grid grid-cols-2 gap-3">
+             
+             {/* CARD 1: NETWORK CAPACITY (Committed) */}
+             <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 relative overflow-hidden group h-20 flex flex-col justify-between">
+                 <div className={`absolute top-0 left-0 w-0.5 h-full ${activeTab === 'ALL' ? 'bg-purple-500' : themeBg}`}></div>
+                 
+                 {/* Background Sparkline (Dynamic) */}
+                 <div className="absolute inset-0 z-0 opacity-10 transition-opacity pointer-events-none px-2 mt-4">
+                    <HistoryChart 
+                        data={heroChartData} 
+                        color={activeTab === 'ALL' ? '#a855f7' : activeTab === 'MAINNET' ? '#22c55e' : '#3b82f6'} 
+                        loading={trendLoading} 
+                        height={60} 
+                    />
+                 </div>
 
-             {/* BOTTOM-ANCHORED CHART */}
-             {/* Positioned strictly at bottom with partial height to avoid text collision */}
-             <div className="absolute bottom-0 left-0 right-0 h-1/2 opacity-40 group-hover:opacity-50 transition-opacity pointer-events-none">
-                <HistoryChart 
-                    data={heroChartData} 
-                    color={activeTab === 'ALL' ? '#a855f7' : activeTab === 'MAINNET' ? '#22c55e' : '#3b82f6'} 
-                    loading={trendLoading} 
-                    height={70} 
-                />
-             </div>
-
-             <div className="flex justify-between relative z-10 w-full">
-                {/* Committed Side */}
-                <div>
-                   <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest">{activeTab} Committed</span>
-                      {!trendLoading && (
+                 <div className="flex justify-between items-center relative z-10">
+                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5"><HardDrive size={10} /> Committed</div>
+                    {!trendLoading && (
                         <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${isPositive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                             {isPositive ? <TrendingUp size={8} /> : <TrendingDown size={8} />}
                             {growth.toFixed(1)}%
                         </span>
-                      )}
-                   </div>
-                   <div className={`text-4xl font-black tracking-tight ${activeTab === 'ALL' ? 'text-white' : themeColor}`}>
-                      {formatBytes(dashboardData.totalCommitted)}
-                   </div>
-                </div>
+                    )}
+                 </div>
+                 <div className={`relative z-10 text-2xl font-black tracking-tighter tabular-nums ${activeTab === 'ALL' ? 'text-white' : themeColor}`}>
+                    {formatBytes(dashboardData.totalCommitted)}
+                 </div>
+             </div>
 
-                {/* Used Side (Right Aligned) */}
-                <div className="text-right">
-                   <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest mb-1">{activeTab} Used</div>
-                   <div className="text-3xl font-black text-blue-400 tracking-tight">
-                      {formatBytes(dashboardData.totalUsed)}
-                   </div>
-                   <div className="text-[10px] text-zinc-600 font-mono mt-1">
-                      {((dashboardData.totalUsed / (dashboardData.totalCommitted || 1)) * 100).toFixed(2)}% Utilized
-                   </div>
-                </div>
+             {/* CARD 2: NETWORK LOAD (Used) - Dynamic Alert Border */}
+             <div className={`bg-zinc-900/50 border ${usageBorderClass} rounded-xl p-3 relative h-20 flex flex-col justify-between transition-colors duration-300`}>
+                 <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5"><CloudLightning size={10} /> Load State</div>
+                 <div>
+                    <div className="text-2xl font-black text-blue-400 tracking-tighter tabular-nums">
+                       {formatBytes(dashboardData.totalUsed)}
+                    </div>
+                    <div className="text-[9px] text-zinc-600 font-bold mt-0.5">
+                       {usagePercent.toFixed(2)}% Utilized
+                    </div>
+                 </div>
              </div>
           </div>
 
-          {/* --- ROW 2: EVOLUTION CHART --- */}
-          <div className="h-64">
+          {/* --- ROW 2: EVOLUTION CHART (Expanded Area) --- */}
+          <div className="h-60">
              <CapacityEvolutionChart 
                 history={evoHistory} 
                 loading={evoLoading} 
                 timeRange={timeRange} 
                 onTimeRangeChange={setTimeRange}
+                // NEW: Pass Dynamic Keys
+                capacityKey={capacityKey}
+                usedKey={usedKey}
              />
           </div>
 
           {/* --- ROW 3: FOOTER GRIDS --- */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-             
-             {/* LEFT: Composition & Benchmarks */}
+
+             {/* LEFT: Composition & Benchmarks (Unchanged) */}
              <div className="flex flex-col gap-3">
                  {/* Pie Composition */}
                  <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex items-center gap-4 h-20">
@@ -240,28 +257,31 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
                  </div>
              </div>
 
-             {/* RIGHT: Whale Dominance */}
+             {/* RIGHT: Whale Dominance (New Layout) */}
              <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-xl p-4 relative flex flex-col justify-between">
-                 <div className="flex justify-between items-start">
-                    <div className="flex flex-col gap-1">
-                       <h4 className="text-[10px] font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                          <Users size={10} className="text-yellow-500"/> Top 10 Dominance
-                       </h4>
-                       <span className="text-2xl font-black text-yellow-500">
-                          {((dashboardData.top10Sum / (dashboardData.totalCommitted || 1)) * 100).toFixed(1)}%
-                       </span>
+                 {/* Top: Header & Number */}
+                 <div className="flex flex-col gap-1">
+                    <h4 className="text-[10px] font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                       <Users size={10} className="text-yellow-500"/> Top 10 Dominance
+                    </h4>
+                    <span className="text-2xl font-black text-yellow-500">
+                       {((dashboardData.top10Sum / (dashboardData.totalCommitted || 1)) * 100).toFixed(1)}%
+                    </span>
+                 </div>
+
+                 {/* Bottom: Text (Left, 2 lines) | Pie (Right, Taller) */}
+                 <div className="flex items-end justify-between gap-2 border-t border-yellow-500/10 pt-2 mt-1">
+                    <div className="flex flex-col text-[9px] leading-tight text-zinc-400 max-w-[65%]">
+                       <span>{getWhaleText()}</span>
+                       <span className="text-white font-mono font-bold mt-0.5">{formatBytes(dashboardData.top10Sum)} combined storage.</span>
                     </div>
-                    {/* Tiny Pie */}
-                    <div className="w-10 h-10 relative opacity-80">
+                    {/* Resized Pie Chart */}
+                    <div className="w-16 h-16 relative opacity-90 shrink-0">
                         {renderPie([
                             { value: dashboardData.top10Sum, color: '#eab308' }, 
                             { value: dashboardData.restSum, color: '#52525b' }   
                         ])}
                     </div>
-                 </div>
-                 
-                 <div className="text-[9px] text-zinc-400 mt-2 border-t border-yellow-500/10 pt-2">
-                    {getWhaleText()} <span className="text-white font-mono font-bold">{formatBytes(dashboardData.top10Sum)}</span> combined storage.
                  </div>
              </div>
 
