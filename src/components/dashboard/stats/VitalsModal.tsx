@@ -16,22 +16,33 @@ interface VitalsModalProps {
 export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
   const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
 
-  // 1. PULSE CHART STATE
+  // 1. PULSE CHART STATE (Main Chart)
   const [timeRange, setTimeRange] = useState<HistoryTimeRange>('24H');
   const { history: pulseHistory, loading: pulseLoading } = useNetworkHistory(timeRange);
 
-  // 2. SHADOW LAYER STATE
+  // 2. SHADOW LAYER STATE (Mini Charts)
   const { history: shadowHistory, loading: shadowLoading } = useNetworkHistory('30D');
-  
-  // --- NEW: Dynamic Key Logic ---
-  const healthKey: keyof NetworkHistoryPoint = activeTab === 'MAINNET' ? 'mainnet_avg_health' : activeTab === 'DEVNET' ? 'devnet_avg_health' : 'avg_health';
-  const countKey: keyof NetworkHistoryPoint = activeTab === 'MAINNET' ? 'mainnet_nodes' : activeTab === 'DEVNET' ? 'devnet_nodes' : 'total_nodes';
+
+  // --- DYNAMIC KEY LOGIC (FIXED) ---
+  // We explicitly select the correct database column based on the active tab.
+  const healthKey: keyof NetworkHistoryPoint = 
+    activeTab === 'MAINNET' ? 'mainnet_avg_health' : 
+    activeTab === 'DEVNET' ? 'devnet_avg_health' : 
+    'avg_health';
+
+  const stabilityKey: keyof NetworkHistoryPoint = 
+    activeTab === 'MAINNET' ? 'mainnet_avg_stability' : 
+    activeTab === 'DEVNET' ? 'devnet_avg_stability' : 
+    'avg_stability';
+
+  const countKey: keyof NetworkHistoryPoint = 
+    activeTab === 'MAINNET' ? 'mainnet_nodes' : 
+    activeTab === 'DEVNET' ? 'devnet_nodes' : 
+    'total_nodes';
 
   // Map shadow data based on active tab
-  const healthData = shadowHistory.map(p => ({ 
-    date: p.date, 
-    value: p[healthKey] // Dynamic access
-  }));
+  const healthData = shadowHistory.map(p => ({ date: p.date, value: p[healthKey] }));
+  const stabilityData = shadowHistory.map(p => ({ date: p.date, value: p[stabilityKey] })); // New: Stability mini-chart data
 
   // --- 3. DATA ENGINE ---
   const data = useMemo(() => {
@@ -92,7 +103,6 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
                     </button>
                  ))}
              </div>
-             {/* RED CLOSE BUTTON */}
              <button onClick={onClose} className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20">
                 <X size={16} />
              </button>
@@ -106,7 +116,6 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
              {/* CARD 1: AVG HEALTH */}
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 relative overflow-hidden group h-20 flex flex-col justify-between">
                 <div className={`absolute top-0 left-0 w-0.5 h-full ${activeTheme.bg}`}></div>
-                {/* Shadow Layer (Uses Dynamic Data) */}
                 <div className="absolute inset-0 z-0 opacity-10 transition-opacity pointer-events-none px-2 mt-4">
                     <HistoryChart 
                         data={healthData} 
@@ -128,8 +137,17 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
              {/* CARD 2: STABILITY */}
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 relative overflow-hidden h-20 flex flex-col justify-between">
                 <div className={`absolute top-0 left-0 w-0.5 h-full ${activeTheme.bg}`}></div>
-                <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5"><Zap size={10} /> Stability</div>
-                <div className="flex items-baseline gap-1">
+                {/* Fixed: Added background chart for stability */}
+                <div className="absolute inset-0 z-0 opacity-10 transition-opacity pointer-events-none px-2 mt-4">
+                    <HistoryChart 
+                        data={stabilityData} 
+                        color={'#eab308'} // Yellow
+                        loading={shadowLoading} 
+                        height={60} 
+                    />
+                </div>
+                <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5 relative z-10"><Zap size={10} /> Stability</div>
+                <div className="flex items-baseline gap-1 relative z-10">
                     <span className="text-2xl font-black tracking-tighter text-white tabular-nums">{data.stabilityPercent}%</span>
                     <span className="text-[9px] text-zinc-600 font-bold">Uptime</span>
                 </div>
@@ -143,8 +161,8 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
                 loading={pulseLoading} 
                 timeRange={timeRange} 
                 onTimeRangeChange={setTimeRange}
-                // NEW PROPS PASSED HERE
                 healthKey={healthKey}
+                stabilityKey={stabilityKey} // PASSED CORRECTLY NOW
                 countKey={countKey}
              />
           </div>
@@ -157,7 +175,6 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
                     <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5"><HeartPulse size={10} /> Health Spectrum</div>
                     <div className="text-[8px] text-zinc-600 font-mono">Real-time Dist.</div>
                 </div>
-                {/* Fluid Transition Bar */}
                 <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden flex mb-2">
                    <div className="h-full bg-green-500 transition-all duration-700 ease-out" style={{ width: `${(data.spectrum.excellent / data.count) * 100}%` }}></div>
                    <div className="h-full bg-blue-500 transition-all duration-700 ease-out" style={{ width: `${(data.spectrum.good / data.count) * 100}%` }}></div>
