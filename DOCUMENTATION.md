@@ -56,6 +56,8 @@ It operates on a **Hybrid-Live Persistence Model**, balancing the need for real-
 
 <br>
 
+---
+
 ### 2.1 System Diagram
 
 ```ascii
@@ -86,6 +88,8 @@ It operates on a **Hybrid-Live Persistence Model**, balancing the need for real-
 ```
 
 ### 2.2 Component Breakdown
+
+---
 
 #### 2.2.1 Frontend Layer
 
@@ -123,7 +127,11 @@ While the dashboard UI fetches live data, a standalone backend engine captures t
 
 <br>
 
+---
+
 The platform aggregates data from three distinct sources to ensure 100% network visibility, even during partial outages.
+
+---
 
 ### 3.1 Fetch Sequence (Every 30 Seconds)
 
@@ -146,6 +154,8 @@ The platform aggregates data from three distinct sources to ensure 100% network 
     * **Score:** Apply Vitality Algorithm.
     * **Rank:** Assign competitive positioning.
 
+---
+
 ### 3.2 Caching Strategy
 
 * **Client-Side:** `localStorage.xandeum_favorites` (persistent) and `localStorage.xandeum_rank_history` (trend calculation).
@@ -160,6 +170,8 @@ The platform aggregates data from three distinct sources to ensure 100% network 
 
 <br>
 
+---
+
 ### 4.1 Multi-Network Identity Resolution ("Identity Crisis")
 
 In distributed systems, a single operator may run multiple node instances (e.g., one Mainnet, one Devnet) using the same Public Key. A naive dashboard would merge these into a single corrupted entry.
@@ -172,6 +184,8 @@ Pulse implements a 3-Factor Matching Logic to ensure atomic precision:
 
 This ensures that "Sibling Nodes" are treated as distinct entities with their own metrics, ranking, and history.
 
+---
+
 ### 4.2 Stable ID v2 (Historical Persistence)
 
 To maintain historical continuity (e.g., Stability Ribbons), the system generates a Stable ID that survives software upgrades. Volatile attributes (like Software Version or Public Status) are strictly excluded from this key.
@@ -180,6 +194,8 @@ To maintain historical continuity (e.g., Stability Ribbons), the system generate
 // Volatile data (Version, Public Status) is STRIPPED from the fingerprint
 const stableId = `${PubKey}-${IP_Address}-${NetworkID}`;
 ```
+
+---
 
 ### 4.3 Deduplication Logic
 
@@ -197,7 +213,11 @@ When aggregating data from multiple RPC sources (Private vs. Public), duplicate 
 
 <br>
 
+---
+
 The "Vitality Score" (0-100) is not arbitrary. It is a weighted composite of four non-linear metrics designed to penalize instability while rewarding consistency.
+
+---
 
 ### 5.1 Vitality Weights Table
 
@@ -207,6 +227,8 @@ The "Vitality Score" (0-100) is not arbitrary. It is a weighted composite of fou
 | **Storage** | 30% | 35% |
 | **Reputation** | 20% | 0% (Excluded) |
 | **Version** | 15% | 20% |
+
+---
 
 ### 5.2 Uptime Score — Stability & Reliability
 
@@ -218,6 +240,8 @@ The "Vitality Score" (0-100) is not arbitrary. It is a weighted composite of fou
     * **Constraint:** If $t < 1.0$ day, the score is **hard-capped at 20/100**.
     * > 14 days → Rapidly approaches 100 points.
 
+---
+
 ### 5.3 Storage Score — Capacity + Utilization
 
 **Goal:** Reward both promised utility (commitment) and real usage (data stored).
@@ -227,6 +251,8 @@ The "Vitality Score" (0-100) is not arbitrary. It is a weighted composite of fou
     * **Utilization Bonus:** Additional points (up to +15) based on actual data stored (`storage_used`).
     * **Whale Protection:** Uses Median instead of Average to prevent "Storage Whales" from skewing the curve.
 
+---
+
 ### 5.4 Reputation Score — Historical Contribution
 
 **Goal:** Measure proven contribution relative to the network's middle standard.
@@ -234,6 +260,8 @@ The "Vitality Score" (0-100) is not arbitrary. It is a weighted composite of fou
 * **Logic:**
     * `min(100, (Credits / (MedianCredits * 2)) * 100)`
     * If the Credits API is offline, this weight (20%) is redistributed to Uptime (+10%), Storage (+5%), and Version (+5%).
+
+---
 
 ### 5.5 Version Score — Security & Consensus Alignment
 
@@ -245,6 +273,8 @@ The "Vitality Score" (0-100) is not arbitrary. It is a weighted composite of fou
     * Distance 2: **70 pts**
     * Distance 3: **50 pts**
     * Distance 4+: **< 30 pts**
+
+---
 
 ### 5.6 Gatekeeper Rule (Hard Constraint)
 
@@ -261,6 +291,8 @@ The "Vitality Score" (0-100) is not arbitrary. It is a weighted composite of fou
 
 <br>
 
+---
+
 ### 6.1 Uptime Scoring (Sigmoid Function)
 
 Linear scoring is flawed for uptime (the difference between 99% and 100% is significant). We use a Sigmoid Function:
@@ -270,6 +302,8 @@ $$S(t) = \frac{100}{1 + e^{-k(t - t_0)}}$$
 * $t$: Uptime in days.
 * $t_0$: Midpoint (7 days).
 * $k$: Steepness factor (0.2).
+
+---
 
 ### 6.2 Economic Simulation (STOINC Protocol)
 
@@ -290,7 +324,11 @@ The Leaderboard includes a hardware-based reward forecaster. This simulation app
 
 <br>
 
+---
+
 Pulse replaces static labels with an Algorithmic Narrative Engine. This system generates context-aware sentences based on the user's specific interaction state.
+
+---
 
 ### 7.1 The 7-Scenario Logic
 
@@ -303,6 +341,8 @@ The engine detects the active context and routes the logic to one of 7 generator
 5.  **Market (Slice Focus):** Wealth dominance and Shareholder leverage.
 6.  **Topology (Default):** Geographic clustering and jurisdictional risk.
 7.  **Topology (Pin Focus):** "King Node" status and regional connectivity.
+
+---
 
 ### 7.2 Seeded Randomness
 
@@ -321,7 +361,11 @@ To prevent the text from "flickering" or feeling robotic, the engine uses a hash
 
 <br>
 
+---
+
 The persistence layer is built on PostgreSQL (Supabase).
+
+---
 
 ### 8.1 network_snapshots
 
@@ -335,6 +379,8 @@ Captures the global heartbeat.
 | `avg_health` | numeric | Global vitality average |
 | `consensus_version` | text | Current network consensus |
 | `total_capacity` | int8 | Total storage (Bytes) |
+
+---
 
 ### 8.2 node_snapshots
 
@@ -358,7 +404,11 @@ The high-volume table driving the Stability Ribbons.
 
 <br>
 
+---
+
 The platform's reliability is guaranteed by a multi-layered testing strategy comprising 31 automated tests across 5 suites.
+
+---
 
 ### 9.1 Mathematical Verification
 
@@ -368,6 +418,8 @@ The platform's reliability is guaranteed by a multi-layered testing strategy com
     * Vitality scores clamp correctly (0-100) even with negative inputs.
     * Fallback weights trigger automatically when API simulates failure.
 
+---
+
 ### 9.2 Spatial Logic Verification
 
 * **Focus:** `api/geo.ts`
@@ -375,12 +427,16 @@ The platform's reliability is guaranteed by a multi-layered testing strategy com
     * **Ghost Node Filtering:** VPN/Private IPs (lat: 0) are excluded from map rendering.
     * **King Selection:** The aggregation engine correctly picks the highest-value node to represent a city cluster.
 
+---
+
 ### 9.3 UI & Integration Tests
 
 * **Focus:** `pages/map.tsx`, `integration/navigation.test.tsx`
 * **Method:** Simulates user journeys:
     * Clicking a deep link (`?focus=1.2.3.4`) correctly zooms the map.
     * Switching view modes updates D3 render layers without crashing.
+
+---
 
 ### 9.4 The Pulse Monitor (Continuous Auditing)
 
@@ -397,6 +453,8 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 <summary><h2>10. API Reference</h2></summary>
 
 <br>
+
+---
 
 ### `/api/stats`
 
@@ -481,6 +539,8 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 
 <br>
 
+---
+
 ### 11.1 Visual Hierarchy
 
 * **Color-Coded Modes:** Each view mode has a dedicated color scheme.
@@ -489,7 +549,9 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
     * Credits: Orange (`#f97316`)
 * **Progressive Disclosure:** Cards start collapsed, expand on click.
     * Overview → Detailed Breakdown → Raw Data.
-* **Micro-Animations:** Every state change has a 300ms transition (Fade-ins, Slide-ins).
+* **Micro-Animations:** Every state change has a 300ms transition (Fade-ins, Slide-ins, Pulse effects).
+
+---
 
 ### 11.2 Responsive Breakpoints
 
@@ -499,6 +561,8 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 * **lg:** 1024px (Laptops)
 * **xl:** 1280px (Desktops)
 * **2xl:** 1536px (Wide Monitors)
+
+---
 
 ### 11.3 User Feedback
 
@@ -529,6 +593,8 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 
 <br>
 
+---
+
 ### 12.1 Dashboard (/)
 
 * **Primary View:** Grid of node cards with rotating metrics.
@@ -541,6 +607,8 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 * **Smart Jump-to-View:** Sorting by Storage locks cycle to step 2; Sorting by Health locks cycle to step 3.
 * **Zen Mode:** Minimalist OLED-black theme for 24/7 monitoring walls.
 
+---
+
 ### 12.2 Node Inspector Modal
 
 * **HealthView:** Breakdown of 4 pillars + 30-Day Stability Ribbon.
@@ -549,6 +617,8 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 * **Versus Mode:** Side-by-side comparison with green checkmarks for superiority.
 * **Proof of Pulse:** PNG generation for social sharing.
 
+---
+
 ### 12.3 Global Map (/map)
 
 * **Three View Modes:**
@@ -556,6 +626,8 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
     * Health: Pin shape = diamond (vs square/circle).
     * Credits: Pin size = total earnings.
 * **Regional X-Ray Stats:** Avg Density, Global Share, Tier Rank.
+
+---
 
 ### 12.4 Leaderboard (/leaderboard)
 
@@ -575,6 +647,8 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 
 <br>
 
+---
+
 ### 13.1 Smart Card Rotation
 
 Cards cycle through 5 metrics every 5 seconds, but **sorting locks the cycle** to the relevant step:
@@ -589,6 +663,8 @@ useEffect(() => {
   if (targetStep !== -1) setCycleStep(targetStep);
 }, [sortBy]);
 ```
+
+---
 
 ### 13.2 Whale Watch (Trend Tracking)
 
@@ -615,6 +691,8 @@ if (prevRank) {
   node.trend = prevRank - currentRank; // Positive = moved up
 }
 ```
+
+---
 
 ### 13.3 Deep Linking
 
@@ -649,16 +727,22 @@ useEffect(() => {
 
 <br>
 
+---
+
 ### 14.1 Bundle Size
 
 * **Target:** < 500KB initial load (gzipped).
 * **Techniques:** Tree Shaking, Code Splitting (Lazy-load map libraries), Image Optimization (WebP), Font Subsetting.
+
+---
 
 ### 14.2 Rendering Strategy
 
 * **Static Generation (SSG):** Documentation page, About/FAQ pages.
 * **Server-Side Rendering (SSR):** Dashboard (for SEO), Leaderboard.
 * **Client-Side Rendering (CSR):** Map (data-heavy), Modals (ephemeral state).
+
+---
 
 ### 14.3 Memory Management
 
@@ -674,6 +758,8 @@ useEffect(() => {
 
 <br>
 
+---
+
 ### 15.1 Circuit Breaker & Failover
 
 To prevent "Lag Cascades" where slow nodes hang the UI, the `RpcOrchestrator` implements a strict Circuit Breaker pattern:
@@ -681,6 +767,8 @@ To prevent "Lag Cascades" where slow nodes hang the UI, the `RpcOrchestrator` im
 * **Threshold:** 3 consecutive failures or timeouts (>4000ms).
 * **Penalty:** The offending node is "Banned" from rotation for 60 seconds.
 * **Recovery:** A background worker passively tests banned nodes; successful pings restore them to the active pool.
+
+---
 
 ### 15.2 Fail-Safe Hierarchy
 
@@ -699,6 +787,8 @@ To prevent "Lag Cascades" where slow nodes hang the UI, the `RpcOrchestrator` im
 
 <br>
 
+---
+
 ### 16.1 Common Error Codes
 
 * `ERR_RPC_ALL_FAIL`: The Circuit Breaker has tripped for the Hero node, and all Swarm backups timed out.
@@ -707,6 +797,8 @@ To prevent "Lag Cascades" where slow nodes hang the UI, the `RpcOrchestrator` im
     * **Action:** Dashboard automatically switches to "Fallback Weighting" mode.
 * `GEO_RATE_LIMIT`: The IP-API batch limit was reached.
     * **Action:** System falls back to local `geoip-lite` database.
+
+---
 
 ### 16.2 More
 
@@ -736,6 +828,8 @@ To prevent "Lag Cascades" where slow nodes hang the UI, the `RpcOrchestrator` im
 - **Cause**: localStorage cleared by browser/extension
 - **Prevention**: Export favorites (future feature)
 
+---
+
 ### 16.3 To force a network snapshot outside the 30-minute cron schedule (e.g., after a deployment), dispatch the GitHub Action manually:
 
 ```bash
@@ -748,11 +842,15 @@ gh workflow run monitor.yml
 
 ## 17. Future Enhancements
 
+---
+
 ### Planned Features
 
 1. **Alerts**: Email/SMS when node goes offline
 2. **API Keys**: Rate-limited access for third-party apps
 3. **Mobile App**: Native iOS/Android (React Native)
+
+---
 
 ### Open Research Questions
 
@@ -765,11 +863,15 @@ gh workflow run monitor.yml
 
 ## 18. Contributing
 
+---
+
 ### Code Standards
 
 - **TypeScript Strict Mode**: Enabled
 - **ESLint**: `next/core-web-vitals` ruleset
 - **Prettier**: 2-space indent, single quotes
+
+---
 
 ### Testing Protocol
 
