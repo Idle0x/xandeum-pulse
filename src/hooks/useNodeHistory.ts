@@ -1,80 +1,91 @@
 import { useState, useEffect } from 'react';
-import { Node } from '../types';
-// Import the Server Action
+import { Node } from '../types'; 
+import { consolidateHistory } from '../utils/historyAggregator'; 
+// We import the Server Action instead of the Supabase client
 import { getNodeHistoryAction } from '../app/actions/getHistory';
+
+export interface NodeHistoryPoint {
+  date: string;
+  health: number;
+  uptime: number;
+  storage_committed: number;
+  storage_used: number;
+  credits: number;
+  reputation: number;
+  rank: number;
+  network: string; 
+}
 
 export type HistoryTimeRange = '24H' | '3D' | '7D' | '30D' | 'ALL';
 
-export const useMultiNodeHistory = (nodes: Node[], timeRange: HistoryTimeRange = '7D') => {
-  const [historyMap, setHistoryMap] = useState<Record<string, any[]>>({});
+export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRange = '24H') => {
+  const [history, setHistory] = useState<NodeHistoryPoint[]>([]);
   const [loading, setLoading] = useState(false);
+  const [reliabilityScore, setReliabilityScore] = useState(100);
 
   useEffect(() => {
-    // If no nodes selected, clear map and return
-    if (nodes.length === 0) {
-      setHistoryMap({});
-      return;
-    }
-
     let isMounted = true;
-    setLoading(true);
+    if (!node || !node.pubkey || !node.network) return;
 
-    async function fetchAll() {
-      // 1. Calculate Start Date (Days)
-      let days = 7;
+    const targetNetwork = node.network;
+    const targetAddress = node.address || '0.0.0.0'; 
+    const targetPubkey = node.pubkey;
+
+    async function fetchNodeHistory() {
+      setLoading(true);
+
+      const ipOnly = targetAddress.includes(':') ? targetAddress.split(':')[0] : targetAddress;
+      // Ensure this ID generation matches your Server Action logic
+      const stableId = `${targetPubkey}-${ipOnly}-${targetNetwork}`;
+
+      // 1. Determine Days
+      let days = 1;
       if (timeRange === '24H') days = 1;
       if (timeRange === '3D') days = 3;
+      if (timeRange === '7D') days = 7;
       if (timeRange === '30D') days = 30;
       if (timeRange === 'ALL') days = 365;
 
-      // 2. Parallel Fetching Strategy (Through Server Cache)
-      const requests = nodes.map(async (node) => {
-          // Standardize ID Generation to match your Backend/Server Action
-          const ipOnly = node.address && node.address.includes(':') 
-            ? node.address.split(':')[0] 
-            : (node.address || '0.0.0.0');
-          
-          const network = node.network || 'MAINNET';
-          const stableId = `${node.pubkey}-${ipOnly}-${network}`;
+      try {
+        // 2. Call Server Action (Hits the RAM Cache)
+        const data = await getNodeHistoryAction(stableId, targetNetwork, days);
 
-          try {
-            // Call Server Action
-            const data = await getNodeHistoryAction(stableId, network, days);
-            
-            // Map the raw server data to the format your charts expect
-            const cleanData = (data || []).map((row: any) => ({
-              created_at: row.created_at,
-              health: Number(row.health || 0),
-              uptime: Number(row.uptime || 0),
-              storage_committed: Number(row.storage_committed || 0),
-              storage_used: Number(row.storage_used || 0),
-              credits: Number(row.credits || 0)
-            }));
+        if (!isMounted) return;
 
-            return { pubkey: node.pubkey, data: cleanData };
-          } catch (err) {
-            console.error(`Failed to fetch history for ${node.pubkey}:`, err);
-            return { pubkey: node.pubkey, data: [] };
-          }
-      });
+        // 3. Map Data
+        const rawPoints = (data || []).map((row: any) => ({
+          date: row.created_at, 
+          health: Number(row.health || 0),
+          uptime: Number(row.uptime || 0),
+          storage_committed: Number(row.storage_committed || 0),
+          storage_used: Number(row.storage_used || 0),
+          credits: Number(row.credits || 0), 
+          rank: Number(row.rank || 0),
+          network: row.network || targetNetwork
+        }));
 
-      // Wait for all cached requests to finish
-      const results = await Promise.all(requests);
+        // 4. Aggregate
+        const processedHistory = consolidateHistory(rawPoints, timeRange);
 
-      if (isMounted) {
-          const newMap: Record<string, any[]> = {};
-          results.forEach(res => {
-              if (res.pubkey) newMap[res.pubkey] = res.data;
-          });
-          setHistoryMap(newMap);
-          setLoading(false);
+        if (processedHistory.length > 0) {
+          const activeCount = processedHistory.filter((p: any) => p.health > 0).length;
+          setReliabilityScore(Math.floor((activeCount / processedHistory.length) * 100));
+        } else {
+          setReliabilityScore(0);
+        }
+
+        setHistory(processedHistory);
+      } catch (err) {
+        console.error("Failed to fetch node history:", err);
+      } finally {
+        if (isMounted) setLoading(false);
       }
     }
 
-    fetchAll();
+    fetchNodeHistory();
 
     return () => { isMounted = false; };
-  }, [nodes, timeRange]); 
+  }, [node?.pubkey, node?.network, node?.address, timeRange]);
 
-  return { historyMap, loading };
+  return { history, reliabilityScore, loading };
 };
