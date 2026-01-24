@@ -52,6 +52,7 @@ const SAMPLE_NODE = {
   network: 'MAINNET',
   storage_committed: 1000,
   last_seen_timestamp: Date.now(),
+  isUntracked: false, // Ensure defaults
 };
 
 describe('Xandeum Pulse - Inspector Integration', () => {
@@ -68,13 +69,11 @@ describe('Xandeum Pulse - Inspector Integration', () => {
   test('REPUTATION LINK: Navigates to leaderboard', async () => {
     await act(async () => { render(<Home />); });
 
-    // 1. Open Modal (Using the card container directly)
     const nodeCardText = await screen.findByText(/1.2.3.4/);
     fireEvent.click(nodeCardText.closest('div')!);
 
-    // 2. Click Reputation (Handle multiple responsive instances)
     const repLabels = await screen.findAllByText('REPUTATION');
-    fireEvent.click(repLabels[0]); // Clicks the first one found
+    fireEvent.click(repLabels[0]);
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('highlight=8xTestNodeKey123'));
@@ -84,7 +83,8 @@ describe('Xandeum Pulse - Inspector Integration', () => {
   test('API STATUS: Shows offline badge', async () => {
     mockedAxios.get.mockResolvedValue({
       data: {
-        result: { pods: [{ ...SAMPLE_NODE, credits: null }] },
+        // Explicitly set isUntracked: false so the logic falls through to credits: null
+        result: { pods: [{ ...SAMPLE_NODE, credits: null, isUntracked: false }] },
         stats: { systemStatus: { credits: false } }
       }
     });
@@ -95,7 +95,7 @@ describe('Xandeum Pulse - Inspector Integration', () => {
     const nodeCardText = await screen.findByText(/1.2.3.4/);
     fireEvent.click(nodeCardText.closest('div')!);
 
-    // Check for "API OFFLINE" - handle multiple instances in responsive layout
+    // Check for "API OFFLINE" 
     await waitFor(() => {
       const offlineBadges = screen.getAllByText(/API OFFLINE/i);
       expect(offlineBadges.length).toBeGreaterThan(0);
