@@ -1,15 +1,17 @@
-import { useState, useMemo } from 'react';
-import { X, Trophy, Wallet, Activity, BarChart3, TrendingUp, TrendingDown, ChevronDown } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { X, Trophy, Wallet, Activity, BarChart3, ChevronDown, Globe, Database, Layers } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart } from 'recharts';
 import { useNetworkHistory, HistoryTimeRange } from '../../hooks/useNetworkHistory';
+import { NetworkType } from '../../types/leaderboard';
 
 interface LeaderboardAnalyticsModalProps {
   onClose: () => void;
-  currentStats: {
+  initialNetwork: NetworkType | 'COMBINED';
+  // We keep this as a fallback for the initial render before history loads
+  initialStats: {
     totalCredits: number;
     avgCredits: number;
     dominance: number;
-    nodeCount: number;
   };
 }
 
@@ -21,6 +23,12 @@ const TIME_OPTIONS = [
     { label: 'All Time', value: 'ALL' },
 ] as const;
 
+const NETWORK_OPTIONS = [
+    { id: 'MAINNET', label: 'Mainnet', icon: Globe, color: 'text-emerald-500' },
+    { id: 'DEVNET', label: 'Devnet', icon: Database, color: 'text-blue-500' },
+    { id: 'COMBINED', label: 'All Networks', icon: Layers, color: 'text-yellow-500' },
+] as const;
+
 // Shared style for consistent, professional chart axes
 const AXIS_STYLE = {
     fontSize: 9, 
@@ -28,23 +36,41 @@ const AXIS_STYLE = {
     fontFamily: 'monospace'
 };
 
-export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: LeaderboardAnalyticsModalProps) => {
+export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStats }: LeaderboardAnalyticsModalProps) => {
   const [timeRange, setTimeRange] = useState<HistoryTimeRange>('24H');
+  const [activeNetwork, setActiveNetwork] = useState<NetworkType | 'COMBINED'>(initialNetwork);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  const { history, loading } = useNetworkHistory(timeRange);
+  // NOTE: You must update your useNetworkHistory hook to accept the network argument!
+  // const { history, loading } = useNetworkHistory(timeRange, activeNetwork);
+  const { history, loading } = useNetworkHistory(timeRange, activeNetwork);
 
   // --- SMART AXIS FORMATTER ---
   const formatXAxis = (val: string) => {
       const date = new Date(val);
-      // If 24H, show Time (14:30). If longer, show Date (Jan 24).
       if (timeRange === '24H') {
           return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
       }
       return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
 
-  // --- METRICS CALCULATION ---
+  // --- DYNAMIC STATS CALCULATION ---
+  // If we switch networks inside the modal, we can't rely on 'initialStats' from the parent anymore.
+  // We must calculate the "Current Big Numbers" from the latest point in the fetched history.
+  const displayStats = useMemo(() => {
+      if (history && history.length > 0) {
+          const latest = history[history.length - 1];
+          return {
+              totalCredits: latest.total_credits,
+              avgCredits: latest.avg_credits,
+              dominance: latest.top10_dominance
+          };
+      }
+      // Fallback to initial stats provided by parent if history is loading or empty
+      return initialStats; 
+  }, [history, initialStats]);
+
+  // --- METRICS CALCULATION (Growth/Delta) ---
   const metrics = useMemo(() => {
       if (!history || history.length < 2) return null;
       const start = history[0];
@@ -79,7 +105,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                       <Icon size={10} className="text-zinc-600"/> {title}
                   </div>
                   <div className="text-xl md:text-2xl font-bold text-zinc-100 tracking-tight font-mono">
-                      {value}
+                      {loading ? <span className="animate-pulse opacity-50">...</span> : value}
                   </div>
               </div>
               <div className="flex flex-col items-end justify-center min-h-[40px]">
@@ -114,18 +140,41 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
       <div className="bg-[#09090b] border border-zinc-800 rounded-2xl p-6 max-w-4xl w-full shadow-2xl overflow-y-auto max-h-[90vh] custom-scrollbar" onClick={(e) => e.stopPropagation()}>
 
         {/* TOP BAR */}
-        <div className="flex justify-between items-center mb-6 border-b border-zinc-800/50 pb-4">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4 border-b border-zinc-800/50 pb-4">
+          
+          {/* TITLE & NETWORK SWITCHER */}
+          <div className="flex items-center gap-4">
             <div className="p-2.5 rounded-lg bg-yellow-500/5 text-yellow-500 border border-yellow-500/10">
               <Trophy size={20} />
             </div>
-            <div>
-              <h3 className="text-lg font-bold text-white tracking-tight">Market Analysis</h3>
-              <p className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest mt-0.5">Financial Report & Trends</p>
+            <div className="flex flex-col gap-2">
+                <div>
+                    <h3 className="text-lg font-bold text-white tracking-tight leading-none">Market Analysis</h3>
+                    <p className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest mt-1">Financial Report & Trends</p>
+                </div>
+                
+                {/* --- NEW NETWORK SWITCHER --- */}
+                <div className="flex items-center bg-zinc-900 p-0.5 rounded-lg border border-zinc-800 w-fit">
+                    {NETWORK_OPTIONS.map((opt) => (
+                        <button
+                            key={opt.id}
+                            onClick={() => setActiveNetwork(opt.id as any)}
+                            className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
+                                activeNetwork === opt.id 
+                                ? 'bg-zinc-800 text-white shadow-sm' 
+                                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                            }`}
+                        >
+                            <opt.icon size={10} className={activeNetwork === opt.id ? opt.color : ''} />
+                            {opt.label}
+                        </button>
+                    ))}
+                </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* TIME CONTROL & CLOSE */}
+          <div className="flex items-center gap-3 self-end md:self-auto">
             <div className="relative">
                 <button 
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -161,7 +210,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                 <ChartHeader 
                     icon={Wallet}
                     title="Total Network Credits"
-                    value={(currentStats.totalCredits / 1_000_000).toFixed(2) + "M"}
+                    value={(displayStats.totalCredits / 1_000_000).toFixed(2) + "M"}
                     delta={metrics?.credit.delta}
                     pct={metrics?.credit.pct}
                 />
@@ -175,8 +224,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                               </linearGradient>
                            </defs>
                            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.3} />
-                           
-                           {/* SMART X-AXIS */}
+
                            <XAxis 
                                dataKey="date" 
                                axisLine={false} 
@@ -185,7 +233,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                                minTickGap={40} 
                                tickFormatter={formatXAxis} 
                            />
-                           
+
                            <YAxis 
                                axisLine={false} 
                                tickLine={false} 
@@ -194,7 +242,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                                domain={['auto', 'auto']}
                                tickFormatter={(val) => (val/1000000).toFixed(1) + 'M'} 
                            />
-                           
+
                            <Tooltip 
                                contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }} 
                                itemStyle={{ fontFamily: 'monospace' }} 
@@ -214,7 +262,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                     <ChartHeader 
                         icon={BarChart3}
                         title="Top 10 Dominance"
-                        value={currentStats.dominance.toFixed(1) + "%"}
+                        value={displayStats.dominance.toFixed(1) + "%"}
                         delta={metrics?.dom.delta}
                         suffix="%"
                     />
@@ -222,8 +270,6 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                          <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={history} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.3} />
-                               
-                               {/* SMART X-AXIS */}
                                <XAxis 
                                    dataKey="date" 
                                    axisLine={false} 
@@ -232,8 +278,6 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                                    minTickGap={30}
                                    tickFormatter={formatXAxis}
                                />
-                               
-                               {/* VISIBLE Y-AXIS */}
                                <YAxis 
                                    axisLine={false} 
                                    tickLine={false} 
@@ -242,7 +286,6 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                                    domain={['auto', 'auto']}
                                    tickFormatter={(val) => val.toFixed(0) + '%'}
                                />
-                               
                                <Tooltip 
                                    contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }} 
                                    itemStyle={{ fontFamily: 'monospace' }}
@@ -259,7 +302,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                     <ChartHeader 
                         icon={Activity}
                         title="Average Node Earnings"
-                        value={(currentStats.avgCredits / 1000).toFixed(1) + "k"}
+                        value={(displayStats.avgCredits / 1000).toFixed(1) + "k"}
                         subLabel="Daily Credits Yield"
                         customRightElement={
                             metrics && (
@@ -273,8 +316,6 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                          <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={history} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.3} />
-                               
-                               {/* SMART X-AXIS */}
                                <XAxis 
                                    dataKey="date" 
                                    axisLine={false} 
@@ -283,8 +324,6 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                                    minTickGap={30}
                                    tickFormatter={formatXAxis}
                                />
-                               
-                               {/* VISIBLE Y-AXIS */}
                                <YAxis 
                                    axisLine={false} 
                                    tickLine={false} 
@@ -293,7 +332,6 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                                    domain={['auto', 'auto']}
                                    tickFormatter={(val) => (val/1000).toFixed(1) + 'k'}
                                />
-                               
                                <Tooltip 
                                    contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }} 
                                    itemStyle={{ fontFamily: 'monospace' }}
