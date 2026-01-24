@@ -40,18 +40,13 @@ export const CapacityEvolutionChart = ({
   }, [viewMode, capacityKey, usedKey]);
 
   // --- REFINED DOMAIN LOGIC ---
-  // FIX: Changed input type to 'any' to resolve Recharts Readonly/Mutable type conflict
   const getDomain = useCallback((args: any): [number, number] => {
-    // Destructure manually
     const [dataMin, dataMax] = args;
 
-    // Safety check for empty data
     if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 1];
 
-    // 1. Calculate Lower Bound
+    // Keep the "Zoom" logic (padding) but allow standard ticks
     const lowerBound = Math.max(0, dataMin * 0.90);
-
-    // 2. Calculate Upper Bound
     const upperBound = dataMax * 1.05;
 
     return [lowerBound, upperBound];
@@ -144,13 +139,14 @@ export const CapacityEvolutionChart = ({
                   axisLine={false} 
                   tickLine={false} 
                   tick={{fontSize: 9, fill: config.color, fontWeight: 600}} 
-                  width={35} 
+                  width={40} // Increased width for 2 decimal places
                   domain={getDomain} 
-                  tickCount={4}      
+                  // REMOVED: tickCount={4} to allow auto-calculation
                   tickFormatter={(val) => {
                       const str = formatBytes(val);
                       const [num] = str.split(' ');
-                      return Math.round(parseFloat(num)).toString();
+                      // FIXED: Force 2 decimal places (e.g., "522.09")
+                      return parseFloat(num).toFixed(2);
                   }}
                />
 
