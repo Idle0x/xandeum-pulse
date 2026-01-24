@@ -40,8 +40,7 @@ export const StatsOverview = ({
   const { vitalsStats, consensusStats, displayCommitted, displayUsed, isGlobalView } = stats;
   const { history, loading: historyLoading } = useNetworkHistory('7D');
 
-  // --- NEW: DYNAMIC DATA MAPPING ---
-  // We now pull the specific column based on the active filter
+  // --- DYNAMIC DATA MAPPING ---
   const capacityData = history.map(p => ({ 
     date: p.date, 
     value: networkFilter === 'MAINNET' ? p.mainnet_capacity : networkFilter === 'DEVNET' ? p.devnet_capacity : p.total_capacity 
@@ -57,28 +56,26 @@ export const StatsOverview = ({
     value: networkFilter === 'MAINNET' ? p.mainnet_consensus_score : networkFilter === 'DEVNET' ? p.devnet_consensus_score : p.consensus_score 
   }));
 
-  // Logic for the subtle border color
-  const healthVal = vitalsStats.avg;
-  const healthBorderClass = healthVal < 50 
-    ? 'border-red-500/20 shadow-[0_0_15px_-3px_rgba(239,68,68,0.1)]' // Red
-    : healthVal > 80 
-      ? 'border-green-500/20 shadow-[0_0_15px_-3px_rgba(34,197,94,0.1)]' // Green
-      : 'border-yellow-500/20 shadow-[0_0_15px_-3px_rgba(234,179,8,0.1)]'; // Yellow
-
   return (
     <>
       <style>
         {`
-          @keyframes scanner {
-            0% { transform: translateX(-150%) skewX(-15deg); }
-            100% { transform: translateX(350%) skewX(-15deg); }
+          @keyframes scanner-loop {
+            /* Scan phase (approx 2s of 7s total) */
+            0% { left: -5%; opacity: 0; }
+            5% { opacity: 1; }
+            25% { opacity: 1; }
+            30% { left: 105%; opacity: 0; }
+            /* Wait phase (remaining 5s) */
+            100% { left: 105%; opacity: 0; }
           }
-          .animate-scanner {
-            animation: scanner 5s linear infinite;
+          .animate-scanner-line {
+            /* 7s total = ~2s scan + ~5s delay */
+            animation: scanner-loop 7s ease-in-out infinite; 
           }
         `}
       </style>
-      
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
 
         {/* --- 1. CAPACITY CARD --- */}
@@ -113,11 +110,14 @@ export const StatsOverview = ({
         {/* --- 2. VITALS CARD --- */}
         <div 
           onClick={() => onOpenModal('vitals')} 
-          className={`bg-zinc-900/50 border ${healthBorderClass} p-3 md:p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer hover:scale-[1.02] active:scale-95 transition-all duration-300 h-24 md:h-auto`}
+          // REMOVED: healthBorderClass, replaced with standard border-zinc-800
+          className="bg-zinc-900/50 border border-zinc-800 p-3 md:p-5 rounded-xl backdrop-blur-sm relative overflow-hidden group cursor-pointer hover:scale-[1.02] active:scale-95 transition-all duration-300 h-24 md:h-auto"
         >
-          {/* THE SCANNER LIGHT */}
+          {/* THE SCANNER LIGHT - UPDATED */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl z-20">
-            <div className="absolute top-0 bottom-0 w-1/3 bg-gradient-to-r from-transparent via-white to-transparent opacity-[0.07] animate-scanner blur-sm"></div>
+             <div 
+               className="absolute top-0 bottom-0 w-[2px] bg-green-500/30 shadow-[0_0_8px_rgba(34,197,94,0.3)] animate-scanner-line"
+             ></div>
           </div>
 
           <div className="absolute inset-0 z-0 opacity-20 group-hover:opacity-30 transition-opacity pointer-events-none mt-4">
