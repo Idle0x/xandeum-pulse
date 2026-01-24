@@ -16,15 +16,10 @@ interface VitalsModalProps {
 export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
   const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
 
-  // 1. PULSE CHART STATE (Main Chart)
   const [timeRange, setTimeRange] = useState<HistoryTimeRange>('24H');
   const { history: pulseHistory, loading: pulseLoading } = useNetworkHistory(timeRange);
-
-  // 2. SHADOW LAYER STATE (Mini Charts)
   const { history: shadowHistory, loading: shadowLoading } = useNetworkHistory('30D');
 
-  // --- DYNAMIC KEY LOGIC (FIXED) ---
-  // We explicitly select the correct database column based on the active tab.
   const healthKey: keyof NetworkHistoryPoint = 
     activeTab === 'MAINNET' ? 'mainnet_avg_health' : 
     activeTab === 'DEVNET' ? 'devnet_avg_health' : 
@@ -40,11 +35,9 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
     activeTab === 'DEVNET' ? 'devnet_nodes' : 
     'total_nodes';
 
-  // Map shadow data based on active tab
   const healthData = shadowHistory.map(p => ({ date: p.date, value: p[healthKey] }));
-  const stabilityData = shadowHistory.map(p => ({ date: p.date, value: p[stabilityKey] })); // New: Stability mini-chart data
+  const stabilityData = shadowHistory.map(p => ({ date: p.date, value: p[stabilityKey] }));
 
-  // --- 3. DATA ENGINE ---
   const data = useMemo(() => {
     const filtered = nodes.filter(n => activeTab === 'ALL' ? true : n.network === activeTab);
     const count = filtered.length || 1;
@@ -71,7 +64,6 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
     };
   }, [nodes, activeTab]);
 
-  // Theme Logic
   const theme = {
     ALL: { text: 'text-purple-400', bg: 'bg-purple-500' },
     MAINNET: { text: 'text-green-500', bg: 'bg-green-500' },
@@ -83,11 +75,11 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#09090b] border border-zinc-800 rounded-3xl p-5 md:p-6 max-w-3xl w-full shadow-2xl animate-in zoom-in-95 fade-in duration-200 overflow-y-auto max-h-[90vh] custom-scrollbar" onClick={(e) => e.stopPropagation()}>
 
-        {/* --- HEADER --- */}
+        {/* HEADER */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-4">
           <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-lg border bg-opacity-10 border-zinc-800 ${activeTheme.bg}`}>
-              <HeartPulse size={20} className={activeTheme.text} />
+            <div className={`p-2.5 rounded-lg border bg-opacity-10 border-zinc-800 transition-colors duration-500 ${activeTheme.bg}`}>
+              <HeartPulse size={20} className={`transition-colors duration-500 ${activeTheme.text}`} />
             </div>
             <div>
               <h3 className="text-lg font-black text-white leading-tight">Network Vitals</h3>
@@ -111,11 +103,11 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
 
         <div className="space-y-3">
 
-          {/* --- ROW 1: COMPACT KPI CARDS --- */}
+          {/* ROW 1: COMPACT KPI CARDS */}
           <div className="grid grid-cols-2 gap-3">
              {/* CARD 1: AVG HEALTH */}
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 relative overflow-hidden group h-20 flex flex-col justify-between">
-                <div className={`absolute top-0 left-0 w-0.5 h-full ${activeTheme.bg}`}></div>
+                <div className={`absolute top-0 left-0 w-0.5 h-full transition-colors duration-500 ${activeTheme.bg}`}></div>
                 <div className="absolute inset-0 z-0 opacity-10 transition-opacity pointer-events-none px-2 mt-4">
                     <HistoryChart 
                         data={healthData} 
@@ -126,22 +118,21 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
                 </div>
                 <div className="flex justify-between items-center relative z-10">
                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5"><Activity size={10} /> Avg Health</div>
-                   <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-950/50 border border-white/5 ${activeTheme.text}`}>{activeTab}</span>
+                   <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-950/50 border border-white/5 transition-colors duration-500 ${activeTheme.text}`}>{activeTab}</span>
                 </div>
                 <div className="relative z-10 flex items-baseline gap-1">
-                    <span className={`text-2xl font-black tracking-tighter tabular-nums ${activeTab === 'ALL' ? 'text-white' : activeTheme.text}`}>{data.avgHealth}</span>
+                    <span className={`text-2xl font-black tracking-tighter tabular-nums transition-colors duration-500 ${activeTab === 'ALL' ? 'text-white' : activeTheme.text}`}>{data.avgHealth}</span>
                     <span className="text-[10px] text-zinc-600 font-bold">/ 100</span>
                 </div>
              </div>
 
              {/* CARD 2: STABILITY */}
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 relative overflow-hidden h-20 flex flex-col justify-between">
-                <div className={`absolute top-0 left-0 w-0.5 h-full ${activeTheme.bg}`}></div>
-                {/* Fixed: Added background chart for stability */}
+                <div className={`absolute top-0 left-0 w-0.5 h-full transition-colors duration-500 ${activeTheme.bg}`}></div>
                 <div className="absolute inset-0 z-0 opacity-10 transition-opacity pointer-events-none px-2 mt-4">
                     <HistoryChart 
                         data={stabilityData} 
-                        color={'#eab308'} // Yellow
+                        color={'#eab308'} 
                         loading={shadowLoading} 
                         height={60} 
                     />
@@ -154,7 +145,7 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
              </div>
           </div>
 
-          {/* --- ROW 2: THE PULSE CHART (Expanded Area) --- */}
+          {/* ROW 2: THE PULSE CHART */}
           <div className="h-60">
              <NetworkStatusChart 
                 history={pulseHistory} 
@@ -162,14 +153,13 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
                 timeRange={timeRange} 
                 onTimeRangeChange={setTimeRange}
                 healthKey={healthKey}
-                stabilityKey={stabilityKey} // PASSED CORRECTLY NOW
+                stabilityKey={stabilityKey}
                 countKey={countKey}
              />
           </div>
 
-          {/* --- ROW 3: FOOTER DISTRIBUTIONS --- */}
+          {/* ROW 3: FOOTER DISTRIBUTIONS */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-             {/* Spectrum Bar */}
              <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex flex-col justify-center h-20">
                 <div className="flex justify-between items-center mb-2">
                     <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5"><HeartPulse size={10} /> Health Spectrum</div>
@@ -187,7 +177,6 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
                 </div>
              </div>
 
-             {/* Tiers Grid */}
              <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 h-20 flex flex-col justify-center">
                 <div className="text-[9px] text-zinc-500 uppercase font-bold mb-2 tracking-wider flex items-center gap-1.5"><Clock size={10} /> Uptime Tiers</div>
                 <div className="grid grid-cols-3 gap-2 text-center">
