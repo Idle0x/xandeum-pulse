@@ -164,7 +164,7 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
                    <div className="h-full bg-yellow-500 transition-all duration-700 ease-out" style={{ width: `${(data.spectrum.fair / data.count) * 100}%` }}></div>
                 </div>
                 <div className="flex justify-between items-center text-[8px] font-mono text-zinc-400">
-                   <span className="flex items-center gap-1"><div className="w-1 h-1 rounded-full bg-green-500"/> {data.spectrum.excellent} Exc.</span>
+                   <span className="flex items-center gap-1"><div className="w-1 h-1 rounded-full bg-green-500"/> {data.spectrum.excellent} Excellent</span>
                    <span className="flex items-center gap-1"><div className="w-1 h-1 rounded-full bg-blue-500"/> {data.spectrum.good} Good</span>
                    <span className="flex items-center gap-1"><div className="w-1 h-1 rounded-full bg-yellow-500"/> {data.spectrum.fair} Fair</span>
                 </div>
