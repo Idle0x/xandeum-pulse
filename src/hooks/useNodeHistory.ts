@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Node } from '../types'; 
 import { consolidateHistory } from '../utils/historyAggregator'; 
-// Import the server action
-import { getCachedNodeHistory } from '../app/actions/getHistory';
+// UPDATE IMPORT HERE
+import { getNodeHistoryAction } from '../app/actions/getHistory';
 
 export interface NodeHistoryPoint {
   date: string;
@@ -46,8 +46,8 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
       if (timeRange === 'ALL') days = 365;
 
       try {
-        // 2. CALL SERVER ACTION (Cached)
-        const data = await getCachedNodeHistory(stableId, targetNetwork, days);
+        // CALL NEW ACTION NAME
+        const data = await getNodeHistoryAction(stableId, targetNetwork, days);
 
         if (!isMounted) return;
 
