@@ -61,8 +61,8 @@ export const InspectorModal = ({
   const [mode, setMode] = useState<'VIEW' | 'SHARE'>('VIEW');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  // NEW: Lifted State for Time Range Selection (Defaults to 7 Days)
-  const [timeRange, setTimeRange] = useState<HistoryTimeRange>('7D');
+  // NEW: Lifted State for Time Range Selection (Defaults to 24H as requested)
+  const [timeRange, setTimeRange] = useState<HistoryTimeRange>('24H');
 
   // UPDATED: Pass the FULL node object to generate the Stable ID
   const { history, loading: historyLoading } = useNodeHistory(selectedNode, timeRange);
@@ -79,7 +79,7 @@ export const InspectorModal = ({
   useEffect(() => {
     setModalView('overview');
     setMode('VIEW');
-    setTimeRange('7D'); // Reset time range when opening a new node
+    setTimeRange('24H'); // Reset time range to 24H when opening a new node
   }, [selectedNode.pubkey]);
 
   const computedNetworkStats = useMemo(() => {
@@ -293,14 +293,14 @@ export const InspectorModal = ({
             <div className="flex flex-col gap-3 md:gap-4 h-full">
                {modalView !== 'overview' ? (
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
-                    
+
                     {/* EXPANDED HEADER VIEW (LEFT SIDEBAR) */}
                     <div className="md:col-span-1 h-full">
-                       
+
                        {/* HEALTH HEADER (Expanded Sidebar) */}
                        {modalView === 'health' && (
                          <div className={`h-full rounded-3xl p-6 border flex flex-col items-center justify-between cursor-pointer ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900 border-green-500 ring-1 ring-green-500 shadow-[0_0_30px_rgba(34,197,94,0.1)]'}`} onClick={() => handleCardToggle('health')}>
-                           
+
                            {/* UPDATED: Centered Header & Rank */}
                            <div className="w-full flex flex-col items-center mb-6">
                                <div className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest mb-3">DIAGNOSTICS</div>
@@ -333,7 +333,7 @@ export const InspectorModal = ({
                                        </span>
                                    </div>
                                </div>
-                               
+
                                <div className={`mt-4 text-[9px] font-bold uppercase flex items-center justify-center gap-1 transition ${zenMode ? 'text-zinc-500' : 'text-red-400/80 hover:text-red-400'}`}>
                                    <Minimize2 size={8}/> CLICK TO COLLAPSE
                                </div>
@@ -352,7 +352,7 @@ export const InspectorModal = ({
                                 <div className="text-left"><div className={`text-2xl font-black ${zenMode ? 'text-white' : 'text-blue-400'}`}>{formatBytes(selectedNode.storage_used || 0)}</div><div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Used Space</div></div>
                                 <div className="text-right"><div className={`text-2xl font-black ${zenMode ? 'text-zinc-300' : 'text-purple-400'}`}>{formatBytes(nodeCap)}</div><div className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Committed</div></div>
                            </div>
-                           
+
                            {/* BAR CHART WITH LABELS */}
                            <div className="flex-1 w-full flex items-end justify-between gap-4 relative z-10 px-2 pb-2">
                                 <div className="absolute bottom-6 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-zinc-700 to-transparent opacity-50"></div>
@@ -464,7 +464,7 @@ export const InspectorModal = ({
                  </div>
                ) : (
                  <div className="flex flex-col gap-3 md:gap-4 h-full">
-                    
+
                     {/* MOBILE OVERVIEW GRID */}
                     <div className="grid grid-cols-2 gap-2 md:hidden">
                         {/* HEALTH CARD */}
@@ -548,7 +548,7 @@ export const InspectorModal = ({
 
                     {/* DESKTOP GRID (THE LIVING OVERVIEW) */}
                     <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-                      
+
                       {/* HEALTH CARD (DESKTOP) */}
                       <div className={`rounded-2xl md:rounded-3xl p-4 md:p-6 flex flex-col justify-between relative overflow-hidden group cursor-pointer ${zenMode ? 'bg-black border border-zinc-800' : `bg-zinc-900/30 ring-1 ${healthRingColor} hover:-translate-y-1 transition-all duration-300`}`} onClick={() => handleCardToggle('health')}>
                          {!zenMode && <div className="absolute inset-0 opacity-10 bg-[linear-gradient(rgba(0,255,0,0.1)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>}
