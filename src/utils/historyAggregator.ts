@@ -53,7 +53,7 @@ export const consolidateHistory = (data: any[], timeRange: string) => {
 };
 
 /**
- * Aggregates Network History (Global Capacity, Consensus, etc.)
+ * Aggregates Network History (Global Capacity, Consensus, Stability, etc.)
  * Used by: useNetworkHistory
  */
 export const consolidateNetworkHistory = (data: any[], timeRange: string) => {
@@ -92,14 +92,21 @@ export const consolidateNetworkHistory = (data: any[], timeRange: string) => {
       date: dateStr, 
 
       // OVERRIDES: Fields that should be Averages, not Closing Values
+      
+      // Global Averages
       avg_health: Math.round(getAvg('avg_health')),
+      avg_stability: Math.round(getAvg('avg_stability') * 10) / 10, // Keep 1 decimal
       consensus_score: Math.round(getAvg('consensus_score')),
       avg_credits: getAvg('avg_credits'), // Keep precision
       
+      // Mainnet Averages
       mainnet_avg_health: Math.round(getAvg('mainnet_avg_health')),
+      mainnet_avg_stability: Math.round(getAvg('mainnet_avg_stability') * 10) / 10,
       mainnet_consensus_score: Math.round(getAvg('mainnet_consensus_score')),
       
+      // Devnet Averages
       devnet_avg_health: Math.round(getAvg('devnet_avg_health')),
+      devnet_avg_stability: Math.round(getAvg('devnet_avg_stability') * 10) / 10,
       devnet_consensus_score: Math.round(getAvg('devnet_consensus_score')),
     };
   });
