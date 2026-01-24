@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+// Import the Server Action (Cached) instead of Supabase
+import { getNetworkHistoryAction } from '../app/actions/getHistory';
 
 export interface NetworkHistoryPoint {
   date: string;
@@ -15,41 +16,60 @@ export const useNetworkHistory = (
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function fetchHistory() {
-      // 1. Calculate date range
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
+      setLoading(true);
 
-      // 2. Query Supabase (The Shadow Layer)
-      const { data: rows, error } = await supabase
-        .from('network_snapshots')
-        .select(`id, ${metric}`)
-        .gte('id', startDate.toISOString())
-        .order('id', { ascending: true });
+      try {
+        // 1. Call Server Action (Hits the RAM Cache)
+        // We fetch the full dataset, then filter for the specific metric we need.
+        const rows = await getNetworkHistoryAction(days);
 
-      if (error || !rows || rows.length === 0) {
-        setLoading(false);
-        return;
+        if (!isMounted) return;
+
+        if (!rows || rows.length === 0) {
+          setData([]);
+          setGrowth(0);
+          setLoading(false);
+          return;
+        }
+
+        // 2. Process Data (Map locally)
+        const processed = rows.map((r: any) => ({
+          date: new Date(r.id).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+          value: Number(r[metric] || 0)
+        }));
+
+        // 3. Calculate Growth (Last vs First)
+        if (processed.length > 0) {
+          const first = processed[0].value;
+          const last = processed[processed.length - 1].value;
+          
+          // Safe percentage calc
+          let percentChange = 0;
+          if (first > 0) {
+            percentChange = ((last - first) / first) * 100;
+          } else {
+            percentChange = last > 0 ? 100 : 0;
+          }
+          
+          setGrowth(percentChange);
+        } else {
+          setGrowth(0);
+        }
+
+        setData(processed);
+      } catch (err) {
+        console.error("Failed to fetch history widget:", err);
+      } finally {
+        if (isMounted) setLoading(false);
       }
-
-      // 3. Process Data for Charts
-      const processed = rows.map((r: any) => ({
-        date: new Date(r.id).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-        value: Number(r[metric] || 0)
-      }));
-
-      // 4. Calculate Growth (Last vs First)
-      const first = processed[0].value;
-      const last = processed[processed.length - 1].value;
-      // Avoid division by zero
-      const percentChange = first === 0 ? 0 : ((last - first) / first) * 100;
-
-      setData(processed);
-      setGrowth(percentChange);
-      setLoading(false);
     }
 
     fetchHistory();
+
+    return () => { isMounted = false; };
   }, [metric, days]);
 
   return { history: data, growth, loading };
