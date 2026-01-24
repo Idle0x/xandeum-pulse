@@ -84,10 +84,11 @@ export const useNetworkData = () => {
             const mainnetNodes = mergedNodes.filter(n => n.network === 'MAINNET');
             const devnetNodes = mergedNodes.filter(n => n.network === 'DEVNET');
 
-            // Dominance Calc
-            const sortedByCredits = [...mergedNodes].sort((a, b) => b.credits - a.credits);
+            // Dominance Calc - SAFELY SORTING WITH || 0
+            const sortedByCredits = [...mergedNodes].sort((a, b) => (b.credits || 0) - (a.credits || 0));
+            
             const totalCredits = sum(mergedNodes, 'credits');
-            const top10 = sortedByCredits.slice(0, 10).reduce((acc, n) => acc + n.credits, 0);
+            const top10 = sortedByCredits.slice(0, 10).reduce((acc, n) => acc + (n.credits || 0), 0);
 
             // Version Consensus
             const versions: Record<string, number> = {};
