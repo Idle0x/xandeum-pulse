@@ -40,22 +40,21 @@ export const CapacityEvolutionChart = ({
   }, [viewMode, capacityKey, usedKey]);
 
   // --- REFINED DOMAIN LOGIC ---
-  // Calculates the Y-Axis boundaries to avoid "Jagged Mountains"
-  // UPDATED: Explicitly returns [number, number] to satisfy Recharts strict typing
-  const getDomain = useCallback(([dataMin, dataMax]: [number, number]): [number, number] => {
+  // FIX: Changed input type to 'any' to resolve Recharts Readonly/Mutable type conflict
+  const getDomain = useCallback((args: any): [number, number] => {
+    // Destructure manually
+    const [dataMin, dataMax] = args;
+
     // Safety check for empty data
-    // If invalid, return a safe default range [0, 1] instead of [0, 'auto'] to satisfy NumberDomain type
     if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 1];
 
-    // 1. Calculate Lower Bound: Lowest Point - 10%
-    // We use Math.max(0, ...) to ensure we never go below zero (The "Zero Floor")
+    // 1. Calculate Lower Bound
     const lowerBound = Math.max(0, dataMin * 0.90);
 
-    // 2. Calculate Upper Bound: Highest Point + 5%
+    // 2. Calculate Upper Bound
     const upperBound = dataMax * 1.05;
 
-    // Cast as tuple to satisfy TypeScript
-    return [lowerBound, upperBound] as [number, number];
+    return [lowerBound, upperBound];
   }, []);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
