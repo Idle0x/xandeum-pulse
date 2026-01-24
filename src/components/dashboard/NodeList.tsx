@@ -99,6 +99,14 @@ export const NodeList = ({
           const versionColor = sortBy === 'version' ? 'text-cyan-400' : 'text-zinc-400';
           const creditsColor = sortBy === 'credits' ? 'text-yellow-400' : 'text-zinc-500';
 
+          // Credit display logic matching InspectorModal
+          const getCreditsDisplay = () => {
+            if ((node as any).isUntracked) return 'N/A';
+            if (node.credits === null) return 'N/A';
+            if (node.credits === 0) return '0';
+            return node.credits.toLocaleString();
+          };
+
           return (
             <div 
               key={uniqueKey}
@@ -149,7 +157,7 @@ export const NodeList = ({
                 </div>
                 {/* Credits */}
                 <div className={`text-right font-mono text-[10px] ${creditsColor}`}>
-                   {node.credits !== null ? node.credits.toLocaleString() : <span className="text-zinc-700">-</span>}
+                   {getCreditsDisplay()}
                 </div>
                 {/* Star */}
                 <button onClick={(e) => onToggleFavorite(e, node.address || '')} className={`p-1.5 rounded-md hover:bg-white/10 transition-colors ${isFav ? 'text-yellow-500' : 'text-zinc-600 hover:text-yellow-500'}`}>
@@ -198,7 +206,7 @@ export const NodeList = ({
                         {health}%
                     </div>
                     <div className={`font-mono text-[8px] ${creditsColor}`}>
-                        {node.credits !== null ? node.credits.toLocaleString() : '-'}
+                        {getCreditsDisplay()}
                     </div>
                  </div>
 
