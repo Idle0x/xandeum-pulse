@@ -27,8 +27,6 @@ This document serves as the definitive "Master Reference" for the [Xandeum Pulse
 15. [Operations, Error Handling & Resilience](#15-operations-error-handling--resilience)
 16. [Troubleshooting](#16-troubleshooting)
 17. [Future Enhancements](#17-future-enhancements)
-18. [Contributing](#18-contributing)
-19. [Credits](#19-credits)
 
 ---
 
@@ -810,7 +808,7 @@ Learn more about [manually running GitHub Actions workflows](https://docs.github
 
 ---
 
-## 18. Contributing
+## Contributing
 
 ### Code Standards
 
@@ -834,7 +832,7 @@ Learn more about [manually running GitHub Actions workflows](https://docs.github
 
 ---
 
-## 19. Credits
+## Credits
 
 **Built by:** riot' ([@33xp_](https://twitter.com/33xp_))  
 **Powered by:** Xandeum pRPC Network  
