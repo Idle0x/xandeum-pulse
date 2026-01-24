@@ -138,7 +138,7 @@ export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
 
           {/* --- ROW 2: THE PULSE CHART (Expanded Area) --- */}
           <div className="h-60">
-             <NetworkPulseChart 
+             <NetworkStatusChart 
                 history={pulseHistory} 
                 loading={pulseLoading} 
                 timeRange={timeRange} 
