@@ -167,7 +167,8 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                             history={cleanHistory} 
                             loading={loading} 
                             mode={chartMode}    
-                            showRank={showRank} 
+                            showRank={showRank}
+                            timeRange={timeRange}
                         />
                    ) : (
                        <div className="w-full h-full overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
