@@ -32,7 +32,7 @@ This document serves as the definitive "Master Reference" for the [Xandeum Pulse
 
 ---
 
-## <details open>
+<details open>
 <summary><strong>1. System Overview</strong></summary>
 
 ## 1. System Overview
