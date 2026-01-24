@@ -62,8 +62,8 @@ export const ConsensusConvergenceChart = ({
       <div className="flex-1 w-full min-h-0 relative">
          {loading && <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/10 backdrop-blur-[1px]"><Loader2 className="w-4 h-4 animate-spin text-zinc-600"/></div>}
          <ResponsiveContainer width="100%" height="100%">
-            {/* Added margin to minimize whitespace since axes are hidden */}
-            <AreaChart data={history} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
+            {/* Added slight margins to prevent labels from clipping */}
+            <AreaChart data={history} margin={{ top: 5, right: 0, left: -2, bottom: 0 }}>
                <defs>
                   <linearGradient id="unityGrad" x1="0" y1="0" x2="0" y2="1">
                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.2}/>
@@ -71,13 +71,33 @@ export const ConsensusConvergenceChart = ({
                   </linearGradient>
                </defs>
                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.5} />
-               
-               {/* HIDING AXES to match screenshot/space requirements */}
-               <XAxis dataKey="date" hide />
-               <YAxis domain={[0, 100]} hide />
-               
+
+               <XAxis 
+                  dataKey="date" 
+                  tickFormatter={(val) => {
+                     const date = new Date(val);
+                     // If range is short (24H), show time. Otherwise show Date.
+                     return timeRange === '24H' 
+                        ? date.toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' })
+                        : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                  }}
+                  tick={{ fontSize: 9, fill: '#52525b' }} // zinc-600
+                  axisLine={false}
+                  tickLine={false}
+                  minTickGap={30}
+                  dy={5} // Push text down slightly away from graph
+               />
+
+               <YAxis 
+                  domain={[0, 100]} 
+                  width={24} // Fixed small width to keep graph area maxed
+                  tick={{ fontSize: 9, fill: '#52525b' }} // zinc-600
+                  axisLine={false}
+                  tickLine={false}
+               />
+
                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3f3f46', strokeWidth: 1 }} />
-               
+
                <Area 
                   type="monotone" 
                   dataKey={dataKey} 
