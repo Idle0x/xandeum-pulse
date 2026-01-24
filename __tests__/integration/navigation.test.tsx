@@ -57,11 +57,24 @@ const SAMPLE_NODE = {
 describe('Xandeum Pulse - Inspector Integration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedAxios.get.mockResolvedValue({
-      data: {
-        result: { pods: [SAMPLE_NODE] },
-        stats: { consensusVersion: '1.5.0', avgBreakdown: { total: 80 } }
+    
+    // Mock both API endpoints
+    mockedAxios.get.mockImplementation((url: string) => {
+      if (url.includes('/api/credits')) {
+        return Promise.resolve({
+          data: {
+            mainnet: [{ pod_id: '8xTestNodeKey123', credits: 50000 }],
+            devnet: []
+          }
+        });
       }
+      // Default mock for /api/stats
+      return Promise.resolve({
+        data: {
+          result: { pods: [SAMPLE_NODE] },
+          stats: { consensusVersion: '1.5.0', avgBreakdown: { total: 80 } }
+        }
+      });
     });
   });
 
@@ -82,11 +95,28 @@ describe('Xandeum Pulse - Inspector Integration', () => {
   });
 
   test('API STATUS: Shows offline badge', async () => {
-    mockedAxios.get.mockResolvedValue({
-      data: {
-        result: { pods: [{ ...SAMPLE_NODE, credits: null, isUntracked: false }] },
-        stats: { systemStatus: { credits: false } }
+    // Mock both endpoints to simulate credits API being offline
+    mockedAxios.get.mockImplementation((url: string) => {
+      if (url.includes('/api/credits')) {
+        // Return empty arrays to simulate offline credits API
+        return Promise.resolve({
+          data: {
+            mainnet: [],
+            devnet: []
+          }
+        });
       }
+      // /api/stats returns normal data
+      return Promise.resolve({
+        data: {
+          result: { pods: [SAMPLE_NODE] },
+          stats: { 
+            consensusVersion: '1.5.0', 
+            avgBreakdown: { total: 80 },
+            systemStatus: { credits: false, rpc: true }
+          }
+        }
+      });
     });
 
     await act(async () => { render(<Home />); });
