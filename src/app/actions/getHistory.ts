@@ -1,71 +1,116 @@
 'use server'
 
+import { unstable_cache } from 'next/cache';
 import { createClient } from '@supabase/supabase-js';
 
-// --- 1. SETUP & DEBUGGING ---
+// --- INIT ---
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// --- 1. INTERNAL FETCHERS (Run ONLY on Cache Miss) ---
 
-// Check if keys exist on the server
-if (!supabaseUrl || !supabaseKey) {
-  console.error("❌ FATAL: Supabase Environment Variables are missing on the server!");
-} else {
-  console.log("✅ Server: Supabase Variables loaded successfully.");
-}
+const fetchRawNetworkHistory = async (days: number) => {
+  const start = Date.now();
+  console.log(`\x1b[33m[CACHE MISS] NetworkHistory(${days}d): Hitting Supabase...\x1b[0m`);
 
-// Create client directly (No unstable_cache for this test)
-const supabase = createClient(supabaseUrl!, supabaseKey!);
-
-// --- 2. DIRECT FETCHERS (No Cache) ---
-
-export async function getNetworkHistoryAction(days: number) {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
 
-  try {
-    const { data, error } = await supabase
-      .from('network_snapshots')
-      .select('*')
-      .gte('id', startDate.toISOString())
-      .order('id', { ascending: true });
+  const { data, error } = await supabase
+    .from('network_snapshots')
+    .select('*')
+    .gte('id', startDate.toISOString())
+    .order('id', { ascending: true });
 
-    if (error) {
-      console.error("Server Network Fetch Error:", error);
-      throw new Error(error.message);
+  if (error) {
+    console.error(`\x1b[31m[DB ERROR] NetworkHistory:\x1b[0m`, error.message);
+    throw new Error(error.message);
+  }
+
+  const duration = Date.now() - start;
+  console.log(`\x1b[32m[DB SUCCESS] Fetched ${data?.length} records in ${duration}ms\x1b[0m`);
+  return data || [];
+};
+
+const fetchRawNodeHistory = async (stableId: string, network: string, days: number) => {
+  const start = Date.now();
+  console.log(`\x1b[33m[CACHE MISS] NodeHistory(${stableId}): Hitting Supabase...\x1b[0m`);
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  const { data, error } = await supabase
+    .from('node_snapshots')
+    .select('*') 
+    .eq('node_id', stableId)
+    .eq('network', network)
+    .gte('created_at', startDate.toISOString()) 
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error(`\x1b[31m[DB ERROR] NodeHistory:\x1b[0m`, error.message);
+    throw new Error(error.message);
+  }
+
+  const duration = Date.now() - start;
+  console.log(`\x1b[32m[DB SUCCESS] Fetched ${data?.length} records in ${duration}ms\x1b[0m`);
+  return data || [];
+};
+
+// --- 2. CACHED WRAPPERS ---
+
+const getCachedNetworkHistoryInternal = unstable_cache(
+  async (days: number) => fetchRawNetworkHistory(days),
+  ['network-history-debug-v1'], // Unique key for this debug session
+  { revalidate: 1800 } 
+);
+
+const getCachedNodeHistoryInternal = unstable_cache(
+  async (stableId: string, network: string, days: number) => fetchRawNodeHistory(stableId, network, days),
+  ['node-history-debug-v1'],    // Unique key for this debug session
+  { revalidate: 1800 } 
+);
+
+// --- 3. EXPORTED ACTIONS (With Result Tracing) ---
+
+export async function getNetworkHistoryAction(days: number) {
+  console.log(`\x1b[36m[ACTION START] getNetworkHistoryAction(${days}d)\x1b[0m`);
+  
+  try {
+    const data = await getCachedNetworkHistoryInternal(days);
+    
+    // Log what we are sending back to the UI
+    if (!data || data.length === 0) {
+      console.warn(`\x1b[31m[CACHE WARNING] Action returning EMPTY ARRAY for ${days}d\x1b[0m`);
+    } else {
+      console.log(`\x1b[36m[ACTION END] Returning ${data.length} cached records\x1b[0m`);
     }
-    return data || [];
-  } catch (err) {
-    console.error("Server Network Exception:", err);
+    
+    return data;
+  } catch (err: any) {
+    console.error(`\x1b[31m[CACHE FATAL] Error inside unstable_cache:\x1b[0m`, err);
     return [];
   }
 }
 
 export async function getNodeHistoryAction(stableId: string, network: string, days: number) {
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
-
-  console.log(`Server Fetching Node: ${stableId} (Days: ${days})`);
+  // Composite key logging to verify inputs
+  const cacheKey = `${stableId}-${network}-${days}`;
+  console.log(`\x1b[36m[ACTION START] getNodeHistoryAction(${cacheKey})\x1b[0m`);
 
   try {
-    const { data, error } = await supabase
-      .from('node_snapshots')
-      .select('*') 
-      .eq('node_id', stableId)
-      .eq('network', network)
-      .gte('created_at', startDate.toISOString()) 
-      .order('created_at', { ascending: true });
+    const data = await getCachedNodeHistoryInternal(stableId, network, days);
 
-    if (error) {
-      console.error("Server Node Fetch Error:", error.message);
-      // We return the error so the UI might see it (optional, but good for debugging)
-      return []; 
+    if (!data || data.length === 0) {
+      console.warn(`\x1b[31m[CACHE WARNING] Action returning EMPTY ARRAY for ${stableId}\x1b[0m`);
+    } else {
+      console.log(`\x1b[36m[ACTION END] Returning ${data.length} cached records\x1b[0m`);
     }
 
-    console.log(`Server Found: ${data?.length} rows`);
-    return data || [];
-  } catch (err) {
-    console.error("Server Node Exception:", err);
+    return data;
+  } catch (err: any) {
+    console.error(`\x1b[31m[CACHE FATAL] Error inside unstable_cache:\x1b[0m`, err);
     return [];
   }
 }
