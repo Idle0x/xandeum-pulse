@@ -97,7 +97,7 @@ async function runMonitor() {
       const health = Number(n.health || 0);
       const stability = Number(n.uptime || 0); 
 
-      // Push to Buckets
+      // Push to Buckets for calculations
       globalNodes.push(n);
       if (net === 'MAINNET') mainnetNodes.push(n);
       if (net === 'DEVNET') devnetNodes.push(n);
@@ -124,7 +124,7 @@ async function runMonitor() {
         devnetStats.stabCount++;
       }
 
-      // Prepare Node Row
+      // Prepare Node Row (Strictly matching your node_snapshots schema)
       const ipOnly = n.address ? n.address.split(':')[0] : '0.0.0.0';
       const stableId = `${n.pubkey}-${ipOnly}-${net}`;
 
@@ -138,7 +138,7 @@ async function runMonitor() {
         storage_used: used,
         uptime: stability, 
         rank: n.rank || 0,
-        version: n.version, 
+        // 'version' removed as it is not in the DB schema
         created_at: new Date().toISOString() 
       });
     }
@@ -146,25 +146,22 @@ async function runMonitor() {
     // --- 2. CALCULATE METRICS ---
     const calcAvg = (sum: number, count: number) => count > 0 ? sum / count : 0;
 
-    // Consensus
+    // Consensus (Calculated using the raw API nodes which contain version info)
     const globalConsensus = getConsensusMetrics(globalNodes);
     const mainnetConsensus = getConsensusMetrics(mainnetNodes);
     const devnetConsensus = getConsensusMetrics(devnetNodes);
 
-    // Financials (Global)
+    // Financials
     const globalFin = getFinancialMetrics(uniqueNodeRows);
-    
-    // Financials (Mainnet)
     const mainnetRows = uniqueNodeRows.filter(n => n.network === 'MAINNET');
     const mainnetFin = getFinancialMetrics(mainnetRows);
-
-    // Financials (Devnet)
     const devnetRows = uniqueNodeRows.filter(n => n.network === 'DEVNET');
     const devnetFin = getFinancialMetrics(devnetRows);
 
-    // --- 3. INSERT SNAPSHOT ---
+    // --- 3. INSERT SNAPSHOTS ---
+
+    // A. Network Snapshots
     const { error: netError } = await supabase.from('network_snapshots').insert({
-      // Global
       total_nodes: globalNodes.length,
       total_capacity: globalStats.cap,
       total_used: globalStats.used,
@@ -176,35 +173,42 @@ async function runMonitor() {
       avg_credits: globalFin.avg,
       top10_dominance: globalFin.dominance,
 
-      // Mainnet
       mainnet_nodes: mainnetNodes.length,
       mainnet_capacity: mainnetStats.cap,
       mainnet_used: mainnetStats.used,
       mainnet_avg_health: Math.round(calcAvg(mainnetStats.healthSum, mainnetStats.healthCount)),
       mainnet_avg_stability: parseFloat(calcAvg(mainnetStats.stabSum, mainnetStats.stabCount).toFixed(2)),
       mainnet_consensus_score: mainnetConsensus.score, 
-      mainnet_credits: mainnetFin.total,         // <--- NEW
-      mainnet_avg_credits: mainnetFin.avg,       // <--- NEW
-      mainnet_dominance: mainnetFin.dominance,   // <--- NEW
+      mainnet_credits: mainnetFin.total,
+      mainnet_avg_credits: mainnetFin.avg,
+      mainnet_dominance: mainnetFin.dominance,
 
-      // Devnet
       devnet_nodes: devnetNodes.length,
       devnet_capacity: devnetStats.cap,
       devnet_used: devnetStats.used,
       devnet_avg_health: Math.round(calcAvg(devnetStats.healthSum, devnetStats.healthCount)),
       devnet_avg_stability: parseFloat(calcAvg(devnetStats.stabSum, devnetStats.stabCount).toFixed(2)),
       devnet_consensus_score: devnetConsensus.score,
-      devnet_credits: devnetFin.total,           // <--- NEW
-      devnet_avg_credits: devnetFin.avg,         // <--- NEW
-      devnet_dominance: devnetFin.dominance      // <--- NEW
+      devnet_credits: devnetFin.total,
+      devnet_avg_credits: devnetFin.avg,
+      devnet_dominance: devnetFin.dominance
     });
 
-    if (netError) console.error('❌ Network Snapshot Failed:', netError.message);
-    else console.log(`✅ Saved Snapshot. Mainnet Credits: ${mainnetFin.total.toLocaleString()} | Devnet Credits: ${devnetFin.total.toLocaleString()}`);
+    if (netError) {
+      console.error('❌ Network Snapshot Failed:', netError.message);
+    } else {
+      console.log(`✅ Saved Network Snapshot.`);
+    }
 
-    // Save Nodes
+    // B. Node Snapshots
+    // Note: PostgREST/Supabase will reject the insert if any key doesn't exist in the table.
     const { error: nodeError } = await supabase.from('node_snapshots').insert(uniqueNodeRows);
-    if (nodeError) console.error('❌ Node Snapshots Failed:', nodeError.message);
+    
+    if (nodeError) {
+      console.error('❌ Node Snapshots Failed:', nodeError.message);
+    } else {
+      console.log(`✅ Saved ${uniqueNodeRows.length} Node Snapshots.`);
+    }
 
     process.exit(0);
   } catch (error: any) {
