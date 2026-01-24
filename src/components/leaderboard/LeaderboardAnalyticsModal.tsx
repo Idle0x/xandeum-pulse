@@ -1,18 +1,22 @@
-import { useState, useMemo, useEffect } from 'react';
-import { X, Trophy, Wallet, Activity, BarChart3, ChevronDown, Globe, Database, Layers } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { X, Trophy, Wallet, Activity, BarChart3, ChevronDown, Network } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart } from 'recharts';
 import { useNetworkHistory, HistoryTimeRange } from '../../hooks/useNetworkHistory';
-import { NetworkType } from '../../types/leaderboard';
+
+// Define the network types locally or import from your types file
+type NetworkScope = 'MAINNET' | 'DEVNET' | 'COMBINED';
 
 interface LeaderboardAnalyticsModalProps {
   onClose: () => void;
-  initialNetwork: NetworkType | 'COMBINED';
-  // We keep this as a fallback for the initial render before history loads
-  initialStats: {
+  // We accept initial stats to show *something* while loading, 
+  // but we will prioritize the historical data for the active network
+  currentStats?: {
     totalCredits: number;
     avgCredits: number;
     dominance: number;
+    nodeCount: number;
   };
+  initialNetwork?: NetworkScope;
 }
 
 const TIME_OPTIONS = [
@@ -23,12 +27,6 @@ const TIME_OPTIONS = [
     { label: 'All Time', value: 'ALL' },
 ] as const;
 
-const NETWORK_OPTIONS = [
-    { id: 'MAINNET', label: 'Mainnet', icon: Globe, color: 'text-emerald-500' },
-    { id: 'DEVNET', label: 'Devnet', icon: Database, color: 'text-blue-500' },
-    { id: 'COMBINED', label: 'All Networks', icon: Layers, color: 'text-yellow-500' },
-] as const;
-
 // Shared style for consistent, professional chart axes
 const AXIS_STYLE = {
     fontSize: 9, 
@@ -36,14 +34,13 @@ const AXIS_STYLE = {
     fontFamily: 'monospace'
 };
 
-export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStats }: LeaderboardAnalyticsModalProps) => {
+export const LeaderboardAnalyticsModal = ({ onClose, currentStats, initialNetwork = 'MAINNET' }: LeaderboardAnalyticsModalProps) => {
   const [timeRange, setTimeRange] = useState<HistoryTimeRange>('24H');
-  const [activeNetwork, setActiveNetwork] = useState<NetworkType | 'COMBINED'>(initialNetwork);
+  const [networkScope, setNetworkScope] = useState<NetworkScope>(initialNetwork);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // NOTE: You must update your useNetworkHistory hook to accept the network argument!
-  // const { history, loading } = useNetworkHistory(timeRange, activeNetwork);
-  const { history, loading } = useNetworkHistory(timeRange, activeNetwork);
+  // Fetch all history (hook typically returns global, mainnet, and devnet columns in one row)
+  const { history, loading } = useNetworkHistory(timeRange);
 
   // --- SMART AXIS FORMATTER ---
   const formatXAxis = (val: string) => {
@@ -54,43 +51,62 @@ export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStat
       return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
 
-  // --- DYNAMIC STATS CALCULATION ---
-  // If we switch networks inside the modal, we can't rely on 'initialStats' from the parent anymore.
-  // We must calculate the "Current Big Numbers" from the latest point in the fetched history.
-  const displayStats = useMemo(() => {
-      if (history && history.length > 0) {
-          const latest = history[history.length - 1];
-          return {
-              totalCredits: latest.total_credits,
-              avgCredits: latest.avg_credits,
-              dominance: latest.top10_dominance
-          };
-      }
-      // Fallback to initial stats provided by parent if history is loading or empty
-      return initialStats; 
-  }, [history, initialStats]);
+  // --- DYNAMIC DATA KEYS ---
+  // This helper selects the correct database column based on the active tab
+  const keys = useMemo(() => {
+      const prefix = networkScope === 'COMBINED' ? 'total_' : `${networkScope.toLowerCase()}_`;
+      const avgPrefix = networkScope === 'COMBINED' ? 'avg_' : `${networkScope.toLowerCase()}_avg_`;
+      
+      // Handle naming variations (dominance usually global or needs specific calculation)
+      // Assuming your backend provides mainnet_dominance or we fallback to global for now
+      const domKey = networkScope === 'COMBINED' ? 'top10_dominance' : `${networkScope.toLowerCase()}_dominance`;
 
-  // --- METRICS CALCULATION (Growth/Delta) ---
+      return {
+          credits: networkScope === 'COMBINED' ? 'total_credits' : `${networkScope.toLowerCase()}_credits`, // e.g., mainnet_credits
+          avg: `${avgPrefix}credits`, // e.g., mainnet_avg_credits
+          dominance: domKey // e.g., mainnet_dominance
+      };
+  }, [networkScope]);
+
+  // --- METRICS CALCULATION ---
   const metrics = useMemo(() => {
       if (!history || history.length < 2) return null;
+      
       const start = history[0];
       const end = history[history.length - 1];
       const days = history.length;
 
+      // Helper to safely get value or 0
+      const getVal = (obj: any, key: string) => Number(obj[key] || 0);
+
+      const startCreds = getVal(start, keys.credits);
+      const endCreds = getVal(end, keys.credits);
+
+      const startDom = getVal(start, keys.dominance);
+      const endDom = getVal(end, keys.dominance);
+
+      const startAvg = getVal(start, keys.avg);
+      const endAvg = getVal(end, keys.avg);
+
       return {
+          currentValues: {
+              credits: endCreds,
+              dominance: endDom,
+              avg: endAvg
+          },
           credit: { 
-              delta: end.total_credits - start.total_credits, 
-              pct: start.total_credits > 0 ? ((end.total_credits - start.total_credits) / start.total_credits) * 100 : 0 
+              delta: endCreds - startCreds, 
+              pct: startCreds > 0 ? ((endCreds - startCreds) / startCreds) * 100 : 0 
           },
           dom: { 
-              delta: end.top10_dominance - start.top10_dominance 
+              delta: endDom - startDom 
           },
           avg: { 
-              delta: end.avg_credits - start.avg_credits, 
-              velocity: days > 0 ? Math.round((end.avg_credits - start.avg_credits) / days) : 0 
+              delta: endAvg - startAvg, 
+              velocity: days > 0 ? Math.round((endAvg - startAvg) / days) : 0 
           }
       };
-  }, [history]);
+  }, [history, keys]);
 
   // --- REUSABLE FINANCIAL HEADER ---
   const ChartHeader = ({ icon: Icon, title, value, delta, pct, suffix = '', subLabel, customRightElement }: any) => {
@@ -105,7 +121,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStat
                       <Icon size={10} className="text-zinc-600"/> {title}
                   </div>
                   <div className="text-xl md:text-2xl font-bold text-zinc-100 tracking-tight font-mono">
-                      {loading ? <span className="animate-pulse opacity-50">...</span> : value}
+                      {value}
                   </div>
               </div>
               <div className="flex flex-col items-end justify-center min-h-[40px]">
@@ -140,41 +156,38 @@ export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStat
       <div className="bg-[#09090b] border border-zinc-800 rounded-2xl p-6 max-w-4xl w-full shadow-2xl overflow-y-auto max-h-[90vh] custom-scrollbar" onClick={(e) => e.stopPropagation()}>
 
         {/* TOP BAR */}
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4 border-b border-zinc-800/50 pb-4">
-          
-          {/* TITLE & NETWORK SWITCHER */}
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 border-b border-zinc-800/50 pb-4">
+          <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-yellow-500/5 text-yellow-500 border border-yellow-500/10">
               <Trophy size={20} />
             </div>
-            <div className="flex flex-col gap-2">
-                <div>
-                    <h3 className="text-lg font-bold text-white tracking-tight leading-none">Market Analysis</h3>
-                    <p className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest mt-1">Financial Report & Trends</p>
-                </div>
-                
-                {/* --- NEW NETWORK SWITCHER --- */}
-                <div className="flex items-center bg-zinc-900 p-0.5 rounded-lg border border-zinc-800 w-fit">
-                    {NETWORK_OPTIONS.map((opt) => (
-                        <button
-                            key={opt.id}
-                            onClick={() => setActiveNetwork(opt.id as any)}
-                            className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
-                                activeNetwork === opt.id 
-                                ? 'bg-zinc-800 text-white shadow-sm' 
-                                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
-                            }`}
-                        >
-                            <opt.icon size={10} className={activeNetwork === opt.id ? opt.color : ''} />
-                            {opt.label}
-                        </button>
-                    ))}
-                </div>
+            <div>
+              <h3 className="text-lg font-bold text-white tracking-tight">Market Analysis</h3>
+              <p className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest mt-0.5">
+                  Financial Report & Trends
+              </p>
             </div>
           </div>
 
-          {/* TIME CONTROL & CLOSE */}
-          <div className="flex items-center gap-3 self-end md:self-auto">
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            {/* NETWORK SWITCHER */}
+            <div className="flex items-center bg-zinc-900 border border-zinc-800 p-0.5 rounded-lg mr-2">
+                {(['MAINNET', 'DEVNET', 'COMBINED'] as const).map((net) => (
+                    <button
+                        key={net}
+                        onClick={() => setNetworkScope(net)}
+                        className={`px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all ${
+                            networkScope === net 
+                            ? 'bg-zinc-800 text-white shadow-sm' 
+                            : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                        }`}
+                    >
+                        {net === 'COMBINED' ? 'All' : net}
+                    </button>
+                ))}
+            </div>
+
+            {/* TIME DROPDOWN */}
             <div className="relative">
                 <button 
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -198,6 +211,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStat
                     </div>
                 )}
             </div>
+            
             <button onClick={onClose} className="p-1.5 rounded-full hover:bg-zinc-900 text-zinc-500 hover:text-white transition"><X size={16} /></button>
           </div>
         </div>
@@ -209,8 +223,9 @@ export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStat
             <div className="bg-zinc-900/20 border border-zinc-800/60 rounded-xl p-5 h-72 flex flex-col relative overflow-hidden">
                 <ChartHeader 
                     icon={Wallet}
-                    title="Total Network Credits"
-                    value={(displayStats.totalCredits / 1_000_000).toFixed(2) + "M"}
+                    title={`${networkScope === 'COMBINED' ? 'Total' : networkScope} Credits`}
+                    // Use latest history value if available, else fallback to passed prop (or 0)
+                    value={metrics ? (metrics.currentValues.credits / 1_000_000).toFixed(2) + "M" : "Loading..."}
                     delta={metrics?.credit.delta}
                     pct={metrics?.credit.pct}
                 />
@@ -219,8 +234,8 @@ export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStat
                         <AreaChart data={history} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                            <defs>
                               <linearGradient id="creditGrad" x1="0" y1="0" x2="0" y2="1">
-                                 <stop offset="5%" stopColor="#eab308" stopOpacity={0.15}/>
-                                 <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
+                                 <stop offset="5%" stopColor={networkScope === 'DEVNET' ? "#3b82f6" : "#eab308"} stopOpacity={0.15}/>
+                                 <stop offset="95%" stopColor={networkScope === 'DEVNET' ? "#3b82f6" : "#eab308"} stopOpacity={0}/>
                               </linearGradient>
                            </defs>
                            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.3} />
@@ -248,7 +263,16 @@ export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStat
                                itemStyle={{ fontFamily: 'monospace' }} 
                                labelFormatter={(label) => new Date(label).toLocaleString()}
                            />
-                           <Area type="monotone" dataKey="total_credits" stroke="#eab308" strokeWidth={2} fill="url(#creditGrad)" animationDuration={1000} />
+                           
+                           {/* DYNAMIC DATA KEY */}
+                           <Area 
+                                type="monotone" 
+                                dataKey={keys.credits} 
+                                stroke={networkScope === 'DEVNET' ? "#3b82f6" : "#eab308"} 
+                                strokeWidth={2} 
+                                fill="url(#creditGrad)" 
+                                animationDuration={1000} 
+                           />
                         </AreaChart>
                      </ResponsiveContainer>
                 </div>
@@ -262,7 +286,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStat
                     <ChartHeader 
                         icon={BarChart3}
                         title="Top 10 Dominance"
-                        value={displayStats.dominance.toFixed(1) + "%"}
+                        value={metrics ? metrics.currentValues.dominance.toFixed(1) + "%" : "..."}
                         delta={metrics?.dom.delta}
                         suffix="%"
                     />
@@ -270,6 +294,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStat
                          <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={history} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.3} />
+
                                <XAxis 
                                    dataKey="date" 
                                    axisLine={false} 
@@ -278,6 +303,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStat
                                    minTickGap={30}
                                    tickFormatter={formatXAxis}
                                />
+
                                <YAxis 
                                    axisLine={false} 
                                    tickLine={false} 
@@ -286,12 +312,21 @@ export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStat
                                    domain={['auto', 'auto']}
                                    tickFormatter={(val) => val.toFixed(0) + '%'}
                                />
+
                                <Tooltip 
                                    contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }} 
                                    itemStyle={{ fontFamily: 'monospace' }}
                                    labelFormatter={(label) => new Date(label).toLocaleString()}
                                />
-                               <Line type="monotone" dataKey="top10_dominance" stroke="#3b82f6" strokeWidth={2} dot={false} animationDuration={1000} />
+                               {/* DYNAMIC DATA KEY */}
+                               <Line 
+                                    type="monotone" 
+                                    dataKey={keys.dominance} 
+                                    stroke="#3b82f6" 
+                                    strokeWidth={2} 
+                                    dot={false} 
+                                    animationDuration={1000} 
+                                />
                             </LineChart>
                          </ResponsiveContainer>
                     </div>
@@ -301,8 +336,8 @@ export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStat
                 <div className="bg-zinc-900/20 border border-zinc-800/60 rounded-xl p-5 h-64 flex flex-col">
                     <ChartHeader 
                         icon={Activity}
-                        title="Average Node Earnings"
-                        value={(displayStats.avgCredits / 1000).toFixed(1) + "k"}
+                        title="Average Earnings"
+                        value={metrics ? (metrics.currentValues.avg / 1000).toFixed(1) + "k" : "..."}
                         subLabel="Daily Credits Yield"
                         customRightElement={
                             metrics && (
@@ -316,6 +351,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStat
                          <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={history} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.3} />
+
                                <XAxis 
                                    dataKey="date" 
                                    axisLine={false} 
@@ -324,6 +360,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStat
                                    minTickGap={30}
                                    tickFormatter={formatXAxis}
                                />
+
                                <YAxis 
                                    axisLine={false} 
                                    tickLine={false} 
@@ -332,12 +369,21 @@ export const LeaderboardAnalyticsModal = ({ onClose, initialNetwork, initialStat
                                    domain={['auto', 'auto']}
                                    tickFormatter={(val) => (val/1000).toFixed(1) + 'k'}
                                />
+
                                <Tooltip 
                                    contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }} 
                                    itemStyle={{ fontFamily: 'monospace' }}
                                    labelFormatter={(label) => new Date(label).toLocaleString()}
                                />
-                               <Line type="monotone" dataKey="avg_credits" stroke="#d4d4d8" strokeWidth={2} dot={false} animationDuration={1000} />
+                               {/* DYNAMIC DATA KEY */}
+                               <Line 
+                                    type="monotone" 
+                                    dataKey={keys.avg} 
+                                    stroke="#d4d4d8" 
+                                    strokeWidth={2} 
+                                    dot={false} 
+                                    animationDuration={1000} 
+                               />
                             </LineChart>
                          </ResponsiveContainer>
                     </div>
