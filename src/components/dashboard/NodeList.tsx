@@ -97,7 +97,7 @@ export const NodeList = ({
           const uptimeColor = sortBy === 'uptime' ? 'text-orange-400' : 'text-zinc-400';
           const healthColor = sortBy === 'health' ? 'text-green-400' : 'text-zinc-400';
           const versionColor = sortBy === 'version' ? 'text-cyan-400' : 'text-zinc-400';
-          const creditsColor = sortBy === 'credits' ? 'text-yellow-400' : 'text-zinc-500';
+          const creditsColor = node.credits === null ? 'text-red-500' : (sortBy === 'credits' ? 'text-yellow-400' : 'text-zinc-500');
 
           // Credit display logic matching InspectorModal
           const getCreditsDisplay = () => {
