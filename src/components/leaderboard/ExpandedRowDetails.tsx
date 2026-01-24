@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, Eye, EyeOff, History, LineChart, Bug } from 'lu
 import { Node } from '../../types';
 import { useNodeHistory } from '../../hooks/useNodeHistory';
 import { DualAxisGrowthChart } from './DualAxisGrowthChart';
-import { NodeDebugger } from '../debug/node/NodeDebugger'; // Import the new debugger
+import { NodeDebugger } from '../debug/NodeDebugger'; // Import the new debugger
 
 const TIME_OPTIONS = [
     { label: '24H', value: '24H' },
