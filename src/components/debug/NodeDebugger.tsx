@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase'; // Client-side connection
+import { getNodeHistoryAction } from '../../app/actions/getHistory'; // <--- IMPORT SERVER ACTION
 import { Node } from '../../types';
 
 export const NodeDebugger = ({ node }: { node: Node }) => {
-  const [data, setData] = useState<any>(null);
-  const [error, setError] = useState<any>(null);
+  // Client DB State
+  const [dbData, setDbData] = useState<any>(null);
+  const [dbError, setDbError] = useState<any>(null);
+  
+  // Server Action (Cache) State
+  const [cacheData, setCacheData] = useState<any>(null);
+  const [cacheStatus, setCacheStatus] = useState<string>('Idle'); // 'Loading', 'Success', 'Error'
+  const [cacheError, setCacheError] = useState<string | null>(null);
+
   const [generatedId, setGeneratedId] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
@@ -12,34 +20,49 @@ export const NodeDebugger = ({ node }: { node: Node }) => {
     async function runDiagnostics() {
       if (!node) return;
       setLoading(true);
-      setError(null);
+      setDbError(null);
+      setCacheError(null);
+      setCacheStatus('Loading');
 
-      // 1. REPLICATE THE ID LOGIC EXACTLY
-      // Logic: [PublicKey]-[IP]-[Network]
+      // 1. GENERATE ID
       const ipOnly = node.address && node.address.includes(':') 
         ? node.address.split(':')[0] 
         : (node.address || '0.0.0.0');
-
       const network = node.network || 'MAINNET';
-      
-      // The specific ID we are looking for
       const stableId = `${node.pubkey}-${ipOnly}-${network}`;
       setGeneratedId(stableId);
 
-      // 2. FETCH RAW DATA (Client-Side, No Cache)
-      // We look for ANY snapshots for this ID to confirm existence
-      const { data: dbData, error: dbError } = await supabase
+      // ---------------------------------------------------------
+      // TEST 1: DIRECT DB LOOKUP (Client Side)
+      // ---------------------------------------------------------
+      const { data: directData, error: directError } = await supabase
         .from('node_snapshots')
         .select('created_at, credits, health, node_id, network') 
         .eq('node_id', stableId)
         .order('created_at', { ascending: false }) 
         .limit(5);
 
-      if (dbError) {
-        setError(dbError);
-      } else {
-        setData(dbData);
+      if (directError) setDbError(directError);
+      else setDbData(directData);
+
+      // ---------------------------------------------------------
+      // TEST 2: SERVER ACTION (Cached)
+      // ---------------------------------------------------------
+      try {
+        const actionResult = await getNodeHistoryAction(stableId, network, 1); // Request 1 Day
+        
+        if (Array.isArray(actionResult)) {
+           setCacheData(actionResult);
+           setCacheStatus('Success');
+        } else {
+           setCacheStatus('Error');
+           setCacheError("Server returned non-array data");
+        }
+      } catch (err: any) {
+        setCacheStatus('Error');
+        setCacheError(err.message || "Unknown Server Action Error");
       }
+
       setLoading(false);
     }
     
@@ -47,63 +70,101 @@ export const NodeDebugger = ({ node }: { node: Node }) => {
   }, [node]);
 
   return (
-    <div className="mx-2 mt-2 mb-4 p-3 bg-black/40 border border-fuchsia-500/30 rounded-lg text-[10px] font-mono shadow-xl animate-in fade-in slide-in-from-top-2">
-      <div className="flex justify-between items-center mb-2 border-b border-zinc-800 pb-1">
-        <h3 className="text-fuchsia-400 font-bold flex items-center gap-2">
-           🕵️ DIRECT DATABASE LOOKUP
+    <div className="mx-2 mt-2 mb-4 p-3 bg-black/80 border border-fuchsia-500/30 rounded-lg text-[10px] font-mono shadow-xl animate-in fade-in slide-in-from-top-2">
+      
+      {/* HEADER */}
+      <div className="flex justify-between items-center mb-3 border-b border-zinc-800 pb-2">
+        <h3 className="text-white font-bold flex items-center gap-2 text-xs">
+           🕵️ CACHE vs. DB COMPARISON
         </h3>
-        {loading && <span className="text-zinc-500 animate-pulse">Scanning DB...</span>}
+        {loading && <span className="text-fuchsia-400 animate-pulse">Running Diagnostics...</span>}
       </div>
 
-      <div className="grid grid-cols-1 gap-2 mb-3">
-        <div>
-           <span className="text-zinc-500 block mb-0.5">Target ID (Being Searched):</span>
-           <code className="block w-full bg-zinc-900/50 text-fuchsia-300 p-2 rounded break-all select-all border border-zinc-800">
+      {/* ID DISPLAY */}
+      <div className="mb-4">
+           <span className="text-zinc-500 block mb-1">Target ID:</span>
+           <code className="block w-full bg-zinc-900 text-zinc-300 p-2 rounded break-all border border-zinc-800">
              {generatedId}
            </code>
-        </div>
       </div>
 
-      {error && (
-        <div className="bg-red-900/20 border border-red-500/50 p-2 text-red-200 rounded mb-2">
-          <strong>DB ERROR:</strong> {JSON.stringify(error)}
+      <div className="grid grid-cols-2 gap-4">
+        
+        {/* --- LEFT COLUMN: DIRECT DB (Truth) --- */}
+        <div className="border border-zinc-700/50 rounded bg-zinc-900/20 p-2">
+            <h4 className="font-bold text-blue-400 mb-2 border-b border-blue-500/20 pb-1">1. DIRECT DB (Truth)</h4>
+            
+            {dbError ? (
+                <div className="text-red-400">DB Error: {JSON.stringify(dbError)}</div>
+            ) : dbData ? (
+                <div>
+                    <div className={`text-lg font-bold mb-1 ${dbData.length > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {dbData.length} Records
+                    </div>
+                    {dbData.length > 0 && (
+                        <div className="text-zinc-500">
+                            Last: {new Date(dbData[0].created_at).toLocaleTimeString()}
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <span className="text-zinc-600">Waiting...</span>
+            )}
         </div>
+
+        {/* --- RIGHT COLUMN: SERVER ACTION (Cache) --- */}
+        <div className="border border-zinc-700/50 rounded bg-zinc-900/20 p-2">
+            <h4 className="font-bold text-fuchsia-400 mb-2 border-b border-fuchsia-500/20 pb-1">2. SERVER ACTION</h4>
+            
+            {cacheStatus === 'Loading' && <span className="text-zinc-500 animate-pulse">Fetching...</span>}
+            
+            {cacheStatus === 'Error' && (
+                <div className="text-red-300 bg-red-900/20 p-1 rounded">
+                    <strong>FAILED:</strong> {cacheError}
+                </div>
+            )}
+
+            {cacheStatus === 'Success' && cacheData && (
+                <div>
+                    <div className={`text-lg font-bold mb-1 ${cacheData.length > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {cacheData.length} Records
+                    </div>
+                    
+                    {cacheData.length === 0 ? (
+                        <div className="text-orange-300 mt-1 leading-tight">
+                            ⚠️ CACHE IS EMPTY
+                            <br/><span className="text-zinc-500 text-[9px]">(Server fetched 0 rows)</span>
+                        </div>
+                    ) : (
+                        <div className="text-zinc-500">
+                           First Item Credits: <span className="text-white">{cacheData[0]?.credits || 'N/A'}</span>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+      </div>
+      
+      {/* --- CONCLUSION BOX --- */}
+      {!loading && dbData && cacheData && (
+          <div className="mt-3 pt-2 border-t border-zinc-800">
+              <span className="text-zinc-500 font-bold">DIAGNOSIS: </span>
+              {dbData.length > 0 && cacheData.length === 0 ? (
+                  <span className="text-red-400 font-bold bg-red-900/20 px-1 rounded">
+                      CRITICAL: DB has data, but Server Action returns 0.
+                  </span>
+              ) : dbData.length === cacheData.length ? (
+                  <span className="text-green-400 font-bold">
+                      SUCCESS: Cache matches Database.
+                  </span>
+              ) : (
+                  <span className="text-yellow-500 font-bold">
+                      MISMATCH: DB has {dbData.length}, Cache has {cacheData.length}.
+                  </span>
+              )}
+          </div>
       )}
 
-      {!error && !loading && (
-        <div>
-          {data && data.length > 0 ? (
-             <div className="bg-green-900/10 border border-green-500/30 p-2 rounded">
-               <div className="text-green-400 font-bold mb-2 flex items-center gap-2">
-                 ✅ FOUND {data.length} RECORDS
-               </div>
-               <div className="space-y-1 max-h-32 overflow-y-auto">
-                 {data.map((row: any, i: number) => (
-                   <div key={i} className="flex justify-between border-b border-green-500/10 last:border-0 pb-1 mb-1">
-                      <div className="flex flex-col">
-                        <span className="text-zinc-300">{new Date(row.created_at).toLocaleString()}</span>
-                        <span className="text-zinc-500 text-[8px]">{row.network}</span>
-                      </div>
-                      <span className="text-yellow-500 font-bold">{row.credits.toLocaleString()} Cr</span>
-                   </div>
-                 ))}
-               </div>
-             </div>
-          ) : (
-             <div className="bg-red-900/10 border border-red-500/30 p-3 rounded text-red-400">
-               <strong className="block mb-1">❌ NO RECORDS FOUND</strong>
-               <p className="text-zinc-500 text-[9px]">
-                 The database has 0 rows matching this specific ID.
-                 <br/><br/>
-                 Possible causes:
-                 <br/>1. The monitor script hasn't run yet.
-                 <br/>2. The monitor script is generating a different ID than the frontend.
-                 <br/>3. The 'network' field doesn't match exactly.
-               </p>
-             </div>
-          )}
-        </div>
-      )}
     </div>
   );
 };
