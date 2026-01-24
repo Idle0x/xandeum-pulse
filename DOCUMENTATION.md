@@ -1,11 +1,15 @@
 # Xandeum Pulse - Technical Documentation
+
 **Version:** 2.0 (Live Architecture)  
 **Last Updated:** January 2026  
 **System:** Xandeum Pulse Analytics Platform
 
 This document serves as the definitive "Master Reference" for the Xandeum Pulse architecture. It covers the data ingestion pipelines, mathematical scoring models, database schema, and the algorithmic "Synthesis Engine" used for narrative generation.
 
+---
+
 ## Table of Contents
+
 1. System Overview
 2. Architecture & Component Breakdown
 3. Data Pipeline (The "Dual Hero" Strategy)
@@ -23,13 +27,12 @@ This document serves as the definitive "Master Reference" for the Xandeum Pulse 
 15. Operations, Error Handling & Resilience
 16. Troubleshooting
 17. Future Enhancements
-18. Contributing
-19. Credits
 
 ---
 
 <details open>
 <summary><h2>1. System Overview</h2></summary>
+
 <br>
 
 Xandeum Pulse is a real-time network monitoring dashboard and temporal intelligence platform for the Xandeum blockchain's physical node (pNode) infrastructure.
@@ -37,6 +40,7 @@ Xandeum Pulse is a real-time network monitoring dashboard and temporal intellige
 It operates on a **Hybrid-Live Persistence Model**, balancing the need for real-time telemetry (via direct RPC) with the requirement for long-term trend analysis (via a historical database).
 
 ### 1.1 Key Features
+
 * **Crash-Proof Design:** Handles API failures gracefully with automatic failover via Circuit Breaker.
 * **Hybrid Persistence:** Balances real-time RPC streams with a historical "Shadow Database" (Supabase).
 * **Dynamic Thresholds:** Percentile-based tiering adapts to network growth.
@@ -49,9 +53,11 @@ It operates on a **Hybrid-Live Persistence Model**, balancing the need for real-
 
 <details open>
 <summary><h2>2. Architecture & Component Breakdown</h2></summary>
+
 <br>
 
 ### 2.1 System Diagram
+
 ```ascii
 ┌─────────────────────────────────────────────────────────────┐
 │                     XANDEUM PULSE                           │
@@ -82,23 +88,28 @@ It operates on a **Hybrid-Live Persistence Model**, balancing the need for real-
 ### 2.2 Component Breakdown
 
 #### 2.2.1 Frontend Layer
+
 * **Next.js 16+:** Server-side rendering for SEO, client-side reactivity for real-time updates.
 * **Tailwind CSS:** Utility-first styling with custom animations (e.g., scanning lights, pulse effects).
 * **React Simple Maps:** D3-powered geographic visualization with deterministic mesh topology.
 * **Modular Components:** Critical UI elements like `RadialProgress.tsx` are isolated for performance.
 
 #### 2.2.2 API Layer (`/pages/api/`)
+
 * **`stats.ts`:** Main telemetry endpoint, returns enriched node data + network statistics.
 * **`geo.ts`:** Geographic aggregation for map view with "King Node" selection logic.
 * **`credits.ts`:** Proxy for reputation data with strict timeout handling.
 
 #### 2.2.3 Brain (`/lib/xandeum-brain.ts`)
+
 * **Data Fetching:** Multi-source failover (Hero Primary + Swarm Backup).
 * **Enrichment Pipeline:** Geolocation, health scoring, rank calculation.
 * **Mathematical Engine:** Implements all scoring algorithms (Sigmoid, Logarithmic).
 
 #### 2.2.4 The Temporal Watchman (Database Persistence)
+
 While the dashboard UI fetches live data, a standalone backend engine captures the network's "Memory."
+
 * **Frequency:** Every 30 Minutes (Triggered via GitHub Actions cron).
 * **Storage:** PostgreSQL (Supabase).
 * **Logic:** The `health-check.ts` script fetches the entire network state, calculates all scores, and commits a snapshot. This data feeds the Stability Ribbons and Growth Velocity charts.
@@ -109,11 +120,13 @@ While the dashboard UI fetches live data, a standalone backend engine captures t
 
 <details open>
 <summary><h2>3. Data Pipeline (The "Dual Hero" Strategy)</h2></summary>
+
 <br>
 
 The platform aggregates data from three distinct sources to ensure 100% network visibility, even during partial outages.
 
 ### 3.1 Fetch Sequence (Every 30 Seconds)
+
 1.  **ORCHESTRATION LAYER (Dual Hero Strategy)**
     * **Hero A (Private RPC):** A dedicated, high-performance node acts as the "Source of Truth" for Mainnet. It utilizes a **15-second RAM cache** to prevent UI "blips" during micro-outages.
     * **Hero B (Public Swarm):** A `Promise.any` race condition targets **5+ random public nodes** simultaneously. This layer is responsible for the passive discovery of "Ghost Nodes" (pods not yet indexed by the private RPC).
@@ -134,6 +147,7 @@ The platform aggregates data from three distinct sources to ensure 100% network 
     * **Rank:** Assign competitive positioning.
 
 ### 3.2 Caching Strategy
+
 * **Client-Side:** `localStorage.xandeum_favorites` (persistent) and `localStorage.xandeum_rank_history` (trend calculation).
 * **Server-Side:** RAM Cache (15s short-term) and Persistence (Supabase 30-minute snapshots).
 
@@ -143,12 +157,15 @@ The platform aggregates data from three distinct sources to ensure 100% network 
 
 <details open>
 <summary><h2>4. Consensus & Identity Protocols</h2></summary>
+
 <br>
 
 ### 4.1 Multi-Network Identity Resolution ("Identity Crisis")
+
 In distributed systems, a single operator may run multiple node instances (e.g., one Mainnet, one Devnet) using the same Public Key. A naive dashboard would merge these into a single corrupted entry.
 
 Pulse implements a 3-Factor Matching Logic to ensure atomic precision:
+
 1.  **Primary Match (Key):** Public Key
 2.  **Context Match (Network):** Mainnet vs. Devnet
 3.  **Physical Match (Origin):** IP Address / Port
@@ -156,6 +173,7 @@ Pulse implements a 3-Factor Matching Logic to ensure atomic precision:
 This ensures that "Sibling Nodes" are treated as distinct entities with their own metrics, ranking, and history.
 
 ### 4.2 Stable ID v2 (Historical Persistence)
+
 To maintain historical continuity (e.g., Stability Ribbons), the system generates a Stable ID that survives software upgrades. Volatile attributes (like Software Version or Public Status) are strictly excluded from this key.
 
 ```typescript
@@ -164,7 +182,9 @@ const stableId = `${PubKey}-${IP_Address}-${NetworkID}`;
 ```
 
 ### 4.3 Deduplication Logic
+
 When aggregating data from multiple RPC sources (Private vs. Public), duplicate reporting is inevitable. Pulse applies a rigorous filter:
+
 * **Fingerprinting:** A 7-point matching protocol isolates physical hardware from volatile metadata.
 * **Priority Rule:** If a fingerprint match is found between the Private RPC (Trusted) and the Public Swarm (Untrusted), the **Public entry is discarded immediately**.
 
@@ -174,11 +194,13 @@ When aggregating data from multiple RPC sources (Private vs. Public), duplicate 
 
 <details open>
 <summary><h2>5. Vitality Score Model</h2></summary>
+
 <br>
 
 The "Vitality Score" (0-100) is not arbitrary. It is a weighted composite of four non-linear metrics designed to penalize instability while rewarding consistency.
 
 ### 5.1 Vitality Weights Table
+
 | Metric | Standard Weight | Fallback Weight (API Offline) |
 |---|---|---|
 | **Uptime** | 35% | 45% |
@@ -187,7 +209,9 @@ The "Vitality Score" (0-100) is not arbitrary. It is a weighted composite of fou
 | **Version** | 15% | 20% |
 
 ### 5.2 Uptime Score — Stability & Reliability
+
 **Goal:** Measure node stability using a smooth, trust-building curve.
+
 * **Metric:** `node.uptime` (seconds → days)
 * **Logic (Sigmoid Curve):**
     * Uses a smooth S-curve (logistic function) centered at 7 days.
@@ -195,20 +219,26 @@ The "Vitality Score" (0-100) is not arbitrary. It is a weighted composite of fou
     * > 14 days → Rapidly approaches 100 points.
 
 ### 5.3 Storage Score — Capacity + Utilization
+
 **Goal:** Reward both promised utility (commitment) and real usage (data stored).
+
 * **Logic (Logarithmic Growth):**
     * **Base Score:** Calculated using a logarithmic scale relative to the **Network Median**.
     * **Utilization Bonus:** Additional points (up to +15) based on actual data stored (`storage_used`).
     * **Whale Protection:** Uses Median instead of Average to prevent "Storage Whales" from skewing the curve.
 
 ### 5.4 Reputation Score — Historical Contribution
+
 **Goal:** Measure proven contribution relative to the network's middle standard.
+
 * **Logic:**
     * `min(100, (Credits / (MedianCredits * 2)) * 100)`
     * If the Credits API is offline, this weight (20%) is redistributed to Uptime (+10%), Storage (+5%), and Version (+5%).
 
 ### 5.5 Version Score — Security & Consensus Alignment
+
 **Goal:** Measure protocol safety and consensus participation.
+
 * **Logic (Distance-Based Decay):**
     * Distance 0 (Consensus): **100 pts**
     * Distance 1 (Lagging): **90 pts**
@@ -217,7 +247,9 @@ The "Vitality Score" (0-100) is not arbitrary. It is a weighted composite of fou
     * Distance 4+: **< 30 pts**
 
 ### 5.6 Gatekeeper Rule (Hard Constraint)
+
 **IF** `storage_committed <= 0` **THEN** `Vitality Score = 0`.
+
 *Reason:* Xandeum is a storage network. A node that commits 0 GB provides zero utility, regardless of uptime, version, or historical performance. It is therefore considered non-participatory.
 
 </details>
@@ -226,10 +258,13 @@ The "Vitality Score" (0-100) is not arbitrary. It is a weighted composite of fou
 
 <details open>
 <summary><h2>6. Core Mathematics</h2></summary>
+
 <br>
 
 ### 6.1 Uptime Scoring (Sigmoid Function)
+
 Linear scoring is flawed for uptime (the difference between 99% and 100% is significant). We use a Sigmoid Function:
+
 $$S(t) = \frac{100}{1 + e^{-k(t - t_0)}}$$
 
 * $t$: Uptime in days.
@@ -237,6 +272,7 @@ $$S(t) = \frac{100}{1 + e^{-k(t - t_0)}}$$
 * $k$: Steepness factor (0.2).
 
 ### 6.2 Economic Simulation (STOINC Protocol)
+
 The Leaderboard includes a hardware-based reward forecaster. This simulation applies the Geometric Stacking rules of the STOINC protocol.
 
 * **BaseRate:** Derived from global network difficulty and total emission pool.
@@ -251,12 +287,15 @@ The Leaderboard includes a hardware-based reward forecaster. This simulation app
 
 <details open>
 <summary><h2>7. The Synthesis Engine (Narrative Logic)</h2></summary>
+
 <br>
 
 Pulse replaces static labels with an Algorithmic Narrative Engine. This system generates context-aware sentences based on the user's specific interaction state.
 
 ### 7.1 The 7-Scenario Logic
+
 The engine detects the active context and routes the logic to one of 7 generators:
+
 1.  **Overview (Default):** Compares Global Health vs. 30-Day Moving Average.
 2.  **Overview (Chart Focus):** Analyzes volatility ($\sigma$) of the selected metric.
 3.  **Overview (Node Focus):** "Drag vs. Lift" analysis (e.g., "Node X is dragging the average down due to poor uptime").
@@ -266,7 +305,9 @@ The engine detects the active context and routes the logic to one of 7 generator
 7.  **Topology (Pin Focus):** "King Node" status and regional connectivity.
 
 ### 7.2 Seeded Randomness
+
 To prevent the text from "flickering" or feeling robotic, the engine uses a hashing algorithm based on the Node ID.
+
 * **Input:** Node ID + Date (Day).
 * **Output:** A stable "Random" seed.
 * **Result:** A specific node will always have the same "Personality" (report style) for the entire day.
@@ -277,12 +318,15 @@ To prevent the text from "flickering" or feeling robotic, the engine uses a hash
 
 <details open>
 <summary><h2>8. Database Schema</h2></summary>
+
 <br>
 
 The persistence layer is built on PostgreSQL (Supabase).
 
 ### 8.1 network_snapshots
+
 Captures the global heartbeat.
+
 | Column | Type | Description |
 |---|---|---|
 | `id` | uuid | Primary Key |
@@ -293,7 +337,9 @@ Captures the global heartbeat.
 | `total_capacity` | int8 | Total storage (Bytes) |
 
 ### 8.2 node_snapshots
+
 The high-volume table driving the Stability Ribbons.
+
 | Column | Type | Description |
 |---|---|---|
 | `node_id` | text | Stable ID (PubKey-IP-Net) |
@@ -309,11 +355,13 @@ The high-volume table driving the Stability Ribbons.
 
 <details open>
 <summary><h2>9. Quality Assurance & Auditing</h2></summary>
+
 <br>
 
 The platform's reliability is guaranteed by a multi-layered testing strategy comprising 31 automated tests across 5 suites.
 
 ### 9.1 Mathematical Verification
+
 * **Focus:** `lib/xandeum-economics.ts`, `lib/xandeum-brain.ts`
 * **Method:** Unit tests verify that:
     * Geometric stacking of NFT boosts calculates correctly to the 8th decimal.
@@ -321,26 +369,33 @@ The platform's reliability is guaranteed by a multi-layered testing strategy com
     * Fallback weights trigger automatically when API simulates failure.
 
 ### 9.2 Spatial Logic Verification
+
 * **Focus:** `api/geo.ts`
 * **Method:** Backend tests confirm:
     * **Ghost Node Filtering:** VPN/Private IPs (lat: 0) are excluded from map rendering.
     * **King Selection:** The aggregation engine correctly picks the highest-value node to represent a city cluster.
 
 ### 9.3 UI & Integration Tests
+
 * **Focus:** `pages/map.tsx`, `integration/navigation.test.tsx`
 * **Method:** Simulates user journeys:
     * Clicking a deep link (`?focus=1.2.3.4`) correctly zooms the map.
     * Switching view modes updates D3 render layers without crashing.
 
 ### 9.4 The Pulse Monitor (Continuous Auditing)
+
 Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly via GitHub Actions.
+
 * **Scope:** Pings 100% of network nodes.
 * **Rule:** If any node returns corrupted schema (e.g., credits: null), alerts are triggered immediately.
 
 </details>
 
+---
+
 <details open>
 <summary><h2>10. API Reference</h2></summary>
+
 <br>
 
 ### `/api/stats`
@@ -348,6 +403,7 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 **Method:** `GET`
 
 **Response Schema:**
+
 ```typescript
 {
   result: {
@@ -374,6 +430,7 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 ```
 
 **Error Codes:**
+
 - `503 Service Unavailable`: RPC network unreachable
 
 ---
@@ -383,6 +440,7 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 **Method:** `GET`
 
 **Response Schema:**
+
 ```typescript
 {
   locations: LocationData[],
@@ -396,6 +454,7 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 ```
 
 **LocationData Fields:**
+
 - `totalCredits`: **Nullable** if no valid credit data exists for region
 - `topPerformers`: Object mapping `{ STORAGE, CREDITS, HEALTH }` to "King" node metadata
 
@@ -410,6 +469,7 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 **Response:** Raw passthrough from upstream API
 
 **Error Codes:**
+
 - `503`: Upstream API offline or timeout
 
 </details>
@@ -418,9 +478,11 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 
 <details open>
 <summary><h2>11. UI/UX Design Principles</h2></summary>
+
 <br>
 
 ### 11.1 Visual Hierarchy
+
 * **Color-Coded Modes:** Each view mode has a dedicated color scheme.
     * Storage: Indigo (`#6366f1`)
     * Health: Emerald (`#10b981`)
@@ -430,6 +492,7 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 * **Micro-Animations:** Every state change has a 300ms transition (Fade-ins, Slide-ins).
 
 ### 11.2 Responsive Breakpoints
+
 * **Base:** 375px (iPhone SE)
 * **sm:** 640px (Tablets)
 * **md:** 768px (Landscape Tablets)
@@ -438,17 +501,21 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 * **2xl:** 1536px (Wide Monitors)
 
 ### 11.3 User Feedback
+
 **Loading States:**
+
 - Skeleton screens (cards with pulsing gray bars)
 - Progress indicators (spinning circles)
 - Animated text ("Calculating Fortunes...")
 
 **Error States:**
+
 - Inline alerts (red border + icon)
 - Toast notifications (auto-dismiss after 6s)
 - Full-screen fallbacks (when entire page fails)
 
 **Success States:**
+
 - Green checkmarks (copy actions)
 - Confetti animation (achievements, future)
 - Haptic feedback (mobile, future)
@@ -459,9 +526,11 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 
 <details open>
 <summary><h2>12. Platform Walkthrough</h2></summary>
+
 <br>
 
 ### 12.1 Dashboard (/)
+
 * **Primary View:** Grid of node cards with rotating metrics.
 * **Card Cycle (5 Steps, 5-Second Rotation):**
     1. Storage Used
@@ -473,6 +542,7 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 * **Zen Mode:** Minimalist OLED-black theme for 24/7 monitoring walls.
 
 ### 12.2 Node Inspector Modal
+
 * **HealthView:** Breakdown of 4 pillars + 30-Day Stability Ribbon.
 * **StorageView:** Distribution curve + Utilization bonus.
 * **IdentityView:** Fleet Topology + RPC Endpoints.
@@ -480,6 +550,7 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 * **Proof of Pulse:** PNG generation for social sharing.
 
 ### 12.3 Global Map (/map)
+
 * **Three View Modes:**
     * Storage: Pin size = total committed capacity.
     * Health: Pin shape = diamond (vs square/circle).
@@ -487,6 +558,7 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 * **Regional X-Ray Stats:** Avg Density, Global Share, Tier Rank.
 
 ### 12.4 Leaderboard (/leaderboard)
+
 * **Sorting:** Always by credits (descending).
 * **STOINC Simulator:**
     * Hardware Calculator Mode: Input nodes, storage, stake → calculates base credits.
@@ -500,9 +572,11 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 
 <details open>
 <summary><h2>13. Advanced Features</h2></summary>
+
 <br>
 
 ### 13.1 Smart Card Rotation
+
 Cards cycle through 5 metrics every 5 seconds, but **sorting locks the cycle** to the relevant step:
 
 ```typescript
@@ -517,11 +591,14 @@ useEffect(() => {
 ```
 
 ### 13.2 Whale Watch (Trend Tracking)
+
 Rank changes are calculated by comparing:
+
 - **Current Rank**: From live API data
 - **Previous Rank**: From `localStorage.xandeum_rank_history`
 
 **Storage Schema:**
+
 ```json
 {
   "xHdG3...": 12,
@@ -531,6 +608,7 @@ Rank changes are calculated by comparing:
 ```
 
 **Trend Calculation:**
+
 ```typescript
 const prevRank = history[node.pubkey];
 if (prevRank) {
@@ -539,6 +617,7 @@ if (prevRank) {
 ```
 
 ### 13.3 Deep Linking
+
 All major views support URL-based state:
 
 | URL | Effect |
@@ -548,6 +627,7 @@ All major views support URL-based state:
 | `/leaderboard?highlight=<pubkey>` | Scrolls to row + expands |
 
 **Implementation:**
+
 ```typescript
 useEffect(() => {
   if (router.isReady && router.query.open && !hasDeepLinked.current) {
@@ -566,18 +646,22 @@ useEffect(() => {
 
 <details open>
 <summary><h2>14. Performance & Optimization</h2></summary>
+
 <br>
 
 ### 14.1 Bundle Size
+
 * **Target:** < 500KB initial load (gzipped).
 * **Techniques:** Tree Shaking, Code Splitting (Lazy-load map libraries), Image Optimization (WebP), Font Subsetting.
 
 ### 14.2 Rendering Strategy
+
 * **Static Generation (SSG):** Documentation page, About/FAQ pages.
 * **Server-Side Rendering (SSR):** Dashboard (for SEO), Leaderboard.
 * **Client-Side Rendering (CSR):** Map (data-heavy), Modals (ephemeral state).
 
 ### 14.3 Memory Management
+
 * **Large Datasets:** Node list capped at 100 visible in leaderboard; virtualized scrolling planned for 1000+ nodes.
 * **Map:** Pins limited to 200 simultaneous renders.
 
@@ -587,15 +671,19 @@ useEffect(() => {
 
 <details open>
 <summary><h2>15. Operations, Error Handling & Resilience</h2></summary>
+
 <br>
 
 ### 15.1 Circuit Breaker & Failover
+
 To prevent "Lag Cascades" where slow nodes hang the UI, the `RpcOrchestrator` implements a strict Circuit Breaker pattern:
+
 * **Threshold:** 3 consecutive failures or timeouts (>4000ms).
 * **Penalty:** The offending node is "Banned" from rotation for 60 seconds.
 * **Recovery:** A background worker passively tests banned nodes; successful pings restore them to the active pool.
 
 ### 15.2 Fail-Safe Hierarchy
+
 1.  **Network Unreachable:** Show "Syncing..." → Retry with exponential backoff.
 2.  **Partial Data Loss (Credits API down):** Re-weight health scores dynamically (Fallback Weighting).
 3.  **Geolocation Failure:** Fallback to `geoip-lite` (local DB).
@@ -608,9 +696,11 @@ To prevent "Lag Cascades" where slow nodes hang the UI, the `RpcOrchestrator` im
 
 <details open>
 <summary><h2>16. Troubleshooting</h2></summary>
+
 <br>
 
 ### 16.1 Common Error Codes
+
 * `ERR_RPC_ALL_FAIL`: The Circuit Breaker has tripped for the Hero node, and all Swarm backups timed out.
     * **Action:** Check global internet connectivity or Xandeum Status Page.
 * `WARN_CREDITS_OFFLINE`: The Credits API returned 500/404.
@@ -619,28 +709,35 @@ To prevent "Lag Cascades" where slow nodes hang the UI, the `RpcOrchestrator` im
     * **Action:** System falls back to local `geoip-lite` database.
 
 ### 16.2 More
+
 **1. "Node not found on map"**
+
 - **Cause**: Node uses VPN/CGNAT (private IP)
 - **Solution**: IP geolocation returns (0, 0) → hidden on map
 - **Workaround**: View in Dashboard or Leaderboard instead
 
 **2. "Credits show as 0"**
+
 - **Cause**: Node hasn't earned rewards yet, OR Credits API offline
 - **Indicator**: Check for "API OFFLINE" badge vs plain "0 Cr"
 
 **3. "Health score dropped suddenly"**
+
 - **Cause**: Credits API went offline → re-weighting shifted balance
 - **Solution**: Score will stabilize when API returns
 
 **4. "Map pins overlap"**
+
 - **Cause**: Multiple nodes in same city
 - **Solution**: Click any pin → Split view shows full list
 
 **5. "Favorites disappeared"**
+
 - **Cause**: localStorage cleared by browser/extension
 - **Prevention**: Export favorites (future feature)
 
 ### 16.3 To force a network snapshot outside the 30-minute cron schedule (e.g., after a deployment), dispatch the GitHub Action manually:
+
 ```bash
 gh workflow run monitor.yml
 ```
@@ -649,7 +746,7 @@ gh workflow run monitor.yml
 
 ---
 
-## Future Enhancements
+## 17. Future Enhancements
 
 ### Planned Features
 
@@ -666,7 +763,7 @@ gh workflow run monitor.yml
 
 ---
 
-## Contributing
+## 18. Contributing
 
 ### Code Standards
 
@@ -690,7 +787,7 @@ gh workflow run monitor.yml
 
 ---
 
-## Credits
+## 19. Credits
 
 **Built by:** riot' ([@33xp_](https://twitter.com/33xp_))  
 **Powered by:** Xandeum pRPC Network  
@@ -698,6 +795,9 @@ gh workflow run monitor.yml
 **Repository:** [github.com/Idle0x/xandeum-pulse](https://github.com/Idle0x/xandeum-pulse)
 
 ---
+
 *Documentation is actively maintained. For code-level implementation details, refer to the source files linked within the README.*
 
-*Documentation last updated: January 2026 (v2.0 Architecture)* *For questions, open an issue on GitHub or reach out on X.*
+*Documentation last updated: January 2026 (v2.0 Architecture)*
+
+*For questions, open an issue on GitHub or reach out on X.*
