@@ -1,9 +1,8 @@
-import { ArrowLeft, Zap, ShieldCheck, Minimize2 } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Node } from '../../../types';
 import { NodeHistoryPoint, HistoryTimeRange } from '../../../hooks/useNodeHistory';
 import { StabilityRibbon } from './StabilityRibbon';
 import { HealthHistoryChart } from './HealthHistoryChart';
-import { RadialProgress } from '../../RadialProgress';
 
 interface HealthViewProps {
   node: Node;
@@ -67,6 +66,7 @@ export const HealthView = ({
   };
 
   // --- NEW: Calculate ribbon density based on Time Range ---
+  // This ensures the visual blocks in the ribbon match the data density
   const getRibbonSlots = () => {
     switch(timeRange) {
         case '24H': return 24;  // 24 Hourly slots
@@ -81,7 +81,7 @@ export const HealthView = ({
   return (
     <div className={`h-full flex flex-col ${zenMode ? '' : 'animate-in fade-in slide-in-from-right-2 duration-300'}`}>
 
-      {/* HEADER: Back Button */}
+      {/* HEADER: Back Button (Mobile Only) */}
       <div className="flex justify-end items-center mb-2 shrink-0 md:hidden">
         <button onClick={onBack} className={`text-[10px] font-bold flex items-center gap-1 px-2.5 py-1.5 rounded-lg border transition ${zenMode ? 'bg-black border-zinc-700 text-white' : 'bg-zinc-900 border-zinc-800 text-red-500 hover:text-red-400 hover:bg-zinc-800'}`}>
           <ArrowLeft size={10} /> BACK
@@ -154,11 +154,11 @@ export const HealthView = ({
                 )}
             </div>
             <div className="h-8 md:h-10 w-full relative">
-                {/* UPDATED: Pass dynamic days prop */}
                 <StabilityRibbon 
                     history={history} 
                     loading={historyLoading} 
-                    days={getRibbonSlots()} 
+                    days={getRibbonSlots()}
+                    timeRange={timeRange} 
                 />
             </div>
         </div>
