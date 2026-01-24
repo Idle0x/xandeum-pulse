@@ -23,16 +23,13 @@ export const StorageHistoryChart = ({
   onTimeRangeChange,
   loading
 }: StorageHistoryChartProps) => {
-  // UPDATED: Default set to 'USED'
   const [viewMode, setViewMode] = useState<'USED' | 'COMMITTED'>('USED');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // Use history directly (it's already filtered by the hook/backend)
   const chartData = useMemo(() => {
     if (!history || history.length === 0) return [];
 
     return history.map((point, index) => {
-      // Use real data if available, else fallback
       const hasData = point.storage_committed !== undefined;
       return {
         date: point.date,
@@ -44,11 +41,28 @@ export const StorageHistoryChart = ({
 
   const activeColor = viewMode === 'COMMITTED' ? '#a855f7' : '#3b82f6'; 
 
+  // --- FORMATTERS ---
+  const formatAxisDate = (val: string) => {
+    const date = new Date(val);
+    if (timeRange === '24H') {
+       return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    }
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+
+  const formatTooltipLabel = (label: string) => {
+    const date = new Date(label);
+    if (timeRange === '24H' || timeRange === '3D' || timeRange === '7D') {
+        return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
         <div className={`px-3 py-2 rounded-lg border shadow-xl text-xs ${zenMode ? 'bg-zinc-900 border-zinc-700' : 'bg-black/90 border-zinc-800'}`}>
-          <div className="text-zinc-400 mb-1">{new Date(label).toLocaleDateString()}</div>
+          <div className="text-zinc-400 mb-1">{formatTooltipLabel(label)}</div>
           <div className="font-bold font-mono text-white flex items-center gap-2">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: activeColor }}></div>
             {formatBytes(payload[0].value)}
@@ -140,7 +154,7 @@ export const StorageHistoryChart = ({
                 tickLine={false} 
                 tick={{ fontSize: 9, fill: '#71717a' }} 
                 minTickGap={30}
-                tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, {month:'short', day:'numeric'})}
+                tickFormatter={formatAxisDate}
             />
             <YAxis 
                 axisLine={false} 
