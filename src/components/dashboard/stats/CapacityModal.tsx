@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { X, Database, TrendingUp, TrendingDown, Users, PieChart, BarChart3, HardDrive, CloudLightning, Activity, Scale } from 'lucide-react';
+import { X, Database, TrendingUp, TrendingDown, Users, PieChart, HardDrive, CloudLightning, Scale } from 'lucide-react';
 import { Node } from '../../../types';
 import { formatBytes } from '../../../utils/formatters';
 import { useNetworkHistory, HistoryTimeRange, NetworkHistoryPoint } from '../../../hooks/useNetworkHistory';
@@ -87,8 +87,8 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
   const themeColor = activeTab === 'MAINNET' ? 'text-green-500' : 'text-blue-500';
   const themeBg = activeTab === 'MAINNET' ? 'bg-green-500' : 'bg-blue-500';
 
-  // --- 3. SVG HELPER (Pie Chart) ---
-  const renderPie = (slices: { value: number; color: string }[]) => {
+  // --- 3. FLUID SVG HELPER (Pie Chart) ---
+  const renderFluidPie = (slices: { value: number; color: string }[]) => {
     const total = slices.reduce((acc, s) => acc + s.value, 0) || 1;
     let cumulativePercent = 0;
     const r = 15.9155; 
@@ -101,11 +101,17 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
           const dashArray = `${percent} ${100 - percent}`;
           const dashOffset = -cumulativePercent;
           cumulativePercent += percent;
+          
           return (
             <circle
               key={i}
-              cx="21" cy="21" r={r} fill="transparent" stroke={slice.color} strokeWidth="6"
-              strokeDasharray={dashArray} strokeDashoffset={dashOffset}
+              cx="21" cy="21" r={r} fill="transparent" 
+              stroke={slice.color} 
+              strokeWidth="6"
+              strokeDasharray={dashArray} 
+              strokeDashoffset={dashOffset}
+              // Added transition classes for fluid morphing
+              className="transition-[stroke-dasharray,stroke-dashoffset,stroke] duration-700 ease-in-out"
             />
           );
         })}
@@ -114,9 +120,9 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
   };
 
   const getWhaleText = () => {
-     if (activeTab === 'ALL') return <>Top 10 nodes <span className="text-zinc-300 font-bold">across network</span> control</>;
-     if (activeTab === 'MAINNET') return <>Top 10 nodes <span className="text-green-500 font-bold">on Mainnet</span> control</>;
-     return <>Top 10 nodes <span className="text-blue-500 font-bold">on Devnet</span> control</>;
+     if (activeTab === 'ALL') return <>Top 10 nodes <span className="text-zinc-300 font-bold transition-colors duration-500">across network</span> control</>;
+     if (activeTab === 'MAINNET') return <>Top 10 nodes <span className="text-green-500 font-bold transition-colors duration-500">on Mainnet</span> control</>;
+     return <>Top 10 nodes <span className="text-blue-500 font-bold transition-colors duration-500">on Devnet</span> control</>;
   };
 
   // --- Pie Chart Colors based on Tab ---
@@ -137,8 +143,9 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
         {/* HEADER */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-4">
           <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-lg border bg-opacity-10 border-zinc-800 ${activeTab === 'ALL' ? 'bg-purple-500 border-purple-500/20' : themeBg.replace('bg-', 'bg-opacity-10 bg-')}`}>
-              <Database size={20} className={activeTab === 'ALL' ? 'text-purple-500' : themeColor} />
+            {/* Added transition-colors to container and icon */}
+            <div className={`p-2.5 rounded-lg border bg-opacity-10 border-zinc-800 transition-colors duration-500 ${activeTab === 'ALL' ? 'bg-purple-500 border-purple-500/20' : themeBg.replace('bg-', 'bg-opacity-10 bg-')}`}>
+              <Database size={20} className={`transition-colors duration-500 ${activeTab === 'ALL' ? 'text-purple-500' : themeColor}`} />
             </div>
             <div>
               <h3 className="text-lg font-black text-white leading-tight">Network Capacity</h3>
@@ -165,7 +172,8 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
           {/* ROW 1: HERO METRICS */}
           <div className="grid grid-cols-2 gap-3">
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 relative overflow-hidden group h-20 flex flex-col justify-between">
-                 <div className={`absolute top-0 left-0 w-0.5 h-full ${activeTab === 'ALL' ? 'bg-purple-500' : themeBg}`}></div>
+                 {/* Added transition-colors to the decorative bar */}
+                 <div className={`absolute top-0 left-0 w-0.5 h-full transition-colors duration-500 ${activeTab === 'ALL' ? 'bg-purple-500' : themeBg}`}></div>
                  <div className="absolute inset-0 z-0 opacity-10 transition-opacity pointer-events-none px-2 mt-4">
                     <HistoryChart 
                         data={heroChartData} 
@@ -183,12 +191,12 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
                         </span>
                     )}
                  </div>
-                 <div className={`relative z-10 text-2xl font-black tracking-tighter tabular-nums ${activeTab === 'ALL' ? 'text-white' : themeColor}`}>
+                 <div className={`relative z-10 text-2xl font-black tracking-tighter tabular-nums transition-colors duration-500 ${activeTab === 'ALL' ? 'text-white' : themeColor}`}>
                     {formatBytes(dashboardData.totalCommitted)}
                  </div>
              </div>
 
-             <div className={`bg-zinc-900/50 border ${usageBorderClass} rounded-xl p-3 relative h-20 flex flex-col justify-between transition-colors duration-300`}>
+             <div className={`bg-zinc-900/50 border ${usageBorderClass} rounded-xl p-3 relative h-20 flex flex-col justify-between transition-all duration-300`}>
                  <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5"><CloudLightning size={10} /> Load State</div>
                  <div>
                     <div className="text-2xl font-black text-blue-400 tracking-tighter tabular-nums">
@@ -223,7 +231,8 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
                  <div className="flex justify-between items-start">
                      {/* Active Nodes Metric */}
                      <div>
-                        <div className={`text-[9px] uppercase font-bold flex items-center gap-1.5 ${activeTab === 'ALL' ? 'text-zinc-400' : themeColor}`}>
+                        {/* Added transition-colors */}
+                        <div className={`text-[9px] uppercase font-bold flex items-center gap-1.5 transition-colors duration-500 ${activeTab === 'ALL' ? 'text-zinc-400' : themeColor}`}>
                            <Users size={12}/> Active Nodes
                         </div>
                         <div className="text-3xl font-black text-white tracking-tighter mt-1 tabular-nums">
@@ -234,9 +243,9 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
                         </div>
                      </div>
 
-                     {/* Dynamic Network Composition Pie */}
+                     {/* Dynamic Network Composition Pie (Fluid) */}
                      <div className="relative w-12 h-12 shrink-0">
-                         {renderPie([
+                         {renderFluidPie([
                             { value: dashboardData.mainnetSum, color: getMainnetColor() }, 
                             { value: dashboardData.devnetSum, color: getDevnetColor() }
                          ])}
@@ -252,24 +261,21 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
                         </div>
                      </div>
 
-                     {/* Median Value Row */}
                      <div className="flex items-center justify-between text-[9px]">
                         <span className="font-mono text-zinc-400">Median</span>
                         <span className="font-mono text-white font-bold">{formatBytes(dashboardData.median)}</span>
                      </div>
 
-                     {/* Progress Bar */}
+                     {/* Fluid Progress Bar */}
                      <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden relative">
-                         {/* Average Marker (Background) */}
                          <div className="absolute top-0 left-0 h-full bg-zinc-700 w-full opacity-30"></div> 
-                         {/* Median Bar (Fill) */}
                          <div 
                             style={{ width: `${Math.min((dashboardData.median / (dashboardData.average || 1)) * 100, 100)}%` }} 
-                            className={`h-full rounded-full ${activeTab === 'ALL' ? 'bg-purple-500' : themeBg}`}
+                            // Added transition-all duration-700 ease-in-out
+                            className={`h-full rounded-full transition-all duration-700 ease-in-out ${activeTab === 'ALL' ? 'bg-purple-500' : themeBg}`}
                          ></div>
                      </div>
 
-                     {/* Average Value Row */}
                      <div className="flex items-center justify-between text-[9px]">
                         <span className="font-mono text-zinc-500">Average</span>
                         <span className="font-mono text-zinc-500 font-bold">{formatBytes(dashboardData.average)}</span>
@@ -277,7 +283,7 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
                  </div>
              </div>
 
-             {/* RIGHT BLOCK: WHALE DOMINANCE (Always Relevant) */}
+             {/* RIGHT BLOCK: WHALE DOMINANCE */}
              <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-xl p-4 relative flex items-center h-full min-h-[156px]">
                  <div className="flex flex-col justify-center gap-1 shrink-0 max-w-[60%]">
                     <h4 className="text-[10px] font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
@@ -296,7 +302,8 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
 
                  <div className="flex-1 flex items-center justify-center h-full">
                     <div className="w-20 h-20 relative opacity-90">
-                        {renderPie([
+                        {/* Fluid Pie for Whales */}
+                        {renderFluidPie([
                             { value: dashboardData.top10Sum, color: '#eab308' }, 
                             { value: dashboardData.remainderSum, color: '#52525b' }   
                         ])}
