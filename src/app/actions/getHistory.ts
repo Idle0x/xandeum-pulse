@@ -1,90 +1,71 @@
 'use server'
 
-import { unstable_cache } from 'next/cache';
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize server-side Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// --- 1. SETUP & DEBUGGING ---
 
-// Safety check to ensure env vars are loaded on the server
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+// Check if keys exist on the server
 if (!supabaseUrl || !supabaseKey) {
-  console.error('SERVER ERROR: Supabase keys are missing in the server environment.');
+  console.error("❌ FATAL: Supabase Environment Variables are missing on the server!");
+} else {
+  console.log("✅ Server: Supabase Variables loaded successfully.");
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Create client directly (No unstable_cache for this test)
+const supabase = createClient(supabaseUrl!, supabaseKey!);
 
-// --- INTERNAL HELPERS (Not Exported) ---
-
-const fetchRawNetworkHistory = async (days: number) => {
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
-
-  const { data, error } = await supabase
-    .from('network_snapshots')
-    .select('*')
-    .gte('id', startDate.toISOString())
-    .order('id', { ascending: true });
-
-  if (error) {
-    console.error('Supabase Network Error:', error);
-    throw new Error(error.message);
-  }
-  return data;
-};
-
-const fetchRawNodeHistory = async (stableId: string, network: string, days: number) => {
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
-
-  const { data, error } = await supabase
-    .from('node_snapshots')
-    .select('*') 
-    .eq('node_id', stableId)
-    .eq('network', network)
-    .gte('created_at', startDate.toISOString()) 
-    .order('created_at', { ascending: true });
-
-  if (error) {
-    console.error('Supabase Node Error:', error);
-    throw new Error(error.message);
-  }
-  return data;
-};
-
-// --- INTERNAL CACHED FUNCTIONS ---
-
-const getCachedNetworkHistoryInternal = unstable_cache(
-  async (days: number) => fetchRawNetworkHistory(days),
-  ['network-history-v1'], // Cache Key
-  { revalidate: 1800 }     // 30 Minutes
-);
-
-const getCachedNodeHistoryInternal = unstable_cache(
-  async (stableId: string, network: string, days: number) => fetchRawNodeHistory(stableId, network, days),
-  ['node-history-v1'],    // Cache Key
-  { revalidate: 1800 }    // 30 Minutes
-);
-
-// --- EXPORTED SERVER ACTIONS ---
-// These are the actual functions your client components will call.
+// --- 2. DIRECT FETCHERS (No Cache) ---
 
 export async function getNetworkHistoryAction(days: number) {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
   try {
-    const data = await getCachedNetworkHistoryInternal(days);
-    return data; // success
-  } catch (error) {
-    console.error('Server Action Error (Network):', error);
-    return []; // Return empty array on failure to prevent crash
+    const { data, error } = await supabase
+      .from('network_snapshots')
+      .select('*')
+      .gte('id', startDate.toISOString())
+      .order('id', { ascending: true });
+
+    if (error) {
+      console.error("Server Network Fetch Error:", error);
+      throw new Error(error.message);
+    }
+    return data || [];
+  } catch (err) {
+    console.error("Server Network Exception:", err);
+    return [];
   }
 }
 
 export async function getNodeHistoryAction(stableId: string, network: string, days: number) {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  console.log(`Server Fetching Node: ${stableId} (Days: ${days})`);
+
   try {
-    const data = await getCachedNodeHistoryInternal(stableId, network, days);
-    return data; // success
-  } catch (error) {
-    console.error('Server Action Error (Node):', error);
-    return []; // Return empty array on failure
+    const { data, error } = await supabase
+      .from('node_snapshots')
+      .select('*') 
+      .eq('node_id', stableId)
+      .eq('network', network)
+      .gte('created_at', startDate.toISOString()) 
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error("Server Node Fetch Error:", error.message);
+      // We return the error so the UI might see it (optional, but good for debugging)
+      return []; 
+    }
+
+    console.log(`Server Found: ${data?.length} rows`);
+    return data || [];
+  } catch (err) {
+    console.error("Server Node Exception:", err);
+    return [];
   }
 }
