@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+// Import the new helper
+import { consolidateNetworkHistory } from '../utils/historyAggregator';
 
 export type HistoryTimeRange = '24H' | '3D' | '7D' | '30D' | 'ALL';
 
@@ -11,7 +13,7 @@ export interface NetworkHistoryPoint {
   total_capacity: number;
   total_used: number;
   consensus_score: number;
-  
+
   // Mainnet
   mainnet_nodes: number;
   mainnet_capacity: number;
@@ -40,14 +42,19 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
     async function fetchHistory() {
       setLoading(true);
 
+      // 1. DETERMINE FETCH WINDOW
+      // We need to fetch enough raw data to satisfy the range.
+      // Even if we aggregate to Daily, we need the raw hourly rows from Supabase first.
       let days = 7;
       if (timeRange === '24H') days = 1;
       if (timeRange === '3D') days = 3;
-      if (timeRange === '30D') days = 30;
+      if (timeRange === '30D') days = 30; 
+      if (timeRange === 'ALL') days = 365; // Fetch a year of raw data
 
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
+      // 2. FETCH RAW DATA
       const { data, error } = await supabase
         .from('network_snapshots')
         .select('*')
@@ -61,9 +68,10 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
       }
 
       if (data && data.length > 0) {
-        const points = data.map((d: any) => ({
-          date: d.id,
-          
+        // 3. MAP RAW DATA
+        const rawPoints = data.map((d: any) => ({
+          date: d.id, // Supabase ID is likely the timestamp in this schema
+
           // Global
           avg_health: Number(d.avg_health || 0),
           total_nodes: Number(d.total_nodes || 0),
@@ -91,12 +99,16 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
           top10_dominance: Number(d.top10_dominance || 0)
         }));
 
-        setHistory(points);
+        // 4. AGGREGATE (The Fix)
+        // Groups hourly data into daily averages if timeRange is 30D or ALL
+        const processedHistory = consolidateNetworkHistory(rawPoints, timeRange);
+
+        setHistory(processedHistory);
 
         // Calculate Growth (Total Capacity as example)
-        if (points.length > 1) {
-            const first = points[0].total_capacity;
-            const last = points[points.length - 1].total_capacity;
+        if (processedHistory.length > 1) {
+            const first = processedHistory[0].total_capacity;
+            const last = processedHistory[processedHistory.length - 1].total_capacity;
             if (first > 0) {
                 setGrowth(((last - first) / first) * 100);
             } else {
