@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { X, Database, TrendingUp, TrendingDown, Users, PieChart, BarChart3, HardDrive, CloudLightning, Globe } from 'lucide-react';
+import { X, Database, TrendingUp, TrendingDown, Users, PieChart, BarChart3, HardDrive, CloudLightning, Activity, Scale } from 'lucide-react';
 import { Node } from '../../../types';
 import { formatBytes } from '../../../utils/formatters';
 import { useNetworkHistory, HistoryTimeRange, NetworkHistoryPoint } from '../../../hooks/useNetworkHistory';
@@ -56,7 +56,7 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
     const descNodes = [...filteredNodes].sort((a, b) => (b.storage_committed || 0) - (a.storage_committed || 0));
     const top10 = descNodes.slice(0, 10);
     const top10Sum = top10.reduce((acc, n) => acc + (n.storage_committed || 0), 0);
-    
+
     // Aggregations for Mainnet/Devnet split
     let mainnetSum = 0;
     let devnetSum = 0;
@@ -71,7 +71,6 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
       median, 
       average,
       top10Sum,
-      // For the pie chart: The "Rest" is Total - Top10 (Corrects the 100% visual bug)
       remainderSum: tCommitted > top10Sum ? tCommitted - top10Sum : 0,
       mainnetSum, devnetSum,
       nodeCount: filteredNodes.length,
@@ -84,6 +83,9 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
   const usageBorderClass = usagePercent > 80 
      ? 'border-red-500/20 shadow-[0_0_15px_-3px_rgba(239,68,68,0.1)]' 
      : 'border-zinc-800';
+
+  const themeColor = activeTab === 'MAINNET' ? 'text-green-500' : 'text-blue-500';
+  const themeBg = activeTab === 'MAINNET' ? 'bg-green-500' : 'bg-blue-500';
 
   // --- 3. SVG HELPER (Pie Chart) ---
   const renderPie = (slices: { value: number; color: string }[]) => {
@@ -117,38 +119,6 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
      return <>Top 10 nodes <span className="text-blue-500 font-bold">on Devnet</span> control</>;
   };
 
-  const themeColor = activeTab === 'MAINNET' ? 'text-green-500' : 'text-blue-500';
-  const themeBg = activeTab === 'MAINNET' ? 'bg-green-500' : 'bg-blue-500';
-
-  // --- 4. COMPOSITION HELPERS ---
-  const getCompositionData = () => {
-    const isMain = activeTab === 'MAINNET';
-    const globalTotal = dashboardData.globalCommitted || 1;
-    const currentVal = dashboardData.totalCommitted;
-    const restVal = globalTotal - currentVal;
-
-    return {
-      label: "Global Share",
-      icon: <Globe size={12} />,
-      primary: { 
-          label: activeTab, 
-          val: currentVal, 
-          pct: (currentVal / globalTotal) * 100, 
-          color: isMain ? "bg-green-500" : "bg-blue-500",
-          text: isMain ? "text-green-500" : "text-blue-500"
-      },
-      secondary: { 
-          label: "Others", 
-          val: restVal, 
-          pct: (restVal / globalTotal) * 100, 
-          color: "bg-zinc-700", 
-          text: "text-zinc-500" 
-      }
-    };
-  };
-
-  const compData = getCompositionData();
-
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#09090b] border border-zinc-800 rounded-3xl p-5 md:p-6 max-w-3xl w-full shadow-2xl animate-in zoom-in-95 fade-in duration-200 overflow-y-auto max-h-[90vh] custom-scrollbar" onClick={(e) => e.stopPropagation()}>
@@ -181,7 +151,7 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
 
         <div className="space-y-3">
 
-          {/* ROW 1: SPLIT HERO CARDS */}
+          {/* ROW 1: HERO METRICS */}
           <div className="grid grid-cols-2 gap-3">
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 relative overflow-hidden group h-20 flex flex-col justify-between">
                  <div className={`absolute top-0 left-0 w-0.5 h-full ${activeTab === 'ALL' ? 'bg-purple-500' : themeBg}`}></div>
@@ -232,14 +202,13 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
              />
           </div>
 
-          {/* ROW 3: FOOTER GRIDS */}
+          {/* ROW 3: INSIGHTS & DEMOGRAPHICS */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
-             {/* LEFT: Composition & Benchmarks */}
-             <div className="flex flex-col gap-3">
-
-                 {/* 1. COMPOSITION CARD */}
-                 {activeTab === 'ALL' ? (
+             {/* LEFT BLOCK: DYNAMIC CONTEXT */}
+             {activeTab === 'ALL' ? (
+                // 🟣 GLOBAL VIEW: COMPOSITION (The "Map")
+                <div className="flex flex-col gap-3">
                    <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex items-center gap-4 h-20">
                       <div className="relative w-12 h-12 shrink-0">
                          {renderPie([
@@ -259,54 +228,68 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
                          </div>
                       </div>
                    </div>
-                 ) : (
-                   <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex flex-col justify-center h-20 gap-2">
-                      <div className="flex justify-between items-center">
-                         <div className="text-[9px] text-zinc-500 uppercase font-bold flex items-center gap-1.5">
-                            {compData.icon} {compData.label}
+                   {/* Benchmark Ticker */}
+                   <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex items-center justify-between h-16">
+                      <div className="text-[9px] text-zinc-500 uppercase font-bold flex items-center gap-1.5"><BarChart3 size={12}/> Benchmark</div>
+                      <div className="flex items-center gap-4">
+                          <div className="text-right">
+                              <div className="text-[8px] text-zinc-500">Median</div>
+                              <div className="text-xs font-mono font-bold text-white">{formatBytes(dashboardData.median)}</div>
+                          </div>
+                          <div className="w-px h-6 bg-zinc-800"></div>
+                          <div className="text-right">
+                              <div className="text-[8px] text-zinc-500">Average</div>
+                              <div className="text-xs font-mono font-bold text-zinc-300">{formatBytes(dashboardData.average)}</div>
+                          </div>
+                      </div>
+                   </div>
+                </div>
+             ) : (
+                // 🟢 / 🔵 LOCAL VIEW: DEMOGRAPHICS (The "Vital Signs")
+                <div className="flex flex-col gap-3">
+                   {/* Node Count & Health Card */}
+                   <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 h-[156px] flex flex-col justify-between">
+                      <div className="flex justify-between items-start">
+                         <div>
+                            <div className={`text-[9px] uppercase font-bold flex items-center gap-1.5 ${activeTab === 'MAINNET' ? 'text-green-500' : 'text-blue-500'}`}>
+                               <Users size={12}/> Active Nodes
+                            </div>
+                            <div className="text-3xl font-black text-white tracking-tighter mt-1 tabular-nums">
+                               {dashboardData.nodeCount}
+                            </div>
                          </div>
-                         <div className="text-[9px] font-mono text-white opacity-50">
-                            {compData.primary.pct.toFixed(1)}% Share
+                         <div className="text-right">
+                            <div className="text-[9px] font-bold text-zinc-500 uppercase flex items-center gap-1.5 justify-end"><Scale size={10}/> Distribution</div>
+                            <div className="text-[9px] text-zinc-400 mt-1">Median vs Average</div>
                          </div>
                       </div>
-                      <div className="w-full h-2 bg-zinc-800/40 rounded-full overflow-hidden flex">
-                         <div style={{ width: `${compData.primary.pct}%` }} className={`h-full ${compData.primary.color} shadow-[0_0_10px_-2px_rgba(255,255,255,0.3)]`}></div>
-                         <div style={{ width: `${compData.secondary.pct}%` }} className={`h-full ${compData.secondary.color}`}></div>
-                      </div>
-                      <div className="flex justify-between items-center">
-                         <div className="flex items-center gap-1.5">
-                            <div className={`w-1.5 h-1.5 rounded-full ${compData.primary.color}`}></div>
-                            <span className="text-[8px] font-bold text-zinc-400 uppercase">{compData.primary.label}</span>
+
+                      {/* Distribution Health Bar */}
+                      <div className="space-y-2">
+                         <div className="flex items-center justify-between text-[9px]">
+                            <span className="font-mono text-zinc-400">Median</span>
+                            <span className="font-mono text-white font-bold">{formatBytes(dashboardData.median)}</span>
                          </div>
-                         <div className="flex items-center gap-1.5">
-                            <div className={`w-1.5 h-1.5 rounded-full ${compData.secondary.color}`}></div>
-                            <span className="text-[8px] font-bold text-zinc-500 uppercase">{compData.secondary.label}</span>
+                         <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden relative">
+                             {/* Average Marker (Background) */}
+                             <div className="absolute top-0 left-0 h-full bg-zinc-700 w-full opacity-30"></div> 
+                             {/* Median Bar (Fill) */}
+                             <div 
+                                style={{ width: `${Math.min((dashboardData.median / (dashboardData.average || 1)) * 100, 100)}%` }} 
+                                className={`h-full rounded-full ${activeTab === 'MAINNET' ? 'bg-green-500' : 'bg-blue-500'}`}
+                             ></div>
+                         </div>
+                         <div className="flex items-center justify-between text-[9px]">
+                            <span className="font-mono text-zinc-500">Average</span>
+                            <span className="font-mono text-zinc-500 font-bold">{formatBytes(dashboardData.average)}</span>
                          </div>
                       </div>
                    </div>
-                 )}
+                </div>
+             )}
 
-                 {/* Benchmarks Ticker */}
-                 <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex items-center justify-between h-16">
-                    <div className="text-[9px] text-zinc-500 uppercase font-bold flex items-center gap-1.5"><BarChart3 size={12}/> Benchmark</div>
-                    <div className="flex items-center gap-4">
-                        <div className="text-right">
-                            <div className="text-[8px] text-zinc-500">Median</div>
-                            <div className="text-xs font-mono font-bold text-white">{formatBytes(dashboardData.median)}</div>
-                        </div>
-                        <div className="w-px h-6 bg-zinc-800"></div>
-                        <div className="text-right">
-                            <div className="text-[8px] text-zinc-500">Average</div>
-                            <div className="text-xs font-mono font-bold text-zinc-300">{formatBytes(dashboardData.average)}</div>
-                        </div>
-                    </div>
-                 </div>
-             </div>
-
-             {/* RIGHT: Whale Dominance (UPDATED LAYOUT) */}
+             {/* RIGHT BLOCK: WHALE DOMINANCE (Always Relevant) */}
              <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-xl p-4 relative flex items-center h-full">
-
-                 {/* LEFT SIDE: HEADER, PERCENTAGE & TEXT */}
                  <div className="flex flex-col justify-center gap-1 shrink-0 max-w-[60%]">
                     <h4 className="text-[10px] font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                        <Users size={10} className="text-yellow-500"/> Top 10 Dominance
@@ -320,10 +303,8 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
                     </div>
                  </div>
 
-                 {/* VERTICAL DIVIDER */}
                  <div className="w-px h-12 bg-yellow-500/20 mx-4"></div>
 
-                 {/* RIGHT SIDE: PIE ONLY (Centered & Larger) */}
                  <div className="flex-1 flex items-center justify-center h-full">
                     <div className="w-20 h-20 relative opacity-90">
                         {renderPie([
