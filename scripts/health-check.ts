@@ -6,21 +6,18 @@ const PULSE_API_URL = process.env.NEXT_PUBLIC_APP_URL
   : 'https://xandeum-pulse.vercel.app/api/stats';
 
 // --- HELPER: Calculate Consensus ---
-// Returns the dominant version and the percentage (score)
 function getConsensusMetrics(nodeList: any[]) {
   if (!nodeList || nodeList.length === 0) {
     return { version: '0.0.0', score: 0 };
   }
 
   const versionCounts: Record<string, number> = {};
-  
-  // 1. Count versions
+
   for (const n of nodeList) {
     const v = n.version || 'Unknown';
     versionCounts[v] = (versionCounts[v] || 0) + 1;
   }
 
-  // 2. Find winner
   let topVersion = 'Unknown';
   let topCount = 0;
 
@@ -31,12 +28,11 @@ function getConsensusMetrics(nodeList: any[]) {
     }
   }
 
-  // 3. Calculate Percentage
   const score = (topCount / nodeList.length) * 100;
-  
+
   return { 
     version: topVersion, 
-    score: parseFloat(score.toFixed(2)) // Round to 2 decimals
+    score: parseFloat(score.toFixed(2)) 
   };
 }
 
@@ -59,15 +55,14 @@ async function runMonitor() {
     const uniqueNodeRows: any[] = [];
     const seenFingerprints = new Set<string>();
 
-    // Buckets for Raw Nodes (to calculate consensus later)
     const globalNodes: any[] = [];
     const mainnetNodes: any[] = [];
     const devnetNodes: any[] = [];
 
-    // Accumulators
-    let globalStats = { cap: 0, used: 0, healthSum: 0, healthCount: 0 };
-    let mainnetStats = { cap: 0, used: 0, healthSum: 0, healthCount: 0 };
-    let devnetStats = { cap: 0, used: 0, healthSum: 0, healthCount: 0 };
+    // UPDATED: Added accumulators for Stability (uptime)
+    let globalStats = { cap: 0, used: 0, healthSum: 0, healthCount: 0, stabSum: 0, stabCount: 0 };
+    let mainnetStats = { cap: 0, used: 0, healthSum: 0, healthCount: 0, stabSum: 0, stabCount: 0 };
+    let devnetStats = { cap: 0, used: 0, healthSum: 0, healthCount: 0, stabSum: 0, stabCount: 0 };
 
     for (const n of nodes) {
       // Dedup Logic
@@ -80,26 +75,34 @@ async function runMonitor() {
       const cap = Number(n.storage_committed || 0);
       const used = Number(n.storage_used || 0);
       const health = Number(n.health || 0);
+      const stability = Number(n.uptime || 0); // Stability = Uptime
 
       // Push to Buckets
       globalNodes.push(n);
       if (net === 'MAINNET') mainnetNodes.push(n);
       if (net === 'DEVNET') devnetNodes.push(n);
 
-      // Update Sums (Global)
+      // --- GLOBAL SUMS ---
       globalStats.cap += cap;
       globalStats.used += used;
       if (health > 0) { globalStats.healthSum += health; globalStats.healthCount++; }
+      // Stability is valid even if 0, but we usually track active nodes
+      globalStats.stabSum += stability; 
+      globalStats.stabCount++;
 
-      // Update Sums (Network Specific)
+      // --- NETWORK SPECIFIC SUMS ---
       if (net === 'MAINNET') {
         mainnetStats.cap += cap;
         mainnetStats.used += used;
         if (health > 0) { mainnetStats.healthSum += health; mainnetStats.healthCount++; }
+        mainnetStats.stabSum += stability;
+        mainnetStats.stabCount++;
       } else if (net === 'DEVNET') {
         devnetStats.cap += cap;
         devnetStats.used += used;
         if (health > 0) { devnetStats.healthSum += health; devnetStats.healthCount++; }
+        devnetStats.stabSum += stability;
+        devnetStats.stabCount++;
       }
 
       // Prepare Node Row
@@ -114,9 +117,9 @@ async function runMonitor() {
         credits: n.credits || 0,
         storage_committed: cap,
         storage_used: used,
-        uptime: n.uptime || 0,
+        uptime: stability, // Save to node history too
         rank: n.rank || 0,
-        version: n.version, // Ensure version is saved
+        version: n.version, 
         created_at: new Date().toISOString() 
       });
     }
@@ -143,7 +146,8 @@ async function runMonitor() {
       total_capacity: globalStats.cap,
       total_used: globalStats.used,
       avg_health: Math.round(calcAvg(globalStats.healthSum, globalStats.healthCount)),
-      consensus_score: globalConsensus.score,    // <--- FIXED: No longer 0
+      avg_stability: parseFloat(calcAvg(globalStats.stabSum, globalStats.stabCount).toFixed(2)), // <--- NEW
+      consensus_score: globalConsensus.score,    
       consensus_version: globalConsensus.version,
 
       // Mainnet
@@ -151,14 +155,16 @@ async function runMonitor() {
       mainnet_capacity: mainnetStats.cap,
       mainnet_used: mainnetStats.used,
       mainnet_avg_health: Math.round(calcAvg(mainnetStats.healthSum, mainnetStats.healthCount)),
-      mainnet_consensus_score: mainnetConsensus.score, // <--- NEW
+      mainnet_avg_stability: parseFloat(calcAvg(mainnetStats.stabSum, mainnetStats.stabCount).toFixed(2)), // <--- NEW
+      mainnet_consensus_score: mainnetConsensus.score, 
 
       // Devnet
       devnet_nodes: devnetNodes.length,
       devnet_capacity: devnetStats.cap,
       devnet_used: devnetStats.used,
       devnet_avg_health: Math.round(calcAvg(devnetStats.healthSum, devnetStats.healthCount)),
-      devnet_consensus_score: devnetConsensus.score,   // <--- NEW
+      devnet_avg_stability: parseFloat(calcAvg(devnetStats.stabSum, devnetStats.stabCount).toFixed(2)), // <--- NEW
+      devnet_consensus_score: devnetConsensus.score,   
 
       // Financials
       total_credits: totalCredits,
@@ -167,7 +173,7 @@ async function runMonitor() {
     });
 
     if (netError) console.error('❌ Network Snapshot Failed:', netError.message);
-    else console.log(`✅ Saved Snapshot. Global Consensus: ${globalConsensus.score}% (${globalConsensus.version})`);
+    else console.log(`✅ Saved Snapshot. Global Stability: ${calcAvg(globalStats.stabSum, globalStats.stabCount).toFixed(1)}%`);
 
     // Save Nodes
     const { error: nodeError } = await supabase.from('node_snapshots').insert(uniqueNodeRows);
