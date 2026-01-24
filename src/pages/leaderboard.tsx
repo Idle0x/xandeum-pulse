@@ -32,7 +32,7 @@ export default function Leaderboard() {
   const [expandedNode, setExpandedNode] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
 
-  // NEW: Analytics Modal State
+  // 4. Analytics Modal State
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
 
   // Refs for deep linking to prevent loops
@@ -68,23 +68,21 @@ export default function Leaderboard() {
       );
   }, [allNodes, networkFilter, searchQuery]);
 
-  // --- HELPER: Get Current Stats for Modal ---
-  const getCurrentStats = () => {
-     // We calculate stats based on the currently filtered view (e.g. Mainnet only vs Combined)
-     // so the modal matches the cards the user just clicked.
+  // --- HELPER: Get Initial Stats for Modal ---
+  // Calculates stats based on the currently filtered view (Mainnet/Devnet/Combined)
+  // so the modal opens matching what the user sees on screen.
+  const getInitialModalStats = () => {
      const nodes = filteredAndRanked; 
      const total = nodes.reduce((sum, n) => sum + n.credits, 0);
      const avg = nodes.length ? Math.round(total / nodes.length) : 0;
      const top10 = nodes.slice(0, 10).reduce((sum, n) => sum + n.credits, 0);
-     
-     // FIX: Return a number, not a string. The Modal handles the .toFixed formatting.
+
      const dom = total > 0 ? (top10 / total) * 100 : 0;
 
      return { 
          totalCredits: total, 
          avgCredits: avg, 
-         dominance: dom, 
-         nodeCount: nodes.length 
+         dominance: dom
      };
   };
 
@@ -155,7 +153,7 @@ export default function Leaderboard() {
       {/* WIZARD COMPONENT */}
       <StoincSimulator controller={simController} />
 
-      {/* STATS OVERVIEW COMPONENT (Updated with onClick handler) */}
+      {/* STATS OVERVIEW COMPONENT */}
       {!loading && !creditsOffline && (
         <StatsOverview 
             nodes={filteredAndRanked} 
@@ -205,11 +203,12 @@ export default function Leaderboard() {
         </footer>
       )}
 
-      {/* NEW: ANALYTICS MODAL */}
+      {/* ANALYTICS MODAL */}
       {isAnalyticsOpen && (
           <LeaderboardAnalyticsModal 
               onClose={() => setIsAnalyticsOpen(false)} 
-              currentStats={getCurrentStats()} 
+              initialNetwork={networkFilter} 
+              initialStats={getInitialModalStats()} 
           />
       )}
     </div>
