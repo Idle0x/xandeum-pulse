@@ -36,7 +36,7 @@ export const HealthView = ({
   // Safe Accessors
   const bd = node.healthBreakdown || { uptime: health, version: health, reputation: health, storage: health };
   const avgs = networkStats?.avgBreakdown || { uptime: 0, version: 0, reputation: 0, storage: 0 };
-  
+
   const isUntracked = (node as any).isUntracked;
   const isApiOffline = node.credits === null;
   const isReputationInvalid = isUntracked || isApiOffline;
@@ -64,6 +64,18 @@ export const HealthView = ({
       let bonus = 0;
       if(usedGB > 0) bonus = Math.min(15, 5 * Math.log2(usedGB + 2));
       return Math.max(0, Math.round(total - Math.round(bonus)));
+  };
+
+  // --- NEW: Calculate ribbon density based on Time Range ---
+  const getRibbonSlots = () => {
+    switch(timeRange) {
+        case '24H': return 24;  // 24 Hourly slots
+        case '3D': return 72;   // 3 * 24 Hourly slots
+        case '7D': return 168;  // 7 * 24 Hourly slots
+        case '30D': return 30;  // 30 Daily slots (Aggregated)
+        case 'ALL': return 60;  // Cap at 60 for visual sanity
+        default: return 30;
+    }
   };
 
   return (
@@ -137,13 +149,17 @@ export const HealthView = ({
                 <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Stability Map</span>
                 {!historyLoading && (
                     <span className="text-[9px] font-mono text-zinc-400">
-                        {/* UPDATED: Added 3D to hourly check */}
                         {timeRange === '24H' || timeRange === '3D' || timeRange === '7D' ? 'Hourly Resolution' : 'Daily Avg Resolution'}
                     </span>
                 )}
             </div>
             <div className="h-8 md:h-10 w-full relative">
-                <StabilityRibbon history={history} loading={historyLoading} />
+                {/* UPDATED: Pass dynamic days prop */}
+                <StabilityRibbon 
+                    history={history} 
+                    loading={historyLoading} 
+                    days={getRibbonSlots()} 
+                />
             </div>
         </div>
 
