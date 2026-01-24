@@ -32,7 +32,7 @@ This document serves as the definitive "Master Reference" for the [Xandeum Pulse
 
 ---
 
-<details open>
+## <details open>
 <summary><strong>1. System Overview</strong></summary>
 
 ## 1. System Overview
@@ -788,6 +788,9 @@ Learn more about [manually running GitHub Actions workflows](https://docs.github
 
 ---
 
+<details open>
+<summary><strong>17. Future Enhancements</strong></summary>
+
 ## 17. Future Enhancements
 
 ### Planned Features
@@ -802,6 +805,8 @@ Learn more about [manually running GitHub Actions workflows](https://docs.github
 2. **Version Decay Curve**: Linear vs exponential penalty?
 3. **Storage Bonus Cap**: 15 points or 20 points?
 4. **Map Clustering**: Aggregate overlapping pins?
+
+</details>
 
 ---
 
