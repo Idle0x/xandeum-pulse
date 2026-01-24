@@ -41,9 +41,11 @@ export const CapacityEvolutionChart = ({
 
   // --- REFINED DOMAIN LOGIC ---
   // Calculates the Y-Axis boundaries to avoid "Jagged Mountains"
-  const getDomain = useCallback(([dataMin, dataMax]: [number, number]) => {
+  // UPDATED: Explicitly returns [number, number] to satisfy Recharts strict typing
+  const getDomain = useCallback(([dataMin, dataMax]: [number, number]): [number, number] => {
     // Safety check for empty data
-    if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 'auto'];
+    // If invalid, return a safe default range [0, 1] instead of [0, 'auto'] to satisfy NumberDomain type
+    if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 1];
 
     // 1. Calculate Lower Bound: Lowest Point - 10%
     // We use Math.max(0, ...) to ensure we never go below zero (The "Zero Floor")
@@ -52,7 +54,8 @@ export const CapacityEvolutionChart = ({
     // 2. Calculate Upper Bound: Highest Point + 5%
     const upperBound = dataMax * 1.05;
 
-    return [lowerBound, upperBound];
+    // Cast as tuple to satisfy TypeScript
+    return [lowerBound, upperBound] as [number, number];
   }, []);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -72,7 +75,7 @@ export const CapacityEvolutionChart = ({
 
   return (
     <div className="w-full h-full flex flex-col rounded-xl border border-zinc-800 bg-black/40 p-3 relative transition-all duration-500">
-      
+
       {/* Header controls */}
       <div className="flex justify-between items-center mb-1 relative z-20 h-6 shrink-0">
          <div className="flex items-center gap-3">
@@ -112,11 +115,10 @@ export const CapacityEvolutionChart = ({
       {/* Chart Area */}
       <div className="flex-1 w-full min-h-0 relative">
          {loading && <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/10 backdrop-blur-[1px]"><Loader2 className="w-4 h-4 animate-spin text-zinc-600"/></div>}
-         
+
          <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={history} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
                <defs>
-                  {/* UPDATE: Increased stopOpacity to 0.6 for better feathering */}
                   <linearGradient id="gradCommitted" x1="0" y1="0" x2="0" y2="1">
                      <stop offset="5%" stopColor="#a855f7" stopOpacity={0.6}/>
                      <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
@@ -126,7 +128,7 @@ export const CapacityEvolutionChart = ({
                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                   </linearGradient>
                </defs>
-               
+
                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.5} />
 
                <XAxis 
@@ -144,12 +146,11 @@ export const CapacityEvolutionChart = ({
                   tickLine={false} 
                   tick={{fontSize: 9, fill: config.color, fontWeight: 600}} 
                   width={35} 
-                  domain={getDomain} // Apply the -10% / +5% logic
-                  tickCount={4}      // Reduce clutter
+                  domain={getDomain} 
+                  tickCount={4}      
                   tickFormatter={(val) => {
                       const str = formatBytes(val);
                       const [num] = str.split(' ');
-                      // Remove decimals for cleaner "ruler" look
                       return Math.round(parseFloat(num)).toString();
                   }}
                />
