@@ -17,23 +17,20 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
 
   // 1. DATA FETCHING
-  // Default to 24H for immediate tactical context
   const [timeRange, setTimeRange] = useState<HistoryTimeRange>('24H');
   const { history: convHistory, loading: convLoading } = useNetworkHistory(timeRange);
 
-  // Sparkline data (Fixed 30D for trend context)
+  // Sparkline data
   const { history: trendHistory, loading: trendLoading } = useNetworkHistory('30D');
 
-  // --- Dynamic Key Logic ---
   const consensusKey: keyof NetworkHistoryPoint = 
     activeTab === 'MAINNET' ? 'mainnet_consensus_score' : 
     activeTab === 'DEVNET' ? 'devnet_consensus_score' : 
     'consensus_score';
 
-  // Map sparkline data based on active tab
   const sparkData = trendHistory.map(p => ({ 
     date: p.date, 
-    value: p[consensusKey] // Dynamic access
+    value: p[consensusKey] 
   }));
 
   // --- 2. DATA ENGINE ---
@@ -79,6 +76,7 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
   }, [nodes, activeTab]);
 
   const isStrong = parseFloat(data.agreementScore) > 66;
+  const chartColor = isStrong ? '#22c55e' : '#eab308'; // Green or Yellow
 
   // Dynamic Theme for "Status" Border
   const statusBorder = isStrong 
@@ -99,8 +97,8 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
         {/* HEADER */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-4">
           <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-lg border bg-opacity-10 border-zinc-800 ${activeTheme.bg}`}>
-              <Server size={20} className={activeTheme.text} />
+            <div className={`p-2.5 rounded-lg border bg-opacity-10 border-zinc-800 transition-colors duration-500 ${activeTheme.bg}`}>
+              <Server size={20} className={`transition-colors duration-500 ${activeTheme.text}`} />
             </div>
             <div>
               <h3 className="text-lg font-black text-white leading-tight">Consensus State</h3>
@@ -116,7 +114,6 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                     </button>
                  ))}
              </div>
-             {/* RED CLOSE BUTTON */}
              <button onClick={onClose} className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20">
                 <X size={16} />
              </button>
@@ -128,27 +125,27 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
           {/* ROW 1: COMPACT HERO METRICS */}
           <div className="grid grid-cols-2 gap-3">
 
-             {/* CARD 1: CONSENSUS TARGET (Dynamic Border) */}
-             <div className={`bg-zinc-900/50 border ${statusBorder} rounded-xl p-3 relative flex flex-col justify-between h-20 transition-all duration-300`}>
+             {/* CARD 1: CONSENSUS TARGET */}
+             <div className={`bg-zinc-900/50 border rounded-xl p-3 relative flex flex-col justify-between h-20 transition-all duration-500 ${statusBorder}`}>
                 <div className="flex justify-between items-center mb-1">
                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5"><GitBranch size={10} /> Target Version</div>
-                   <div className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-950/50 border border-white/5 ${activeTheme.text}`}>{activeTab}</div>
+                   <div className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-950/50 border border-white/5 transition-colors duration-500 ${activeTheme.text}`}>{activeTab}</div>
                 </div>
                 <div className="flex items-baseline gap-1.5">
-                   <div className={`text-2xl font-black tracking-tighter truncate tabular-nums ${activeTab === 'ALL' ? 'text-white' : activeTheme.text}`} title={data.consensusVer}>
+                   <div className={`text-2xl font-black tracking-tighter truncate tabular-nums transition-colors duration-500 ${activeTab === 'ALL' ? 'text-white' : activeTheme.text}`} title={data.consensusVer}>
                       {data.consensusVer}
                    </div>
                    <div className="text-[9px] text-zinc-600 font-bold uppercase">Active</div>
                 </div>
              </div>
 
-             {/* CARD 2: UNITY SCORE (Sparkline Background) */}
+             {/* CARD 2: UNITY SCORE */}
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 relative overflow-hidden group h-20 flex flex-col justify-between">
-                {/* Background Chart (Dynamic Data) */}
+                {/* Background Chart */}
                 <div className="absolute inset-0 z-0 opacity-10 transition-opacity pointer-events-none px-2 mt-4">
                     <HistoryChart 
                         data={sparkData} 
-                        color={isStrong ? '#22c55e' : '#eab308'} 
+                        color={chartColor} // Syncs with isStrong logic
                         loading={trendLoading} 
                         height={60} 
                     />
@@ -156,7 +153,7 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
 
                 <div className="flex justify-between items-center mb-1 relative z-10">
                    <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5"><ShieldCheck size={10} /> Unity Score</div>
-                   <div className={`text-[8px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-1 ${
+                   <div className={`text-[8px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-1 transition-all duration-500 ${
                       isStrong ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
                    }`}>
                       {isStrong ? 'STRONG' : 'FRACTURED'}
@@ -177,12 +174,12 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                 timeRange={timeRange} 
                 onTimeRangeChange={setTimeRange}
                 dataKey={consensusKey}
+                color={chartColor} // Passed dynamic color
              />
           </div>
 
           {/* ROW 3: DETAILED DISTRIBUTION */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-             {/* BUCKETS STRIP */}
              <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex flex-col justify-between">
                 <div className="text-[9px] text-zinc-500 uppercase font-bold mb-3 tracking-wider flex items-center gap-1.5"><Activity size={10} /> Lifecycle State</div>
                 <div className="grid grid-cols-3 gap-2 text-center h-full items-center">
@@ -190,9 +187,9 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                       <div className="text-lg font-black text-white leading-none mb-1">{data.buckets.lagging}</div>
                       <div className="text-[7px] font-bold text-red-400 uppercase tracking-wider flex justify-center items-center gap-1"><AlertCircle size={8}/> Lagging</div>
                    </div>
-                   <div className={`py-1 rounded-lg border ${isStrong ? 'border-green-500/30 shadow-[0_0_10px_-2px_rgba(34,197,94,0.1)]' : 'border-zinc-700'} bg-zinc-900/40`}>
+                   <div className={`py-1 rounded-lg border transition-all duration-500 ${isStrong ? 'border-green-500/30 shadow-[0_0_10px_-2px_rgba(34,197,94,0.1)]' : 'border-zinc-700'} bg-zinc-900/40`}>
                       <div className="text-lg font-black text-white leading-none mb-1">{data.buckets.target}</div>
-                      <div className={`text-[7px] font-bold uppercase tracking-wider flex justify-center items-center gap-1 ${activeTheme.text}`}><CheckCircle size={8}/> Synced</div>
+                      <div className={`text-[7px] font-bold uppercase tracking-wider flex justify-center items-center gap-1 transition-colors duration-500 ${activeTheme.text}`}><CheckCircle size={8}/> Synced</div>
                    </div>
                    <div className="opacity-60">
                       <div className="text-lg font-black text-white leading-none mb-1">{data.buckets.leading}</div>
@@ -202,7 +199,7 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
              </div>
 
              {/* VERSION LIST */}
-             <div className={`border border-zinc-800 rounded-xl overflow-hidden flex flex-col max-h-40 ${activeTab === 'ALL' ? 'bg-purple-900/5' : activeTab === 'MAINNET' ? 'bg-green-900/5' : 'bg-blue-900/5'}`}>
+             <div className={`border border-zinc-800 rounded-xl overflow-hidden flex flex-col max-h-40 transition-colors duration-500 ${activeTab === 'ALL' ? 'bg-purple-900/5' : activeTab === 'MAINNET' ? 'bg-green-900/5' : 'bg-blue-900/5'}`}>
                  <div className="p-2 border-b border-zinc-800 flex justify-between items-center bg-black/20">
                     <span className="text-[9px] text-zinc-500 uppercase font-bold">Version List</span>
                     <span className="text-[8px] text-zinc-600 font-mono">{data.sortedVersions.length} Active</span>
@@ -222,7 +219,7 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                                 {isExpanded && <div className="absolute bottom-full left-0 mb-1 px-2 py-1 bg-black border border-zinc-700 rounded text-[9px] text-white whitespace-nowrap z-50 shadow-xl">{ver}</div>}
                              </div>
                              <div className="w-12 h-1 bg-zinc-800 rounded-full overflow-hidden">
-                                <div className={`h-full ${isConsensus ? activeTheme.bg : 'bg-zinc-600'}`} style={{ width: `${percent}%` }}></div>
+                                <div className={`h-full transition-colors duration-500 ${isConsensus ? activeTheme.bg : 'bg-zinc-600'}`} style={{ width: `${percent}%` }}></div>
                              </div>
                              <div className="text-right font-mono text-zinc-500 w-12"><span className="mr-1 text-zinc-400">{count}</span><span>{percent}%</span></div>
                           </div>
