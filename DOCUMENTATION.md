@@ -45,6 +45,8 @@ It operates on a **Hybrid-Live Persistence Model**, balancing the need for real-
 
 </details>
 
+---
+
 <details open>
 <summary><h2>2. Architecture & Component Breakdown</h2></summary>
 <br>
@@ -103,6 +105,8 @@ While the dashboard UI fetches live data, a standalone backend engine captures t
 
 </details>
 
+---
+
 <details open>
 <summary><h2>3. Data Pipeline (The "Dual Hero" Strategy)</h2></summary>
 <br>
@@ -135,6 +139,8 @@ The platform aggregates data from three distinct sources to ensure 100% network 
 
 </details>
 
+---
+
 <details open>
 <summary><h2>4. Consensus & Identity Protocols</h2></summary>
 <br>
@@ -163,6 +169,8 @@ When aggregating data from multiple RPC sources (Private vs. Public), duplicate 
 * **Priority Rule:** If a fingerprint match is found between the Private RPC (Trusted) and the Public Swarm (Untrusted), the **Public entry is discarded immediately**.
 
 </details>
+
+---
 
 <details open>
 <summary><h2>5. Vitality Score Model</h2></summary>
@@ -214,6 +222,8 @@ The "Vitality Score" (0-100) is not arbitrary. It is a weighted composite of fou
 
 </details>
 
+---
+
 <details open>
 <summary><h2>6. Core Mathematics</h2></summary>
 <br>
@@ -236,6 +246,8 @@ The Leaderboard includes a hardware-based reward forecaster. This simulation app
 * **Precision:** All calculations use floating-point arithmetic verified to 8 decimal places.
 
 </details>
+
+---
 
 <details open>
 <summary><h2>7. The Synthesis Engine (Narrative Logic)</h2></summary>
@@ -260,6 +272,8 @@ To prevent the text from "flickering" or feeling robotic, the engine uses a hash
 * **Result:** A specific node will always have the same "Personality" (report style) for the entire day.
 
 </details>
+
+---
 
 <details open>
 <summary><h2>8. Database Schema</h2></summary>
@@ -290,6 +304,8 @@ The high-volume table driving the Stability Ribbons.
 | `rank` | int4 | Network rank at time of snapshot |
 
 </details>
+
+---
 
 <details open>
 <summary><h2>9. Quality Assurance & Auditing</h2></summary>
@@ -398,6 +414,8 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 
 </details>
 
+---
+
 <details open>
 <summary><h2>11. UI/UX Design Principles</h2></summary>
 <br>
@@ -437,6 +455,8 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 
 </details>
 
+---
+
 <details open>
 <summary><h2>12. Platform Walkthrough</h2></summary>
 <br>
@@ -475,6 +495,8 @@ Beyond tests, a live Health Check Script (`scripts/health-check.ts`) runs hourly
 * **Trend Tracking:** Compares current rank to previous session via `localStorage`.
 
 </details>
+
+---
 
 <details open>
 <summary><h2>13. Advanced Features</h2></summary>
@@ -540,6 +562,8 @@ useEffect(() => {
 
 </details>
 
+---
+
 <details open>
 <summary><h2>14. Performance & Optimization</h2></summary>
 <br>
@@ -558,6 +582,8 @@ useEffect(() => {
 * **Map:** Pins limited to 200 simultaneous renders.
 
 </details>
+
+---
 
 <details open>
 <summary><h2>15. Operations, Error Handling & Resilience</h2></summary>
@@ -578,11 +604,13 @@ To prevent "Lag Cascades" where slow nodes hang the UI, the `RpcOrchestrator` im
 
 </details>
 
+---
+
 <details open>
 <summary><h2>16. Troubleshooting</h2></summary>
 <br>
 
-### 15.1 Common Error Codes
+### 16.1 Common Error Codes
 * `ERR_RPC_ALL_FAIL`: The Circuit Breaker has tripped for the Hero node, and all Swarm backups timed out.
     * **Action:** Check global internet connectivity or Xandeum Status Page.
 * `WARN_CREDITS_OFFLINE`: The Credits API returned 500/404.
@@ -590,7 +618,7 @@ To prevent "Lag Cascades" where slow nodes hang the UI, the `RpcOrchestrator` im
 * `GEO_RATE_LIMIT`: The IP-API batch limit was reached.
     * **Action:** System falls back to local `geoip-lite` database.
 
-### 15.2 More
+### 16.2 More
 **1. "Node not found on map"**
 - **Cause**: Node uses VPN/CGNAT (private IP)
 - **Solution**: IP geolocation returns (0, 0) → hidden on map
@@ -612,7 +640,7 @@ To prevent "Lag Cascades" where slow nodes hang the UI, the `RpcOrchestrator` im
 - **Cause**: localStorage cleared by browser/extension
 - **Prevention**: Export favorites (future feature)
 
-### 15.3 To force a network snapshot outside the 30-minute cron schedule (e.g., after a deployment), dispatch the GitHub Action manually:
+### 16.3 To force a network snapshot outside the 30-minute cron schedule (e.g., after a deployment), dispatch the GitHub Action manually:
 ```bash
 gh workflow run monitor.yml
 ```
