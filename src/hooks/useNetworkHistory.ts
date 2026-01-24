@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { consolidateNetworkHistory } from '../utils/historyAggregator';
-// Import the server action
-import { getCachedNetworkHistory } from '../app/actions/getHistory';
+// UPDATE IMPORT HERE
+import { getNetworkHistoryAction } from '../app/actions/getHistory';
 
 export type HistoryTimeRange = '24H' | '3D' | '7D' | '30D' | 'ALL';
 
@@ -47,7 +47,6 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
     async function fetchHistory() {
       setLoading(true);
 
-      // 1. Determine Days
       let days = 7;
       if (timeRange === '24H') days = 1;
       if (timeRange === '3D') days = 3;
@@ -55,15 +54,14 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
       if (timeRange === 'ALL') days = 365; 
 
       try {
-        // 2. CALL SERVER ACTION (Cached)
-        const data = await getCachedNetworkHistory(days);
+        // CALL NEW ACTION NAME
+        const data = await getNetworkHistoryAction(days);
 
         if (!isMounted) return;
 
         if (data && data.length > 0) {
           const rawPoints = data.map((d: any) => ({
             date: d.id,
-
             // Global
             avg_health: Number(d.avg_health || 0),
             avg_stability: Number(d.avg_stability || 0),
@@ -71,7 +69,6 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
             total_capacity: Number(d.total_capacity || 0),
             total_used: Number(d.total_used || 0),
             consensus_score: Number(d.consensus_score || 0),
-
             // Mainnet
             mainnet_nodes: Number(d.mainnet_nodes || 0),
             mainnet_capacity: Number(d.mainnet_capacity || 0),
@@ -79,7 +76,6 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
             mainnet_avg_health: Number(d.mainnet_avg_health || 0),
             mainnet_avg_stability: Number(d.mainnet_avg_stability || 0),
             mainnet_consensus_score: Number(d.mainnet_consensus_score || 0),
-
             // Devnet
             devnet_nodes: Number(d.devnet_nodes || 0),
             devnet_capacity: Number(d.devnet_capacity || 0),
@@ -87,7 +83,6 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
             devnet_avg_health: Number(d.devnet_avg_health || 0),
             devnet_avg_stability: Number(d.devnet_avg_stability || 0),
             devnet_consensus_score: Number(d.devnet_consensus_score || 0),
-
             // Financials
             total_credits: Number(d.total_credits || 0),
             avg_credits: Number(d.avg_credits || 0),
@@ -95,7 +90,6 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
           }));
 
           const processedHistory = consolidateNetworkHistory(rawPoints, timeRange);
-
           setHistory(processedHistory);
 
           if (processedHistory.length > 1) {
