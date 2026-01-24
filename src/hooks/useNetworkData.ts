@@ -2,141 +2,216 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Node } from '../types';
 
-// Define the shape of the aggregated stats
-export interface NetworkStats {
-  total_nodes: number;
-  total_capacity: number;
-  total_used: number;
-  avg_health: number;
-  avg_stability: number; // Global Stability
-
-  total_credits: number;
-  avg_credits: number;
-  top10_dominance: number;
-
-  // Mainnet
-  mainnet_nodes: number;
-  mainnet_credits: number;
-  mainnet_avg_stability: number;
-  mainnet_capacity: number;
-
-  // Devnet
-  devnet_nodes: number;
-  devnet_credits: number;
-  devnet_avg_stability: number;
-  devnet_capacity: number;
-
-  consensus_version: string;
-  consensus_score: number;
+interface NetworkDataState {
+  nodes: Node[];
+  loading: boolean;
+  isBackgroundSyncing: boolean;
+  error: string;
+  lastSync: string;
+  networkStats: {
+    avgBreakdown: any;
+    totalNodes: number;
+    systemStatus: { credits: boolean; rpc: boolean };
+    consensusVersion: '0.0.0' | string;
+    medianStorage: number;
+    
+    // --- NEW: Vitals & Financials ---
+    totalCredits: number;
+    avgStability: number; // Global Uptime Average
+    
+    mainnet: {
+        nodes: number;
+        credits: number;
+        avgStability: number;
+        capacity: number;
+    };
+    devnet: {
+        nodes: number;
+        credits: number;
+        avgStability: number;
+        capacity: number;
+    };
+  };
+  mostCommonVersion: string;
+  totalStorageCommitted: number;
+  totalStorageUsed: number;
+  medianCommitted: number;
+  networkHealth: string;     // Your existing calculation (Active Nodes %)
+  avgNetworkHealth: number;  // From API (Algo Score)
+  networkConsensus: number;
 }
 
-export const useNetworkData = () => {
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [stats, setStats] = useState<NetworkStats | null>(null); // New Stats Object
-  const [loading, setLoading] = useState(true);
+export const useNetworkData = (onNewNodes?: (count: number) => void) => {
+  const [data, setData] = useState<NetworkDataState>({
+    nodes: [],
+    loading: true,
+    isBackgroundSyncing: false,
+    error: '',
+    lastSync: 'Syncing...',
+    networkStats: {
+      avgBreakdown: {},
+      totalNodes: 0,
+      systemStatus: { credits: true, rpc: true },
+      consensusVersion: '0.0.0',
+      medianStorage: 0,
+      // Init New Fields
+      totalCredits: 0,
+      avgStability: 0,
+      mainnet: { nodes: 0, credits: 0, avgStability: 0, capacity: 0 },
+      devnet: { nodes: 0, credits: 0, avgStability: 0, capacity: 0 },
+    },
+    mostCommonVersion: 'N/A',
+    totalStorageCommitted: 0,
+    totalStorageUsed: 0,
+    medianCommitted: 0,
+    networkHealth: '0.00',
+    avgNetworkHealth: 0,
+    networkConsensus: 0,
+  });
 
-  useEffect(() => {
-    let isMounted = true;
+  const fetchData = async (mode: 'fast' | 'swarm' = 'fast') => {
+    if (mode === 'fast') setData(prev => ({ ...prev, loading: true }));
+    else setData(prev => ({ ...prev, isBackgroundSyncing: true }));
 
-    const fetchData = async () => {
-      try {
-        // Parallel Fetch: Real-time Stats + Real-time Credits
-        const [statsRes, creditsRes] = await Promise.all([
-          axios.get('/api/stats').catch(() => ({ data: { result: { pods: [] } } })),
-          axios.get('/api/credits').catch(() => ({ data: { mainnet: [], devnet: [] } }))
-        ]);
+    try {
+      // 1. PARALLEL FETCH (The Fix: Get Credits + Nodes together)
+      const [res, creditsRes] = await Promise.all([
+        axios.get(`/api/stats?mode=${mode}&t=${Date.now()}`),
+        axios.get('/api/credits').catch(() => ({ data: { mainnet: [], devnet: [] } }))
+      ]);
 
-        if (!isMounted) return;
+      if (res.data.result && res.data.result.pods) {
+        let rawPods = res.data.result.pods as Node[];
+        const stats = res.data.stats;
 
-        const rawNodes = statsRes.data?.result?.pods || [];
-        const rawCreditsMain = creditsRes.data?.mainnet || [];
-        const rawCreditsDev = creditsRes.data?.devnet || [];
-
-        // 1. Create Credit Map
+        // 2. MERGE CREDITS (Before Sorting)
         const creditMap = new Map<string, number>();
-        [...rawCreditsMain, ...rawCreditsDev].forEach((c: any) => {
+        const rawCredits = [...(creditsRes.data.mainnet || []), ...(creditsRes.data.devnet || [])];
+        rawCredits.forEach((c: any) => {
             const key = c.pod_id || c.pubkey;
             if (key) creditMap.set(key, Number(c.credits || 0));
         });
 
-        // 2. Merge Data into Node List
-        const mergedNodes: Node[] = rawNodes.map((n: any) => ({
-          pubkey: n.pubkey,
-          address: n.address,
-          network: n.network || 'MAINNET',
-          health: Number(n.health || 0),
-          storage_committed: Number(n.storage_committed || 0),
-          storage_used: Number(n.storage_used || 0),
-          uptime: Number(n.uptime || 0), // Stability
-          version: n.version || '0.0.0',
-          is_public: n.is_public,
-          credits: creditMap.get(n.pubkey) || 0
+        // Inject credits into the raw list so sorting works
+        const podList = rawPods.map(node => ({
+            ...node,
+            credits: creditMap.get(node.pubkey || '') || 0
         }));
 
-        setNodes(mergedNodes);
+        // --- Logic: Rank & Cluster Calculations (PRESERVED) ---
+        const sortFn = (a: Node, b: Node) => {
+          if ((b.credits || 0) !== (a.credits || 0))
+            return (b.credits || 0) - (a.credits || 0); // Now sorts by REAL credits
+          if ((b.health || 0) !== (a.health || 0)) return (b.health || 0) - (a.health || 0);
+          return (a.pubkey || '').localeCompare(b.pubkey || '');
+        };
 
-        // 3. Calculate Aggregated Stats (Live Client-Side Calculation)
-        if (mergedNodes.length > 0) {
-            // Helpers
-            const sum = (arr: Node[], key: keyof Node) => arr.reduce((acc, n) => acc + (Number(n[key]) || 0), 0);
-            const avg = (arr: Node[], key: keyof Node) => arr.length > 0 ? sum(arr, key) / arr.length : 0;
-            
-            const mainnetNodes = mergedNodes.filter(n => n.network === 'MAINNET');
-            const devnetNodes = mergedNodes.filter(n => n.network === 'DEVNET');
+        const clusterMap = new Map<string, { mainnet: number; devnet: number }>();
+        podList.forEach(node => {
+          if (!node.pubkey) return;
+          const current = clusterMap.get(node.pubkey) || { mainnet: 0, devnet: 0 };
+          if (node.network === 'MAINNET') current.mainnet++;
+          if (node.network === 'DEVNET') current.devnet++;
+          clusterMap.set(node.pubkey, current);
+        });
 
-            // Dominance Calc - SAFELY SORTING WITH || 0
-            const sortedByCredits = [...mergedNodes].sort((a, b) => (b.credits || 0) - (a.credits || 0));
-            
-            const totalCredits = sum(mergedNodes, 'credits');
-            const top10 = sortedByCredits.slice(0, 10).reduce((acc, n) => acc + (n.credits || 0), 0);
+        const mainnetNodes = podList.filter(n => n.network === 'MAINNET').sort(sortFn);
+        const devnetNodes = podList.filter(n => n.network === 'DEVNET').sort(sortFn);
+        const rankMap = new Map<string, number>();
 
-            // Version Consensus
-            const versions: Record<string, number> = {};
-            mergedNodes.forEach(n => { versions[n.version!] = (versions[n.version!] || 0) + 1; });
-            const topVersion = Object.keys(versions).reduce((a, b) => versions[a] > versions[b] ? a : b, '0.0.0');
-            const consensusScore = (versions[topVersion] / mergedNodes.length) * 100;
+        mainnetNodes.forEach((node, idx) => { if (node.pubkey) rankMap.set(`${node.pubkey}-MAINNET`, idx + 1); });
+        devnetNodes.forEach((node, idx) => { if (node.pubkey) rankMap.set(`${node.pubkey}-DEVNET`, idx + 1); });
 
-            setStats({
-                total_nodes: mergedNodes.length,
-                total_capacity: sum(mergedNodes, 'storage_committed'),
-                total_used: sum(mergedNodes, 'storage_used'),
-                avg_health: avg(mergedNodes, 'health'),
-                avg_stability: avg(mergedNodes, 'uptime'),
+        const processedNodes = podList.map(node => {
+          const used = node.storage_used || 0;
+          const cap = node.storage_committed || 0;
+          let percentStr = '0%';
+          let rawPercent = 0;
+          if (cap > 0 && used > 0) {
+            rawPercent = (used / cap) * 100;
+            percentStr = rawPercent < 0.01 ? '< 0.01%' : `${rawPercent.toFixed(2)}%`;
+          }
+          const compositeKey = `${node.pubkey}-${node.network}`;
+          const cluster = clusterMap.get(node.pubkey || '') || { mainnet: 0, devnet: 0 };
+          return {
+            ...node,
+            rank: node.pubkey ? rankMap.get(compositeKey) || 0 : 0,
+            storage_usage_percentage: percentStr,
+            storage_usage_raw: rawPercent,
+            clusterStats: {
+              totalGlobal: cluster.mainnet + cluster.devnet,
+              mainnetCount: cluster.mainnet,
+              devnetCount: cluster.devnet,
+            },
+          };
+        });
 
-                total_credits: totalCredits,
-                avg_credits: avg(mergedNodes, 'credits'),
-                top10_dominance: totalCredits > 0 ? (top10 / totalCredits) * 100 : 0,
-
-                // Mainnet
-                mainnet_nodes: mainnetNodes.length,
-                mainnet_credits: sum(mainnetNodes, 'credits'),
-                mainnet_avg_stability: avg(mainnetNodes, 'uptime'),
-                mainnet_capacity: sum(mainnetNodes, 'storage_committed'),
-
-                // Devnet
-                devnet_nodes: devnetNodes.length,
-                devnet_credits: sum(devnetNodes, 'credits'),
-                devnet_avg_stability: avg(devnetNodes, 'uptime'),
-                devnet_capacity: sum(devnetNodes, 'storage_committed'),
-
-                consensus_version: topVersion,
-                consensus_score: consensusScore
-            });
+        // --- Logic: Notifications (PRESERVED) ---
+        if (mode === 'swarm' && processedNodes.length > data.nodes.length && data.nodes.length > 0) {
+          if (onNewNodes) onNewNodes(processedNodes.length - data.nodes.length);
         }
 
-      } catch (err) {
-        console.error("Failed to load network data:", err);
-      } finally {
-        if (isMounted) setLoading(false);
+        // --- Logic: Aggregates ---
+        const stableNodes = processedNodes.filter(n => (n.uptime || 0) > 86400).length;
+        const consensusCount = processedNodes.filter(n => (n.version || 'Unknown') === (stats?.consensusVersion || '0.0.0')).length;
+
+        // --- NEW: Calculate Breakdown Stats (Client Side) ---
+        const calcStats = (nodes: Node[]) => ({
+            nodes: nodes.length,
+            credits: nodes.reduce((a, b) => a + (b.credits || 0), 0),
+            capacity: nodes.reduce((a, b) => a + (b.storage_committed || 0), 0),
+            avgStability: nodes.length > 0 ? nodes.reduce((a, b) => a + (b.uptime || 0), 0) / nodes.length : 0
+        });
+
+        const mainStats = calcStats(mainnetNodes);
+        const devStats = calcStats(devnetNodes);
+        const globalStability = processedNodes.length > 0 
+            ? processedNodes.reduce((a, b) => a + (b.uptime || 0), 0) / processedNodes.length 
+            : 0;
+
+        setData({
+          nodes: processedNodes,
+          loading: false,
+          isBackgroundSyncing: false,
+          error: '',
+          lastSync: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          
+          networkStats: {
+              ...(stats || data.networkStats),
+              // Inject New Vitals
+              totalCredits: mainStats.credits + devStats.credits,
+              avgStability: globalStability,
+              mainnet: mainStats,
+              devnet: devStats
+          },
+
+          mostCommonVersion: stats?.consensusVersion || 'N/A',
+          totalStorageCommitted: processedNodes.reduce((sum, n) => sum + (n.storage_committed || 0), 0),
+          totalStorageUsed: processedNodes.reduce((sum, n) => sum + (n.storage_used || 0), 0),
+          medianCommitted: stats?.medianStorage || 0,
+          networkHealth: (processedNodes.length > 0 ? (stableNodes / processedNodes.length) * 100 : 0).toFixed(2),
+          avgNetworkHealth: stats?.avgBreakdown?.total || 0,
+          networkConsensus: (consensusCount / processedNodes.length) * 100,
+        });
+
+        if (mode === 'fast') fetchData('swarm');
       }
-    };
+    } catch (err: any) {
+      console.error('Fetch error:', err);
+      setData(prev => ({
+        ...prev,
+        loading: false,
+        isBackgroundSyncing: false,
+        error: mode === 'fast' ? 'Syncing latest network data...' : ''
+      }));
+    }
+  };
 
-    fetchData();
-
-    return () => { isMounted = false; };
+  useEffect(() => {
+    fetchData('fast');
+    const interval = setInterval(() => fetchData('swarm'), 30000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Return BOTH the list (for Compare) AND the stats (for Dashboard)
-  // We map 'data' to 'stats' for backward compatibility if any component used 'data'
-  return { nodes, stats, data: stats, loading };
+  return { ...data, refetch: () => fetchData('fast') };
 };
