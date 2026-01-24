@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Node } from '../types'; 
+import { consolidateHistory } from '../utils/historyAggregator'; // Import the helper
 
 export interface NodeHistoryPoint {
   date: string;
@@ -16,42 +17,38 @@ export interface NodeHistoryPoint {
 
 export type HistoryTimeRange = '24H' | '3D' | '7D' | '30D' | 'ALL';
 
-export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRange = '7D') => {
+export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRange = '24H') => {
   const [history, setHistory] = useState<NodeHistoryPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [reliabilityScore, setReliabilityScore] = useState(100);
 
   useEffect(() => {
-    // 1. Cleanup Flag
     let isMounted = true;
-
-    // 2. Safety Check
     if (!node || !node.pubkey || !node.network) return;
 
-    // 3. Capture Variables
     const targetNetwork = node.network;
-    const targetPubkey = node.pubkey;
     const targetAddress = node.address || '0.0.0.0'; 
-    
-    // Note: We intentionally ignore node.version and node.is_public for the ID
+    const targetPubkey = node.pubkey;
 
     async function fetchNodeHistory() {
       setLoading(true);
 
-      // --- STABLE ID V2 ---
-      // Logic: [PublicKey]-[IP]-[Network]
-      
       const ipOnly = targetAddress.includes(':') ? targetAddress.split(':')[0] : targetAddress;
       const stableId = `${targetPubkey}-${ipOnly}-${targetNetwork}`;
 
-      let days = 7;
+      // 1. DETERMINE FETCH WINDOW
+      // We always fetch enough raw data, then aggregate later
+      let days = 1;
       if (timeRange === '24H') days = 1;
       if (timeRange === '3D') days = 3;
+      if (timeRange === '7D') days = 7;
       if (timeRange === '30D') days = 30;
+      if (timeRange === 'ALL') days = 365; // or max retention
 
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
+      // 2. FETCH RAW DATA
       const { data, error } = await supabase
         .from('node_snapshots')
         .select('*') 
@@ -68,26 +65,30 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
         return;
       }
 
-      const points = (data || []).map((row: any) => ({
+      // 3. MAP TO STANDARD FORMAT
+      const rawPoints = (data || []).map((row: any) => ({
         date: row.created_at, 
         health: Number(row.health || 0),
         uptime: Number(row.uptime || 0),
         storage_committed: Number(row.storage_committed || 0),
         storage_used: Number(row.storage_used || 0),
         credits: Number(row.credits || 0), 
-        reputation: Number(row.credits || 0), 
         rank: Number(row.rank || 0),
         network: row.network || targetNetwork
       }));
 
-      if (points.length > 0) {
-        const activeCount = points.filter(p => p.health > 0).length;
-        setReliabilityScore(Math.floor((activeCount / points.length) * 100));
+      // 4. AGGREGATE IF NEEDED (The Fix)
+      // This turns 720 hourly points into 30 daily points if timeRange is '30D'
+      const processedHistory = consolidateHistory(rawPoints, timeRange);
+
+      if (processedHistory.length > 0) {
+        const activeCount = processedHistory.filter((p: any) => p.health > 0).length;
+        setReliabilityScore(Math.floor((activeCount / processedHistory.length) * 100));
       } else {
         setReliabilityScore(0);
       }
 
-      setHistory(points);
+      setHistory(processedHistory);
       setLoading(false);
     }
 
