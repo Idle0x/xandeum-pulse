@@ -27,6 +27,11 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
 
   const { history, loading } = useNodeHistory(isOpen ? node : undefined, timeRange);
 
+  // Logic to determine resolution label based on our aggregation rules
+  const resolutionLabel = ['24H', '3D', '7D'].includes(timeRange) 
+    ? 'Hourly Resolution' 
+    : 'Daily Resolution';
+
   const cleanHistory = useMemo(() => {
       if (!history) return [];
       return history.filter((h: any) => h.network ? h.network === node.network : true);
@@ -78,7 +83,14 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
 
                {/* TOP CONTROLS */}
                <div className="flex justify-between items-center mb-1 relative z-30">
-                   <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Consistency Map</span>
+                   {/* UPDATED HEADER WITH RESOLUTION TEXT */}
+                   <div className="flex items-baseline gap-2">
+                       <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Consistency Map</span>
+                       <span className="text-[8px] font-medium text-zinc-500 opacity-70">
+                           {resolutionLabel}
+                       </span>
+                   </div>
+
                    <div className="relative">
                         <button 
                             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -200,13 +212,13 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                             {stats.rankChange > 0 ? '+' : ''}{stats.rankChange}
                         </span>
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                         <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">({timeRange}) Credits Accumulated</span>
                         <span className={`text-[9px] font-mono font-bold ${stats.creditChange > 0 ? 'text-yellow-500' : 'text-zinc-500'}`}>
                             {stats.creditChange > 0 ? '+' : ''}{stats.creditChange.toLocaleString()}
                         </span>
-                        
+
                         {/* TOGGLE BUTTON */}
                         <button 
                             onClick={() => setViewMode(viewMode === 'CHART' ? 'TABLE' : 'CHART')}
