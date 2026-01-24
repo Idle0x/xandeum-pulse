@@ -56,10 +56,8 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
     const descNodes = [...filteredNodes].sort((a, b) => (b.storage_committed || 0) - (a.storage_committed || 0));
     const top10 = descNodes.slice(0, 10);
     const top10Sum = top10.reduce((acc, n) => acc + (n.storage_committed || 0), 0);
-    const midTier = descNodes.slice(10, 100);
-    const midTierSum = midTier.reduce((acc, n) => acc + (n.storage_committed || 0), 0);
-    const restSum = tCommitted > (top10Sum + midTierSum) ? tCommitted - (top10Sum + midTierSum) : 0;
-
+    
+    // Aggregations for Mainnet/Devnet split
     let mainnetSum = 0;
     let devnetSum = 0;
     nodes.forEach(n => {
@@ -72,7 +70,9 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
       totalUsed: tUsed, 
       median, 
       average,
-      top10Sum, midTierSum, restSum,
+      top10Sum,
+      // For the pie chart: The "Rest" is Total - Top10 (Corrects the 100% visual bug)
+      remainderSum: tCommitted > top10Sum ? tCommitted - top10Sum : 0,
       mainnetSum, devnetSum,
       nodeCount: filteredNodes.length,
       globalShare: globalCommitted > 0 ? (tCommitted / globalCommitted) * 100 : 0,
@@ -122,12 +122,11 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
 
   // --- 4. COMPOSITION HELPERS ---
   const getCompositionData = () => {
-    // Logic for Single Network (Global Share) - Stacked Bar
     const isMain = activeTab === 'MAINNET';
     const globalTotal = dashboardData.globalCommitted || 1;
     const currentVal = dashboardData.totalCommitted;
     const restVal = globalTotal - currentVal;
-    
+
     return {
       label: "Global Share",
       icon: <Globe size={12} />,
@@ -238,10 +237,9 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
 
              {/* LEFT: Composition & Benchmarks */}
              <div className="flex flex-col gap-3">
-                 
-                 {/* 1. COMPOSITION CARD (Dynamic: Pie for ALL, Stacked Bar for Networks) */}
+
+                 {/* 1. COMPOSITION CARD */}
                  {activeTab === 'ALL' ? (
-                   /* RESTORED PIE CHART FOR 'ALL' TAB */
                    <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex items-center gap-4 h-20">
                       <div className="relative w-12 h-12 shrink-0">
                          {renderPie([
@@ -262,7 +260,6 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
                       </div>
                    </div>
                  ) : (
-                   /* STACKED BAR FOR SPECIFIC NETWORKS */
                    <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex flex-col justify-center h-20 gap-2">
                       <div className="flex justify-between items-center">
                          <div className="text-[9px] text-zinc-500 uppercase font-bold flex items-center gap-1.5">
@@ -306,35 +303,33 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
                  </div>
              </div>
 
-             {/* RIGHT: Whale Dominance (SPLIT LAYOUT) */}
+             {/* RIGHT: Whale Dominance (UPDATED LAYOUT) */}
              <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-xl p-4 relative flex items-center h-full">
-                 
-                 {/* LEFT SIDE: HEADER & % */}
-                 <div className="flex flex-col gap-0.5 shrink-0 pr-4">
+
+                 {/* LEFT SIDE: HEADER, PERCENTAGE & TEXT */}
+                 <div className="flex flex-col justify-center gap-1 shrink-0 max-w-[60%]">
                     <h4 className="text-[10px] font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                        <Users size={10} className="text-yellow-500"/> Top 10 Dominance
                     </h4>
-                    <span className="text-3xl font-black text-yellow-500 tracking-tight">
+                    <span className="text-3xl font-black text-yellow-500 tracking-tight leading-none my-1">
                        {((dashboardData.top10Sum / (dashboardData.totalCommitted || 1)) * 100).toFixed(1)}%
                     </span>
+                    <div className="text-[9px] leading-tight text-zinc-400">
+                       <span className="block mb-0.5">{getWhaleText()}</span>
+                       <span className="text-white font-mono font-bold">{formatBytes(dashboardData.top10Sum)} storage.</span>
+                    </div>
                  </div>
 
-                 {/* VERTICAL DIVIDER (RED MARK) */}
-                 <div className="w-px h-12 bg-yellow-500/20"></div>
+                 {/* VERTICAL DIVIDER */}
+                 <div className="w-px h-12 bg-yellow-500/20 mx-4"></div>
 
-                 {/* RIGHT SIDE: PIE & TEXT (Moved Up, No horizontal lines) */}
-                 <div className="flex-1 flex items-center gap-3 pl-4">
-                    {/* Tiny Pie */}
-                    <div className="w-10 h-10 relative opacity-90 shrink-0">
+                 {/* RIGHT SIDE: PIE ONLY (Centered & Larger) */}
+                 <div className="flex-1 flex items-center justify-center h-full">
+                    <div className="w-20 h-20 relative opacity-90">
                         {renderPie([
                             { value: dashboardData.top10Sum, color: '#eab308' }, 
-                            { value: dashboardData.restSum, color: '#52525b' }   
+                            { value: dashboardData.remainderSum, color: '#52525b' }   
                         ])}
-                    </div>
-                    {/* Text */}
-                    <div className="flex flex-col justify-center text-[9px] leading-tight text-zinc-400">
-                       <span className="mb-0.5">{getWhaleText()}</span>
-                       <span className="text-white font-mono font-bold">{formatBytes(dashboardData.top10Sum)} storage.</span>
                     </div>
                  </div>
              </div>
