@@ -92,11 +92,17 @@ export const useNetworkData = (onNewNodes?: (count: number) => void) => {
             if (key) creditMap.set(key, Number(c.credits || 0));
         });
 
+        // Detect if credits API is completely offline (empty response)
+        const isCreditsApiOffline = creditsRes.data.mainnet.length === 0 && creditsRes.data.devnet.length === 0;
+
         // Inject credits into the raw list so sorting works
-        const podList = rawPods.map(node => ({
-            ...node,
-            credits: creditMap.get(node.pubkey || '') || 0
-        }));
+        const podList = rawPods.map(node => {
+            const creditValue = creditMap.get(node.pubkey || '');
+            return {
+                ...node,
+                credits: creditValue !== undefined ? creditValue : (isCreditsApiOffline ? null : 0)
+            };
+        });
 
         // --- Logic: Rank & Cluster Calculations (PRESERVED) ---
         const sortFn = (a: Node, b: Node) => {
