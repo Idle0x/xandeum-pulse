@@ -8,7 +8,7 @@ interface Props {
   loading: boolean;
   mode: 'ACCUMULATION' | 'VELOCITY'; 
   showRank: boolean;     
-  timeRange: string; // <--- NEW PROP
+  timeRange: string;
 }
 
 export const DualAxisGrowthChart = ({ history, loading, mode, showRank, timeRange }: Props) => {
@@ -26,7 +26,10 @@ export const DualAxisGrowthChart = ({ history, loading, mode, showRank, timeRang
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
 
-  const formatTooltipLabel = (label: string | number) => {
+  // FIX: Updated type definition to accept undefined and added a guard clause
+  const formatTooltipLabel = (label: string | number | undefined) => {
+      if (!label) return '';
+      
       const date = new Date(label);
       if (timeRange === '24H') {
           // Full Date + Time for context
@@ -109,7 +112,7 @@ export const DualAxisGrowthChart = ({ history, loading, mode, showRank, timeRang
             cursor={{ stroke: '#ffffff10', strokeWidth: 1 }}
             content={({ active, payload, label }) => {
                 if (!active || !payload || !payload.length) return null;
-                
+
                 return (
                     <div className="bg-zinc-950 border border-zinc-800 p-2 rounded shadow-xl text-[10px]">
                         <div className="text-zinc-500 font-mono mb-1.5 border-b border-zinc-900 pb-0.5">
