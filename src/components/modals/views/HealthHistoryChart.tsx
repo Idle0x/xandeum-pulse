@@ -30,18 +30,34 @@ export const HealthHistoryChart = ({
     }));
   }, [history]);
 
-  // Dynamic color based on current average in view
   const avgHealth = chartData.length > 0 
     ? chartData.reduce((acc, p) => acc + p.health, 0) / chartData.length 
     : currentHealth;
-    
+
   const activeColor = avgHealth >= 80 ? '#22c55e' : avgHealth >= 50 ? '#eab308' : '#ef4444';
+
+  // --- FORMATTERS ---
+  const formatAxisDate = (val: string) => {
+    const date = new Date(val);
+    if (timeRange === '24H') {
+       return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    }
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+
+  const formatTooltipLabel = (label: string) => {
+    const date = new Date(label);
+    if (timeRange === '24H' || timeRange === '3D' || timeRange === '7D') {
+        return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  };
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
         <div className={`px-3 py-2 rounded-lg border shadow-xl text-xs ${zenMode ? 'bg-zinc-900 border-zinc-700' : 'bg-black/90 border-zinc-800'}`}>
-          <div className="text-zinc-400 mb-1">{new Date(label).toLocaleDateString()}</div>
+          <div className="text-zinc-400 mb-1">{formatTooltipLabel(label)}</div>
           <div className="font-bold font-mono text-white flex items-center gap-2">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: activeColor }}></div>
             {payload[0].value}/100 Health
@@ -54,7 +70,7 @@ export const HealthHistoryChart = ({
 
   return (
     <div className={`w-full h-full flex flex-col rounded-2xl border p-4 transition-all duration-300 ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900/30 border-zinc-800'}`}>
-      
+
       {/* HEADER */}
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-2">
@@ -119,7 +135,7 @@ export const HealthHistoryChart = ({
                 tickLine={false} 
                 tick={{ fontSize: 9, fill: '#71717a' }} 
                 minTickGap={30}
-                tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, {month:'short', day:'numeric'})}
+                tickFormatter={formatAxisDate}
             />
             <YAxis 
                 domain={[0, 100]} 
