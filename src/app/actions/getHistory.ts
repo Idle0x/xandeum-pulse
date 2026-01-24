@@ -110,4 +110,3 @@ export async function getNodeHistoryAction(stableId: string, network: string, da
     return await fetchRawNodeHistory(stableId, network, days);
   });
 }
-m
