@@ -39,16 +39,32 @@ export const CapacityEvolutionChart = ({
         };
   }, [viewMode, capacityKey, usedKey]);
 
-  // --- REFINED DOMAIN LOGIC ---
+  // --- DYNAMIC X-AXIS FORMATTER ---
+  const formatXAxis = useCallback((tickItem: string) => {
+    const date = new Date(tickItem);
+    
+    // 1. If viewing just today/24h, we care about the TIME
+    if (timeRange === '24H') {
+       return date.toLocaleTimeString(undefined, { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: false // 14:30 is cleaner than 2:30 PM for charts
+       });
+    }
+
+    // 2. For longer ranges (7D, 30D, ALL), we care about the DATE
+    return date.toLocaleDateString(undefined, { 
+       month: 'short', 
+       day: 'numeric' 
+    });
+  }, [timeRange]);
+
+  // --- REFINED Y-AXIS DOMAIN LOGIC ---
   const getDomain = useCallback((args: any): [number, number] => {
     const [dataMin, dataMax] = args;
-
     if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 1];
-
-    // Keep the "Zoom" logic (padding) but allow standard ticks
     const lowerBound = Math.max(0, dataMin * 0.90);
     const upperBound = dataMax * 1.05;
-
     return [lowerBound, upperBound];
   }, []);
 
@@ -56,7 +72,14 @@ export const CapacityEvolutionChart = ({
     if (active && payload && payload.length) {
       return (
         <div className="px-2 py-1.5 rounded bg-zinc-950 border border-zinc-800 shadow-xl text-[10px] backdrop-blur-md z-50">
-          <div className="text-zinc-500 mb-1 font-mono">{new Date(label).toLocaleDateString(undefined, {month:'short', day:'numeric', hour:'numeric'})}</div>
+          <div className="text-zinc-500 mb-1 font-mono">
+            {new Date(label).toLocaleDateString(undefined, {
+              month:'short', 
+              day:'numeric', 
+              hour:'numeric', 
+              minute: '2-digit'
+            })}
+          </div>
           <div className={`font-bold font-mono flex items-center gap-1.5 ${config.text}`}>
              <div className={`w-1.5 h-1.5 rounded-full ${config.bg}`}></div>
              {formatBytes(payload[0].value)} {config.label}
@@ -69,7 +92,6 @@ export const CapacityEvolutionChart = ({
 
   return (
     <div className="w-full h-full flex flex-col rounded-xl border border-zinc-800 bg-black/40 p-3 relative transition-all duration-500">
-
       {/* Header controls */}
       <div className="flex justify-between items-center mb-1 relative z-20 h-6 shrink-0">
          <div className="flex items-center gap-3">
@@ -124,34 +146,30 @@ export const CapacityEvolutionChart = ({
                </defs>
 
                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.5} />
-
+               
                <XAxis 
                   dataKey="date" 
                   axisLine={false} 
                   tickLine={false} 
                   tick={{fontSize: 9, fill: '#71717a'}} 
-                  minTickGap={40} 
-                  tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, {day:'numeric'})} 
+                  minTickGap={30} 
+                  tickFormatter={formatXAxis} // <--- Updated here
                   height={15}
                />
-
+               
                <YAxis 
                   axisLine={false} 
                   tickLine={false} 
                   tick={{fontSize: 9, fill: config.color, fontWeight: 600}} 
-                  width={40} // Increased width for 2 decimal places
+                  width={40} 
                   domain={getDomain} 
-                  // REMOVED: tickCount={4} to allow auto-calculation
                   tickFormatter={(val) => {
-                      const str = formatBytes(val);
-                      const [num] = str.split(' ');
-                      // FIXED: Force 2 decimal places (e.g., "522.09")
-                      return parseFloat(num).toFixed(2);
+                      if (val === 0) return '0';
+                      const formatted = formatBytes(val);
+                      return formatted.split(' ')[0];
                   }}
                />
-
                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3f3f46', strokeWidth: 1 }} />
-
                <Area 
                   type="monotone" 
                   dataKey={config.key} 
