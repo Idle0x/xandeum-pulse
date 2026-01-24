@@ -3,28 +3,46 @@ import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
 
-// 1. UPDATE INTERFACE TO ACCEPT NEW PROPS
 interface Props {
   history: any[];
   loading: boolean;
   mode: 'ACCUMULATION' | 'VELOCITY'; 
-  showRank: boolean;                 
+  showRank: boolean;     
+  timeRange: string; // <--- NEW PROP
 }
 
-export const DualAxisGrowthChart = ({ history, loading, mode, showRank }: Props) => {
+export const DualAxisGrowthChart = ({ history, loading, mode, showRank, timeRange }: Props) => {
   if (loading) return <div className="w-full h-full animate-pulse bg-zinc-900/30 rounded-xl" />;
   if (!history || history.length < 2) return <div className="flex items-center justify-center h-full text-zinc-600 text-[9px] font-mono">Insufficient Data</div>;
 
-  // 2. TRANSFORM DATA BASED ON MODE
+  // 1. FORMATTING LOGIC
+  const formatAxis = (tickItem: string | number) => {
+    const date = new Date(tickItem);
+    if (timeRange === '24H') {
+        // Returns "14:30" or "02:30"
+        return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+    }
+    // Returns "Jan 24"
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+
+  const formatTooltipLabel = (label: string | number) => {
+      const date = new Date(label);
+      if (timeRange === '24H') {
+          // Full Date + Time for context
+          return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      }
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  // 2. DATA TRANSFORMATION
   const data = history.map((curr, i) => {
       const prev = history[i - 1];
       let creditValue = 0;
 
       if (mode === 'ACCUMULATION') {
-          creditValue = curr.credits; // Total Wealth
+          creditValue = curr.credits; 
       } else {
-          // Daily Velocity (Delta)
-          // Skip index 0 for velocity because we need a previous value
           creditValue = prev ? Math.max(0, curr.credits - prev.credits) : 0;
       }
 
@@ -35,13 +53,11 @@ export const DualAxisGrowthChart = ({ history, loading, mode, showRank }: Props)
       };
   });
 
-  // Slice the first element if in Velocity mode (since delta is 0/undefined)
   const chartData = mode === 'VELOCITY' ? data.slice(1) : data;
 
   return (
     <div className="w-full h-full">
       <ResponsiveContainer width="100%" height="100%">
-        {/* 3. INCREASED MARGINS FOR AXIS LABELS */}
         <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
           <defs>
             <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
@@ -49,20 +65,21 @@ export const DualAxisGrowthChart = ({ history, loading, mode, showRank }: Props)
               <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
             </linearGradient>
           </defs>
-          
+
           <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.3} />
-          
+
+          {/* 3. UPDATED XAXIS */}
           <XAxis 
             dataKey="date" 
             axisLine={false} 
             tickLine={false} 
             tick={{fontSize: 8, fill: '#52525b', fontFamily: 'monospace'}} 
-            minTickGap={30}
-            tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, {day:'numeric'})}
+            // Use slightly larger gap for Time string to avoid "12:00 13:00" bunching
+            minTickGap={timeRange === '24H' ? 40 : 30} 
+            tickFormatter={formatAxis}
             dy={5}
           />
 
-          {/* LEFT AXIS: RANK (Conditionally Rendered) */}
           {showRank && (
               <YAxis 
                 yAxisId="left"
@@ -77,7 +94,6 @@ export const DualAxisGrowthChart = ({ history, loading, mode, showRank }: Props)
               />
           )}
 
-          {/* RIGHT AXIS: CREDITS (Accumulation or Velocity) */}
           <YAxis 
             yAxisId="right"
             orientation="right"
@@ -93,12 +109,12 @@ export const DualAxisGrowthChart = ({ history, loading, mode, showRank }: Props)
             cursor={{ stroke: '#ffffff10', strokeWidth: 1 }}
             content={({ active, payload, label }) => {
                 if (!active || !payload || !payload.length) return null;
-                const dateStr = label ? new Date(label).toLocaleDateString() : '';
-
+                
                 return (
                     <div className="bg-zinc-950 border border-zinc-800 p-2 rounded shadow-xl text-[10px]">
                         <div className="text-zinc-500 font-mono mb-1.5 border-b border-zinc-900 pb-0.5">
-                            {dateStr}
+                            {/* Updated Label Formatter */}
+                            {formatTooltipLabel(label)}
                         </div>
                         {payload.map((p: any, i) => (
                             <div key={i} className="flex items-center justify-between gap-3 mb-0.5">
@@ -117,7 +133,6 @@ export const DualAxisGrowthChart = ({ history, loading, mode, showRank }: Props)
             }}
           />
 
-          {/* CREDITS AREA */}
           <Area 
             yAxisId="right" 
             type="monotone" 
@@ -128,7 +143,6 @@ export const DualAxisGrowthChart = ({ history, loading, mode, showRank }: Props)
             animationDuration={500}
           />
 
-          {/* RANK LINE (Conditionally Rendered) */}
           {showRank && (
               <Line 
                 yAxisId="left" 
