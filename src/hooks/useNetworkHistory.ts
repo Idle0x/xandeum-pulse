@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { consolidateNetworkHistory } from '../utils/historyAggregator';
-// UPDATE IMPORT HERE
+// We import the Server Action instead of the Supabase client
 import { getNetworkHistoryAction } from '../app/actions/getHistory';
 
 export type HistoryTimeRange = '24H' | '3D' | '7D' | '30D' | 'ALL';
@@ -54,7 +54,7 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
       if (timeRange === 'ALL') days = 365; 
 
       try {
-        // CALL NEW ACTION NAME
+        // 2. Call Server Action (Hits the RAM Cache)
         const data = await getNetworkHistoryAction(days);
 
         if (!isMounted) return;
