@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { X, Trophy, Wallet, Activity, BarChart3, TrendingUp, TrendingDown, Minus, ChevronDown, Loader2 } from 'lucide-react';
+import { X, Trophy, Wallet, Activity, BarChart3, TrendingUp, TrendingDown, ChevronDown } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart } from 'recharts';
 import { useNetworkHistory, HistoryTimeRange } from '../../hooks/useNetworkHistory';
 
@@ -21,12 +21,28 @@ const TIME_OPTIONS = [
     { label: 'All Time', value: 'ALL' },
 ] as const;
 
+// Shared style for consistent, professional chart axes
+const AXIS_STYLE = {
+    fontSize: 9, 
+    fill: '#52525b', // zinc-600
+    fontFamily: 'monospace'
+};
+
 export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: LeaderboardAnalyticsModalProps) => {
-  // 1. Default to 24H as requested
   const [timeRange, setTimeRange] = useState<HistoryTimeRange>('24H');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  
+
   const { history, loading } = useNetworkHistory(timeRange);
+
+  // --- SMART AXIS FORMATTER ---
+  const formatXAxis = (val: string) => {
+      const date = new Date(val);
+      // If 24H, show Time (14:30). If longer, show Date (Jan 24).
+      if (timeRange === '24H') {
+          return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      }
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
 
   // --- METRICS CALCULATION ---
   const metrics = useMemo(() => {
@@ -51,17 +67,13 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
   }, [history]);
 
   // --- REUSABLE FINANCIAL HEADER ---
-  // Left: Label + Big Number
-  // Right: Subtitle Label + Ticker (Aligned Right)
   const ChartHeader = ({ icon: Icon, title, value, delta, pct, suffix = '', subLabel, customRightElement }: any) => {
       const isPos = delta > 0;
       const isNeg = delta < 0;
-      // Muted colors for "Financial Report" feel
       const color = isPos ? 'text-emerald-400' : isNeg ? 'text-rose-400' : 'text-zinc-500';
 
       return (
-          <div className="flex justify-between items-start mb-4 w-full border-b border-zinc-800/30 pb-3">
-              {/* LEFT COLUMN: Main Metric */}
+          <div className="flex justify-between items-start mb-2 w-full border-b border-zinc-800/30 pb-3 shrink-0">
               <div className="flex flex-col justify-center">
                   <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1.5 mb-1">
                       <Icon size={10} className="text-zinc-600"/> {title}
@@ -70,15 +82,10 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                       {value}
                   </div>
               </div>
-
-              {/* RIGHT COLUMN: Context & Trends */}
               <div className="flex flex-col items-end justify-center min-h-[40px]">
-                  {/* 1. The Subtitle Label */}
                   <div className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider mb-0.5">
                       {subLabel || `Growth (${timeRange})`}
                   </div>
-
-                  {/* 2. The Ticker / Custom Element */}
                   {customRightElement ? (
                       customRightElement
                   ) : (
@@ -117,9 +124,8 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
               <p className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest mt-0.5">Financial Report & Trends</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
-            {/* TIMEFRAME DROPDOWN */}
             <div className="relative">
                 <button 
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -128,7 +134,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                     <span>{TIME_OPTIONS.find(o => o.value === timeRange)?.label}</span>
                     <ChevronDown size={12} className={`transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}/>
                 </button>
-                
+
                 {isDropdownOpen && (
                     <div className="absolute right-0 top-full mt-1 w-32 bg-zinc-950 border border-zinc-800 rounded shadow-xl overflow-hidden py-1 z-50">
                         {TIME_OPTIONS.map((opt) => (
@@ -143,7 +149,6 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                     </div>
                 )}
             </div>
-
             <button onClick={onClose} className="p-1.5 rounded-full hover:bg-zinc-900 text-zinc-500 hover:text-white transition"><X size={16} /></button>
           </div>
         </div>
@@ -151,7 +156,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
         {/* GRID LAYOUT */}
         <div className="space-y-4">
 
-            {/* ROW 1: TOTAL CREDITS */}
+            {/* ROW 1: TOTAL CREDITS (AREA CHART) */}
             <div className="bg-zinc-900/20 border border-zinc-800/60 rounded-xl p-5 h-72 flex flex-col relative overflow-hidden">
                 <ChartHeader 
                     icon={Wallet}
@@ -162,7 +167,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                 />
                 <div className="flex-1 w-full min-h-0">
                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={history}>
+                        <AreaChart data={history} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                            <defs>
                               <linearGradient id="creditGrad" x1="0" y1="0" x2="0" y2="1">
                                  <stop offset="5%" stopColor="#eab308" stopOpacity={0.15}/>
@@ -170,19 +175,41 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                               </linearGradient>
                            </defs>
                            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.3} />
-                           <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#52525b', fontFamily: 'monospace'}} minTickGap={40} tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, {day:'numeric'})} />
-                           <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#52525b', fontFamily: 'monospace'}} width={35} tickFormatter={(val) => (val/1000000).toFixed(1) + 'M'} />
-                           <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }} itemStyle={{ fontFamily: 'monospace' }} />
+                           
+                           {/* SMART X-AXIS */}
+                           <XAxis 
+                               dataKey="date" 
+                               axisLine={false} 
+                               tickLine={false} 
+                               tick={AXIS_STYLE} 
+                               minTickGap={40} 
+                               tickFormatter={formatXAxis} 
+                           />
+                           
+                           <YAxis 
+                               axisLine={false} 
+                               tickLine={false} 
+                               tick={AXIS_STYLE} 
+                               width={40} 
+                               domain={['auto', 'auto']}
+                               tickFormatter={(val) => (val/1000000).toFixed(1) + 'M'} 
+                           />
+                           
+                           <Tooltip 
+                               contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }} 
+                               itemStyle={{ fontFamily: 'monospace' }} 
+                               labelFormatter={(label) => new Date(label).toLocaleString()}
+                           />
                            <Area type="monotone" dataKey="total_credits" stroke="#eab308" strokeWidth={2} fill="url(#creditGrad)" animationDuration={1000} />
                         </AreaChart>
                      </ResponsiveContainer>
                 </div>
             </div>
 
-            {/* ROW 2 */}
+            {/* ROW 2: SMALLER CHARTS */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                {/* DOMINANCE */}
+                {/* DOMINANCE (LINE CHART) */}
                 <div className="bg-zinc-900/20 border border-zinc-800/60 rounded-xl p-5 h-64 flex flex-col">
                     <ChartHeader 
                         icon={BarChart3}
@@ -191,27 +218,49 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                         delta={metrics?.dom.delta}
                         suffix="%"
                     />
-                    <div className="flex-1 w-full">
+                    <div className="flex-1 w-full mt-1 min-h-0">
                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={history}>
+                            <LineChart data={history} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.3} />
-                               <XAxis dataKey="date" hide />
-                               <YAxis domain={['auto', 'auto']} hide />
-                               <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }} itemStyle={{ fontFamily: 'monospace' }}/>
+                               
+                               {/* SMART X-AXIS */}
+                               <XAxis 
+                                   dataKey="date" 
+                                   axisLine={false} 
+                                   tickLine={false} 
+                                   tick={AXIS_STYLE}
+                                   minTickGap={30}
+                                   tickFormatter={formatXAxis}
+                               />
+                               
+                               {/* VISIBLE Y-AXIS */}
+                               <YAxis 
+                                   axisLine={false} 
+                                   tickLine={false} 
+                                   tick={AXIS_STYLE}
+                                   width={40}
+                                   domain={['auto', 'auto']}
+                                   tickFormatter={(val) => val.toFixed(0) + '%'}
+                               />
+                               
+                               <Tooltip 
+                                   contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }} 
+                                   itemStyle={{ fontFamily: 'monospace' }}
+                                   labelFormatter={(label) => new Date(label).toLocaleString()}
+                               />
                                <Line type="monotone" dataKey="top10_dominance" stroke="#3b82f6" strokeWidth={2} dot={false} animationDuration={1000} />
                             </LineChart>
                          </ResponsiveContainer>
                     </div>
                 </div>
 
-                {/* AVERAGE EARNINGS */}
+                {/* AVERAGE EARNINGS (LINE CHART) */}
                 <div className="bg-zinc-900/20 border border-zinc-800/60 rounded-xl p-5 h-64 flex flex-col">
                     <ChartHeader 
                         icon={Activity}
                         title="Average Node Earnings"
                         value={(currentStats.avgCredits / 1000).toFixed(1) + "k"}
                         subLabel="Daily Credits Yield"
-                        // Custom Right Element for Velocity
                         customRightElement={
                             metrics && (
                                 <div className={`text-[10px] font-mono font-bold ${metrics.avg.velocity >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -220,13 +269,36 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats }: Leaderboard
                             )
                         }
                     />
-                    <div className="flex-1 w-full mt-1">
+                    <div className="flex-1 w-full mt-1 min-h-0">
                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={history}>
+                            <LineChart data={history} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.3} />
-                               <XAxis dataKey="date" hide />
-                               <YAxis domain={['auto', 'auto']} hide />
-                               <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }} itemStyle={{ fontFamily: 'monospace' }}/>
+                               
+                               {/* SMART X-AXIS */}
+                               <XAxis 
+                                   dataKey="date" 
+                                   axisLine={false} 
+                                   tickLine={false} 
+                                   tick={AXIS_STYLE}
+                                   minTickGap={30}
+                                   tickFormatter={formatXAxis}
+                               />
+                               
+                               {/* VISIBLE Y-AXIS */}
+                               <YAxis 
+                                   axisLine={false} 
+                                   tickLine={false} 
+                                   tick={AXIS_STYLE}
+                                   width={40}
+                                   domain={['auto', 'auto']}
+                                   tickFormatter={(val) => (val/1000).toFixed(1) + 'k'}
+                               />
+                               
+                               <Tooltip 
+                                   contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', fontSize: '10px' }} 
+                                   itemStyle={{ fontFamily: 'monospace' }}
+                                   labelFormatter={(label) => new Date(label).toLocaleString()}
+                               />
                                <Line type="monotone" dataKey="avg_credits" stroke="#d4d4d8" strokeWidth={2} dot={false} animationDuration={1000} />
                             </LineChart>
                          </ResponsiveContainer>
