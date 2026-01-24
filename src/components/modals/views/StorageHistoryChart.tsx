@@ -23,13 +23,14 @@ export const StorageHistoryChart = ({
   onTimeRangeChange,
   loading
 }: StorageHistoryChartProps) => {
-  const [viewMode, setViewMode] = useState<'USED' | 'COMMITTED'>('COMMITTED');
+  // UPDATED: Default set to 'USED'
+  const [viewMode, setViewMode] = useState<'USED' | 'COMMITTED'>('USED');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Use history directly (it's already filtered by the hook/backend)
   const chartData = useMemo(() => {
     if (!history || history.length === 0) return [];
-    
+
     return history.map((point, index) => {
       // Use real data if available, else fallback
       const hasData = point.storage_committed !== undefined;
@@ -60,7 +61,7 @@ export const StorageHistoryChart = ({
 
   return (
     <div className={`w-full h-full flex flex-col rounded-2xl border p-4 transition-all duration-300 ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900/30 border-zinc-800'}`}>
-      
+
       {/* HEADER ROW */}
       <div className="flex flex-wrap gap-2 justify-between items-start mb-4">
         <div className="flex flex-col gap-2">
@@ -73,7 +74,7 @@ export const StorageHistoryChart = ({
                     <div className="text-xs font-bold text-white">{viewMode === 'COMMITTED' ? 'Committed Capacity' : 'Actual Usage'}</div>
                 </div>
             </div>
-            
+
             <div className="flex bg-zinc-900/80 p-0.5 rounded-lg border border-zinc-800 w-fit mt-1">
                 {(['USED', 'COMMITTED'] as const).map(mode => (
                     <button 
