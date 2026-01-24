@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { consolidateNetworkHistory } from '../utils/historyAggregator';
-// We import the Server Action instead of the Supabase client
 import { getNetworkHistoryAction } from '../app/actions/getHistory';
 
 export type HistoryTimeRange = '24H' | '3D' | '7D' | '30D' | 'ALL';
@@ -14,6 +13,9 @@ export interface NetworkHistoryPoint {
   total_capacity: number;
   total_used: number;
   consensus_score: number;
+  total_credits: number;
+  avg_credits: number;
+  top10_dominance: number;
 
   // Mainnet
   mainnet_nodes: number;
@@ -22,6 +24,9 @@ export interface NetworkHistoryPoint {
   mainnet_avg_health: number;
   mainnet_avg_stability: number;
   mainnet_consensus_score: number;
+  mainnet_credits: number;       // <--- NEW
+  mainnet_avg_credits: number;   // <--- NEW
+  mainnet_dominance: number;     // <--- NEW
 
   // Devnet
   devnet_nodes: number;
@@ -30,10 +35,9 @@ export interface NetworkHistoryPoint {
   devnet_avg_health: number;
   devnet_avg_stability: number;
   devnet_consensus_score: number;
-
-  total_credits: number;
-  avg_credits: number;
-  top10_dominance: number;
+  devnet_credits: number;        // <--- NEW
+  devnet_avg_credits: number;    // <--- NEW
+  devnet_dominance: number;      // <--- NEW
 }
 
 export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
@@ -47,6 +51,7 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
     async function fetchHistory() {
       setLoading(true);
 
+      // Determine Days
       let days = 7;
       if (timeRange === '24H') days = 1;
       if (timeRange === '3D') days = 3;
@@ -54,7 +59,7 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
       if (timeRange === 'ALL') days = 365; 
 
       try {
-        // 2. Call Server Action (Hits the RAM Cache)
+        // Fetch from RAM Cache
         const data = await getNetworkHistoryAction(days);
 
         if (!isMounted) return;
@@ -62,6 +67,7 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
         if (data && data.length > 0) {
           const rawPoints = data.map((d: any) => ({
             date: d.id,
+
             // Global
             avg_health: Number(d.avg_health || 0),
             avg_stability: Number(d.avg_stability || 0),
@@ -69,6 +75,10 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
             total_capacity: Number(d.total_capacity || 0),
             total_used: Number(d.total_used || 0),
             consensus_score: Number(d.consensus_score || 0),
+            total_credits: Number(d.total_credits || 0),
+            avg_credits: Number(d.avg_credits || 0),
+            top10_dominance: Number(d.top10_dominance || 0),
+
             // Mainnet
             mainnet_nodes: Number(d.mainnet_nodes || 0),
             mainnet_capacity: Number(d.mainnet_capacity || 0),
@@ -76,6 +86,10 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
             mainnet_avg_health: Number(d.mainnet_avg_health || 0),
             mainnet_avg_stability: Number(d.mainnet_avg_stability || 0),
             mainnet_consensus_score: Number(d.mainnet_consensus_score || 0),
+            mainnet_credits: Number(d.mainnet_credits || 0),         // <--- MAPPED
+            mainnet_avg_credits: Number(d.mainnet_avg_credits || 0), // <--- MAPPED
+            mainnet_dominance: Number(d.mainnet_dominance || 0),     // <--- MAPPED
+
             // Devnet
             devnet_nodes: Number(d.devnet_nodes || 0),
             devnet_capacity: Number(d.devnet_capacity || 0),
@@ -83,23 +97,19 @@ export const useNetworkHistory = (timeRange: HistoryTimeRange = '7D') => {
             devnet_avg_health: Number(d.devnet_avg_health || 0),
             devnet_avg_stability: Number(d.devnet_avg_stability || 0),
             devnet_consensus_score: Number(d.devnet_consensus_score || 0),
-            // Financials
-            total_credits: Number(d.total_credits || 0),
-            avg_credits: Number(d.avg_credits || 0),
-            top10_dominance: Number(d.top10_dominance || 0)
+            devnet_credits: Number(d.devnet_credits || 0),           // <--- MAPPED
+            devnet_avg_credits: Number(d.devnet_avg_credits || 0),   // <--- MAPPED
+            devnet_dominance: Number(d.devnet_dominance || 0),       // <--- MAPPED
           }));
 
           const processedHistory = consolidateNetworkHistory(rawPoints, timeRange);
           setHistory(processedHistory);
 
+          // Growth calc
           if (processedHistory.length > 1) {
               const first = processedHistory[0].total_capacity;
               const last = processedHistory[processedHistory.length - 1].total_capacity;
-              if (first > 0) {
-                  setGrowth(((last - first) / first) * 100);
-              } else {
-                  setGrowth(last > 0 ? 100 : 0);
-              }
+              setGrowth(first > 0 ? ((last - first) / first) * 100 : (last > 0 ? 100 : 0));
           }
         } else {
           setHistory([]);
