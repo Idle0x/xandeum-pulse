@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Node } from '../types'; 
 import { consolidateHistory } from '../utils/historyAggregator'; 
-// UPDATE IMPORT HERE
+// We import the Server Action instead of the Supabase client
 import { getNodeHistoryAction } from '../app/actions/getHistory';
 
 export interface NodeHistoryPoint {
@@ -35,6 +35,7 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
       setLoading(true);
 
       const ipOnly = targetAddress.includes(':') ? targetAddress.split(':')[0] : targetAddress;
+      // Ensure this ID generation matches your Server Action logic
       const stableId = `${targetPubkey}-${ipOnly}-${targetNetwork}`;
 
       // 1. Determine Days
@@ -46,7 +47,7 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
       if (timeRange === 'ALL') days = 365;
 
       try {
-        // CALL NEW ACTION NAME
+        // 2. Call Server Action (Hits the RAM Cache)
         const data = await getNodeHistoryAction(stableId, targetNetwork, days);
 
         if (!isMounted) return;
