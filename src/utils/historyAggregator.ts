@@ -1,104 +1,53 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { Node } from '../types'; 
-// Import the new utility
-import { consolidateHistory } from '../utils/historyAggregator'; 
+// utils/historyAggregator.ts
 
-export interface NodeHistoryPoint {
-  date: string;
-  health: number;
-  uptime: number;
-  storage_committed: number;
-  storage_used: number;
-  credits: number;
-  reputation: number;
-  rank: number;
-  network: string; 
-}
+export const consolidateHistory = (data: any[], timeRange: string) => {
+  // 1. For High-Res windows, return raw hourly data
+  if (timeRange === '24H' || timeRange === '3D' || timeRange === '7D') {
+    return data;
+  }
 
-export type HistoryTimeRange = '24H' | '3D' | '7D' | '30D' | 'ALL';
+  // 2. For Long-Term windows, group by Date (YYYY-MM-DD)
+  const groups: Record<string, any[]> = {};
+  
+  data.forEach(point => {
+    // robust date parsing
+    const dateObj = new Date(point.date || point.created_at);
+    if (isNaN(dateObj.getTime())) return;
+    
+    const dateKey = dateObj.toISOString().split('T')[0];
+    if (!groups[dateKey]) groups[dateKey] = [];
+    groups[dateKey].push(point);
+  });
 
-export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRange = '24H') => {
-  const [history, setHistory] = useState<NodeHistoryPoint[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [reliabilityScore, setReliabilityScore] = useState(100);
+  // 3. Flatten into Daily Summaries
+  return Object.keys(groups).sort().map(dateStr => {
+    const dayPoints = groups[dateStr];
+    
+    // Sort chronological to ensure we find the true "End of Day" values
+    dayPoints.sort((a, b) => new Date(a.date || a.created_at).getTime() - new Date(b.date || b.created_at).getTime());
+    
+    const lastPoint = dayPoints[dayPoints.length - 1];
+    
+    // CALCULATION LOGIC:
+    // Health = Average of the day (rounded)
+    const avgHealth = dayPoints.reduce((sum, p) => sum + (Number(p.health) || 0), 0) / dayPoints.length;
+    
+    // Uptime = Average of the day (since it's a percentage)
+    const avgUptime = dayPoints.reduce((sum, p) => sum + (Number(p.uptime) || 0), 0) / dayPoints.length;
 
-  useEffect(() => {
-    let isMounted = true;
-    if (!node || !node.pubkey || !node.network) return;
+    // Rank = Best (lowest) rank of the day
+    const minRank = Math.min(...dayPoints.map(p => p.rank || 999999));
 
-    const targetNetwork = node.network;
-    const targetAddress = node.address || '0.0.0.0'; 
-    const targetPubkey = node.pubkey;
-
-    async function fetchNodeHistory() {
-      setLoading(true);
-
-      // Create Stable ID: [PublicKey]-[IP]-[Network]
-      const ipOnly = targetAddress.includes(':') ? targetAddress.split(':')[0] : targetAddress;
-      const stableId = `${targetPubkey}-${ipOnly}-${targetNetwork}`;
-
-      // 1. DETERMINE FETCH WINDOW
-      // We always fetch the raw amount of days needed
-      let days = 1;
-      if (timeRange === '24H') days = 1;
-      if (timeRange === '3D') days = 3;
-      if (timeRange === '7D') days = 7;
-      if (timeRange === '30D') days = 30;
-      if (timeRange === 'ALL') days = 365; // Max retention
-
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-
-      // 2. FETCH RAW DATA FROM SUPABASE
-      const { data, error } = await supabase
-        .from('node_snapshots')
-        .select('*') 
-        .eq('node_id', stableId)
-        .eq('network', targetNetwork)
-        .gte('created_at', startDate.toISOString()) 
-        .order('created_at', { ascending: true });
-
-      if (!isMounted) return;
-
-      if (error) {
-        console.error("Node History Error:", error);
-        setLoading(false);
-        return;
-      }
-
-      // 3. NORMALIZE DATA
-      const rawPoints = (data || []).map((row: any) => ({
-        date: row.created_at, 
-        health: Number(row.health || 0),
-        uptime: Number(row.uptime || 0),
-        storage_committed: Number(row.storage_committed || 0),
-        storage_used: Number(row.storage_used || 0),
-        credits: Number(row.credits || 0), 
-        rank: Number(row.rank || 0),
-        network: row.network || targetNetwork
-      }));
-
-      // 4. AGGREGATE (The Fix)
-      // This automatically groups hourly data into daily averages if timeRange is 30D or ALL
-      const processedHistory = consolidateHistory(rawPoints, timeRange);
-
-      // Calculate Reliability Score based on processed data
-      if (processedHistory.length > 0) {
-        const activeCount = processedHistory.filter((p: any) => p.health > 0).length;
-        setReliabilityScore(Math.floor((activeCount / processedHistory.length) * 100));
-      } else {
-        setReliabilityScore(0);
-      }
-
-      setHistory(processedHistory);
-      setLoading(false);
-    }
-
-    fetchNodeHistory();
-
-    return () => { isMounted = false; };
-  }, [node?.pubkey, node?.network, node?.address, timeRange]);
-
-  return { history, reliabilityScore, loading };
+    return {
+      ...lastPoint, // Keep network, pubkey, static info
+      date: dateStr, // Overwrite timestamp with just the date
+      health: Math.round(avgHealth),
+      uptime: avgUptime,
+      // Credits/Storage = Last value of the day (Accumulators)
+      credits: lastPoint.credits,
+      storage_committed: lastPoint.storage_committed,
+      storage_used: lastPoint.storage_used,
+      rank: minRank === 999999 ? 0 : minRank
+    };
+  });
 };
