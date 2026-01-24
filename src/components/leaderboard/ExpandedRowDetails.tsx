@@ -1,9 +1,8 @@
 import { useState, useMemo } from 'react';
-import { ChevronDown, ChevronUp, Eye, EyeOff, History, LineChart, Bug } from 'lucide-react'; // Added 'Bug' icon
+import { ChevronDown, ChevronUp, Eye, EyeOff, History, LineChart } from 'lucide-react';
 import { Node } from '../../types';
 import { useNodeHistory } from '../../hooks/useNodeHistory';
 import { DualAxisGrowthChart } from './DualAxisGrowthChart';
-import { NodeDebugger } from '../debug/NodeDebugger'; // Import the new debugger
 
 const TIME_OPTIONS = [
     { label: '24H', value: '24H' },
@@ -18,9 +17,8 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
   const [timeRange, setTimeRange] = useState<typeof TIME_OPTIONS[number]['value']>('24H');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // View States
+  // View State
   const [viewMode, setViewMode] = useState<'CHART' | 'TABLE'>('CHART');
-  const [showDebug, setShowDebug] = useState(false); // <--- NEW DEBUG STATE
 
   // Chart Controls
   const [chartMode, setChartMode] = useState<'ACCUMULATION' | 'VELOCITY'>('ACCUMULATION');
@@ -85,6 +83,7 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
 
                {/* TOP CONTROLS */}
                <div className="flex justify-between items-center mb-1 relative z-30">
+                   {/* UPDATED HEADER WITH RESOLUTION TEXT */}
                    <div className="flex items-baseline gap-2">
                        <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Consistency Map</span>
                        <span className="text-[8px] font-medium text-zinc-500 opacity-70">
@@ -92,38 +91,27 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                        </span>
                    </div>
 
-                   <div className="flex items-center gap-2">
-                        {/* DEBUG TOGGLE BUTTON */}
+                   <div className="relative">
                         <button 
-                            onClick={() => setShowDebug(!showDebug)}
-                            className={`p-0.5 rounded transition-colors ${showDebug ? 'text-fuchsia-400 bg-fuchsia-400/10' : 'text-zinc-600 hover:text-zinc-300'}`}
-                            title="Toggle Data Debugger"
+                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                            className="flex items-center gap-1.5 px-2 py-0.5 bg-zinc-950 border border-zinc-800 hover:border-zinc-600 text-[9px] font-bold text-zinc-400 rounded transition-all uppercase tracking-wider"
                         >
-                            <Bug size={10} />
+                            <span>{TIME_OPTIONS.find(o => o.value === timeRange)?.label}</span>
+                            <ChevronDown size={10} className={`transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}/>
                         </button>
-
-                        <div className="relative">
-                            <button 
-                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                className="flex items-center gap-1.5 px-2 py-0.5 bg-zinc-950 border border-zinc-800 hover:border-zinc-600 text-[9px] font-bold text-zinc-400 rounded transition-all uppercase tracking-wider"
-                            >
-                                <span>{TIME_OPTIONS.find(o => o.value === timeRange)?.label}</span>
-                                <ChevronDown size={10} className={`transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}/>
-                            </button>
-                            {isDropdownOpen && (
-                                <div className="absolute right-0 top-full mt-1 w-24 bg-zinc-950 border border-zinc-800 rounded shadow-xl overflow-hidden py-0.5 z-50">
-                                    {TIME_OPTIONS.map((opt) => (
-                                        <button
-                                            key={opt.value}
-                                            onClick={() => { setTimeRange(opt.value); setIsDropdownOpen(false); }}
-                                            className={`w-full text-left px-2 py-1.5 text-[9px] font-bold uppercase tracking-wider hover:bg-zinc-900 ${timeRange === opt.value ? 'text-white bg-zinc-900' : 'text-zinc-500'}`}
-                                        >
-                                            {opt.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                        {isDropdownOpen && (
+                            <div className="absolute right-0 top-full mt-1 w-24 bg-zinc-950 border border-zinc-800 rounded shadow-xl overflow-hidden py-0.5 z-50">
+                                {TIME_OPTIONS.map((opt) => (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => { setTimeRange(opt.value); setIsDropdownOpen(false); }}
+                                        className={`w-full text-left px-2 py-1.5 text-[9px] font-bold uppercase tracking-wider hover:bg-zinc-900 ${timeRange === opt.value ? 'text-white bg-zinc-900' : 'text-zinc-500'}`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                    </div>
                </div>
 
@@ -132,120 +120,115 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                    <Ribbon />
                </div>
 
-               {/* --- CONDITIONAL RENDER: DEBUGGER OR CHART --- */}
-               {showDebug ? (
-                   <NodeDebugger node={node} />
-               ) : (
-                   <>
-                       {/* CHART / TABLE CONTROLS */}
-                       <div className="flex justify-between items-center mb-1 px-1 relative z-20">
-                           {viewMode === 'CHART' ? (
-                                <button 
-                                    onClick={() => setShowRank(!showRank)}
-                                    className={`flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest transition-colors ${showRank ? 'text-blue-400' : 'text-zinc-600 hover:text-zinc-400'}`}
-                                >
-                                    {showRank ? <Eye size={10} /> : <EyeOff size={10} />}
-                                    {showRank ? 'Rank Visible' : 'Show Rank'}
-                                </button>
-                           ) : (
-                               <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">
-                                   Raw Snapshots ({cleanHistory.length})
-                                </span>
-                           )}
+               {/* CHART / TABLE CONTROLS */}
+               <div className="flex justify-between items-center mb-1 px-1 relative z-20">
+                   {viewMode === 'CHART' ? (
+                        <button 
+                            onClick={() => setShowRank(!showRank)}
+                            className={`flex items-center gap-1.5 text-[8px] font-bold uppercase tracking-widest transition-colors ${showRank ? 'text-blue-400' : 'text-zinc-600 hover:text-zinc-400'}`}
+                        >
+                            {showRank ? <Eye size={10} /> : <EyeOff size={10} />}
+                            {showRank ? 'Rank Visible' : 'Show Rank'}
+                        </button>
+                   ) : (
+                       <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">
+                           Raw Snapshots ({cleanHistory.length})
+                       </span>
+                   )}
 
-                           {viewMode === 'CHART' && (
-                               <div className="relative">
-                                   <button 
-                                        onClick={() => setIsModeDropdownOpen(!isModeDropdownOpen)}
-                                        className="flex items-center gap-1 text-[8px] font-bold uppercase tracking-widest text-zinc-500 hover:text-yellow-500 transition-colors"
-                                   >
-                                        {chartMode === 'ACCUMULATION' ? 'Total Accumulation' : 'Yield Velocity'}
-                                        <ChevronDown size={10} className={`transition-transform duration-200 ${isModeDropdownOpen ? 'rotate-180' : ''}`}/>
+                   {viewMode === 'CHART' && (
+                       <div className="relative">
+                           <button 
+                                onClick={() => setIsModeDropdownOpen(!isModeDropdownOpen)}
+                                className="flex items-center gap-1 text-[8px] font-bold uppercase tracking-widest text-zinc-500 hover:text-yellow-500 transition-colors"
+                           >
+                                {chartMode === 'ACCUMULATION' ? 'Total Accumulation' : 'Yield Velocity'}
+                                <ChevronDown size={10} className={`transition-transform duration-200 ${isModeDropdownOpen ? 'rotate-180' : ''}`}/>
+                           </button>
+
+                           {isModeDropdownOpen && (
+                               <div className="absolute right-0 top-full mt-1 w-32 bg-zinc-950 border border-zinc-800 rounded shadow-xl overflow-hidden py-0.5 z-50">
+                                   <button onClick={() => { setChartMode('ACCUMULATION'); setIsModeDropdownOpen(false); }} className={`w-full text-left px-2 py-1.5 text-[8px] font-bold uppercase tracking-wider hover:bg-zinc-900 ${chartMode === 'ACCUMULATION' ? 'text-yellow-500 bg-zinc-900' : 'text-zinc-500'}`}>
+                                       Total Accumulation
                                    </button>
-
-                                   {isModeDropdownOpen && (
-                                       <div className="absolute right-0 top-full mt-1 w-32 bg-zinc-950 border border-zinc-800 rounded shadow-xl overflow-hidden py-0.5 z-50">
-                                           <button onClick={() => { setChartMode('ACCUMULATION'); setIsModeDropdownOpen(false); }} className={`w-full text-left px-2 py-1.5 text-[8px] font-bold uppercase tracking-wider hover:bg-zinc-900 ${chartMode === 'ACCUMULATION' ? 'text-yellow-500 bg-zinc-900' : 'text-zinc-500'}`}>
-                                               Total Accumulation
-                                           </button>
-                                           <button onClick={() => { setChartMode('VELOCITY'); setIsModeDropdownOpen(false); }} className={`w-full text-left px-2 py-1.5 text-[8px] font-bold uppercase tracking-wider hover:bg-zinc-900 ${chartMode === 'VELOCITY' ? 'text-yellow-500 bg-zinc-900' : 'text-zinc-500'}`}>
-                                               Yield Velocity
-                                           </button>
-                                       </div>
-                                   )}
+                                   <button onClick={() => { setChartMode('VELOCITY'); setIsModeDropdownOpen(false); }} className={`w-full text-left px-2 py-1.5 text-[8px] font-bold uppercase tracking-wider hover:bg-zinc-900 ${chartMode === 'VELOCITY' ? 'text-yellow-500 bg-zinc-900' : 'text-zinc-500'}`}>
+                                       Yield Velocity
+                                   </button>
                                </div>
                            )}
                        </div>
+                   )}
+               </div>
 
-                       {/* MAIN VISUALIZATION AREA */}
-                       <div className="h-32 border border-zinc-800/40 rounded-lg bg-black/20 p-1 relative overflow-hidden">
-                           {viewMode === 'CHART' ? (
-                               <DualAxisGrowthChart 
-                                    history={cleanHistory} 
-                                    loading={loading} 
-                                    mode={chartMode}    
-                                    showRank={showRank} 
-                                />
+               {/* MAIN VISUALIZATION AREA (Swaps between Chart and Table) */}
+               <div className="h-32 border border-zinc-800/40 rounded-lg bg-black/20 p-1 relative overflow-hidden">
+                   {viewMode === 'CHART' ? (
+                       <DualAxisGrowthChart 
+                            history={cleanHistory} 
+                            loading={loading} 
+                            mode={chartMode}    
+                            showRank={showRank} 
+                        />
+                   ) : (
+                       <div className="w-full h-full overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+                           {loading ? (
+                               <div className="text-zinc-600 text-[9px] font-mono text-center pt-10 animate-pulse">Loading Snapshots...</div>
+                           ) : cleanHistory.length === 0 ? (
+                               <div className="text-zinc-600 text-[9px] font-mono text-center pt-10">No snapshot data available</div>
                            ) : (
-                               <div className="w-full h-full overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
-                                   {loading ? (
-                                       <div className="text-zinc-600 text-[9px] font-mono text-center pt-10 animate-pulse">Loading Snapshots...</div>
-                                   ) : cleanHistory.length === 0 ? (
-                                       <div className="text-zinc-600 text-[9px] font-mono text-center pt-10">No snapshot data available</div>
-                                   ) : (
-                                       <table className="w-full text-[9px] font-mono border-collapse">
-                                           <thead className="sticky top-0 bg-zinc-950/90 backdrop-blur border-b border-zinc-800 text-zinc-500 uppercase z-10">
-                                               <tr>
-                                                   <th className="text-left py-1.5 px-2 font-bold tracking-wider">Timestamp</th>
-                                                   <th className="text-right py-1.5 px-2 font-bold tracking-wider">Credits</th>
-                                               </tr>
-                                           </thead>
-                                           <tbody className="divide-y divide-zinc-900/50">
-                                               {[...cleanHistory].reverse().map((point, i) => (
-                                                   <tr key={i} className="hover:bg-zinc-900/30 transition-colors">
-                                                       <td className="py-1 px-2 text-zinc-400">
-                                                           {new Date(point.date).toLocaleString(undefined, {
-                                                               month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                                                           })}
-                                                       </td>
-                                                       <td className="py-1 px-2 text-right font-bold text-yellow-500/90">
-                                                           {point.credits.toLocaleString()}
-                                                       </td>
-                                                   </tr>
-                                               ))}
-                                           </tbody>
-                                       </table>
-                                   )}
-                               </div>
+                               <table className="w-full text-[9px] font-mono border-collapse">
+                                   <thead className="sticky top-0 bg-zinc-950/90 backdrop-blur border-b border-zinc-800 text-zinc-500 uppercase z-10">
+                                       <tr>
+                                           <th className="text-left py-1.5 px-2 font-bold tracking-wider">Timestamp</th>
+                                           <th className="text-right py-1.5 px-2 font-bold tracking-wider">Credits</th>
+                                       </tr>
+                                   </thead>
+                                   <tbody className="divide-y divide-zinc-900/50">
+                                       {/* Show newest first */}
+                                       {[...cleanHistory].reverse().map((point, i) => (
+                                           <tr key={i} className="hover:bg-zinc-900/30 transition-colors">
+                                               <td className="py-1 px-2 text-zinc-400">
+                                                   {new Date(point.date).toLocaleString(undefined, {
+                                                       month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                                   })}
+                                               </td>
+                                               <td className="py-1 px-2 text-right font-bold text-yellow-500/90">
+                                                   {point.credits.toLocaleString()}
+                                               </td>
+                                           </tr>
+                                       ))}
+                                   </tbody>
+                               </table>
                            )}
                        </div>
+                   )}
+               </div>
 
-                       {/* BOTTOM STATS ROW */}
-                       <div className="flex items-center justify-between mt-2 pt-2 border-t border-zinc-800/30 px-1">
-                            <div className="flex items-center gap-2">
-                                <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">({timeRange}) Rank Change</span>
-                                <span className={`text-[9px] font-mono font-bold ${stats.rankChange > 0 ? 'text-emerald-400' : stats.rankChange < 0 ? 'text-rose-400' : 'text-zinc-500'}`}>
-                                    {stats.rankChange > 0 ? '+' : ''}{stats.rankChange}
-                                </span>
-                            </div>
+               {/* BOTTOM STATS ROW */}
+               <div className="flex items-center justify-between mt-2 pt-2 border-t border-zinc-800/30 px-1">
+                    <div className="flex items-center gap-2">
+                        <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">({timeRange}) Rank Change</span>
+                        <span className={`text-[9px] font-mono font-bold ${stats.rankChange > 0 ? 'text-emerald-400' : stats.rankChange < 0 ? 'text-rose-400' : 'text-zinc-500'}`}>
+                            {stats.rankChange > 0 ? '+' : ''}{stats.rankChange}
+                        </span>
+                    </div>
 
-                            <div className="flex items-center gap-2">
-                                <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">({timeRange}) Credits Accumulated</span>
-                                <span className={`text-[9px] font-mono font-bold ${stats.creditChange > 0 ? 'text-yellow-500' : 'text-zinc-500'}`}>
-                                    {stats.creditChange > 0 ? '+' : ''}{stats.creditChange.toLocaleString()}
-                                </span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">({timeRange}) Credits Accumulated</span>
+                        <span className={`text-[9px] font-mono font-bold ${stats.creditChange > 0 ? 'text-yellow-500' : 'text-zinc-500'}`}>
+                            {stats.creditChange > 0 ? '+' : ''}{stats.creditChange.toLocaleString()}
+                        </span>
 
-                                <button 
-                                    onClick={() => setViewMode(viewMode === 'CHART' ? 'TABLE' : 'CHART')}
-                                    className={`ml-1 p-1 rounded hover:bg-zinc-800 transition-colors ${viewMode === 'TABLE' ? 'text-yellow-500 bg-zinc-900' : 'text-zinc-600 hover:text-zinc-400'}`}
-                                    title={viewMode === 'CHART' ? "View Raw Snapshots" : "View Growth Chart"}
-                                >
-                                    {viewMode === 'CHART' ? <History size={10} /> : <LineChart size={10} />}
-                                </button>
-                            </div>
-                       </div>
-                   </>
-               )}
+                        {/* TOGGLE BUTTON */}
+                        <button 
+                            onClick={() => setViewMode(viewMode === 'CHART' ? 'TABLE' : 'CHART')}
+                            className={`ml-1 p-1 rounded hover:bg-zinc-800 transition-colors ${viewMode === 'TABLE' ? 'text-yellow-500 bg-zinc-900' : 'text-zinc-600 hover:text-zinc-400'}`}
+                            title={viewMode === 'CHART' ? "View Raw Snapshots" : "View Growth Chart"}
+                        >
+                            {viewMode === 'CHART' ? <History size={10} /> : <LineChart size={10} />}
+                        </button>
+                    </div>
+               </div>
            </div>
        )}
     </div>
