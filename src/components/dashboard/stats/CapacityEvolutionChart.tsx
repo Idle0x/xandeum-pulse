@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { HistoryTimeRange, NetworkHistoryPoint } from '../../../hooks/useNetworkHistory';
 import { ChevronDown, Loader2 } from 'lucide-react';
@@ -19,12 +19,11 @@ export const CapacityEvolutionChart = ({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'COMMITTED' | 'USED'>('COMMITTED');
 
-  // Configuration based on active view
   const config = useMemo(() => {
     return viewMode === 'COMMITTED' 
       ? { 
           key: capacityKey, 
-          color: '#a855f7', // Purple
+          color: '#a855f7', 
           label: 'Capacity', 
           gradientId: 'gradCommitted',
           bg: 'bg-purple-500',
@@ -32,13 +31,29 @@ export const CapacityEvolutionChart = ({
         }
       : { 
           key: usedKey, 
-          color: '#3b82f6', // Blue
+          color: '#3b82f6', 
           label: 'Used', 
           gradientId: 'gradUsed',
           bg: 'bg-blue-500',
           text: 'text-blue-400'
         };
   }, [viewMode, capacityKey, usedKey]);
+
+  // --- REFINED DOMAIN LOGIC ---
+  // Calculates the Y-Axis boundaries to avoid "Jagged Mountains"
+  const getDomain = useCallback(([dataMin, dataMax]: [number, number]) => {
+    // Safety check for empty data
+    if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 'auto'];
+
+    // 1. Calculate Lower Bound: Lowest Point - 10%
+    // We use Math.max(0, ...) to ensure we never go below zero (The "Zero Floor")
+    const lowerBound = Math.max(0, dataMin * 0.90);
+
+    // 2. Calculate Upper Bound: Highest Point + 5%
+    const upperBound = dataMax * 1.05;
+
+    return [lowerBound, upperBound];
+  }, []);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -57,12 +72,11 @@ export const CapacityEvolutionChart = ({
 
   return (
     <div className="w-full h-full flex flex-col rounded-xl border border-zinc-800 bg-black/40 p-3 relative transition-all duration-500">
-      {/* Header with Slick Toggle */}
+      
+      {/* Header controls */}
       <div className="flex justify-between items-center mb-1 relative z-20 h-6 shrink-0">
          <div className="flex items-center gap-3">
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Evolution</span>
-            
-            {/* The Slick Toggle */}
             <div className="flex bg-zinc-900/80 rounded border border-zinc-800/50 p-0.5">
                <button 
                   onClick={() => setViewMode('COMMITTED')}
@@ -78,8 +92,6 @@ export const CapacityEvolutionChart = ({
                </button>
             </div>
          </div>
-
-         {/* Time Range Dropdown */}
          <div className="relative">
             <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="flex items-center gap-1 px-2 py-0.5 rounded border border-zinc-800 bg-zinc-900/50 text-[9px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all">
                {timeRange === 'ALL' ? 'MAX' : timeRange}
@@ -97,26 +109,26 @@ export const CapacityEvolutionChart = ({
          </div>
       </div>
 
-      {/* Chart */}
+      {/* Chart Area */}
       <div className="flex-1 w-full min-h-0 relative">
          {loading && <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/10 backdrop-blur-[1px]"><Loader2 className="w-4 h-4 animate-spin text-zinc-600"/></div>}
+         
          <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={history} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
                <defs>
-                  {/* Purple Gradient (Committed) */}
+                  {/* UPDATE: Increased stopOpacity to 0.6 for better feathering */}
                   <linearGradient id="gradCommitted" x1="0" y1="0" x2="0" y2="1">
-                     <stop offset="5%" stopColor="#a855f7" stopOpacity={0.4}/>
+                     <stop offset="5%" stopColor="#a855f7" stopOpacity={0.6}/>
                      <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
                   </linearGradient>
-                  {/* Blue Gradient (Used) */}
                   <linearGradient id="gradUsed" x1="0" y1="0" x2="0" y2="1">
-                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.6}/>
                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                   </linearGradient>
                </defs>
-               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.5} />
                
-               {/* X Axis */}
+               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.5} />
+
                <XAxis 
                   dataKey="date" 
                   axisLine={false} 
@@ -127,19 +139,23 @@ export const CapacityEvolutionChart = ({
                   height={15}
                />
 
-               {/* Single Y Axis (Adapts to data) */}
                <YAxis 
                   axisLine={false} 
                   tickLine={false} 
                   tick={{fontSize: 9, fill: config.color, fontWeight: 600}} 
                   width={35} 
-                  tickFormatter={(val) => formatBytes(val).split(' ')[0]} 
-                  domain={['auto', 'auto']}
+                  domain={getDomain} // Apply the -10% / +5% logic
+                  tickCount={4}      // Reduce clutter
+                  tickFormatter={(val) => {
+                      const str = formatBytes(val);
+                      const [num] = str.split(' ');
+                      // Remove decimals for cleaner "ruler" look
+                      return Math.round(parseFloat(num)).toString();
+                  }}
                />
 
                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3f3f46', strokeWidth: 1 }} />
-               
-               {/* Fluid Area Chart */}
+
                <Area 
                   type="monotone" 
                   dataKey={config.key} 
@@ -148,7 +164,6 @@ export const CapacityEvolutionChart = ({
                   fill={`url(#${config.gradientId})`} 
                   isAnimationActive={true}
                   animationDuration={1000}
-                  animationEasing="ease-in-out"
                />
             </AreaChart>
          </ResponsiveContainer>
