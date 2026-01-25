@@ -12,7 +12,6 @@ export type NarrativeContext = {
   nodes: Node[];
   benchmarks: any;
   chartSection?: string | null;
-  // Contextual Awareness: Previous snapshot for trend analysis
   historySnapshot?: {
       totalStorage?: number;
       avgHealth?: number;
@@ -41,27 +40,29 @@ type AnalysisStats = {
   countryCounts: Record<string, number>;
   dominantRegion: string;
   dominanceScore: number;
+  historyDelta?: {
+      health: number;
+      storage: number;
+      credits: number;
+      uptime: number;
+  }
 };
 
 // --- SESSION MEMORY ---
 const NARRATIVE_CACHE = new Map<string, string>();
 
-// --- 1. THE COMBINATORIAL MATRIX (Superfluid Expansion) ---
+// --- 1. THE COMBINATORIAL MATRIX ---
 const MATRIX = {
   generic: {
     openers: [
-      // Simple / Direct
       "Analysis suggests", "Telemetry confirms", "Data reveals", "Current scans show",
       "Network audit reports", "System diagnostics indicate", "Live telemetry shows", "Cluster review confirms",
-      // Technical / Formal
       "Current modeling indicates", "Our audit shows", "Diagnostic scans highlight", "Algorithmic assessment reveals",
       "System performance audit reveals:", "Cluster Health Telemetry:", "According to real-time sensors", "The consensus layer reports"
     ],
     bridges: [
-      // Simple
       "which essentially means", "indicating that", "meaning", "showing that",
       "translating to", "suggesting", "pointing to the fact that", "implying",
-      // Technical
       "signifying a state where", "effectively translating to", "which points toward", "suggesting a trend where",
       "correlating with", "substantiating that", "validating the hypothesis that", "statistically inferring"
     ],
@@ -78,9 +79,8 @@ const MATRIX = {
     critical: ["extreme", "critical", "severe", "acute", "heavy", "urgent", "drastic", "radical", "paramount"]
   },
   
-  // --- NEW: TEMPORAL MATRIX (Historical Context) ---
+  // --- TEMPORAL MATRIX ---
   temporal: {
-     // Trend: Improvement / Upward
      positive: {
          simple: [
              "climbing steadily from", "rising well above", "beating the record of", "jumping up from",
@@ -95,7 +95,6 @@ const MATRIX = {
              "trajectory elevating from", "momentum shifting above", "metrics exceeding the", "quantifiably higher than"
          ]
      },
-     // Trend: Decline / Downward
      negative: {
          simple: [
              "dropping below", "falling from", "slipping under", "losing ground to",
@@ -110,7 +109,6 @@ const MATRIX = {
              "yielding less than", "metrics suppressed below", "trailing the historical", "downtrending from"
          ]
      },
-     // Trend: Flat / Stable
      neutral: {
          simple: [
              "holding steady at", "stuck around", "hovering near", "matching the",
@@ -132,7 +130,7 @@ const MATRIX = {
      ]
   },
 
-  // BRAIN 1: THE PERFORMANCE EXECUTIVE
+  // BRAIN 1: EXECUTIVE
   executive: { 
     verbs_up: [
       "outperforming", "surpassing", "exceeding", "lifting", "stabilizing",
@@ -175,7 +173,7 @@ const MATRIX = {
       ]
     }
   },
-  // BRAIN 2: THE RISK ANALYST
+  // BRAIN 2: ANALYST
   analyst: { 
     structures: {
       oligarchy: [
@@ -266,7 +264,7 @@ const MATRIX = {
       ]
     }
   },
-  // BRAIN 3: THE GEOPOLITICAL STRATEGIST
+  // BRAIN 3: STRATEGIST
   strategist: { 
     geo_verbs: ["clustered", "concentrated", "distributed", "spread", "anchored", "grouped", "dispersed"],
     spreads: {
@@ -318,11 +316,12 @@ const PERSONALITIES: Record<string, any> = {
 
 const roll = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
 
-// Updated Weave with optional Temporal Injection
+// --- FIXED WEAVE LOGIC (66% CHANCE, NO LIMITS) ---
 const weave = (tech: string, simple: string, historyPhrase?: string) => {
   const pattern = Math.random();
-  // 30% Chance to inject history if available
-  if (historyPhrase && Math.random() > 0.7) {
+  
+  // LOGIC FIX: 66% Chance (>0.34) to show history if it exists.
+  if (historyPhrase && Math.random() > 0.34) {
       return `${tech}, ${historyPhrase}. ${roll(MATRIX.generic.bridges)} ${simple}.`;
   }
   
@@ -339,25 +338,23 @@ const getIntensity = (delta: number): AnalysisStats['intensity'] => {
   return 'neutral';
 };
 
-// --- NEW: Temporal Phrase Generator (FIXED LOGIC) ---
+// --- UNLOCKED TEMPORAL GENERATOR (No Thresholds) ---
 const getTemporalPhrasing = (current: number, past: number | undefined, metricType: 'storage' | 'percent' | 'number') => {
-    if (past === undefined || past === 0) return undefined;
+    // Only check if past data exists. No mathematical gates.
+    if (past === undefined) return undefined;
     
     const delta = current - past;
-    const percentChange = (delta / past) * 100;
-
-    // Use percentage change for flatness check to handle large numbers (storage/credits) accurately
-    const isFlat = Math.abs(percentChange) < 0.5; // Less than 0.5% change is "flat"
     const isUp = delta > 0;
     
-    let bucket = isFlat ? MATRIX.temporal.neutral : (isUp ? MATRIX.temporal.positive : MATRIX.temporal.negative);
+    // Only strictly 0 is neutral. Any shift is a shift.
+    const isNeutral = delta === 0;
     
-    // Roll tone: Simple vs Tech
+    let bucket = isNeutral ? MATRIX.temporal.neutral : (isUp ? MATRIX.temporal.positive : MATRIX.temporal.negative);
+    
     const tone = Math.random() > 0.5 ? 'simple' : 'tech';
     const phrase = roll(bucket[tone]);
     const timeframe = roll(MATRIX.temporal.timeframes);
     
-    // Format Value using proper formatters
     let valStr = '';
     if (metricType === 'storage') valStr = formatBytes(past);
     else if (metricType === 'percent') valStr = `${past.toFixed(1)}%`;
@@ -368,22 +365,18 @@ const getTemporalPhrasing = (current: number, past: number | undefined, metricTy
 
 // --- 3. THE ANALYTICS ENGINE ---
 
-// Helper: Dynamic Distribution Calculation for any metric
 const getMetricDistribution = (nodes: Node[], metricKey: string) => {
   const values = nodes.map(n => (n as any)[metricKey] || 0).sort((a, b) => a - b);
-  const sum = values.reduce((a, b) => a + b, 0) || 1; // avoid divide by zero
+  const sum = values.reduce((a, b) => a + b, 0) || 1;
   const count = values.length;
 
-  // Top 3 Share
   const top3Sum = values.slice(-3).reduce((a, b) => a + b, 0);
   const top3Share = (top3Sum / sum) * 100;
 
-  // Gini
   let giniNumerator = 0;
   values.forEach((val, i) => { giniNumerator += (i + 1) * val; });
   const gini = (2 * giniNumerator) / (count * sum) - (count + 1) / count;
 
-  // Concentration Thresholds (Slightly looser for non-storage metrics)
   const isConcentrated = top3Share > 40 || gini > 0.55;
 
   return { sum, top3Sum, top3Share, gini, isConcentrated, count };
@@ -393,7 +386,6 @@ const analyze = (nodes: Node[], benchmark: any, history?: NarrativeContext['hist
   if (nodes.length === 0) return null;
   const count = nodes.length;
 
-  // Basic Sums
   const totalStorage = nodes.reduce((a, b) => a + (b.storage_committed || 0), 0);
   const totalCredits = nodes.reduce((a, b) => a + (b.credits || 0), 0);
   const avgHealth = nodes.reduce((a, b) => a + (b.health || 0), 0) / count;
@@ -402,7 +394,6 @@ const analyze = (nodes: Node[], benchmark: any, history?: NarrativeContext['hist
   const netAvg = benchmark?.networkRaw?.health || 75; 
   const delta = avgHealth - netAvg;
 
-  // Median Calculation
   const healths = nodes.map(n => n.health || 0).sort((a, b) => a - b);
   const storages = nodes.map(n => n.storage_committed || 0).sort((a, b) => a - b);
   const mid = Math.floor(count / 2);
@@ -410,20 +401,16 @@ const analyze = (nodes: Node[], benchmark: any, history?: NarrativeContext['hist
   const medianHealth = count % 2 !== 0 ? healths[mid] : (healths[mid - 1] + healths[mid]) / 2;
   const medianStorage = count % 2 !== 0 ? storages[mid] : (storages[mid - 1] + storages[mid]) / 2;
 
-  // Variance & Deviation
   const variance = nodes.reduce((a, b) => a + Math.pow((b.health || 0) - avgHealth, 2), 0) / count;
   const stdDev = Math.sqrt(variance);
 
-  // Gini Calculation (Storage Default)
   let giniNumerator = 0;
   storages.forEach((val, i) => { giniNumerator += (i + 1) * val; });
   const gini = (2 * giniNumerator) / (count * totalStorage) - (count + 1) / count;
 
-  // Whale Calculation (Storage Default)
   const top3Volume = storages.slice(-3).reduce((a, b) => a + b, 0);
   const top3Share = (top3Volume / totalStorage) * 100;
 
-  // Topology Logic
   const countryCounts: Record<string, number> = {};
   nodes.forEach(n => {
     const c = n.location?.countryName || "Unknown";
@@ -437,13 +424,24 @@ const analyze = (nodes: Node[], benchmark: any, history?: NarrativeContext['hist
   if (delta > 5) tier = 'positive';
   if (delta < -5) tier = 'negative';
 
+  let historyDelta = undefined;
+  if (history) {
+      historyDelta = {
+          health: avgHealth - (history.avgHealth || avgHealth),
+          storage: totalStorage - (history.totalStorage || totalStorage),
+          credits: totalCredits - (history.totalCredits || totalCredits),
+          uptime: avgUptime - (history.avgUptime || avgUptime)
+      };
+  }
+
   return { 
     count, totalStorage, avgHealth, netAvg, delta, tier,
     intensity: getIntensity(delta), 
     stdDev, 
     gini, countries, medianHealth, medianStorage, top3Share, top3Volume, 
     isCentralized: top3Share > 50 || gini > 0.6,
-    countryCounts, dominantRegion, dominanceScore
+    countryCounts, dominantRegion, dominanceScore,
+    historyDelta 
   };
 };
 
@@ -461,14 +459,11 @@ const findRootCause = (node: Node, groupAvg: number) => {
 /** SCENARIO 1: OVERVIEW - DEFAULT */
 const buildOverviewDefault = (stats: AnalysisStats, history?: NarrativeContext['historySnapshot']) => {
   const h1 = `${roll(MATRIX.generic.openers)} the cluster health is at ${stats.avgHealth.toFixed(1)}%.`;
-
-  // HISTORY INJECTION POINT 1
   const historyPhrase = getTemporalPhrasing(stats.avgHealth, history?.avgHealth, 'percent');
 
   const tech = `${stats.delta > 0 ? roll(MATRIX.executive.verbs_up) : roll(MATRIX.executive.verbs_down)} the network benchmark by ${Math.abs(stats.delta).toFixed(1)} points`;
   const simple = `this means the group is ${stats.delta > 0 ? 'performing better' : 'struggling compared'} to the world average`;
   
-  // Pass history phrase to weave
   const h2 = weave(tech, simple, historyPhrase);
 
   const h3 = stats.stdDev > 15 
@@ -546,7 +541,6 @@ const buildMarketStorage = (stats: AnalysisStats, history?: NarrativeContext['hi
     ? roll(MATRIX.analyst.structures.oligarchy)
     : roll(MATRIX.analyst.structures.democracy);
 
-  // HISTORY INJECTION POINT 2
   const historyPhrase = getTemporalPhrasing(stats.totalStorage, history?.totalStorage, 'storage');
 
   const tech = `The top 3 stakeholders aggregate ${stats.top3Share.toFixed(1)}% of total grid volume`;
@@ -563,9 +557,8 @@ const buildMarketStorage = (stats: AnalysisStats, history?: NarrativeContext['hi
   return `${h1} ${h2} ${h3} ${h4}`;
 };
 
-/** SCENARIO 4B: MARKET - DYNAMIC METRICS (Credits, Health, Uptime) */
+/** SCENARIO 4B: MARKET - DYNAMIC METRICS */
 const buildMarketMetric = (nodes: Node[], metric: string, history?: NarrativeContext['historySnapshot']) => {
-  // Map metric name to node key and matrix key
   let nodeKey = metric;
   let matrixKey: 'credits' | 'health' | 'uptime' = 'credits'; 
 
@@ -578,7 +571,6 @@ const buildMarketMetric = (nodes: Node[], metric: string, history?: NarrativeCon
 
   const h1 = dist.isConcentrated ? roll(vocab.centralized) : roll(vocab.decentralized);
 
-  // HISTORY INJECTION POINT 3
   let histVal = undefined;
   let histType: 'percent' | 'number' = 'number';
   if (metric === 'credits') { histVal = history?.totalCredits; histType = 'number'; }
@@ -604,19 +596,14 @@ const buildMarketMetric = (nodes: Node[], metric: string, history?: NarrativeCon
 const buildMarketNode = (stats: AnalysisStats, node: Node, metric: string) => {
   const m = metric === 'storage' ? 'storage_committed' : metric;
   const val = (node as any)[m] || 0;
-  // Dynamic total calculation for accurate share
   const total = metric === 'storage' 
     ? stats.totalStorage 
-    : (stats.count * (metric === 'health' || metric === 'uptime' ? 100 : 100)); // approx base for % metrics
+    : (stats.count * (metric === 'health' || metric === 'uptime' ? 100 : 100));
 
-  // Use simple comparison for % based metrics if total is abstract
   const isPercentMetric = metric === 'health' || metric === 'uptime';
   const share = isPercentMetric ? val : (val / (total || 1)) * 100;
 
   const h1 = `Shareholder Report: Node holds ${val.toFixed(0)}${isPercentMetric ? ' pts' : ''} in ${metric}.`;
-
-  const medianVal = stats.medianStorage || 1; 
-  // Note: For non-storage, median calc is complex in this scope, simplifying to relative checks
 
   const tech = isPercentMetric 
     ? `This node is operating at ${val}% efficiency relative to theoretical max`
