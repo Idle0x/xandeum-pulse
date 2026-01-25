@@ -9,6 +9,15 @@ import { TIER_COLORS, TIER_LABELS, MODE_COLORS } from '../../utils/mapConstants'
 import { formatStorage, getDeepLink, getPerformerStats, getXRayStats } from '../../utils/mapHelpers';
 import { ViewModeToggle } from './ViewModeToggle';
 
+// Helper to get correct icon and color for headers
+const getHeaderVisuals = (mode: ViewMode) => {
+    switch (mode) {
+        case 'STORAGE': return { icon: Database, color: 'text-purple-500' };
+        case 'CREDITS': return { icon: Zap, color: 'text-orange-500' };
+        case 'HEALTH': return { icon: Activity, color: 'text-green-500' };
+    }
+};
+
 interface LocationDrawerProps {
   isSplitView: boolean;
   setIsSplitView: (val: boolean) => void;
@@ -50,6 +59,8 @@ export const LocationDrawer: React.FC<LocationDrawerProps> = ({
     }
   };
 
+  const { icon: ModeIcon, color: modeColorClass } = getHeaderVisuals(viewMode);
+
   return (
       <div className={`shrink-0 bg-[#09090b] relative z-50 flex flex-col ${isSplitView ? 'h-[50vh]' : 'h-auto'}`}>
             <div className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 gap-4 ${isSplitView ? 'hidden' : 'flex'}`}>
@@ -66,7 +77,14 @@ export const LocationDrawer: React.FC<LocationDrawerProps> = ({
 
             <div className={`flex flex-col h-full overflow-hidden ${isSplitView ? 'flex' : 'hidden'}`}>
                  <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-3 border-b border-zinc-800/30 bg-[#09090b]">
-                    <div className="flex items-center gap-3"><h2 className="text-sm font-bold text-white flex items-center gap-2"><Activity size={14} className="text-green-500" /> Live Data</h2><div className="hidden md:block scale-90 origin-left"><ViewModeToggle viewMode={viewMode} setViewMode={setViewMode} /></div></div>
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                            {/* Updated Dynamic Icon and Color */}
+                            <ModeIcon size={14} className={modeColorClass} /> 
+                            Live Data
+                        </h2>
+                        <div className="hidden md:block scale-90 origin-left"><ViewModeToggle viewMode={viewMode} setViewMode={setViewMode} /></div>
+                    </div>
                     <div className="flex items-center gap-2">
                         <div className="md:hidden scale-75 origin-right"><ViewModeToggle viewMode={viewMode} setViewMode={setViewMode} /></div>
                         <button onClick={handleCloseDrawer} className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg"><X size={20} /></button>
@@ -118,6 +136,7 @@ export const LocationDrawer: React.FC<LocationDrawerProps> = ({
                                             const CardContent = (
                                                 <div className={`w-full border border-zinc-700/50 rounded-xl p-3 flex items-center justify-between transition-all group/card ${getCardStyle()} ${isGlobalCreditsOffline ? '' : 'bg-zinc-800/50'}`}>
                                                     <div className="flex items-center gap-3">
+                                                        {/* Ensure Icon Background also matches mode if MODE_COLORS uses our conventions, otherwise we can enforce it here too */}
                                                         <div className={`p-2 rounded-lg ${MODE_COLORS[viewMode].bg} text-white`}>
                                                             {viewMode === 'STORAGE' ? <Database size={14} /> : viewMode === 'CREDITS' ? <Zap size={14} /> : <Activity size={14} />}
                                                         </div>
