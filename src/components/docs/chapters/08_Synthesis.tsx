@@ -17,10 +17,13 @@ const syncSynthesis = (hoveredNodeId) => {
 
 // Narrative Weave Logic
 const weave = (tech, simple, history) => {
+  // Blends technical deltas with human-readable simple English
   const bridge = roll(MATRIX.generic.bridges);
-  return history 
-    ? \`\${tech}, \${history}. \${bridge} \${simple}.\` 
+  const narrative = history 
+    ? \`\${tech}, showing \${history}. \${bridge} \${simple}.\` 
     : \`\${tech}. \${bridge} \${simple}.\`;
+    
+  return narrative; // Returns non-robotic, organic sentences
 };
 `;
 
@@ -56,7 +59,7 @@ export function SynthesisChapter() {
                     </div>
 
                     {/* 2. Feature Callouts */}
-                    <div className="lg:col-span-5 space-y-6">
+                    <div className="lg:col-span-5 space-y-6 text-left">
                         <div className="p-6 bg-zinc-900/30 border border-zinc-800 rounded-2xl group hover:border-pink-500/30 transition-colors">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="p-2 bg-pink-500/10 rounded-lg text-pink-500"><Cpu size={18} /></div>
@@ -103,7 +106,6 @@ function Narrative_Builder_Simulator() {
         <div className="bg-[#09090b] border border-zinc-800 rounded-[2.5rem] overflow-hidden shadow-2xl relative">
             <div className="absolute top-4 right-6 text-[8px] font-mono text-zinc-600 uppercase tracking-[0.3em] font-bold">Synthesis Engine Active</div>
 
-            {/* Header Controls */}
             <div className="p-6 border-b border-zinc-800 bg-zinc-900/30 flex flex-col md:flex-row gap-4 justify-between items-center">
                 <div className="flex bg-black p-1 rounded-xl border border-zinc-800">
                     <button onClick={() => setPerformance('HIGH')} className={`px-5 py-2 rounded-lg text-[10px] font-black tracking-widest transition-all \${performance === 'HIGH' ? 'bg-green-500 text-black shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}>LEADER</button>
@@ -115,7 +117,6 @@ function Narrative_Builder_Simulator() {
                 </div>
             </div>
 
-            {/* AI Console Area */}
             <div className="p-10 bg-black min-h-[260px] relative text-left">
                 <div className="flex gap-6 items-start">
                     <div className={`p-4 rounded-2xl flex items-center justify-center shrink-0 shadow-2xl transition-all duration-500 \${tone === 'TECH' ? 'bg-pink-500 text-black shadow-pink-500/20' : 'bg-blue-500 text-black shadow-blue-500/20'}`}>
@@ -133,7 +134,6 @@ function Narrative_Builder_Simulator() {
                     </div>
                 </div>
 
-                {/* Simulator Visual Cues */}
                 <div className="mt-12 flex flex-wrap items-center gap-6 border-t border-zinc-900 pt-8">
                     <div className="flex items-center gap-2 text-[9px] font-bold text-zinc-600 uppercase tracking-widest">
                         <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div> TABLE SYNC
