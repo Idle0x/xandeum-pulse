@@ -67,10 +67,8 @@ interface SynthesisEngineProps {
   hoveredNodeKey?: string | null;
   onHover?: (key: string | null) => void;
   isExport?: boolean;
-  focusedNodeKey?: string | null; // From parent (Table selection)
-  
-  // NEW PROP: For broadcasting chart clicks back to parent to trigger scroll
-  onNodeSelect?: (key: string | null) => void;
+  focusedNodeKey?: string | null; 
+  onNodeSelect?: (key: string | null) => void; // Wired Prop
 }
 
 export const SynthesisEngine = ({ 
@@ -99,7 +97,7 @@ export const SynthesisEngine = ({
       return nodes.find(n => n.pubkey === focusedNodeKey);
   }, [nodes, focusedNodeKey]);
 
-  // FETCH HISTORY FOR CONTEXT (Using '30D' for reliability)
+  // FETCH HISTORY FOR CONTEXT
   const { reliabilityScore, loading: historyLoading } = useNodeHistory(focusedNode || undefined, '30D');
 
   const activeHoverKey = externalHoverKey !== undefined ? externalHoverKey : internalHoverKey;
@@ -110,8 +108,9 @@ export const SynthesisEngine = ({
   };
 
   const handleSelection = (key: string | null, location?: {lat: number, lon: number}) => {
-      setLocalFocusedNodeKey(prev => prev === key ? null : key);
-      
+      // Logic: Update local state for map focus, but always broadcast the select event
+      setLocalFocusedNodeKey(key);
+
       if (location) {
           setPos({ coordinates: [location.lon, location.lat], zoom: 4 });
       }
@@ -199,7 +198,7 @@ export const SynthesisEngine = ({
 
   const isDense = nodes.length > 10;
   const overviewBarWidth = isDense ? 'flex-1 mx-[1px]' : 'w-2 md:w-3 mx-0.5'; 
-  
+
   const getElementStyle = (nodeKey: string | null, sectionType?: string) => {
       if (focusedSection && sectionType && sectionType !== focusedSection) return 'opacity-30 grayscale-[0.5] transition-all duration-500';
 
@@ -280,8 +279,15 @@ export const SynthesisEngine = ({
                         </div>
                     ))}
                 </div>
+                
                 {/* Unified Legend with Click Handler */}
-                <OverviewLegend nodes={nodes} themes={themes} hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => handleSelection(n.pubkey || null)} />
+                <OverviewLegend 
+                    nodes={nodes} 
+                    themes={themes} 
+                    hoveredKey={activeHoverKey} 
+                    onHover={handleHover} 
+                    onNodeClick={(n) => handleSelection(n.pubkey || null)} 
+                />
 
                 {focusedNodeKey && !historyLoading && (
                    <div className="mt-2 mx-4 md:mx-6 p-3 rounded-lg border border-yellow-500/10 bg-yellow-500/5 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
@@ -345,7 +351,7 @@ export const SynthesisEngine = ({
                                     /* --- NEW PRECISION TRACK HEALTH LAYOUT --- */
                                     <div className="w-full max-w-sm flex flex-col gap-2 animate-in slide-in-from-bottom-10 duration-500 overflow-y-auto max-h-[300px] custom-scrollbar pr-2 pt-2">
                                         {nodes.map((n, i) => {
-                                            const healthVal = n.health || 0; // Fix: Default to 0
+                                            const healthVal = n.health || 0; 
                                             return (
                                                 <div 
                                                     key={n.pubkey} 
@@ -364,7 +370,7 @@ export const SynthesisEngine = ({
                                                             {healthVal}%
                                                         </span>
                                                     </div>
-                                                    
+
                                                     {/* ROW 2: PRECISION TRACK BAR (Ultra-Thin 2px) */}
                                                     <div className="w-full h-[2px] bg-zinc-800 rounded-full overflow-hidden">
                                                         <div 
@@ -396,7 +402,15 @@ export const SynthesisEngine = ({
                         </div>
                     </div>
 
-                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="METRIC" specificMetric={marketMetric} hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => handleSelection(n.pubkey || null)} />
+                    <UnifiedLegend 
+                        nodes={nodes} 
+                        themes={themes} 
+                        metricMode="METRIC" 
+                        specificMetric={marketMetric} 
+                        hoveredKey={activeHoverKey} 
+                        onHover={handleHover} 
+                        onNodeClick={(n) => handleSelection(n.pubkey || null)} 
+                    />
                     {!isExport && <InterpretationPanel contextText={narrative} />}
                 </>
             )}
@@ -448,7 +462,14 @@ export const SynthesisEngine = ({
                         </ComposableMap>
                     </div>
                     {/* Unified Legend with Click Handler */}
-                    <UnifiedLegend nodes={nodes} themes={themes} metricMode="COUNTRY" hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => handleSelection(n.pubkey || null, n.location ? { lat: n.location.lat, lon: n.location.lon } : undefined)} />
+                    <UnifiedLegend 
+                        nodes={nodes} 
+                        themes={themes} 
+                        metricMode="COUNTRY" 
+                        hoveredKey={activeHoverKey} 
+                        onHover={handleHover} 
+                        onNodeClick={(n) => handleSelection(n.pubkey || null, n.location ? { lat: n.location.lat, lon: n.location.lon } : undefined)} 
+                    />
                     {!isExport && <InterpretationPanel contextText={narrative} />}
                 </div>
             )}
