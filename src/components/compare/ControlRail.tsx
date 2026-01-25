@@ -14,17 +14,20 @@ export const ControlRail = ({ showNetwork, benchmarks }: ControlRailProps) => {
     <div className="h-[36px] md:h-[72px] flex flex-col justify-center px-4 relative group">
       <div className="flex items-center gap-2 text-zinc-500 group-hover:text-zinc-300 transition-colors">
         {Icon && <Icon size={10} className="md:w-3.5 md:h-3.5" />}
-        <span className="text-[9px] md:text-xs font-bold uppercase tracking-widest">{label}</span>
+        <span className="text-[9px] md:text-xs font-bold uppercase tracking-widest whitespace-nowrap">{label}</span>
       </div>
       
-      {/* FIXED: 
-          1. Removed 'hidden md:block' so it shows on mobile 
-          2. Added 'showNetwork' check to only show if mode is active
-          3. Bumped text brightness slightly for legibility
+      {/* UPDATED PILL DESIGN:
+          - Color: Cyan (Neutral Data / System Metric)
+          - Font: Larger (md:text-sm) for readability
+          - Background: Subtle Cyan Tint
       */}
       {showNetwork && value && (
-        <div className="text-[8px] text-zinc-500 font-mono pl-5 md:pl-6 mt-0.5 animate-in fade-in slide-in-from-left-1 truncate">
-           <span className="opacity-50 mr-1">AVG</span>{value}
+        <div className="flex items-center mt-1 md:mt-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
+           <div className="flex items-center gap-2 px-2 py-0.5 md:py-1 rounded bg-cyan-500/10 border border-cyan-500/20 shadow-[0_0_10px_rgba(34,211,238,0.1)]">
+              <span className="text-[6px] md:text-[10px] font-black text-cyan-700 uppercase tracking-wider">AVG</span>
+              <span className="text-[9px] md:text-sm font-mono font-bold text-cyan-400">{value}</span>
+           </div>
         </div>
       )}
     </div>
@@ -54,6 +57,7 @@ export const ControlRail = ({ showNetwork, benchmarks }: ControlRailProps) => {
         <RowLabel icon={Globe} label="Network" />
 
         <SectionSpacer label="Vitality" />
+        {/* Explicitly passing values to ensure they render */}
         <RowLabel icon={Activity} label="Health Score" value={benchmarks.network?.health} />
         <RowLabel icon={Clock} label="Uptime" value={benchmarks.network?.uptime} />
         
