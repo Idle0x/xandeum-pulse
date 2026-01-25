@@ -1,95 +1,132 @@
 import { 
-    Activity, Eye, Search, Camera, Hash, Layers, Zap, WifiOff, Swords 
+    Activity, Eye, Search, Camera, Hash, Layers, Zap, WifiOff, Swords, 
+    Globe, Clock, MessageSquare 
 } from 'lucide-react';
 import { useState } from 'react';
 
 export function ManualChapter() {
     return (
         <div className="max-w-7xl mx-auto px-6 py-12">
-            <div className="text-center mb-16 animate-in fade-in slide-in-from-bottom-4">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 text-green-400 text-[10px] font-bold uppercase tracking-widest mb-4">
-                    <Activity size={12}/> Active Protocols
-                </div>
-                <h2 className="text-4xl font-bold text-white mb-4">Field Manual</h2>
-                <p className="text-zinc-500 max-w-xl mx-auto text-sm">
-                    Pulse is an active intelligence tool. Master these 9 protocols to achieve full network visibility.
+            {/* Context Header */}
+            <div className="text-center mb-24 animate-in fade-in slide-in-from-bottom-4">
+                <h2 className="text-3xl font-bold text-white mb-6">Field Manual</h2>
+                <p className="text-zinc-400 max-w-2xl mx-auto text-base leading-relaxed">
+                    The dashboard is powered by 12 active protocols. These are the core features you need to master to achieve full network visibility. 
+                    Hover over any card to activate its micro-simulation.
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in zoom-in-95 duration-700 stagger-100">
+            {/* The Materializing Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <ManualCard 
                     icon={Activity} title="Cyclic Rotation" color="blue" tag="UX/UI" 
-                    desc="Node Cards automatically cycle metrics every 5 seconds. Storage → Health → Uptime." 
+                    desc="To save screen space, Node Cards automatically cycle their tertiary metric every 5 seconds: Storage → Capacity → Health." 
+                    delay={0}
                 />
                 <ManualCard 
                     icon={Eye} title="Zen Mode" color="zinc" tag="OLED" 
-                    desc="Minimizes burn-in for 24/7 monitors by stripping all gradients and animations." 
+                    desc="Visual noise kills focus. Zen Mode strips away all gradients and blurs, rendering the UI in pure #000000 black to save OLED pixels." 
+                    delay={100}
                 />
                 <ManualCard 
-                    icon={Search} title="Diagnostics" color="red" tag="MODAL" 
-                    desc="Deep-dive into specific node health, storage distribution, and version consensus." 
+                    icon={Search} title="Node Inspector" color="red" tag="DIAGNOSTICS" 
+                    desc="Clicking any node opens the Inspector. This is the source of truth for raw Uptime, Storage usage, and Version consensus." 
+                    delay={200}
                 />
                 <ManualCard 
                     icon={Camera} title="Proof of Pulse" color="green" tag="SOCIAL" 
-                    desc="Generates cryptographic PNG snapshots for social verification." 
+                    desc="Generates a verifiable, cryptographic snapshot of a node's health status into a shareable high-res PNG." 
+                    delay={300}
                 />
                 <ManualCard 
                     icon={Hash} title="Stable ID v2" color="indigo" tag="BACKEND" 
-                    desc="Strips volatile version data to ensure history persists across upgrades." 
+                    desc="The system strips volatile data (like Version tags) from the ID, ensuring your node's history isn't lost when you upgrade software." 
+                    delay={400}
                 />
                 <ManualCard 
                     icon={Layers} title="Ghost Canvas" color="purple" tag="EXPORT" 
-                    desc="Off-screen rendering engine that captures pixel-perfect reports without scrollbars." 
+                    desc="An invisible engine that renders reports off-screen at 5000px width, allowing you to export massive data tables without scrollbars." 
+                    delay={500}
                 />
                 <ManualCard 
-                    icon={Zap} title="STOINC Sim" color="yellow" tag="MATH" 
-                    desc="Hardware-based rewards forecasting using geometric stacking multipliers." 
+                    icon={Zap} title="STOINC Sim" color="yellow" tag="ECONOMICS" 
+                    desc="Forecasts earnings based on hardware using Geometric Stacking—multipliers compound (multiply) rather than add." 
+                    delay={0}
                 />
                 <ManualCard 
                     icon={WifiOff} title="Crash Protocols" color="red" tag="RESILIENCE" 
-                    desc="Gracefully degrades to cached data if upstream APIs fail." 
+                    desc="Optimistic UI Architecture. If the upstream API fails, Pulse switches to cached metrics without breaking the rendering tree." 
+                    delay={100}
                 />
                 <ManualCard 
                     icon={Swords} title="Comparative Intel" color="pink" tag="ANALYTICS" 
-                    desc="Head-to-head node analysis with synthetic narrative generation." 
+                    desc="Head-to-head analysis engine. Compare your node against the Network Average or specific 'Leader' nodes." 
+                    delay={200}
+                />
+                <ManualCard 
+                    icon={Globe} title="King Node Logic" color="cyan" tag="SPATIAL" 
+                    desc="In crowded cities, the map selects a single 'King Node' to represent the cluster based on the highest score." 
+                    delay={300}
+                />
+                <ManualCard 
+                    icon={Clock} title="Time Machine" color="orange" tag="TEMPORAL" 
+                    desc="The database snapshots the network every 30 minutes. You can 'travel back' to see performance from days or weeks ago." 
+                    delay={400}
+                />
+                <ManualCard 
+                    icon={MessageSquare} title="Synthesis Engine" color="pink" tag="AI" 
+                    desc="A logic-driven narrative builder that writes human-readable reports explaining *why* a node is succeeding or failing." 
+                    delay={500}
                 />
             </div>
         </div>
     )
 }
 
-function ManualCard({ icon: Icon, title, desc, color, tag }: any) {
+function ManualCard({ icon: Icon, title, desc, color, tag, delay }: any) {
     const [isActive, setIsActive] = useState(false);
     
-    // Quick color mapping
-    const cMap: any = {
-        blue: "text-blue-400 bg-blue-500/10 border-blue-500/20 hover:border-blue-500/50 hover:shadow-[0_0_30px_rgba(59,130,246,0.1)]",
-        green: "text-green-400 bg-green-500/10 border-green-500/20 hover:border-green-500/50 hover:shadow-[0_0_30px_rgba(34,197,94,0.1)]",
-        red: "text-red-400 bg-red-500/10 border-red-500/20 hover:border-red-500/50 hover:shadow-[0_0_30px_rgba(239,68,68,0.1)]",
-        purple: "text-purple-400 bg-purple-500/10 border-purple-500/20 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(168,85,247,0.1)]",
-        yellow: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20 hover:border-yellow-500/50 hover:shadow-[0_0_30px_rgba(234,179,8,0.1)]",
-        indigo: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20 hover:border-indigo-500/50 hover:shadow-[0_0_30px_rgba(99,102,241,0.1)]",
-        pink: "text-pink-400 bg-pink-500/10 border-pink-500/20 hover:border-pink-500/50 hover:shadow-[0_0_30px_rgba(236,72,153,0.1)]",
-        zinc: "text-zinc-400 bg-zinc-500/10 border-zinc-500/20 hover:border-zinc-500/50 hover:shadow-[0_0_30px_rgba(113,113,122,0.1)]"
+    // Color Theme Mapping
+    const themes: any = {
+        blue: "text-blue-400 border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500/50",
+        green: "text-green-400 border-green-500/20 bg-green-500/5 hover:bg-green-500/10 hover:border-green-500/50",
+        red: "text-red-400 border-red-500/20 bg-red-500/5 hover:bg-red-500/10 hover:border-red-500/50",
+        purple: "text-purple-400 border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 hover:border-purple-500/50",
+        yellow: "text-yellow-400 border-yellow-500/20 bg-yellow-500/5 hover:bg-yellow-500/10 hover:border-yellow-500/50",
+        indigo: "text-indigo-400 border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 hover:border-indigo-500/50",
+        pink: "text-pink-400 border-pink-500/20 bg-pink-500/5 hover:bg-pink-500/10 hover:border-pink-500/50",
+        cyan: "text-cyan-400 border-cyan-500/20 bg-cyan-500/5 hover:bg-cyan-500/10 hover:border-cyan-500/50",
+        orange: "text-orange-400 border-orange-500/20 bg-orange-500/5 hover:bg-orange-500/10 hover:border-orange-500/50",
+        zinc: "text-zinc-400 border-zinc-500/20 bg-zinc-500/5 hover:bg-zinc-500/10 hover:border-zinc-500/50"
     };
-    const style = cMap[color] || cMap['zinc'];
+    const activeTheme = themes[color] || themes['zinc'];
 
     return (
         <div 
+            className={`
+                group relative p-8 rounded-3xl border transition-all duration-500 cursor-pointer overflow-hidden
+                animate-in slide-in-from-bottom-8 fade-in fill-mode-backwards
+                ${activeTheme}
+                hover:-translate-y-1 hover:shadow-2xl
+            `}
+            style={{ animationDelay: `${delay}ms` }}
             onMouseEnter={() => setIsActive(true)}
             onMouseLeave={() => setIsActive(false)}
-            className={`p-6 md:p-8 rounded-3xl border transition-all duration-300 cursor-pointer backdrop-blur-sm ${style} ${isActive ? '-translate-y-2' : ''}`}
         >
-            <div className="flex gap-4 items-start">
-                <div className={`p-3 bg-black rounded-xl border border-white/10 shrink-0 transition-transform duration-500 ${isActive ? 'scale-110 rotate-3' : ''}`}>
+            <div className="flex gap-5 items-start relative z-10">
+                <div className={`p-4 rounded-2xl bg-black border border-white/5 shrink-0 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3`}>
                     <Icon size={24} className={isActive ? 'animate-pulse' : ''}/>
                 </div>
                 <div>
-                    <div className="flex items-center gap-2 mb-2">
-                        <h4 className="font-bold text-white">{title}</h4>
-                        <span className="px-1.5 py-0.5 rounded text-[9px] border border-white/10 bg-white/5 uppercase">{tag}</span>
+                    <div className="flex items-center gap-3 mb-3">
+                        <h4 className="font-bold text-white text-lg tracking-tight">{title}</h4>
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold border border-white/10 bg-white/5 uppercase tracking-wider text-zinc-400 group-hover:text-white transition-colors">
+                            {tag}
+                        </span>
                     </div>
-                    <p className="text-xs text-zinc-400 leading-relaxed">{desc}</p>
+                    <p className="text-xs text-zinc-400 leading-relaxed font-medium group-hover:text-zinc-300 transition-colors">
+                        {desc}
+                    </p>
                 </div>
             </div>
         </div>
