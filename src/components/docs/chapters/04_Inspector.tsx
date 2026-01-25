@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Activity, Database, Hash, Hand } from 'lucide-react';
+import { Activity, Database, Hash, Hand, Search } from 'lucide-react';
 
 export function InspectorChapter() {
     return (
