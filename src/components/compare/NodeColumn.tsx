@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { Crown, CheckCircle, Trash2, X } from 'lucide-react';
 import { Node } from '../../types';
 import { getSafeIp } from '../../utils/nodeHelpers';
@@ -20,7 +20,6 @@ interface NodeColumnProps {
   onFocus?: (key: string | null) => void;
   isLeader?: boolean;
   leaderType?: string;
-  shouldBounce?: boolean; // New Prop
 }
 
 export const NodeColumn = ({ 
@@ -35,21 +34,10 @@ export const NodeColumn = ({
     hoveredNodeKey,
     onFocus, 
     isLeader,
-    leaderType,
-    shouldBounce = false // Default to false
+    leaderType
 }: NodeColumnProps) => {
 
   const { history, loading } = useNodeHistory(node, '30D');
-  const [isBouncing, setIsBouncing] = useState(false);
-
-  // --- BOUNCE LOGIC ---
-  useEffect(() => {
-    if (shouldBounce) {
-      setIsBouncing(true);
-      const timer = setTimeout(() => setIsBouncing(false), 300); // 300ms jump duration
-      return () => clearTimeout(timer);
-    }
-  }, [shouldBounce]);
 
   const Row = ({ children }: { children: React.ReactNode }) => (
     <div className={`h-[36px] md:h-[72px] flex flex-col justify-center px-3 md:px-4 min-w-[100px] md:min-w-[140px] relative`}>
@@ -89,7 +77,6 @@ export const NodeColumn = ({
                     : `${theme.bodyBg}`
             }
             ${isLeader ? theme.border : 'border-white/5'}
-            ${/* BOUNCE CLASS */ isBouncing ? '-translate-y-2' : 'translate-y-0'}
         `}
     >
       {/* Header */}
