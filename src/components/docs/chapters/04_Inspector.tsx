@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Activity, Database, Hash, Hand, Search, Info } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Activity, Database, Hash, Hand, Search, Info, Wifi, WifiOff, CheckCircle2 } from 'lucide-react';
 
 export function InspectorChapter() {
     return (
@@ -13,44 +13,44 @@ export function InspectorChapter() {
                 
                 <div className="max-w-4xl mx-auto text-left space-y-6">
                     <p className="text-zinc-300 text-base leading-relaxed">
-                        The <strong>Inspector System</strong> is the platform's investigative core, transforming complex network telemetry into three distinct perspectives: <strong>Health</strong>, <strong>Storage</strong>, and <strong>Identity</strong>. The <strong>Health View</strong> uses a non-linear scoring engine to weigh uptime stability and reputation against the network average, providing a 0-100 "Vitality Score." The <strong>Storage View</strong> focuses on physical utility, visualizing the gap between committed capacity and actual data usage, while the <strong>Identity View</strong> unmasks the technical footprint of a node—mapping its RPC endpoints and fleet topology to ensure you are connected to the correct physical hardware.
+                        The <strong>Inspector System</strong> operates as the platform's investigative core. It fetches raw telemetry via the <code>useNetworkData</code> hook and translates it into three distinct perspectives: <strong>Health</strong>, <strong>Storage</strong>, and <strong>Identity</strong>. By utilizing non-linear algorithms, it filters out ephemeral network noise to provide a definitive "Ground Truth" for every node in the fleet.
                     </p>
                     <p className="text-zinc-300 text-base leading-relaxed">
-                        These views matter because they provide the "Ground Truth" for your operations. Data is pulled directly from the blockchain's gossip protocol and enriched with historical snapshots to create fluid visualizations like 30-day stability ribbons and growth curves. By handling data this way, the Inspector allows you to see through session-level noise. You aren't just looking at current numbers; you are seeing a verified record of performance that proves a node's long-term reliability and economic value to the Xandeum ecosystem.
+                        The simulation below replicates the actual <strong>Vitality Engine</strong> logic. It demonstrates how the system reacts when upstream APIs go offline, triggering a failover to optimistic caching. In this state, the engine re-prioritizes hardware commitment (Storage) over live reputation, ensuring that the dashboard remains functional even during total network desynchronization.
                     </p>
                 </div>
             </div>
             
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
                 {/* Visual Feature Breakdown */}
-                <div className="lg:col-span-5 space-y-4">
-                    <div className="p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 hover:border-green-500/30 transition-all group">
+                <div className="lg:col-span-4 space-y-4">
+                    <div className="p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 group hover:border-green-500/30 transition-all">
                         <div className="flex items-center gap-4 mb-3">
-                            <div className="p-2 bg-green-500/10 rounded-xl text-green-500 group-hover:scale-110 transition-transform"><Activity size={20}/></div>
-                            <h3 className="text-lg font-bold text-white">Health Analysis</h3>
+                            <div className="p-2 bg-green-500/10 rounded-xl text-green-500"><Activity size={20}/></div>
+                            <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Health</h3>
                         </div>
-                        <p className="text-xs text-zinc-400 leading-relaxed">Aggregates 4 pillars (Uptime, Storage, Version, Reputation) into a single score. It uses the <strong>Sigmoid Algorithm</strong> to ensure new nodes must earn trust over time.</p>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed">Combines uptime sigmoid curves with version consensus. If the node version is outdated, the vitality score is slashed by 15%.</p>
                     </div>
 
-                    <div className="p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 hover:border-purple-500/30 transition-all group">
+                    <div className="p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 group hover:border-purple-500/30 transition-all">
                         <div className="flex items-center gap-4 mb-3">
-                            <div className="p-2 bg-purple-500/10 rounded-xl text-purple-500 group-hover:scale-110 transition-transform"><Database size={20}/></div>
-                            <h3 className="text-lg font-bold text-white">Storage Metrics</h3>
+                            <div className="p-2 bg-purple-500/10 rounded-xl text-purple-500"><Database size={20}/></div>
+                            <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Storage</h3>
                         </div>
-                        <p className="text-xs text-zinc-400 leading-relaxed">Visualizes the "Load State" of a node. Shows exactly how much data is stored versus how much was promised, including utilization bonuses for active data hosting.</p>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed">The heaviest weight in the vitality formula. High commitment relative to the network average triggers a multiplier bonus.</p>
                     </div>
 
-                    <div className="p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 hover:border-indigo-500/30 transition-all group">
+                    <div className="p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 group hover:border-indigo-500/30 transition-all">
                         <div className="flex items-center gap-4 mb-3">
-                            <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-500 group-hover:scale-110 transition-transform"><Hash size={20}/></div>
-                            <h3 className="text-lg font-bold text-white">Identity Verification</h3>
+                            <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-500"><Hash size={20}/></div>
+                            <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Identity</h3>
                         </div>
-                        <p className="text-xs text-zinc-400 leading-relaxed">The source of truth for metadata. Displays Public Keys, IP history, and software versions to prevent spoofing and ensure consensus alignment across the fleet.</p>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed">Unique node fingerprinting. It ensures the 30-day history remains linked to the hardware, even if the IP or Version changes.</p>
                     </div>
                 </div>
                 
-                {/* The Simulation Widget */}
-                <div className="lg:col-span-7 h-full">
+                {/* The 4-Pillar Simulation Widget */}
+                <div className="lg:col-span-8 h-full">
                     <VitalitySimulator />
                 </div>
             </div>
@@ -59,56 +59,134 @@ export function InspectorChapter() {
 }
 
 function VitalitySimulator() {
-    const [uptimeDays, setUptimeDays] = useState(14);
-    
-    // Sigmoid logic: 100 / (1 + e^(-0.2 * (days - 7)))
-    const uScore = Math.min(100, Math.round(100 / (1 + Math.exp(-0.2 * (uptimeDays - 7)))));
-    const totalScore = Math.round((uScore * 0.45) + (80 * 0.35) + (100 * 0.20)); 
+    // 1. STATE MACHINE
+    const [isOnline, setIsOnline] = useState(true);
+    const [uptime, setUptime] = useState(14);
+    const [storage, setStorage] = useState(60); // 0-100 scale
+    const [credits, setCredits] = useState(45); // 0-100 scale
+    const [version, setVersion] = useState('v3.2.0');
+
+    // 2. VITALITY FORMULA RESTORATION
+    const totalScore = useMemo(() => {
+        // Sigmoid for Uptime
+        const uScore = Math.min(100, Math.round(100 / (1 + Math.exp(-0.2 * (uptime - 7)))));
+        
+        // Base weightings
+        let sWeight = storage * 0.40;
+        let cWeight = isOnline ? (credits * 0.30) : 0; // Reputation disabled if offline
+        let uWeight = uScore * 0.30;
+        
+        let raw = sWeight + cWeight + uWeight;
+
+        // Offline Penalty/Adjustment
+        if (!isOnline) {
+            raw = (sWeight * 1.5) + (uWeight * 1.0); // Boost hardware importance if API is dark
+        }
+
+        // Version Penalty
+        if (version !== 'v3.2.0') raw *= 0.85;
+
+        return Math.min(100, Math.round(raw));
+    }, [uptime, storage, credits, version, isOnline]);
 
     return (
-        <div className="bg-black border border-zinc-800 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden group h-full flex flex-col justify-center min-h-[450px]">
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-red-500 via-orange-500 to-green-500"></div>
-
-            <div className="text-center mb-12">
-                <div className={`text-8xl font-black transition-colors duration-500 tracking-tighter ${totalScore > 80 ? 'text-green-500' : totalScore > 50 ? 'text-yellow-500' : 'text-red-500'}`}>
-                    {totalScore}
+        <div className="bg-[#050505] border border-zinc-800 rounded-[2.5rem] p-8 md:p-12 shadow-2xl relative overflow-hidden h-full flex flex-col">
+            
+            {/* API STATUS TOGGLE */}
+            <div className="flex justify-between items-center mb-12">
+                <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+                        API STATUS: {isOnline ? 'ONLINE (UPLINK ACTIVE)' : 'OFFLINE (CACHE MODE)'}
+                    </span>
                 </div>
-                <div className="text-[10px] text-zinc-500 mt-4 font-mono uppercase tracking-[0.3em] font-bold">Mathematical Vitality Score</div>
+                <button 
+                    onClick={() => setIsOnline(!isOnline)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-bold border transition-all active:scale-95
+                    ${isOnline ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-red-400' : 'bg-red-500/10 border-red-500 text-red-500'}`}
+                >
+                    {isOnline ? <Wifi size={14}/> : <WifiOff size={14}/>}
+                    {isOnline ? 'FORCE FAILOVER' : 'RECONNECT API'}
+                </button>
             </div>
 
-            <div className="space-y-8 max-w-sm mx-auto w-full">
-                <div>
-                    <div className="flex justify-between text-xs mb-4 font-bold uppercase tracking-wider">
-                        <span className="text-blue-400 flex items-center gap-2">
-                            Uptime Duration ({uptimeDays} Days)
-                            <div className="px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-[9px] text-blue-400 animate-pulse">LIVE SIM</div>
-                        </span>
-                        <span className="text-white font-mono">{uScore} pts</span>
-                    </div>
-                    <div className="relative group/slider">
-                        <input 
-                            type="range" min="0" max="30" 
-                            value={uptimeDays} onChange={(e) => setUptimeDays(Number(e.target.value))} 
-                            className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500 relative z-10"
-                        />
-                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover/slider:opacity-100 transition-opacity pointer-events-none bg-blue-600 text-white text-[9px] font-bold px-2 py-1 rounded">
-                            DRAG TO KILL UPTIME
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                {/* PILLAR CONTROLS */}
+                <div className="space-y-6">
+                    <SimulatorSlider label="Uptime Stability" val={uptime} setVal={setUptime} unit="Days" color="text-blue-400" accent="accent-blue-500" />
+                    <SimulatorSlider label="Storage Commitment" val={storage} setVal={setStorage} unit="%" color="text-purple-400" accent="accent-purple-500" />
+                    <SimulatorSlider label="Network Credits" val={credits} setVal={setCredits} unit="Cr" color="text-yellow-500" accent="accent-yellow-500" disabled={!isOnline} />
+                    
+                    <div>
+                        <div className="text-[9px] font-black text-zinc-600 uppercase mb-3 tracking-widest">Protocol Version</div>
+                        <div className="grid grid-cols-3 gap-2">
+                            {['v3.0.1', 'v3.1.2', 'v3.2.0'].map(v => (
+                                <button 
+                                    key={v}
+                                    onClick={() => setVersion(v)}
+                                    className={`py-2 rounded-lg text-[10px] font-bold border transition-all
+                                    ${version === v ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-600'}`}
+                                >
+                                    {v}
+                                </button>
+                            ))}
                         </div>
                     </div>
-                     <div className="flex justify-between text-[9px] text-zinc-600 mt-3 font-mono font-bold">
-                        <span>CRITICAL (0D)</span>
-                        <span>MIDPOINT (7D)</span>
-                        <span>IRONCLAD (30D)</span>
+                </div>
+
+                {/* THE GAUGE */}
+                <div className="flex flex-col items-center">
+                    <div className="relative flex flex-col items-center justify-center w-56 h-56 rounded-full border-8 border-zinc-900 shadow-2xl group">
+                         {/* Dynamic Progress Ring */}
+                        <svg className="absolute inset-0 w-full h-full -rotate-90">
+                            <circle cx="112" cy="112" r="104" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-zinc-900" />
+                            <circle 
+                                cx="112" cy="112" r="104" stroke="currentColor" strokeWidth="8" fill="transparent" 
+                                strokeDasharray={653}
+                                strokeDashoffset={653 - (653 * totalScore) / 100}
+                                className={`transition-all duration-1000 ease-out ${totalScore > 80 ? 'text-green-500' : totalScore > 50 ? 'text-yellow-500' : 'text-red-500'}`}
+                            />
+                        </svg>
+
+                        <div className="relative z-10 flex flex-col items-center">
+                            <span className="text-6xl font-black text-white tracking-tighter">{totalScore}</span>
+                            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-1">Vitality Score</span>
+                        </div>
+                    </div>
+
+                    <div className="mt-8 flex items-center gap-2 text-[9px] font-mono text-zinc-600">
+                        <CheckCircle2 size={12} className={totalScore > 80 ? 'text-green-500' : 'text-zinc-800'} />
+                        {totalScore > 80 ? 'CONSENSUS ALIGNED' : 'UNDERPERFORMING'}
                     </div>
                 </div>
-                
-                <div className="p-4 bg-zinc-900/50 rounded-2xl border border-zinc-800 flex gap-3 items-center">
-                    <Info size={16} className="text-zinc-500 shrink-0" />
-                    <p className="text-[11px] text-zinc-500 leading-relaxed">
-                        The <strong>Sigmoid Curve</strong> penalizes new nodes heavily. Stability is only "Proven" once a node crosses the 7-day threshold.
-                    </p>
-                </div>
             </div>
+
+            {/* LOGIC ANNOTATION */}
+            <div className="mt-12 p-4 bg-zinc-900/30 rounded-2xl border border-zinc-800 flex items-start gap-4">
+                <Info size={18} className="text-zinc-500 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-zinc-500 leading-relaxed italic">
+                    {!isOnline 
+                        ? "CRASH PROTECTION ACTIVE: Reputation-based credits are being ignored to prevent data corruption. The score now reflects pure hardware reliability + cache persistence." 
+                        : "LIVE SYNC ACTIVE: The Neural Core is currently merging RPC telemetry with historical reputation credits to generate a complete Vitality profile."
+                    }
+                </p>
+            </div>
+        </div>
+    )
+}
+
+function SimulatorSlider({ label, val, setVal, unit, color, accent, disabled = false }: any) {
+    return (
+        <div className={`transition-opacity duration-300 ${disabled ? 'opacity-20 pointer-events-none grayscale' : 'opacity-100'}`}>
+            <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-2">
+                <span className={color}>{label}</span>
+                <span className="text-white font-mono">{val}{unit}</span>
+            </div>
+            <input 
+                type="range" min="0" max={unit === 'Days' ? 30 : 100} 
+                value={val} onChange={(e) => setVal(Number(e.target.value))}
+                className={`w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer ${accent}`}
+            />
         </div>
     )
 }
