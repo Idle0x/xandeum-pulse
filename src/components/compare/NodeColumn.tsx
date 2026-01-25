@@ -64,6 +64,8 @@ export const NodeColumn = ({
 
   return (
     <div 
+        /* --- ADDED ID FOR SCROLL TARGETING --- */
+        id={`node-col-${node.pubkey}`} 
         onClick={(e) => {
             e.stopPropagation();
             onFocus?.(node.pubkey || null);
@@ -172,7 +174,6 @@ export const NodeColumn = ({
         <Row><span className="text-[9px] md:text-base font-mono text-zinc-500">#{node.rank || '-'}</span></Row>
 
         {/* --- FIXED: DNA Strip (Seamless Extension) --- */}
-        {/* We adjusted height to match ControlRail and removed borders/text */}
         <div className="h-[36px] md:h-[50px] flex items-center justify-center px-3 md:px-4 bg-zinc-900/20 backdrop-blur-sm group-hover/col:bg-zinc-800/40 transition-colors mt-1">
            <div className="w-full opacity-60 group-hover/col:opacity-100 transition-opacity">
               <StabilityRibbon history={history} loading={loading} />
