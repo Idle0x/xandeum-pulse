@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Crown, CheckCircle, Trash2, X } from 'lucide-react';
 import { Node } from '../../types';
 import { getSafeIp } from '../../utils/nodeHelpers';
@@ -20,6 +20,7 @@ interface NodeColumnProps {
   onFocus?: (key: string | null) => void;
   isLeader?: boolean;
   leaderType?: string;
+  shouldBounce?: boolean; 
 }
 
 export const NodeColumn = ({ 
@@ -34,10 +35,21 @@ export const NodeColumn = ({
     hoveredNodeKey,
     onFocus, 
     isLeader,
-    leaderType
+    leaderType,
+    shouldBounce = false 
 }: NodeColumnProps) => {
 
   const { history, loading } = useNodeHistory(node, '30D');
+  const [isBouncing, setIsBouncing] = useState(false);
+
+  // --- BOUNCE LOGIC ---
+  useEffect(() => {
+    if (shouldBounce) {
+      setIsBouncing(true);
+      const timer = setTimeout(() => setIsBouncing(false), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldBounce]);
 
   const Row = ({ children }: { children: React.ReactNode }) => (
     <div className={`h-[36px] md:h-[72px] flex flex-col justify-center px-3 md:px-4 min-w-[100px] md:min-w-[140px] relative`}>
@@ -77,6 +89,7 @@ export const NodeColumn = ({
                     : `${theme.bodyBg}`
             }
             ${isLeader ? theme.border : 'border-white/5'}
+            ${isBouncing ? '-translate-y-2' : 'translate-y-0'}
         `}
     >
       {/* Header */}
@@ -132,6 +145,14 @@ export const NodeColumn = ({
         </Row>
         <Row><span className="text-[9px] md:text-base font-mono text-zinc-300">{formatUptimePrecise(node.uptime || 0)}</span></Row>
 
+        {/* 👇 MOVED & FIXED: Stability Ribbon (Matches Height & Colors) */}
+        <div className="h-[36px] md:h-[72px] flex items-center justify-center px-3 md:px-4 mt-0 relative">
+           <div className="w-full opacity-90 group-hover/col:opacity-100 transition-opacity">
+              {/* Passed theme.hex to force color matching */}
+              <StabilityRibbon history={history} loading={loading} color={theme.hex} />
+           </div>
+        </div>
+
         <SectionSpacer />
         <Row>
              <div className="flex flex-col w-full">
@@ -171,12 +192,6 @@ export const NodeColumn = ({
             </div>
         </Row>
         <Row><span className="text-[9px] md:text-base font-mono text-zinc-500">#{node.rank || '-'}</span></Row>
-
-        <div className="h-[36px] md:h-[50px] flex items-center justify-center px-3 md:px-4 bg-zinc-900/20 backdrop-blur-sm group-hover/col:bg-zinc-800/40 transition-colors mt-1">
-           <div className="w-full opacity-60 group-hover/col:opacity-100 transition-opacity">
-              <StabilityRibbon history={history} loading={loading} />
-           </div>
-        </div>
 
         <div className={`h-[28px] md:h-[32px] border-t border-white/5 flex items-center justify-center transition-colors cursor-pointer group/trash ${isLeader ? 'bg-yellow-900/10 hover:bg-yellow-500/20' : 'bg-black/20 hover:bg-red-500/10'}`} onClick={(e) => { e.stopPropagation(); onRemove(); }}>
             {isLeader ? (
