@@ -2,7 +2,6 @@ import React from 'react';
 import Link from 'next/link';
 import { ArrowLeft, HelpCircle } from 'lucide-react';
 import { ViewMode, NetworkType, LocationData, CountryAggregated, MapStats } from '../../types/map';
-import { MODE_COLORS } from '../../utils/mapConstants';
 import { RegionTrigger } from './RegionTrigger';
 import { NetworkSwitcher } from './NetworkSwitcher';
 
@@ -27,15 +26,26 @@ export const MapHeader: React.FC<MapHeaderProps> = ({
 
   const formatStorage = (gb: number) => gb >= 1000 ? `${(gb / 1024).toFixed(1)} TB` : `${Math.round(gb)} GB`;
 
+  // Explicit Color Mapping
+  const getThemeColors = () => {
+      switch (viewMode) {
+          case 'STORAGE': return { text: 'text-purple-500', bg: 'bg-purple-500' };
+          case 'CREDITS': return { text: 'text-orange-500', bg: 'bg-orange-500' };
+          case 'HEALTH': return { text: 'text-green-500', bg: 'bg-green-500' };
+      }
+  };
+
+  const theme = getThemeColors();
+
   const getDynamicTitle = () => {
     if (loading) return "Calibrating Global Sensors...";
     if (!leadingRegion) return "Waiting for Node Telemetry...";
     const { country } = leadingRegion;
-    const colorClass = MODE_COLORS[viewMode].tailwind; 
+    
     switch (viewMode) {
-        case 'STORAGE': return <><span className={colorClass}>{country}</span> Leads Storage Capacity</>;
-        case 'CREDITS': return <><span className={colorClass}>{country}</span> Tops Network Earnings</>;
-        case 'HEALTH': return <><span className={colorClass}>{country}</span> Sets Vitality Standard</>;
+        case 'STORAGE': return <><span className={theme.text}>{country}</span> Leads Storage Capacity</>;
+        case 'CREDITS': return <><span className={theme.text}>{country}</span> Tops Network Earnings</>;
+        case 'HEALTH': return <><span className={theme.text}>{country}</span> Sets Vitality Standard</>;
     }
   };
 
@@ -60,7 +70,8 @@ export const MapHeader: React.FC<MapHeaderProps> = ({
             </Link>
             <div className="flex flex-col items-end gap-1">
                 <div className="flex items-center gap-2">
-                    <div className={`w-1.5 h-1.5 rounded-full animate-pulse`} style={{ backgroundColor: MODE_COLORS[viewMode].hex }}></div>
+                    {/* Dynamic Dot Color */}
+                    <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${theme.bg}`}></div>
                     <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{viewMode} Mode</span>
                 </div>
                 {!loading && (
