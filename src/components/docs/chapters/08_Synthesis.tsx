@@ -1,16 +1,40 @@
 import { useState } from 'react';
 import { MessageSquare, FileJson, Cpu, Zap, Layers, MousePointer2 } from 'lucide-react';
+import { LogicWrapper } from '../layout/LogicWrapper';
+
+const SYNTHESIS_LOGIC_SNIPPET = `
+const syncSynthesis = (hoveredNodeId) => {
+  // Bi-Directional Spotlight: Highlights node across 4 separate UI layers
+  const spotlight = CHAPTER_DATA.find(n => n.id === hoveredNodeId);
+  
+  updateMapFocus(spotlight.coords);    // Panning Map Logic
+  updateTableScroll(spotlight.index);  // Pre-emptive Scrolling
+  updateLegend(spotlight.id);          // UI Highlighting
+  
+  // Handshake with Narrative Engine
+  return generateNarrative(spotlight.metrics, spotlight.history);
+};
+
+// Narrative Weave Logic
+const weave = (tech, simple, history) => {
+  const bridge = roll(MATRIX.generic.bridges);
+  return history ? \`\${tech}, \${history}. \${bridge} \${simple}.\` : \`\${tech}. \${bridge} \${simple}.\`;
+};
+`;
 
 export function SynthesisChapter() {
     return (
-        <div className="max-w-5xl mx-auto px-6 py-12">
-            {/* Header: Professional Explanation */}
+        <LogicWrapper 
+            title="Synthesis_Engine.ts" 
+            code={SYNTHESIS_LOGIC_SNIPPET} 
+            githubPath="src/logic/synthesis-orchestrator.ts"
+        >
             <div className="text-center mb-16 animate-in fade-in slide-in-from-bottom-4">
                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/10 text-pink-400 text-[10px] font-bold uppercase tracking-widest mb-4">
                     <Layers size={12}/> Intelligence Orchestration
                 </div>
                 <h2 className="text-4xl font-bold text-white mb-8 tracking-tight">Synthesis & Narrative Engine</h2>
-                
+
                 <div className="max-w-4xl mx-auto text-left space-y-6">
                     <p className="text-zinc-300 text-base leading-relaxed">
                         The <strong>Synthesis Engine</strong> serves as the central orchestrator for the entire analytical footer, seamlessly unifying the Overview, Market Share, and Topology modules. It performs the heavy lifting of mapping specific nodes from the comparison table directly to their corresponding data points across all charts and map markers. By calculating real-time deltas and historical trends, the Synthesis Engine ensures that when you focus on a node, the entire dashboard responds in unison—highlighting legends, panning map views, and extracting relevant context to provide a singular, cohesive picture of a validator's role within the network.
@@ -50,7 +74,7 @@ export function SynthesisChapter() {
                     </div>
                 </div>
             </div>
-        </div>
+        </LogicWrapper>
     );
 }
 
@@ -73,7 +97,7 @@ function Narrative_Builder_Simulator() {
     return (
         <div className="bg-[#09090b] border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl relative">
             <div className="absolute top-4 right-4 text-[8px] font-mono text-zinc-600 uppercase tracking-widest">Synthesis active</div>
-            
+
             {/* Header Controls */}
             <div className="p-6 border-b border-zinc-800 bg-zinc-900/30 flex flex-col md:flex-row gap-4 justify-between items-center">
                 <div className="flex bg-black p-1 rounded-lg border border-zinc-800">
@@ -87,7 +111,7 @@ function Narrative_Builder_Simulator() {
             </div>
 
             {/* AI Console Area */}
-            <div className="p-8 bg-black min-h-[220px] relative">
+            <div className="p-8 bg-black min-h-[220px] relative text-left">
                 <div className="flex gap-4 items-start">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-lg ${tone === 'TECH' ? 'bg-pink-500 shadow-pink-500/20' : 'bg-blue-500 shadow-blue-500/20'}`}>
                         <MessageSquare size={18} className="text-white" />
@@ -103,7 +127,7 @@ function Narrative_Builder_Simulator() {
                         </div>
                     </div>
                 </div>
-                
+
                 {/* Simulator Visual Cues */}
                 <div className="mt-8 flex items-center gap-4 border-t border-zinc-900 pt-6">
                     <div className="flex items-center gap-2 text-[8px] font-mono text-zinc-600">
