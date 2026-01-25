@@ -7,13 +7,23 @@ import { useState } from 'react';
 export function ManualChapter() {
     return (
         <div className="max-w-7xl mx-auto px-6 py-12">
-            {/* Context Header */}
+            {/* Header: Professional Explanation */}
             <div className="text-center mb-24 animate-in fade-in slide-in-from-bottom-4">
-                <h2 className="text-3xl font-bold text-white mb-6">Field Manual</h2>
-                <p className="text-zinc-400 max-w-2xl mx-auto text-base leading-relaxed">
-                    The dashboard is powered by 12 active protocols. These are the core features you need to master to achieve full network visibility. 
-                    Hover over any card to activate its micro-simulation.
-                </p>
+                <h2 className="text-4xl font-bold text-white mb-8 tracking-tight">Field Manual</h2>
+                
+                <div className="max-w-4xl mx-auto text-left space-y-6">
+                    <p className="text-zinc-300 text-base leading-relaxed">
+                        The <strong>Field Manual</strong> is a collection of 12 active protocols that power the Xandeum Pulse ecosystem. These aren't just visual features; they are the operational standards that allow you to maintain full visibility over the network's physical and economic topology. From the way we preserve your hardware with Zen Mode to the high-speed failover logic of our crash protocols, every system is designed to give you a competitive edge while ensuring your data remains accurate and verifiable.
+                    </p>
+                    <p className="text-zinc-300 text-base leading-relaxed">
+                        To get the most out of the platform, you should understand how these protocols interact. For example, our <strong>Stable ID</strong> system ensures your historical records survive software updates, while the <strong>Synthesis Engine</strong> interprets that history to tell you exactly how your node is performing compared to the rest of the world. Hover over any protocol card below to activate a micro-simulation and see these systems in action.
+                    </p>
+                    <div className="pt-4 flex items-center gap-3">
+                        <div className="h-px flex-1 bg-zinc-800"></div>
+                        <span className="text-[10px] font-black text-green-500 uppercase tracking-[0.2em]">Objective: Master the toolkit to achieve 100% operational awareness.</span>
+                        <div className="h-px flex-1 bg-zinc-800"></div>
+                    </div>
+                </div>
             </div>
 
             {/* The Materializing Grid */}
