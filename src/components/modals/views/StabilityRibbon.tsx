@@ -5,10 +5,11 @@ interface StabilityRibbonProps {
   history: NodeHistoryPoint[];
   loading: boolean;
   days?: number; 
-  timeRange?: HistoryTimeRange; // NEW Prop
+  timeRange?: HistoryTimeRange;
+  color?: string; // NEW: Optional override for thematic coloring
 }
 
-export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D' }: StabilityRibbonProps) => {
+export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D', color: customColor }: StabilityRibbonProps) => {
   const slots = Array.from({ length: days });
 
   if (loading) {
@@ -39,18 +40,26 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
           const dataIndex = displayData.length - (days - i);
           const point = displayData[dataIndex];
 
-          let color = 'bg-zinc-800/50'; 
+          let classNameColor = 'bg-zinc-800/50'; 
+          const style: React.CSSProperties = {};
 
           if (point) {
-            if (point.health >= 80) color = 'bg-green-500';      
-            else if (point.health >= 50) color = 'bg-yellow-500'; 
-            else if (point.health >= 0) color = 'bg-red-500';     
+            if (customColor) {
+               // If a custom theme color is passed, use it directly
+               style.backgroundColor = customColor;
+            } else {
+               // Default Modal Logic (Red/Yellow/Green)
+               if (point.health >= 80) classNameColor = 'bg-green-500';      
+               else if (point.health >= 50) classNameColor = 'bg-yellow-500'; 
+               else if (point.health >= 0) classNameColor = 'bg-red-500';     
+            }
           }
 
           return (
             <div 
               key={i} 
-              className={`flex-1 rounded-[1px] ${color} ${point ? 'opacity-80 hover:opacity-100 hover:scale-y-125 hover:shadow-[0_0_8px_rgba(255,255,255,0.4)]' : 'opacity-30'} transition-all duration-200 cursor-help relative group`} 
+              className={`flex-1 rounded-[1px] ${!customColor ? classNameColor : ''} ${point ? 'opacity-80 hover:opacity-100 hover:scale-y-125 hover:shadow-[0_0_8px_rgba(255,255,255,0.4)]' : 'opacity-30'} transition-all duration-200 cursor-help relative group`} 
+              style={style}
             >
                {point && <title>{`${getTooltipLabel(point.date)}: ${point.health}% Health`}</title>}
             </div>
