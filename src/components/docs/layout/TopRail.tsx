@@ -3,21 +3,23 @@ import { ArrowLeft } from 'lucide-react';
 
 export function TopRail({ activeChapter, chapters }: { activeChapter: string, chapters: any[] }) {
     const currentIndex = chapters.findIndex(c => c.id === activeChapter);
+    // Progress calculation based on current index vs total chapters
     const progress = ((currentIndex + 1) / chapters.length) * 100;
 
     return (
-        <header className="fixed top-0 left-0 right-0 h-16 bg-black/80 backdrop-blur-xl border-b border-white/5 z-40 flex items-center justify-between px-6">
+        <header className="fixed top-0 left-0 right-0 h-16 bg-black/80 backdrop-blur-xl border-b border-white/5 z-40 flex items-center justify-between px-6 transition-all">
             <Link href="/" className="flex items-center gap-3 group">
-                <div className="p-2 rounded bg-zinc-900 border border-zinc-800 group-hover:border-blue-500/50 transition-all">
-                <ArrowLeft size={16} className="text-zinc-400 group-hover:text-blue-400" />
+                <div className="p-2 rounded bg-zinc-900 border border-zinc-800 group-hover:border-red-500/50 transition-all">
+                    <ArrowLeft size={16} className="text-zinc-400 group-hover:text-red-400" />
                 </div>
-                <span className="text-xs font-bold text-zinc-500 group-hover:text-white uppercase tracking-widest">
-                    Terminating Session
+                <span className="text-xs font-bold text-zinc-500 group-hover:text-red-500 uppercase tracking-widest transition-colors">
+                    Back to Dashboard
                 </span>
             </Link>
             
-            <div className="text-[10px] font-mono text-zinc-600 uppercase hidden md:block">
-                PULSE_OS // v3.2.0 // OPERATOR_MANUAL
+            {/* Desktop-only System Version Label */}
+            <div className="hidden md:block text-[10px] font-mono text-zinc-700 uppercase tracking-widest">
+                PULSE_OS // v3.2.0 // MANUAL
             </div>
             
             {/* Neon Progress Line */}
