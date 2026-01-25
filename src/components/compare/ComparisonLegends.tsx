@@ -3,17 +3,18 @@ import { getSafeIp } from '../../utils/nodeHelpers';
 import { formatBytes } from '../../utils/formatters';
 import { formatUptimePrecise } from './MicroComponents';
 
+// --- FIXED: Added onNodeClick to base interface ---
 interface LegendProps {
     nodes: Node[];
     themes: any[];
     hoveredKey?: string | null;
     onHover?: (key: string | null) => void;
+    onNodeClick?: (node: Node) => void; // <--- RESTORED THIS
 }
 
 interface UnifiedLegendProps extends LegendProps {
     metricMode?: 'COUNTRY' | 'METRIC';
     specificMetric?: 'storage' | 'credits' | 'health' | 'uptime';
-    onNodeClick?: (node: Node) => void;
 }
 
 export const UnifiedLegend = ({ 
@@ -29,7 +30,7 @@ export const UnifiedLegend = ({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 p-4 md:p-6 mt-auto border-t border-white/5 bg-black/40 min-h-[80px]">
          {nodes.map((node, i) => {
              const theme = themes[i % themes.length];
-             
+
              // --- SPOTLIGHT LOGIC ---
              const isActive = hoveredKey === node.pubkey;
              const isDimmed = hoveredKey && hoveredKey !== node.pubkey;
@@ -98,12 +99,12 @@ export const UnifiedLegend = ({
     )
  }
 
-export const OverviewLegend = ({ nodes, themes, hoveredKey, onHover }: LegendProps) => {
+export const OverviewLegend = ({ nodes, themes, hoveredKey, onHover, onNodeClick }: LegendProps) => {
     return (
       <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 p-4 border-t border-white/5 bg-black/40 min-h-[60px]">
           {nodes.map((node, i) => {
               const theme = themes[i % themes.length];
-              
+
               // --- SPOTLIGHT LOGIC ---
               const isActive = hoveredKey === node.pubkey;
               const isDimmed = hoveredKey && hoveredKey !== node.pubkey;
@@ -113,6 +114,11 @@ export const OverviewLegend = ({ nodes, themes, hoveredKey, onHover }: LegendPro
                 key={node.pubkey} 
                 onMouseEnter={() => onHover?.(node.pubkey || null)}
                 onMouseLeave={() => onHover?.(null)}
+                // --- FIXED: Added Click Handler ---
+                onClick={(e) => {
+                    e.stopPropagation();
+                    if (onNodeClick) onNodeClick(node);
+                }}
                 className={`flex items-center gap-1.5 md:gap-2 transition-all duration-300 px-2 py-1 rounded-md cursor-pointer
                     ${isActive 
                         ? 'bg-white/10 scale-110 ring-1 ring-white/20 opacity-100 z-10 shadow-[0_0_10px_rgba(255,255,255,0.1)]' 
