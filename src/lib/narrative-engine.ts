@@ -316,12 +316,12 @@ const PERSONALITIES: Record<string, any> = {
 
 const roll = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
 
-// --- FIXED WEAVE LOGIC (66% CHANCE, NO LIMITS) ---
+// --- FIXED WEAVE LOGIC (100% CHANCE if history exists) ---
 const weave = (tech: string, simple: string, historyPhrase?: string) => {
   const pattern = Math.random();
   
-  // LOGIC FIX: 66% Chance (>0.34) to show history if it exists.
-  if (historyPhrase && Math.random() > 0.34) {
+  // LOGIC FIX: 100% Chance to show history if it exists. No dice rolls.
+  if (historyPhrase) {
       return `${tech}, ${historyPhrase}. ${roll(MATRIX.generic.bridges)} ${simple}.`;
   }
   
@@ -338,15 +338,15 @@ const getIntensity = (delta: number): AnalysisStats['intensity'] => {
   return 'neutral';
 };
 
-// --- UNLOCKED TEMPORAL GENERATOR (No Thresholds) ---
+// --- UNLOCKED TEMPORAL GENERATOR ---
 const getTemporalPhrasing = (current: number, past: number | undefined, metricType: 'storage' | 'percent' | 'number') => {
-    // Only check if past data exists. No mathematical gates.
+    // Basic existence check only.
     if (past === undefined) return undefined;
     
     const delta = current - past;
     const isUp = delta > 0;
     
-    // Only strictly 0 is neutral. Any shift is a shift.
+    // Strict neutral check (0 change). Anything else is movement.
     const isNeutral = delta === 0;
     
     let bucket = isNeutral ? MATRIX.temporal.neutral : (isUp ? MATRIX.temporal.positive : MATRIX.temporal.negative);
