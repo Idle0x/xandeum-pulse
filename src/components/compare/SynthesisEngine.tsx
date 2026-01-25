@@ -90,11 +90,9 @@ export const SynthesisEngine = ({
   const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false);
 
   const [focusedSection, setFocusedSection] = useState<string | null>(null); 
-  // We still keep local state for internal logic, but we sync interactions
   const [localFocusedNodeKey, setLocalFocusedNodeKey] = useState<string | null>(null); 
   const [internalHoverKey, setInternalHoverKey] = useState<string | null>(null);
 
-  // Determine effective focused node (Parent prop takes precedence)
   const focusedNodeKey = propFocusedKey !== undefined ? propFocusedKey : localFocusedNodeKey;
 
   const focusedNode = useMemo(() => {
@@ -111,18 +109,13 @@ export const SynthesisEngine = ({
       if (setExternalHover) setExternalHover(key);
   };
 
-  // --- UPDATED: HANDLE SELECTION ---
-  // This function updates local state AND tells the parent to scroll
   const handleSelection = (key: string | null, location?: {lat: number, lon: number}) => {
-      // 1. Update Local State (for highlighting)
       setLocalFocusedNodeKey(prev => prev === key ? null : key);
       
-      // 2. Topology Logic: Zoom to node if location provided
       if (location) {
           setPos({ coordinates: [location.lon, location.lat], zoom: 4 });
       }
 
-      // 3. Notify Parent (Triggers Table Scroll)
       if (key && onNodeSelect) {
           onNodeSelect(key);
       }
@@ -273,7 +266,6 @@ export const SynthesisEngine = ({
                                         onMouseLeave={() => handleHover(null)}
                                         onClick={(e) => { 
                                             e.stopPropagation(); 
-                                            // --- UPDATE: Use unified handler ---
                                             handleSelection(n.pubkey || null); 
                                         }}
                                         className={`${overviewBarWidth} bg-zinc-800/30 rounded-t-sm relative group/bar h-full flex flex-col justify-end min-w-[2px] transition-all duration-200 cursor-pointer ${getElementStyle(n.pubkey || null)}`}
@@ -288,7 +280,7 @@ export const SynthesisEngine = ({
                         </div>
                     ))}
                 </div>
-                {/* --- UPDATE: Pass down click handler to legend --- */}
+                {/* Unified Legend with Click Handler */}
                 <OverviewLegend nodes={nodes} themes={themes} hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => handleSelection(n.pubkey || null)} />
 
                 {focusedNodeKey && !historyLoading && (
@@ -352,38 +344,40 @@ export const SynthesisEngine = ({
                                 ) : (
                                     /* --- NEW PRECISION TRACK HEALTH LAYOUT --- */
                                     <div className="w-full max-w-sm flex flex-col gap-2 animate-in slide-in-from-bottom-10 duration-500 overflow-y-auto max-h-[300px] custom-scrollbar pr-2 pt-2">
-                                        {nodes.map((n, i) => (
-                                            <div 
-                                                key={n.pubkey} 
-                                                onMouseEnter={() => handleHover(n.pubkey || null)} 
-                                                onMouseLeave={() => handleHover(null)} 
-                                                onClick={(e) => { 
-                                                    e.stopPropagation(); 
-                                                    // --- UPDATE: Use unified handler ---
-                                                    handleSelection(n.pubkey || null); 
-                                                }}
-                                                className={`flex flex-col gap-1.5 cursor-pointer p-1.5 rounded-lg hover:bg-zinc-800/30 transition-all duration-300 ${getElementStyle(n.pubkey || null)}`}
-                                            >
-                                                {/* ROW 1: DATA LABELS */}
-                                                <div className="flex justify-between items-end">
-                                                    <span className="text-[10px] font-mono font-medium text-zinc-400 tracking-tight">{getSafeIp(n)}</span>
-                                                    <span className={`text-[10px] font-mono font-bold ${n.health >= 90 ? 'text-green-500' : n.health >= 70 ? 'text-yellow-500' : 'text-red-500'}`}>
-                                                        {n.health}%
-                                                    </span>
+                                        {nodes.map((n, i) => {
+                                            const healthVal = n.health || 0; // Fix: Default to 0
+                                            return (
+                                                <div 
+                                                    key={n.pubkey} 
+                                                    onMouseEnter={() => handleHover(n.pubkey || null)} 
+                                                    onMouseLeave={() => handleHover(null)} 
+                                                    onClick={(e) => { 
+                                                        e.stopPropagation(); 
+                                                        handleSelection(n.pubkey || null); 
+                                                    }}
+                                                    className={`flex flex-col gap-1.5 cursor-pointer p-1.5 rounded-lg hover:bg-zinc-800/30 transition-all duration-300 ${getElementStyle(n.pubkey || null)}`}
+                                                >
+                                                    {/* ROW 1: DATA LABELS */}
+                                                    <div className="flex justify-between items-end">
+                                                        <span className="text-[10px] font-mono font-medium text-zinc-400 tracking-tight">{getSafeIp(n)}</span>
+                                                        <span className={`text-[10px] font-mono font-bold ${healthVal >= 90 ? 'text-green-500' : healthVal >= 70 ? 'text-yellow-500' : 'text-red-500'}`}>
+                                                            {healthVal}%
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    {/* ROW 2: PRECISION TRACK BAR (Ultra-Thin 2px) */}
+                                                    <div className="w-full h-[2px] bg-zinc-800 rounded-full overflow-hidden">
+                                                        <div 
+                                                            className="h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_currentColor]" 
+                                                            style={{ 
+                                                                width: `${healthVal}%`, 
+                                                                backgroundColor: themes[i % themes.length].hex 
+                                                            }} 
+                                                        />
+                                                    </div>
                                                 </div>
-                                                
-                                                {/* ROW 2: PRECISION TRACK BAR (Ultra-Thin 2px) */}
-                                                <div className="w-full h-[2px] bg-zinc-800 rounded-full overflow-hidden">
-                                                    <div 
-                                                        className="h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_currentColor]" 
-                                                        style={{ 
-                                                            width: `${n.health}%`, 
-                                                            backgroundColor: themes[i % themes.length].hex 
-                                                        }} 
-                                                    />
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
@@ -402,7 +396,6 @@ export const SynthesisEngine = ({
                         </div>
                     </div>
 
-                    {/* --- UPDATE: Unified Handler for Legend Clicks --- */}
                     <UnifiedLegend nodes={nodes} themes={themes} metricMode="METRIC" specificMetric={marketMetric} hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => handleSelection(n.pubkey || null)} />
                     {!isExport && <InterpretationPanel contextText={narrative} />}
                 </>
@@ -441,7 +434,6 @@ export const SynthesisEngine = ({
                                             coordinates={[cluster.lon, cluster.lat]} 
                                             onClick={(e: any) => { 
                                                 e.stopPropagation(); 
-                                                // --- UPDATE: Unified Handler ---
                                                 const nodeId = cluster.nodes.length === 1 ? cluster.nodes[0].pubkey : cluster.id;
                                                 handleSelection(nodeId, { lat: cluster.lat, lon: cluster.lon }); 
                                             }} 
@@ -455,7 +447,7 @@ export const SynthesisEngine = ({
                             </ZoomableGroup>
                         </ComposableMap>
                     </div>
-                    {/* --- UPDATE: Unified Handler --- */}
+                    {/* Unified Legend with Click Handler */}
                     <UnifiedLegend nodes={nodes} themes={themes} metricMode="COUNTRY" hoveredKey={activeHoverKey} onHover={handleHover} onNodeClick={(n) => handleSelection(n.pubkey || null, n.location ? { lat: n.location.lat, lon: n.location.lon } : undefined)} />
                     {!isExport && <InterpretationPanel contextText={narrative} />}
                 </div>
