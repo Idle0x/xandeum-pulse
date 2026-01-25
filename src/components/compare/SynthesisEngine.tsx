@@ -65,10 +65,9 @@ interface SynthesisEngineProps {
   networkScope: string;
   benchmarks: any;
   hoveredNodeKey?: string | null;
-  onHover?: (key: string | null) => void; // Existing: for hover state syncing
+  onHover?: (key: string | null) => void;
   isExport?: boolean;
   focusedNodeKey?: string | null; // From parent (Table selection)
-  onHover?: (key: string | null) => void; // Update prop signature (already there, just clarifying)
   
   // NEW PROP: For broadcasting chart clicks back to parent to trigger scroll
   onNodeSelect?: (key: string | null) => void;
@@ -83,7 +82,7 @@ export const SynthesisEngine = ({
     onHover: setExternalHover, 
     isExport = false, 
     focusedNodeKey: propFocusedKey,
-    onNodeSelect // <--- NEW
+    onNodeSelect
 }: SynthesisEngineProps) => {
   const [tab, setTab] = useState<'OVERVIEW' | 'MARKET' | 'TOPOLOGY'>('OVERVIEW');
   const [marketMetric, setMarketMetric] = useState<'storage' | 'credits' | 'health' | 'uptime'>('storage');
