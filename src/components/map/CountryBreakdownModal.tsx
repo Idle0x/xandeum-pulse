@@ -1,9 +1,15 @@
 import React, { useRef, useLayoutEffect } from 'react';
 import { Globe, X } from 'lucide-react';
 import { ViewMode, CountryAggregated } from '../../types/map';
-import { MODE_COLORS } from '../../utils/mapConstants';
 import { formatStorage, formatCredits, formatUptime } from '../../utils/mapHelpers';
 import { ViewModeToggle } from './ViewModeToggle';
+
+// Define local robust color map to guarantee UI matches requirements
+const THEME_COLORS: Record<ViewMode, { text: string; bg: string; border: string }> = {
+  STORAGE: { text: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-500' },
+  CREDITS: { text: 'text-orange-500', bg: 'bg-orange-500', border: 'border-orange-500' },
+  HEALTH: { text: 'text-green-500', bg: 'bg-green-500', border: 'border-green-500' },
+};
 
 interface CountryBreakdownModalProps {
   isOpen: boolean;
@@ -33,6 +39,9 @@ export const CountryBreakdownModal: React.FC<CountryBreakdownModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Get active theme colors
+  const theme = THEME_COLORS[viewMode];
+
   return (
       <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
         <div className="bg-[#09090b] border border-zinc-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
@@ -41,7 +50,8 @@ export const CountryBreakdownModal: React.FC<CountryBreakdownModalProps> = ({
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Globe size={18} className="text-blue-500" /> Global Breakdown
+                  {/* Applied dynamic theme color to the Header Icon */}
+                  <Globe size={18} className={theme.text} /> Global Breakdown
                 </h3>
                 <p className="text-xs text-zinc-500 mt-0.5">
                   Ranking {countryBreakdown.length} active regions.
@@ -81,8 +91,6 @@ export const CountryBreakdownModal: React.FC<CountryBreakdownModalProps> = ({
               }
 
               const nodeShare = (c.count / (globalTotals.nodes || 1)) * 100;
-              const barColor = MODE_COLORS[viewMode].bg;
-              const textColor = MODE_COLORS[viewMode].tailwind;
 
               return (
                 <div key={c.code} className="p-3 rounded-xl bg-zinc-900/30 border border-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-700 transition flex flex-col gap-2">
@@ -92,30 +100,31 @@ export const CountryBreakdownModal: React.FC<CountryBreakdownModalProps> = ({
                       <img src={`https://flagcdn.com/w40/${c.code.toLowerCase()}.png`} alt={c.code} className="w-5 rounded-[2px]" />
                       <span className="text-sm font-bold text-zinc-200">{c.name}</span>
                     </div>
-                    <div className={`text-sm font-mono font-bold ${textColor}`}>
+                    {/* Applied dynamic theme color to the Metric Value */}
+                    <div className={`text-sm font-mono font-bold ${theme.text}`}>
                       {metricValue}
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
                     <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden flex">
-                      <div className={`h-full ${barColor} shadow-[0_0_10px_currentColor]`} style={{ width: `${Math.max(2, primaryShare)}%` }}></div>
+                      {/* Applied dynamic theme color to the Progress Bar */}
+                      <div className={`h-full ${theme.bg} shadow-[0_0_10px_currentColor]`} style={{ width: `${Math.max(2, primaryShare)}%` }}></div>
                     </div>
                     {viewMode === 'HEALTH' ? (
                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[9px] font-mono uppercase tracking-wide text-zinc-500 leading-none mt-1">
-                          <span className="text-green-500 font-bold">{c.stableCount} nodes stable</span>
+                          <span className={`${theme.text} font-bold`}>{c.stableCount} nodes stable</span>
                           <span className="text-zinc-700">|</span>
                           <span>avg uptime: <span className="text-zinc-300">{formatUptime(c.avgUptime)}</span></span>
                           <span className="text-zinc-700">|</span>
-                          {/* UPDATED HEALTH VIEW TEXT AS WELL FOR CONSISTENCY */}
                           <span>Hosts <span className="text-zinc-300">{c.count}</span> nodes ({nodeShare.toFixed(1)}%)</span>
                        </div>
                     ) : (
                        <div className="flex justify-between items-center text-[9px] font-mono uppercase tracking-wide text-zinc-500">
                           <span>
-                            <span className={textColor}>{primaryShare.toFixed(2)}%</span> of {metricLabel}
+                            {/* Applied dynamic theme color to the Share Text */}
+                            <span className={theme.text}>{primaryShare.toFixed(2)}%</span> of {metricLabel}
                           </span>
-                          {/* --- UPDATED TEXT HERE --- */}
                           <span>
                             Hosts <span className="text-zinc-300">{c.count}</span> nodes ({nodeShare.toFixed(1)}%)
                           </span>
