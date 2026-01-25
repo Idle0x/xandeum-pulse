@@ -10,11 +10,11 @@ import { getSafeIp } from '../../utils/nodeHelpers';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { OverviewLegend, UnifiedLegend } from './ComparisonLegends';
 import { generateNarrative } from '../../lib/narrative-engine';
-import { useNodeHistory } from '../../hooks/useNodeHistory';
 import { formatUptimePrecise } from './MicroComponents';
 
 // 👇 History Chart Component
 import { MarketHistoryChart } from './MarketHistoryChart';
+import { useNodeHistory } from '../../hooks/useNodeHistory';
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -68,7 +68,7 @@ interface SynthesisEngineProps {
   onHover?: (key: string | null) => void;
   isExport?: boolean;
   focusedNodeKey?: string | null; 
-  onNodeSelect?: (key: string | null) => void; // Wired Prop
+  onNodeSelect?: (key: string | null) => void;
 }
 
 export const SynthesisEngine = ({ 
@@ -97,8 +97,26 @@ export const SynthesisEngine = ({
       return nodes.find(n => n.pubkey === focusedNodeKey);
   }, [nodes, focusedNodeKey]);
 
-  // FETCH HISTORY FOR CONTEXT
-  const { reliabilityScore, loading: historyLoading } = useNodeHistory(focusedNode || undefined, '30D');
+  // --- CHANGED: Extract 'history' to feed the AI ---
+  const { reliabilityScore, history, loading: historyLoading } = useNodeHistory(focusedNode || undefined, '30D');
+
+  // --- NEW: Calculate History Snapshot for Context ---
+  const historySnapshot = useMemo(() => {
+      if (!history || history.length < 2) return undefined;
+      // Grab data from ~24h ago (approx 2nd to last item, assuming daily resolution or recent slice)
+      // If history is '30D', the last item is today, item before is yesterday.
+      const pastPoint = history[history.length - 2]; 
+      
+      if (!pastPoint) return undefined;
+
+      return {
+          avgHealth: pastPoint.health,
+          totalStorage: pastPoint.storage_committed, // For single node, total = specific
+          totalCredits: pastPoint.credits,
+          avgUptime: pastPoint.uptime,
+          timestamp: new Date(pastPoint.date).getTime()
+      };
+  }, [history]);
 
   const activeHoverKey = externalHoverKey !== undefined ? externalHoverKey : internalHoverKey;
 
@@ -108,7 +126,6 @@ export const SynthesisEngine = ({
   };
 
   const handleSelection = (key: string | null, location?: {lat: number, lon: number}) => {
-      // Logic: Update local state for map focus, but always broadcast the select event
       setLocalFocusedNodeKey(key);
 
       if (location) {
@@ -183,9 +200,11 @@ export const SynthesisEngine = ({
           hoverKey: activeHoverKey,
           nodes,
           benchmarks,
-          chartSection: focusedSection
+          chartSection: focusedSection,
+          // --- CHANGED: Pass the history snapshot to the engine ---
+          historySnapshot: historySnapshot 
       });
-  }, [tab, marketMetric, focusedNodeKey, focusedSection, activeHoverKey, nodes, benchmarks]);
+  }, [tab, marketMetric, focusedNodeKey, focusedSection, activeHoverKey, nodes, benchmarks, historySnapshot]);
 
   if (nodes.length < 1) return null;
 
@@ -279,7 +298,7 @@ export const SynthesisEngine = ({
                         </div>
                     ))}
                 </div>
-                
+
                 {/* Unified Legend with Click Handler */}
                 <OverviewLegend 
                     nodes={nodes} 
@@ -289,20 +308,7 @@ export const SynthesisEngine = ({
                     onNodeClick={(n) => handleSelection(n.pubkey || null)} 
                 />
 
-                {focusedNodeKey && !historyLoading && (
-                   <div className="mt-2 mx-4 md:mx-6 p-3 rounded-lg border border-yellow-500/10 bg-yellow-500/5 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
-                      <div className={`text-xl font-black ${reliabilityScore >= 98 ? 'text-green-500' : reliabilityScore >= 90 ? 'text-yellow-500' : 'text-red-500'}`}>
-                         {reliabilityScore}%
-                      </div>
-                      <div className="flex flex-col">
-                         <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">Historical Reliability (30d)</span>
-                         <span className="text-[10px] text-zinc-500 leading-tight">
-                            This node has been online and healthy for <strong>{reliabilityScore}%</strong> of recorded snapshots.
-                            {reliabilityScore < 90 && " Caution recommended for long-term storage."}
-                         </span>
-                      </div>
-                   </div>
-                )}
+                {/* NOTE: Generic reliability block removed per instructions */}
 
                 {!isExport && <InterpretationPanel contextText={narrative} />}
                 </>
