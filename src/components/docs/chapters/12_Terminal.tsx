@@ -78,7 +78,7 @@ export function TerminalChapter() {
                             className="flex items-center gap-2 text-[11px] font-bold text-zinc-500 hover:text-white transition-all group tracking-widest uppercase"
                         >
                             <Twitter size={14} className="group-hover:scale-110 transition-transform"/>
-                            riot'
+                            Riot
                         </a>
 
                         <div className="text-[11px] font-mono text-zinc-700 select-none">
