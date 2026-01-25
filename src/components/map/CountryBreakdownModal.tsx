@@ -57,7 +57,12 @@ export const CountryBreakdownModal: React.FC<CountryBreakdownModalProps> = ({
                   Ranking {countryBreakdown.length} active regions.
                 </p>
               </div>
-              <button onClick={onClose} className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-full text-zinc-400 hover:text-white transition">
+              
+              {/* UPDATED CLOSE BUTTON: Professional Red Glass Style */}
+              <button 
+                onClick={onClose} 
+                className="p-2 bg-red-500/10 border border-red-500/20 rounded-full text-red-500 hover:bg-red-500/20 hover:text-red-400 backdrop-blur-md transition-all shadow-lg"
+              >
                 <X size={18} />
               </button>
             </div>
