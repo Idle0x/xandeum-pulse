@@ -97,21 +97,19 @@ export const SynthesisEngine = ({
       return nodes.find(n => n.pubkey === focusedNodeKey);
   }, [nodes, focusedNodeKey]);
 
-  // --- CHANGED: Extract 'history' to feed the AI ---
+  // Extract 'history' to feed the AI
   const { reliabilityScore, history, loading: historyLoading } = useNodeHistory(focusedNode || undefined, '30D');
 
-  // --- NEW: Calculate History Snapshot for Context ---
+  // Calculate History Snapshot for Context
   const historySnapshot = useMemo(() => {
       if (!history || history.length < 2) return undefined;
-      // Grab data from ~24h ago (approx 2nd to last item, assuming daily resolution or recent slice)
-      // If history is '30D', the last item is today, item before is yesterday.
       const pastPoint = history[history.length - 2]; 
       
       if (!pastPoint) return undefined;
 
       return {
           avgHealth: pastPoint.health,
-          totalStorage: pastPoint.storage_committed, // For single node, total = specific
+          totalStorage: pastPoint.storage_committed,
           totalCredits: pastPoint.credits,
           avgUptime: pastPoint.uptime,
           timestamp: new Date(pastPoint.date).getTime()
@@ -201,7 +199,6 @@ export const SynthesisEngine = ({
           nodes,
           benchmarks,
           chartSection: focusedSection,
-          // --- CHANGED: Pass the history snapshot to the engine ---
           historySnapshot: historySnapshot 
       });
   }, [tab, marketMetric, focusedNodeKey, focusedSection, activeHoverKey, nodes, benchmarks, historySnapshot]);
@@ -299,7 +296,6 @@ export const SynthesisEngine = ({
                     ))}
                 </div>
 
-                {/* Unified Legend with Click Handler */}
                 <OverviewLegend 
                     nodes={nodes} 
                     themes={themes} 
@@ -307,8 +303,6 @@ export const SynthesisEngine = ({
                     onHover={handleHover} 
                     onNodeClick={(n) => handleSelection(n.pubkey || null)} 
                 />
-
-                {/* NOTE: Generic reliability block removed per instructions */}
 
                 {!isExport && <InterpretationPanel contextText={narrative} />}
                 </>
@@ -318,7 +312,6 @@ export const SynthesisEngine = ({
             {tab === 'MARKET' && (
                 <>
                     <div className="relative flex flex-col flex-1 h-full">
-                        {/* METRIC SELECTOR */}
                         <div className="absolute top-4 left-4 z-20" ref={metricDropdownRef}>
                              <button onClick={(e) => { e.stopPropagation(); setIsMetricDropdownOpen(!isMetricDropdownOpen); }} className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 rounded-lg text-[10px] md:text-xs font-bold uppercase transition shadow-xl">
                                 <span className="opacity-50">Metric:</span> {marketMetric} <ChevronDown size={12} className="md:w-3.5 md:h-3.5" />
@@ -334,10 +327,7 @@ export const SynthesisEngine = ({
                             )}
                         </div>
 
-                        {/* SPLIT VIEW LAYOUT */}
                         <div className="flex-1 flex flex-col lg:flex-row items-center justify-center p-4 lg:p-8 gap-8 h-full">
-
-                            {/* LEFT: VISUALIZATION */}
                             <div className="w-full lg:w-[40%] flex items-center justify-center relative">
                                 {marketMetric !== 'health' ? (
                                     <div className="w-56 h-56 md:w-72 md:h-72 rounded-full relative flex items-center justify-center shadow-[0_0_50px_rgba(0,0,0,0.3)] transition-all animate-in zoom-in-50 duration-500" style={{ background: getConicGradient(marketMetric) }}>
@@ -354,7 +344,6 @@ export const SynthesisEngine = ({
                                         </div>
                                     </div>
                                 ) : (
-                                    /* --- NEW PRECISION TRACK HEALTH LAYOUT --- */
                                     <div className="w-full max-w-sm flex flex-col gap-2 animate-in slide-in-from-bottom-10 duration-500 overflow-y-auto max-h-[300px] custom-scrollbar pr-2 pt-2">
                                         {nodes.map((n, i) => {
                                             const healthVal = n.health || 0; 
@@ -369,15 +358,12 @@ export const SynthesisEngine = ({
                                                     }}
                                                     className={`flex flex-col gap-1.5 cursor-pointer p-1.5 rounded-lg hover:bg-zinc-800/30 transition-all duration-300 ${getElementStyle(n.pubkey || null)}`}
                                                 >
-                                                    {/* ROW 1: DATA LABELS */}
                                                     <div className="flex justify-between items-end">
                                                         <span className="text-[10px] font-mono font-medium text-zinc-400 tracking-tight">{getSafeIp(n)}</span>
                                                         <span className={`text-[10px] font-mono font-bold ${healthVal >= 90 ? 'text-green-500' : healthVal >= 70 ? 'text-yellow-500' : 'text-red-500'}`}>
                                                             {healthVal}%
                                                         </span>
                                                     </div>
-
-                                                    {/* ROW 2: PRECISION TRACK BAR (Ultra-Thin 2px) */}
                                                     <div className="w-full h-[2px] bg-zinc-800 rounded-full overflow-hidden">
                                                         <div 
                                                             className="h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_currentColor]" 
@@ -393,8 +379,6 @@ export const SynthesisEngine = ({
                                     </div>
                                 )}
                             </div>
-
-                            {/* RIGHT: HISTORY CHART */}
                             <div className="w-full lg:w-[60%] h-[300px] lg:h-full min-h-[300px] animate-in slide-in-from-right-4 duration-500">
                                 <MarketHistoryChart 
                                     nodes={nodes} 
@@ -404,7 +388,6 @@ export const SynthesisEngine = ({
                                     onHover={handleHover}
                                 />
                             </div>
-
                         </div>
                     </div>
 
@@ -424,15 +407,18 @@ export const SynthesisEngine = ({
             {/* TOPOLOGY TAB */}
             {tab === 'TOPOLOGY' && (
                 <div className="flex flex-col h-full relative group/map">
-                    {!isExport && (
-                        <div className="absolute bottom-6 right-6 z-50 flex flex-col gap-2 opacity-80 hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                            <button onClick={handleZoomIn} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><Plus size={16} /></button>
-                            <button onClick={handleReset} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><RotateCcw size={16} /></button>
-                            <button onClick={handleZoomOut} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><Minus size={16} /></button>
-                        </div>
-                    )}
-
                     <div className="flex-1 rounded-xl overflow-hidden border border-white/5 bg-[#050505] mx-4 md:mx-6 relative shadow-inner">
+                        
+                        {/* --- MOVED CONTROLS INSIDE THE MAP WRAPPER --- */}
+                        {!isExport && (
+                            <div className="absolute bottom-6 right-6 z-50 flex flex-col gap-2 opacity-80 hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                <button onClick={handleZoomIn} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><Plus size={16} /></button>
+                                {/* --- UPDATED RESET BUTTON: RED STYLE --- */}
+                                <button onClick={handleReset} className="p-2 bg-zinc-900/90 backdrop-blur text-red-500 hover:text-red-400 hover:bg-red-500/10 border border-white/10 rounded-lg shadow-lg transition"><RotateCcw size={16} /></button>
+                                <button onClick={handleZoomOut} className="p-2 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white border border-white/10 rounded-lg shadow-lg hover:bg-zinc-800 transition"><Minus size={16} /></button>
+                            </div>
+                        )}
+
                         <ComposableMap projectionConfig={{ scale: 160 }} className="w-full h-full">
                             <ZoomableGroup zoom={pos.zoom} center={pos.coordinates as [number, number]} maxZoom={10} onMoveEnd={(e: any) => setPos({ coordinates: e.coordinates as [number, number], zoom: e.zoom })}>
                                 <Geographies geography={GEO_URL}>{({ geographies }: { geographies: any[] }) => geographies.map((geo: any) => (<Geography key={geo.rsmKey} geography={geo} fill="#18181b" stroke="#27272a" strokeWidth={0.5} style={{ default: { outline: "none" }, hover: { outline: "none" }, pressed: { outline: "none" } }} />))}</Geographies>
@@ -467,7 +453,7 @@ export const SynthesisEngine = ({
                             </ZoomableGroup>
                         </ComposableMap>
                     </div>
-                    {/* Unified Legend with Click Handler */}
+                    
                     <UnifiedLegend 
                         nodes={nodes} 
                         themes={themes} 
