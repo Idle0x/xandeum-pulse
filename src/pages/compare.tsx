@@ -56,9 +56,6 @@ export default function ComparePage() {
 
   // Spotlight State
   const [hoveredNodeKey, setHoveredNodeKey] = useState<string | null>(null);
-  
-  // NEW: Triggers the "Bounce" animation only on explicit clicks, not hovers
-  const [focusedClickKey, setFocusedClickKey] = useState<string | null>(null);
 
   // Dropdown States
   const [isLeaderDropdownOpen, setIsLeaderDropdownOpen] = useState(false);
@@ -154,45 +151,45 @@ export default function ComparePage() {
   const removeFavorite = (pubkey: string) => { const newFavs = favorites.filter(f => f !== pubkey); setFavorites(newFavs); localStorage.setItem('xandeum_favorites', JSON.stringify(newFavs)); };
 
   // --- UPDATED: HANDLE NODE FOCUS + SCROLL TO CENTER ---
-  const handleNodeFocusToggle = (key: string | null) => {
-      // 1. Set highlight state
-      setHoveredNodeKey(prev => prev === key ? null : key);
+  const handleNodeFocusToggle = (key: string | null, isSelection = false) => {
+      // Logic: If it's a selection event (from legend), FORCE select. Do not toggle off.
+      // If it's a click on the column itself (isSelection=false or implicit), we might want to toggle, 
+      // but for stability, we will prioritize "Focus" behavior.
+      
+      setHoveredNodeKey(prev => {
+          if (isSelection) return key; // Always set if selecting
+          return prev === key ? null : key; // Toggle if clicking the same column directly
+      });
 
-      // 2. Set "Click" state (triggers bounce) & Scroll Logic
-      if (key) {
-          setFocusedClickKey(key);
-          
-          // Clear the "bounce trigger" after animation duration so it can be re-triggered later
-          setTimeout(() => setFocusedClickKey(null), 1000); 
+      // SCROLL LOGIC
+      if (key && printRef.current) {
+          // Delay to allow any potential layout shifts (though unlikely in this stable layout)
+          setTimeout(() => {
+              const element = document.getElementById(`node-col-${key}`);
+              if (element && printRef.current) {
+                  const container = printRef.current;
+                  
+                  // CONSTANTS
+                  // We assume the Sticky Control Rail is ~200px (md breakpoint).
+                  // If on mobile, it's smaller, but this approximation is safe for centering.
+                  const RAIL_WIDTH = window.innerWidth >= 768 ? 200 : 140; 
+                  const CONTAINER_WIDTH = container.clientWidth;
+                  const VISIBLE_WIDTH = CONTAINER_WIDTH - RAIL_WIDTH;
+                  
+                  // MATH: Use offsetLeft (relative to container start) for stability
+                  // Target: We want the element's center to align with the visual center of the available space.
+                  // Visual Center (relative to container left) = RAIL_WIDTH + (VISIBLE_WIDTH / 2)
+                  // Element Center (relative to container content start) = element.offsetLeft + (element.offsetWidth / 2)
+                  
+                  // Scroll Position = ElementCenter - VisualCenter
+                  const targetScroll = (element.offsetLeft + (element.offsetWidth / 2)) - (RAIL_WIDTH + (VISIBLE_WIDTH / 2));
 
-          if (printRef.current) {
-              // Delay slightly to ensure render cycle is complete
-              setTimeout(() => {
-                  const element = document.getElementById(`node-col-${key}`);
-                  if (element && printRef.current) {
-                      const container = printRef.current;
-                      const elementRect = element.getBoundingClientRect();
-                      const containerRect = container.getBoundingClientRect();
-                      
-                      // MATH: Calculate visual center accounting for Sticky Rail
-                      // The sticky rail takes up ~200px on the left (on md screens).
-                      // We want to center the node in the *remaining* visible space.
-                      const RAIL_WIDTH = 200; // Approximate md:min-w-[200px]
-                      const VISIBLE_WIDTH = containerRect.width - RAIL_WIDTH;
-                      
-                      const relativeLeft = elementRect.left - containerRect.left;
-                      
-                      // Target Scroll = Current + RelativeLeft - (Rail + HalfVisibleSpace) + HalfElement
-                      // This centers it in the "active" area to the right of the rail
-                      const scrollPosition = container.scrollLeft + relativeLeft - (RAIL_WIDTH + (VISIBLE_WIDTH / 2)) + (elementRect.width / 2);
-
-                      container.scrollTo({
-                          left: scrollPosition,
-                          behavior: 'smooth'
-                      });
-                  }
-              }, 50);
-          }
+                  container.scrollTo({
+                      left: targetScroll,
+                      behavior: 'smooth'
+                  });
+              }
+          }, 10);
       }
   };
 
@@ -379,11 +376,9 @@ export default function ComparePage() {
                                 benchmarks={benchmarks}
                                 showNetwork={showNetwork}
                                 hoveredNodeKey={hoveredNodeKey} 
-                                onFocus={handleNodeFocusToggle} 
+                                onFocus={(k) => handleNodeFocusToggle(k, false)} 
                                 isLeader={true}      
                                 leaderType={leader.metric}
-                                // Pass Bounce Trigger
-                                shouldBounce={focusedClickKey === leader.node.pubkey}
                             />
                         );
                     })}
@@ -402,9 +397,7 @@ export default function ComparePage() {
                                 benchmarks={benchmarks}
                                 showNetwork={showNetwork}
                                 hoveredNodeKey={hoveredNodeKey} 
-                                onFocus={handleNodeFocusToggle} 
-                                // Pass Bounce Trigger
-                                shouldBounce={focusedClickKey === node.pubkey}
+                                onFocus={(k) => handleNodeFocusToggle(k, false)} 
                             />
                         );
                     })}
@@ -423,8 +416,8 @@ export default function ComparePage() {
                 benchmarks={benchmarks} 
                 hoveredNodeKey={hoveredNodeKey} 
                 onHover={setHoveredNodeKey}
-                // --- CONNECTED THE CHART CLICK TO TABLE SCROLL ---
-                onNodeSelect={handleNodeFocusToggle}
+                // --- CONNECTED THE CHART CLICK TO TABLE SCROLL (Mode: Selection) ---
+                onNodeSelect={(k) => handleNodeFocusToggle(k, true)}
             />
          </div>
       </div>
