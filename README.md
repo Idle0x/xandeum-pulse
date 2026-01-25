@@ -13,7 +13,7 @@ Real-time network monitor and high-fidelity analytics dashboard for the Xandeum 
 **Live Dashboard:** https://xandeum-pulse.vercel.app  
 **Technical Documentation:** [DOCUMENTATION.md](DOCUMENTATION.md)
 
-![Homepage](https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2Fhomepage.png)
+![Homepage]([https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2FPulse%20Home.png)
 
 ---
 
@@ -192,7 +192,7 @@ Comprehensive diagnostic suite for individual node auditing.
 
 **Components:** [`src/components/modals/InspectorModal.tsx`](src/components/modals/InspectorModal.tsx)
 
-![Inspector Modal](https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2FInspector%20Modal.png)
+![Inspector Modal](https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2FInspection%20Modal.png)
 
 ### 3. Geographic Map – Spatial Intelligence
 
@@ -218,7 +218,7 @@ Tracks economic contribution and rank velocity.
 
 **Components:** [`src/components/leaderboard/`](src/components/leaderboard/)
 
-![Credits & Reputation](https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2FCredits%20%26%20Reputation.png)
+![Credits & Reputation](https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2FReputation%20Statistics%20%26%20History.png)
 
 ### 5. Node Comparison – Competitive Intelligence
 
@@ -229,6 +229,8 @@ Side-by-side fleet evaluation featuring the "Ghost Canvas" export system.
 - **Synthesis Engine:** Provides a multi-sentence "War Room" summary of performance differentials.
 
 **Components:** [`src/components/compare/`](src/components/compare/)
+
+![Credits & Reputation](https://github.com/Idle0x/xandeum-pulse/blob/main/Screenshots%2FComparative%20Intelligence.png)
 
 </details>
 
@@ -478,8 +480,8 @@ A: RPC (15s cache) vs. Supabase (30-min snapshots).
 **[DOCUMENTATION.md](DOCUMENTATION.md)** – Technical deep-dive covering math models (sigmoid curves), synthesis logic, database schema, and optimization principles.
 
 **Related:**
-- [Xandeum Docs](https://docs.xandeum.com)
-- [STOINC](https://xandeum.com/stoinc)
+- [Xandeum Docs](https://docs.xandeum.network)
+- [STOINC](https://www.xandeum.network/stoinc)
 
 ---
 
