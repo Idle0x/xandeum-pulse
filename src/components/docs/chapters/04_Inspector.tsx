@@ -1,60 +1,83 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Activity, Database, Hash, Hand, Search, Info, Wifi, WifiOff, CheckCircle2 } from 'lucide-react';
+import { LogicWrapper } from '../layout/LogicWrapper';
+
+const VITALITY_LOGIC_SNIPPET = `
+const computeVitality = (uptime, storage, credits, version, isOnline) => {
+  // Sigmoid curve: creates a "Trust Barrier" at the 7-day mark
+  const uptimeScore = 100 / (1 + Math.exp(-0.2 * (uptime - 7)));
+  
+  // Weights: Hardware (40%), Reputation (30%), Stability (30%)
+  let score = (storage * 0.40) + (isOnline ? credits * 0.30 : 0) + (uptimeScore * 0.30);
+  
+  // Failover Logic: If API is offline, reputation is voided; hardware weight increases.
+  if (!isOnline) score = (storage * 0.65) + (uptimeScore * 0.35);
+  
+  // Version Consensus: 15% penalty for outdated protocol versions
+  return version === 'v3.2.0' ? score : score * 0.85;
+};
+`;
 
 export function InspectorChapter() {
     return (
-        <div className="max-w-6xl mx-auto px-6 py-12 flex flex-col gap-16">
-            {/* Header: Professional Explanation */}
-            <div className="text-center animate-in fade-in slide-in-from-bottom-4">
-                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 text-red-400 text-[10px] font-bold uppercase tracking-widest mb-4">
-                    <Search size={12}/> Diagnostics Suite
-                </div>
-                <h2 className="text-4xl font-bold text-white mb-8 tracking-tight">Granular Diagnostics</h2>
-                
-                <div className="max-w-4xl mx-auto text-left space-y-6">
-                    <p className="text-zinc-300 text-base leading-relaxed">
-                        The <strong>Inspector System</strong> operates as the platform's investigative core. It fetches raw telemetry via the <code>useNetworkData</code> hook and translates it into three distinct perspectives: <strong>Health</strong>, <strong>Storage</strong>, and <strong>Identity</strong>. By utilizing non-linear algorithms, it filters out ephemeral network noise to provide a definitive "Ground Truth" for every node in the fleet.
-                    </p>
-                    <p className="text-zinc-300 text-base leading-relaxed">
-                        The simulation below replicates the actual <strong>Vitality Engine</strong> logic. It demonstrates how the system reacts when upstream APIs go offline, triggering a failover to optimistic caching. In this state, the engine re-prioritizes hardware commitment (Storage) over live reputation, ensuring that the dashboard remains functional even during total network desynchronization.
-                    </p>
-                </div>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-                {/* Visual Feature Breakdown */}
-                <div className="lg:col-span-4 space-y-4">
-                    <div className="p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 group hover:border-green-500/30 transition-all">
-                        <div className="flex items-center gap-4 mb-3">
-                            <div className="p-2 bg-green-500/10 rounded-xl text-green-500"><Activity size={20}/></div>
-                            <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Health</h3>
-                        </div>
-                        <p className="text-[11px] text-zinc-500 leading-relaxed">Combines uptime sigmoid curves with version consensus. If the node version is outdated, the vitality score is slashed by 15%.</p>
+        <LogicWrapper 
+            title="Vitality_Engine.ts" 
+            code={VITALITY_LOGIC_SNIPPET} 
+            githubPath="src/logic/vitality-engine.ts"
+        >
+            <div className="flex flex-col gap-16">
+                {/* Header: Professional Explanation */}
+                <div className="text-center animate-in fade-in slide-in-from-bottom-4">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 text-red-400 text-[10px] font-bold uppercase tracking-widest mb-4">
+                        <Search size={12}/> Diagnostics Suite
                     </div>
-
-                    <div className="p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 group hover:border-purple-500/30 transition-all">
-                        <div className="flex items-center gap-4 mb-3">
-                            <div className="p-2 bg-purple-500/10 rounded-xl text-purple-500"><Database size={20}/></div>
-                            <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Storage</h3>
-                        </div>
-                        <p className="text-[11px] text-zinc-500 leading-relaxed">The heaviest weight in the vitality formula. High commitment relative to the network average triggers a multiplier bonus.</p>
-                    </div>
-
-                    <div className="p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 group hover:border-indigo-500/30 transition-all">
-                        <div className="flex items-center gap-4 mb-3">
-                            <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-500"><Hash size={20}/></div>
-                            <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Identity</h3>
-                        </div>
-                        <p className="text-[11px] text-zinc-500 leading-relaxed">Unique node fingerprinting. It ensures the 30-day history remains linked to the hardware, even if the IP or Version changes.</p>
+                    <h2 className="text-4xl font-bold text-white mb-8 tracking-tight">Granular Diagnostics</h2>
+                    
+                    <div className="max-w-4xl mx-auto text-left space-y-6">
+                        <p className="text-zinc-300 text-base leading-relaxed">
+                            The <strong>Inspector System</strong> operates as the platform's investigative core. It fetches raw telemetry via the <code>useNetworkData</code> hook and translates it into three distinct perspectives: <strong>Health</strong>, <strong>Storage</strong>, and <strong>Identity</strong>. By utilizing non-linear algorithms, it filters out ephemeral network noise to provide a definitive "Ground Truth" for every node in the fleet.
+                        </p>
+                        <p className="text-zinc-300 text-base leading-relaxed">
+                            The simulation below replicates the actual <strong>Vitality Engine</strong> logic. It demonstrates how the system reacts when upstream APIs go offline, triggering a failover to optimistic caching. In this state, the engine re-prioritizes hardware commitment (Storage) over live reputation, ensuring that the dashboard remains functional even during total network desynchronization.
+                        </p>
                     </div>
                 </div>
                 
-                {/* The 4-Pillar Simulation Widget */}
-                <div className="lg:col-span-8 h-full">
-                    <VitalitySimulator />
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+                    {/* Visual Feature Breakdown */}
+                    <div className="lg:col-span-4 space-y-4">
+                        <div className="p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 group hover:border-green-500/30 transition-all">
+                            <div className="flex items-center gap-4 mb-3">
+                                <div className="p-2 bg-green-500/10 rounded-xl text-green-500"><Activity size={20}/></div>
+                                <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Health</h3>
+                            </div>
+                            <p className="text-[11px] text-zinc-500 leading-relaxed">Combines uptime sigmoid curves with version consensus. If the node version is outdated, the vitality score is slashed by 15%.</p>
+                        </div>
+
+                        <div className="p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 group hover:border-purple-500/30 transition-all">
+                            <div className="flex items-center gap-4 mb-3">
+                                <div className="p-2 bg-purple-500/10 rounded-xl text-purple-500"><Database size={20}/></div>
+                                <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Storage</h3>
+                            </div>
+                            <p className="text-[11px] text-zinc-500 leading-relaxed">The heaviest weight in the vitality formula. High commitment relative to the network average triggers a multiplier bonus.</p>
+                        </div>
+
+                        <div className="p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 group hover:border-indigo-500/30 transition-all">
+                            <div className="flex items-center gap-4 mb-3">
+                                <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-500"><Hash size={20}/></div>
+                                <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Identity</h3>
+                            </div>
+                            <p className="text-[11px] text-zinc-500 leading-relaxed">Unique node fingerprinting. It ensures the 30-day history remains linked to the hardware, even if the IP or Version changes.</p>
+                        </div>
+                    </div>
+                    
+                    {/* The 4-Pillar Simulation Widget */}
+                    <div className="lg:col-span-8 h-full">
+                        <VitalitySimulator />
+                    </div>
                 </div>
             </div>
-        </div>
+        </LogicWrapper>
     )
 }
 
@@ -62,8 +85,8 @@ function VitalitySimulator() {
     // 1. STATE MACHINE
     const [isOnline, setIsOnline] = useState(true);
     const [uptime, setUptime] = useState(14);
-    const [storage, setStorage] = useState(60); // 0-100 scale
-    const [credits, setCredits] = useState(45); // 0-100 scale
+    const [storage, setStorage] = useState(60); 
+    const [credits, setCredits] = useState(45); 
     const [version, setVersion] = useState('v3.2.0');
 
     // 2. VITALITY FORMULA RESTORATION
@@ -71,16 +94,16 @@ function VitalitySimulator() {
         // Sigmoid for Uptime
         const uScore = Math.min(100, Math.round(100 / (1 + Math.exp(-0.2 * (uptime - 7)))));
         
-        // Base weightings
+        // Base weightings (40/30/30)
         let sWeight = storage * 0.40;
-        let cWeight = isOnline ? (credits * 0.30) : 0; // Reputation disabled if offline
+        let cWeight = isOnline ? (credits * 0.30) : 0; 
         let uWeight = uScore * 0.30;
         
         let raw = sWeight + cWeight + uWeight;
 
-        // Offline Penalty/Adjustment
+        // Offline Penalty/Adjustment: Heavy weight on hardware reliability
         if (!isOnline) {
-            raw = (sWeight * 1.5) + (uWeight * 1.0); // Boost hardware importance if API is dark
+            raw = (storage * 0.65) + (uScore * 0.35);
         }
 
         // Version Penalty
@@ -118,14 +141,14 @@ function VitalitySimulator() {
                     <SimulatorSlider label="Network Credits" val={credits} setVal={setCredits} unit="Cr" color="text-yellow-500" accent="accent-yellow-500" disabled={!isOnline} />
                     
                     <div>
-                        <div className="text-[9px] font-black text-zinc-600 uppercase mb-3 tracking-widest">Protocol Version</div>
+                        <div className="text-[9px] font-black text-zinc-600 uppercase mb-3 tracking-widest font-mono">Protocol Version</div>
                         <div className="grid grid-cols-3 gap-2">
                             {['v3.0.1', 'v3.1.2', 'v3.2.0'].map(v => (
                                 <button 
                                     key={v}
                                     onClick={() => setVersion(v)}
-                                    className={`py-2 rounded-lg text-[10px] font-bold border transition-all
-                                    ${version === v ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-600'}`}
+                                    className={`py-2 rounded-lg text-[10px] font-bold border transition-all font-mono
+                                    ${version === v ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-600'}`}
                                 >
                                     {v}
                                 </button>
@@ -137,7 +160,6 @@ function VitalitySimulator() {
                 {/* THE GAUGE */}
                 <div className="flex flex-col items-center">
                     <div className="relative flex flex-col items-center justify-center w-56 h-56 rounded-full border-8 border-zinc-900 shadow-2xl group">
-                         {/* Dynamic Progress Ring */}
                         <svg className="absolute inset-0 w-full h-full -rotate-90">
                             <circle cx="112" cy="112" r="104" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-zinc-900" />
                             <circle 
@@ -178,7 +200,7 @@ function VitalitySimulator() {
 function SimulatorSlider({ label, val, setVal, unit, color, accent, disabled = false }: any) {
     return (
         <div className={`transition-opacity duration-300 ${disabled ? 'opacity-20 pointer-events-none grayscale' : 'opacity-100'}`}>
-            <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-2">
+            <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-2 font-mono">
                 <span className={color}>{label}</span>
                 <span className="text-white font-mono">{val}{unit}</span>
             </div>
