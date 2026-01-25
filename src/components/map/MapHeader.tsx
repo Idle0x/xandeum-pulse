@@ -62,17 +62,19 @@ export const MapHeader: React.FC<MapHeaderProps> = ({
   };
 
   return (
-    <div className="shrink-0 w-full z-50 flex flex-col gap-3 px-4 md:px-6 py-3 bg-[#09090b] border-b border-zinc-800/30">
+    // Mobile: py-1.5 | Desktop: py-3
+    <div className="shrink-0 w-full z-50 flex flex-col gap-2 md:gap-3 px-3 py-1.5 md:px-6 md:py-3 bg-[#09090b] border-b border-zinc-800/30">
         <div className="flex items-center justify-between w-full">
-            <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-800 transition-all cursor-pointer">
-                <ArrowLeft size={12} className="text-zinc-400 group-hover:text-white" />
-                <span className="text-zinc-500 group-hover:text-zinc-300 text-[10px] font-bold uppercase tracking-widest">Dashboard</span>
+            {/* UPDATED DASHBOARD BUTTON: Professional Red Glass */}
+            <Link href="/" className="group flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 backdrop-blur-md transition-all cursor-pointer">
+                <ArrowLeft size={12} className="text-red-500 group-hover:scale-110 transition-transform" />
+                <span className="text-red-500/90 group-hover:text-red-400 text-[10px] font-bold uppercase tracking-widest">Dashboard</span>
             </Link>
-            <div className="flex flex-col items-end gap-1">
+            
+            <div className="flex flex-col items-end gap-0.5 md:gap-1">
                 <div className="flex items-center gap-2">
-                    {/* Dynamic Dot Color */}
                     <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${theme.bg}`}></div>
-                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{viewMode} Mode</span>
+                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">{viewMode} Mode</span>
                 </div>
                 {!loading && (
                     <button 
@@ -101,8 +103,10 @@ export const MapHeader: React.FC<MapHeaderProps> = ({
 
         <div className="flex justify-between items-end">
             <div>
-                <h1 className="text-lg md:text-2xl font-bold tracking-tight text-white leading-tight">{getDynamicTitle()}</h1>
-                <p className="text-xs text-zinc-400 leading-relaxed mt-1 max-w-2xl">{getDynamicSubtitle()}</p>
+                {/* Mobile: text-xs | Desktop: text-2xl */}
+                <h1 className="text-xs md:text-2xl font-bold tracking-tight text-white leading-tight">{getDynamicTitle()}</h1>
+                {/* Mobile: text-[10px] | Desktop: text-xs */}
+                <p className="text-[10px] md:text-xs text-zinc-400 leading-relaxed mt-0.5 md:mt-1 max-w-2xl line-clamp-1 md:line-clamp-none">{getDynamicSubtitle()}</p>
             </div>
 
             {/* Desktop: Region + Network Switcher Grouped Right */}
@@ -114,13 +118,13 @@ export const MapHeader: React.FC<MapHeaderProps> = ({
             )}
         </div>
 
-        {/* Mobile Bottom Bar: Split Space Between Regions and Network */}
+        {/* Mobile Bottom Bar: Compacted padding */}
         {!loading && (
-            <div className="flex md:hidden w-full items-center justify-between gap-2 px-0 pt-1">
-                <div className="flex-1 min-w-0">
-                    <RegionTrigger countryBreakdown={countryBreakdown} onClick={onRegionClick} className="w-full justify-start text-[9px] px-2 py-2" />
+            <div className="flex md:hidden w-full items-center justify-between gap-2 px-0 pt-0.5">
+                <div className="flex-1 min-w-0 scale-95 origin-left">
+                    <RegionTrigger countryBreakdown={countryBreakdown} onClick={onRegionClick} className="w-full justify-start text-[9px] px-2 py-1.5" />
                 </div>
-                <div className="shrink-0">
+                <div className="shrink-0 scale-95 origin-right">
                     <NetworkSwitcher selectedNetwork={selectedNetwork} setSelectedNetwork={setSelectedNetwork} />
                 </div>
             </div>
