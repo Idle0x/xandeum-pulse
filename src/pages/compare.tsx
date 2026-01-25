@@ -38,7 +38,7 @@ export default function ComparePage() {
 
   // --- REFS for Live UI ---
   const printRef = useRef<HTMLDivElement>(null);      
-  
+
   // --- REFS for Ghost Exports ---
   const exportTableRef = useRef<HTMLDivElement>(null);
   const exportFullRef = useRef<HTMLDivElement>(null);
@@ -159,7 +159,7 @@ export default function ComparePage() {
   const updateUrl = (keys: string[]) => router.replace({ pathname: '/compare', query: { nodes: keys.join(',') } }, undefined, { shallow: true });
 
   const addNode = (pubkey: string) => { if (!selectedKeys.includes(pubkey) && selectedKeys.length < 30) { const k = [...selectedKeys, pubkey]; setSelectedKeys(k); updateUrl(k); setIsSearchOpen(false); setSearchQuery(''); setIsWatchlistOpen(false); } };
-  
+
   const removeNode = (pubkey: string) => { 
       if (hoveredNodeKey === pubkey) setHoveredNodeKey(null);
       const k = selectedKeys.filter(x => x !== pubkey); 
@@ -186,8 +186,32 @@ export default function ComparePage() {
       localStorage.setItem('xandeum_favorites', JSON.stringify(newFavs));
   };
 
+  // --- UPDATED: HANDLE NODE FOCUS + SCROLL TO CENTER ---
   const handleNodeFocusToggle = (key: string | null) => {
       setHoveredNodeKey(prev => prev === key ? null : key);
+
+      // Scroll Logic
+      if (key && printRef.current) {
+          // Allow render cycle to complete if needed, though usually element exists
+          setTimeout(() => {
+              const element = document.getElementById(`node-col-${key}`);
+              if (element && printRef.current) {
+                  const container = printRef.current;
+                  // Calculate center position
+                  const elementRect = element.getBoundingClientRect();
+                  const containerRect = container.getBoundingClientRect();
+                  
+                  // Logic: The scrollLeft position = currentScroll + (elementLeft - containerLeft) - (containerWidth/2 - elementWidth/2)
+                  const relativeLeft = elementRect.left - containerRect.left;
+                  const scrollPosition = container.scrollLeft + relativeLeft - (containerRect.width / 2) + (elementRect.width / 2);
+
+                  container.scrollTo({
+                      left: scrollPosition,
+                      behavior: 'smooth'
+                  });
+              }
+          }, 50); // Small delay to ensure state update propagated if coming from chart click
+      }
   };
 
   useEffect(() => {
@@ -278,7 +302,7 @@ export default function ComparePage() {
                 overallWinnerKey={overallWinnerKey}
              />
           </div>
-          
+
           {/* Instance 2: Full Report */}
           <div style={{ display: 'block' }}>
              <PulseExportCanvas 
