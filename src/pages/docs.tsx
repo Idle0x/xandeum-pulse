@@ -4,20 +4,24 @@ import { DocShell } from '../components/docs/layout/DocShell';
 import { TopRail } from '../components/docs/layout/TopRail';
 import { NavigatorPod } from '../components/docs/layout/NavigatorPod';
 
-// --- CHAPTER IMPORTS ---
+// --- BATCH 1 IMPORTS ---
 import { BootChapter } from '../components/docs/chapters/00_Boot';
 import { FlightChapter } from '../components/docs/chapters/01_Flight';
-import { ManualChapter } from '../components/docs/chapters/02_Manual';
-import { TelemetryChapter } from '../components/docs/chapters/03_Telemetry';
-import { InspectorChapter } from '../components/docs/chapters/04_Inspector';
-import { CompareChapter } from '../components/docs/chapters/05_Compare';
-import { BrainChapter } from '../components/docs/chapters/06_Brain';
-import { TemporalChapter } from '../components/docs/chapters/07_Temporal';
-import { SynthesisChapter } from '../components/docs/chapters/08_Synthesis';
-import { SpatialChapter } from '../components/docs/chapters/09_Spatial';
-import { EconomicsChapter } from '../components/docs/chapters/10_Economics';
-import { EngineeringChapter } from '../components/docs/chapters/11_Engineering';
-import { TerminalChapter } from '../components/docs/chapters/12_Terminal';
+
+// --- BATCH 2 IMPORTS (Placeholders to prevent build error until next step) ---
+// Note: We will replace these with real imports in subsequent batches.
+const ManualChapter = () => <div className="text-center pt-40">Loading Manual...</div>;
+const TelemetryChapter = () => <div className="text-center pt-40">Loading Telemetry...</div>;
+const InspectorChapter = () => <div className="text-center pt-40">Loading Inspector...</div>;
+const CompareChapter = () => <div className="text-center pt-40">Loading Compare...</div>;
+const BrainChapter = () => <div className="text-center pt-40">Loading Brain...</div>;
+// --- BATCH 3 IMPORTS ---
+const TemporalChapter = () => <div className="text-center pt-40">Loading Temporal...</div>;
+const SynthesisChapter = () => <div className="text-center pt-40">Loading Synthesis...</div>;
+const SpatialChapter = () => <div className="text-center pt-40">Loading Spatial...</div>;
+const EconomicsChapter = () => <div className="text-center pt-40">Loading Economics...</div>;
+const EngineeringChapter = () => <div className="text-center pt-40">Loading Engineering...</div>;
+const TerminalChapter = () => <div className="text-center pt-40">Loading Terminal...</div>;
 
 export type ChapterID = 
   'BOOT' | 'FLIGHT' | 'MANUAL' | 'TELEMETRY' | 'INSPECTOR' | 'COMPARE' | 
@@ -60,9 +64,21 @@ export default function DocsPage() {
   };
 
   const nextChapter = () => {
+    // SKIP LOGIC: If currently on Boot, "Next" takes you to Manual (Index 2), skipping Flight School.
+    if (activeChapter === 'BOOT') {
+        return changeChapter('MANUAL');
+    }
+
     const currentIndex = CHAPTERS.findIndex(c => c.id === activeChapter);
     if (currentIndex < CHAPTERS.length - 1) {
       changeChapter(CHAPTERS[currentIndex + 1].id as ChapterID);
+    }
+  };
+
+  const prevChapter = () => {
+    const currentIndex = CHAPTERS.findIndex(c => c.id === activeChapter);
+    if (currentIndex > 0) {
+      changeChapter(CHAPTERS[currentIndex - 1].id as ChapterID);
     }
   };
 
@@ -74,11 +90,11 @@ export default function DocsPage() {
 
       <TopRail activeChapter={activeChapter} chapters={CHAPTERS} />
 
-      <main className="flex-1 relative pt-16 pb-32 overflow-y-auto scrollbar-hide">
-        <div className={`transition-all duration-300 ease-in-out ${isTransitioning ? (direction === 'NEXT' ? '-translate-x-10 opacity-0' : 'translate-x-10 opacity-0') : 'translate-x-0 opacity-100'}`}>
+      <main className="flex-1 relative pt-16 overflow-y-auto scrollbar-hide">
+        <div className={`transition-all duration-500 ease-in-out ${isTransitioning ? (direction === 'NEXT' ? '-translate-x-10 opacity-0' : 'translate-x-10 opacity-0') : 'translate-x-0 opacity-100'}`}>
             
             {/* The 12-Step Journey */}
-            {activeChapter === 'BOOT' && <BootChapter onStart={() => changeChapter('FLIGHT')} />}
+            {activeChapter === 'BOOT' && <BootChapter onStart={() => changeChapter('MANUAL')} />}
             {activeChapter === 'FLIGHT' && <FlightChapter />}
             {activeChapter === 'MANUAL' && <ManualChapter />}
             {activeChapter === 'TELEMETRY' && <TelemetryChapter />}
@@ -100,6 +116,7 @@ export default function DocsPage() {
         chapters={CHAPTERS} 
         onChange={changeChapter as any} 
         onNext={nextChapter}
+        onPrev={prevChapter}
       />
     </DocShell>
   );
