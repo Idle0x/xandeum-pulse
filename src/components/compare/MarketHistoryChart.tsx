@@ -26,34 +26,63 @@ export const MarketHistoryChart = ({ nodes, themes, metric, hoveredNodeKey, onHo
   const { chartData, globalMax } = useMemo(() => {
     if (loading || Object.keys(historyMap).length === 0) return { chartData: [], globalMax: 0 };
 
-    // Find longest history to anchor the timeline
+    // Find longest history to anchor the timeline (The Master Timeline)
     const masterPubkey = Object.keys(historyMap).reduce((a, b) => 
         historyMap[a].length > historyMap[b].length ? a : b
     );
     const masterTimeline = historyMap[masterPubkey] || [];
-    
+
     let calculatedMax = 0;
 
     const data = masterTimeline.map((snap, index) => {
+        // Create the base data point with the timestamp
         const point: any = { date: snap.created_at };
 
         nodes.forEach(node => {
             if (!node.pubkey) return;
             const nodeHistory = historyMap[node.pubkey];
-            const nodeSnap = nodeHistory?.[index] || {}; 
+            
+            // --- FIX: DETECT MISSING SNAPSHOTS ---
+            // If this node doesn't have a snapshot at this specific index (timeline mismatch),
+            // we must set it to NULL, not 0. 0 implies a crash; Null implies "no data yet".
+            const nodeSnap = nodeHistory?.[index];
 
-            let val = 0;
+            if (!nodeSnap) {
+                point[node.pubkey] = null;
+                return; 
+            }
+
+            let val: number | null = 0;
+
+            // Strict Metric Isolation
             switch(metric) {
-                case 'credits': val = nodeSnap.credits || 0; break;
-                case 'health': val = nodeSnap.health || 0; break;
-                case 'uptime': val = nodeSnap.uptime || 0; break;
+                case 'credits': 
+                    val = nodeSnap.credits ?? null; 
+                    break;
+                case 'health': 
+                    val = nodeSnap.health ?? null; 
+                    break;
+                case 'uptime': 
+                    val = nodeSnap.uptime ?? null; 
+                    break;
                 case 'storage': 
-                    val = storageMode === 'USED' ? (nodeSnap.storage_used || 0) : (nodeSnap.storage_committed || 0);
+                    // Strict mode check to ensure USED doesn't contaminate COMMITTED
+                    val = storageMode === 'USED' 
+                        ? (nodeSnap.storage_used ?? null) 
+                        : (nodeSnap.storage_committed ?? null);
                     break;
             }
+
+            // Fallback: If val is explicitly null (missing in DB), keep it null.
+            // Only convert to 0 if we really mean 0. 
+            // However, for graphing, if val is null, we treat it as null in the point object.
             
             point[node.pubkey] = val;
-            if (val > calculatedMax) calculatedMax = val;
+
+            // Only update Max if we have a valid number
+            if (typeof val === 'number' && val > calculatedMax) {
+                calculatedMax = val;
+            }
         });
 
         return point;
@@ -64,15 +93,18 @@ export const MarketHistoryChart = ({ nodes, themes, metric, hoveredNodeKey, onHo
 
   // 3. Scale Configuration (Locking units for the entire Y-Axis)
   const scaleConfig = useMemo(() => {
+    // If Global Max is 0 (empty data), default to base units to prevent division by zero errors
+    const safeMax = globalMax || 1;
+
     if (metric === 'storage') {
-        if (globalMax >= 1024 ** 4) return { divisor: 1024 ** 4, unit: 'TB' };
-        if (globalMax >= 1024 ** 3) return { divisor: 1024 ** 3, unit: 'GB' };
-        if (globalMax >= 1024 ** 2) return { divisor: 1024 ** 2, unit: 'MB' };
+        if (safeMax >= 1024 ** 4) return { divisor: 1024 ** 4, unit: 'TB' };
+        if (safeMax >= 1024 ** 3) return { divisor: 1024 ** 3, unit: 'GB' };
+        if (safeMax >= 1024 ** 2) return { divisor: 1024 ** 2, unit: 'MB' };
         return { divisor: 1024, unit: 'KB' };
     }
     if (metric === 'credits') {
-        if (globalMax >= 1_000_000) return { divisor: 1_000_000, unit: 'M' };
-        if (globalMax >= 1_000) return { divisor: 1_000, unit: 'k' };
+        if (safeMax >= 1_000_000) return { divisor: 1_000_000, unit: 'M' };
+        if (safeMax >= 1_000) return { divisor: 1_000, unit: 'k' };
         return { divisor: 1, unit: '' };
     }
     if (metric === 'uptime') return { divisor: 3600, unit: 'h' };
@@ -156,6 +188,7 @@ export const MarketHistoryChart = ({ nodes, themes, metric, hoveredNodeKey, onHo
                         labelStyle={{ color: '#a1a1aa', marginBottom: '6px', fontWeight: 'bold' }}
                         labelFormatter={(label) => new Date(label).toLocaleString()}
                         formatter={(value: any, name: any) => {
+                            if (value === null) return ['No Data', name];
                             const node = nodes.find(n => n.pubkey === name);
                             const valNum = Number(value);
                             return [
@@ -183,7 +216,7 @@ export const MarketHistoryChart = ({ nodes, themes, metric, hoveredNodeKey, onHo
                                 onMouseEnter={() => onHover?.(node.pubkey || null)}
                                 onMouseLeave={() => onHover?.(null)}
                                 animationDuration={800}
-                                connectNulls // Handles gaps in history gracefully
+                                connectNulls={true} // IMPORTANT: Bridges gaps caused by missing/null data
                             />
                         );
                     })}
