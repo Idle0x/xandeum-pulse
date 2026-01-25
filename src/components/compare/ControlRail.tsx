@@ -10,13 +10,23 @@ interface ControlRailProps {
 export const ControlRail = ({ showNetwork, benchmarks }: ControlRailProps) => {
 
   // Helper to match NodeColumn spacing exactly
-  const RowLabel = ({ icon: Icon, label, subLabel }: any) => (
+  const RowLabel = ({ icon: Icon, label, value }: any) => (
     <div className="h-[36px] md:h-[72px] flex flex-col justify-center px-4 relative group">
       <div className="flex items-center gap-2 text-zinc-500 group-hover:text-zinc-300 transition-colors">
         {Icon && <Icon size={10} className="md:w-3.5 md:h-3.5" />}
         <span className="text-[9px] md:text-xs font-bold uppercase tracking-widest">{label}</span>
       </div>
-      {subLabel && <div className="text-[8px] text-zinc-600 font-mono pl-6 hidden md:block">{subLabel}</div>}
+      
+      {/* FIXED: 
+          1. Removed 'hidden md:block' so it shows on mobile 
+          2. Added 'showNetwork' check to only show if mode is active
+          3. Bumped text brightness slightly for legibility
+      */}
+      {showNetwork && value && (
+        <div className="text-[8px] text-zinc-500 font-mono pl-5 md:pl-6 mt-0.5 animate-in fade-in slide-in-from-left-1 truncate">
+           <span className="opacity-50 mr-1">AVG</span>{value}
+        </div>
+      )}
     </div>
   );
 
@@ -44,10 +54,10 @@ export const ControlRail = ({ showNetwork, benchmarks }: ControlRailProps) => {
         <RowLabel icon={Globe} label="Network" />
 
         <SectionSpacer label="Vitality" />
-        <RowLabel icon={Activity} label="Health Score" subLabel={`AVG ${benchmarks.network?.health || '-'}`} />
-        <RowLabel icon={Clock} label="Uptime" subLabel={`AVG ${benchmarks.network?.uptime || '-'}`} />
+        <RowLabel icon={Activity} label="Health Score" value={benchmarks.network?.health} />
+        <RowLabel icon={Clock} label="Uptime" value={benchmarks.network?.uptime} />
         
-        {/* 👇 MOVED: Stability Label is now part of Vitality */}
+        {/* Stability Label Block */}
         <div className="h-[36px] md:h-[72px] flex flex-col justify-center px-4 relative group">
            <div className="flex items-center gap-2 text-zinc-500 group-hover:text-zinc-300 transition-colors">
               <Activity size={10} className="md:w-3.5 md:h-3.5" />
@@ -56,11 +66,11 @@ export const ControlRail = ({ showNetwork, benchmarks }: ControlRailProps) => {
         </div>
 
         <SectionSpacer label="Hardware" />
-        <RowLabel icon={HardDrive} label="Capacity" subLabel={`MED ${benchmarks.network?.storage || '-'}`} />
+        <RowLabel icon={HardDrive} label="Capacity" value={benchmarks.network?.storage} />
         <RowLabel icon={Cpu} label="Used Space" />
 
         <SectionSpacer label="Economy" />
-        <RowLabel icon={Zap} label="Credits" subLabel={`MED ${benchmarks.network?.credits || '-'}`} />
+        <RowLabel icon={Zap} label="Credits" value={benchmarks.network?.credits} />
         <RowLabel icon={Hash} label="Global Rank" />
 
         {/* Footer Alignment */}
