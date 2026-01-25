@@ -68,6 +68,9 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
       );
   };
 
+  // Helper to get reversed history for the table view
+  const reversedHistory = useMemo(() => [...cleanHistory].reverse(), [cleanHistory]);
+
   return (
     <div className="border-t border-zinc-800/50 pt-0.5 mt-0.5 bg-gradient-to-b from-zinc-900/10 to-zinc-900/30">
        <button 
@@ -83,7 +86,6 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
 
                {/* TOP CONTROLS */}
                <div className="flex justify-between items-center mb-1 relative z-30">
-                   {/* UPDATED HEADER WITH RESOLUTION TEXT */}
                    <div className="flex items-baseline gap-2">
                        <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Consistency Map</span>
                        <span className="text-[8px] font-medium text-zinc-500 opacity-70">
@@ -181,23 +183,38 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                                    <thead className="sticky top-0 bg-zinc-950/90 backdrop-blur border-b border-zinc-800 text-zinc-500 uppercase z-10">
                                        <tr>
                                            <th className="text-left py-1.5 px-2 font-bold tracking-wider">Timestamp</th>
+                                           {/* Added Yield Header - Right Aligned to group with Credits */}
+                                           <th className="text-right py-1.5 px-2 font-bold tracking-wider text-zinc-600/80">Yield</th>
                                            <th className="text-right py-1.5 px-2 font-bold tracking-wider">Credits</th>
                                        </tr>
                                    </thead>
                                    <tbody className="divide-y divide-zinc-900/50">
-                                       {/* Show newest first */}
-                                       {[...cleanHistory].reverse().map((point, i) => (
-                                           <tr key={i} className="hover:bg-zinc-900/30 transition-colors">
-                                               <td className="py-1 px-2 text-zinc-400">
-                                                   {new Date(point.date).toLocaleString(undefined, {
-                                                       month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                                                   })}
-                                               </td>
-                                               <td className="py-1 px-2 text-right font-bold text-yellow-500/90">
-                                                   {point.credits.toLocaleString()}
-                                               </td>
-                                           </tr>
-                                       ))}
+                                       {/* Rendering from helper to keep mapping clean */}
+                                       {reversedHistory.map((point, i) => {
+                                           // Calculate Yield relative to the previous chronological entry
+                                           // reversedHistory[i+1] is the data point from the "day before" current point
+                                           const prevPoint = reversedHistory[i + 1];
+                                           const yieldAmount = prevPoint ? point.credits - prevPoint.credits : 0;
+                                           
+                                           return (
+                                               <tr key={i} className="hover:bg-zinc-900/30 transition-colors">
+                                                   <td className="py-1 px-2 text-zinc-400">
+                                                       {new Date(point.date).toLocaleString(undefined, {
+                                                           month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                                       })}
+                                                   </td>
+                                                   
+                                                   {/* New Yield Column */}
+                                                   <td className="py-1 px-2 text-right text-zinc-600 italic">
+                                                       {yieldAmount > 0 ? '+' : ''}{yieldAmount > 0 ? yieldAmount.toLocaleString() : '-'}
+                                                   </td>
+
+                                                   <td className="py-1 px-2 text-right font-bold text-yellow-500/90">
+                                                       {point.credits.toLocaleString()}
+                                                   </td>
+                                               </tr>
+                                           );
+                                       })}
                                    </tbody>
                                </table>
                            )}
