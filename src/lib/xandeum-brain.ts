@@ -1,6 +1,11 @@
 import axios from 'axios';
 import geoip from 'geoip-lite';
 import { publicOrchestrator } from './rpc-orchestrator';
+import { 
+  cleanSemver, 
+  compareVersions, 
+  calculateVitalityScore 
+} from './xandeum-math';
 
 // --- CONFIGURATION ---
 
