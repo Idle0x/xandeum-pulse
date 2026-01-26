@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Check, Copy, CheckCircle, AlertTriangle, Wifi, WifiOff, RefreshCw, Calendar, Activity } from 'lucide-react';
+import { ArrowLeft, Check, Copy, CheckCircle, AlertTriangle, Calendar, Activity } from 'lucide-react';
 import { Node } from '../../../types';
 import { getSafeIp, getSafeVersion, compareVersions } from '../../../utils/nodeHelpers';
 import { formatUptime } from '../../../utils/formatters';
 import { supabase } from '../../../lib/supabase';
+// NEW: Import the Vitality Hook
+import { useNodeVitality } from '../../../hooks/useNodeVitality';
+import { NodeHistoryPoint } from '../../../hooks/useNodeHistory';
 
 interface IdentityViewProps {
   node: Node;
@@ -16,10 +19,14 @@ interface IdentityViewProps {
 export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: IdentityViewProps) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   
-  // New State for "Identity Metadata"
+  // Metadata State
   const [firstSeen, setFirstSeen] = useState<string>('Loading...');
   const [resetCount, setResetCount] = useState<number | null>(null);
   const [lastResetDate, setLastResetDate] = useState<string | null>(null);
+  const [historyBuffer, setHistoryBuffer] = useState<NodeHistoryPoint[]>([]); // Small buffer for vitality logic
+
+  // --- USE VITALITY HOOK ---
+  const vitality = useNodeVitality(node, historyBuffer);
 
   const copyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
@@ -31,12 +38,10 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
   const cleanConsensus = mostCommonVersion.replace(/[^0-9.]/g, '');
   const isLatest = cleanVer === cleanConsensus || compareVersions(cleanVer, cleanConsensus) > 0;
 
-  // --- 1. FETCH METADATA (Tracking & Resets) ---
   useEffect(() => {
       async function fetchIdentityMeta() {
           if (!node || !node.pubkey) return;
 
-          // --- GHOST LOGIC REPLICATION ---
           const targetAddress = node.address || '0.0.0.0';
           const network = node.network || 'MAINNET';
           
@@ -51,10 +56,9 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
           }
           
           const stableId = `${node.pubkey}-${ipOnly}-${network}`;
-          // -------------------------------
 
           try {
-              // A. FETCH FIRST SEEN (Tracking Since)
+              // A. FETCH FIRST SEEN
               const { data: firstData, error: firstError } = await supabase
                   .from('node_snapshots')
                   .select('created_at')
@@ -71,40 +75,46 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                   setFirstSeen('Unknown');
               }
 
-              // B. FETCH RESET METRICS (Last 30 Days)
-              // We look for significant drops in uptime
-              const thirtyDaysAgo = new Date();
-              thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+              // B. FETCH HISTORY FOR DIAGNOSTICS (Last 24 Hours)
+              const oneDayAgo = new Date();
+              oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
-              const { data: uptimeData, error: uptimeError } = await supabase
+              const { data: recentHistory, error: histError } = await supabase
                   .from('node_snapshots')
-                  .select('created_at, uptime')
+                  .select('created_at, uptime, health')
                   .eq('node_id', stableId)
-                  .gte('created_at', thirtyDaysAgo.toISOString())
-                  .order('created_at', { ascending: true }); // Chronological
+                  .gte('created_at', oneDayAgo.toISOString())
+                  .order('created_at', { ascending: true });
 
-              if (!uptimeError && uptimeData && uptimeData.length > 1) {
-                  let resets = 0;
-                  let lastReset = null;
+              if (!histError && recentHistory) {
+                  // 1. Pass to State for Vitality Hook
+                  const mappedHistory = recentHistory.map((r: any) => ({
+                      date: r.created_at,
+                      uptime: r.uptime,
+                      health: r.health,
+                      credits: 0, storage_committed: 0, storage_used: 0, rank: 0, network: network
+                  }));
+                  setHistoryBuffer(mappedHistory);
 
-                  for (let i = 1; i < uptimeData.length; i++) {
-                      const prev = uptimeData[i-1].uptime || 0;
-                      const curr = uptimeData[i].uptime || 0;
-
-                      // Logic: If uptime drops by more than 50% or goes to near 0, it's a reset
-                      // We use a threshold (e.g. drop > 1000 seconds) to avoid noise
-                      if (curr < prev && (prev - curr) > 600) {
-                          resets++;
-                          lastReset = uptimeData[i].created_at;
+                  // 2. Calculate Resets
+                  if (recentHistory.length > 1) {
+                      let resets = 0;
+                      let lastReset = null;
+                      for (let i = 1; i < recentHistory.length; i++) {
+                          const prev = recentHistory[i-1].uptime || 0;
+                          const curr = recentHistory[i].uptime || 0;
+                          if (curr < prev && (prev - curr) > 600) {
+                              resets++;
+                              lastReset = recentHistory[i].created_at;
+                          }
                       }
+                      setResetCount(resets);
+                      if (lastReset) {
+                          setLastResetDate(new Date(lastReset).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+                      }
+                  } else {
+                      setResetCount(0);
                   }
-
-                  setResetCount(resets);
-                  if (lastReset) {
-                      setLastResetDate(new Date(lastReset).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
-                  }
-              } else {
-                  setResetCount(0);
               }
 
           } catch (err) {
@@ -115,26 +125,6 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
 
       fetchIdentityMeta();
   }, [node]);
-
-
-  // --- STATUS LOGIC ---
-  const getStatus = (lastSeen: number) => {
-    if (!lastSeen) return 'OFFLINE';
-    const now = Date.now();
-    const diffMs = now - (lastSeen * 1000); 
-
-    if (diffMs < 20 * 60 * 1000) return 'ONLINE';
-    if (diffMs < 3 * 24 * 60 * 60 * 1000) return 'SYNCING';
-    return 'OFFLINE';
-  };
-
-  const status = getStatus(node.last_seen_timestamp || 0);
-
-  const statusConfig = {
-      ONLINE: { color: 'text-green-500', icon: Wifi, bg: 'bg-green-500/10 border-green-500/20' },
-      SYNCING: { color: 'text-orange-500', icon: RefreshCw, bg: 'bg-orange-500/10 border-orange-500/20' },
-      OFFLINE: { color: 'text-zinc-500', icon: WifiOff, bg: 'bg-zinc-900 border-zinc-800' }
-  }[status];
 
   // Helper Card Component
   const FieldCard = ({ 
@@ -151,13 +141,12 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
              {statusBadge ? (
                  statusBadge
              ) : (
-                <div className="flex flex-col">
+                <div className="flex flex-col min-w-0">
                     <div className={`font-mono text-xs md:text-sm font-bold truncate ${zenMode ? 'text-zinc-200' : (color || 'text-zinc-200')}`}>
                         {val}
                     </div>
-                    {/* Sub Value for Metadata (e.g., Last Reset Date) */}
                     {subVal && (
-                        <div className="text-[9px] font-bold text-zinc-600 uppercase mt-0.5">{subVal}</div>
+                        <div className="text-[9px] font-bold text-zinc-600 uppercase mt-0.5 truncate pr-2" title={subVal}>{subVal}</div>
                     )}
                 </div>
              )}
@@ -192,7 +181,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
         {/* --- GRID LAYOUT --- */}
         <div className="grid grid-cols-2 gap-3">
 
-             {/* ROW 1: Public Key (Full Width) */}
+             {/* ROW 1: Public Key */}
              <FieldCard 
                 label="Public Key" 
                 val={node?.pubkey || 'Unknown'} 
@@ -213,7 +202,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                 id="version" 
              />
 
-             {/* ROW 3: Tracking Since & Uptime */}
+             {/* ROW 3: Tracking & Uptime */}
              <FieldCard 
                 label="Tracking Since" 
                 val={firstSeen} 
@@ -227,27 +216,33 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                 id="uptime"
              />
 
-             {/* ROW 4: Session Resets & Status */}
+             {/* ROW 4: Resets & STATUS (Vitality) */}
              <FieldCard 
                 label="Session Resets (30d)" 
                 val={resetCount === null ? '...' : `${resetCount} Events`}
-                subVal={lastResetDate ? `Last: ${lastResetDate}` : resetCount === 0 ? 'No interruptions' : ''}
+                subVal={lastResetDate ? `Last: ${lastResetDate}` : resetCount === 0 ? 'Stable' : ''}
                 icon={Activity}
                 color={resetCount === 0 ? 'text-green-400' : resetCount && resetCount > 5 ? 'text-orange-400' : 'text-zinc-300'}
              />
              
-             {/* Status Card */}
+             {/* VITALITY STATUS CARD */}
              <div className={`relative group p-3 rounded-xl border transition-all duration-300 col-span-1 flex flex-col justify-between ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900/40 border-zinc-800/60 hover:border-zinc-700'}`}>
                 <div className="flex justify-between items-start mb-1">
                     <span className="text-[9px] font-bold uppercase text-zinc-500 tracking-wider">Status</span>
                 </div>
-                <div className={`flex items-center gap-2 px-2 py-1 rounded-lg border w-fit ${zenMode ? 'bg-zinc-800 border-zinc-700 text-white' : statusConfig.bg}`}>
-                    <statusConfig.icon size={12} className={zenMode ? 'text-white' : statusConfig.color} />
-                    <span className={`text-[10px] font-bold uppercase ${zenMode ? 'text-white' : statusConfig.color}`}>{status}</span>
+                <div className="flex flex-col min-w-0">
+                    <div className={`flex items-center gap-2 px-2 py-1 rounded-lg border w-fit mb-1 ${zenMode ? 'bg-zinc-800 border-zinc-700 text-white' : vitality.bgColor}`}>
+                        <vitality.icon size={12} className={zenMode ? 'text-white' : vitality.color} />
+                        <span className={`text-[10px] font-bold uppercase ${zenMode ? 'text-white' : vitality.color}`}>{vitality.label}</span>
+                    </div>
+                    {/* Reason / Sub-value */}
+                    <div className="text-[8px] font-bold text-zinc-600 truncate pr-1" title={vitality.reason}>
+                        {vitality.reason}
+                    </div>
                 </div>
              </div>
 
-             {/* ROW 5: RPC (Full Width) */}
+             {/* ROW 5: RPC */}
              <FieldCard 
                 label="RPC Endpoint" 
                 val={`http://${getSafeIp(node)}:6000`} 
