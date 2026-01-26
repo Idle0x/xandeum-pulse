@@ -24,30 +24,34 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
 
   useEffect(() => {
     let isMounted = true;
-    if (!node || !node.pubkey || !node.network) return;
+    if (!node || !node.pubkey) return; // network might be undefined, default to MAINNET
 
-    const targetNetwork = node.network;
+    const targetNetwork = node.network || 'MAINNET';
     const targetAddress = node.address || '0.0.0.0'; 
     const targetPubkey = node.pubkey;
 
     async function fetchNodeHistory() {
       setLoading(true);
 
-      // --- STABLE ID LOGIC (Synced with runMonitor) ---
+      // --- STABLE ID LOGIC (SYNCED WITH DEBUGGER & SCRIPT) ---
       let ipOnly = '0.0.0.0';
 
       if (targetAddress.toLowerCase().includes('private')) {
-         // Case A: Ghost Node (Private)
          ipOnly = 'private';
       } else {
-         // Case B: Public Node (Strip Port)
          ipOnly = targetAddress.includes(':') 
            ? targetAddress.split(':')[0] 
            : targetAddress;
       }
 
+      // THE MISSING LINK: GHOST FALLBACK
+      // If the address is empty/null/0.0.0.0, force 'private' to match DB
+      if (!ipOnly || ipOnly === '0.0.0.0' || ipOnly === '') {
+          ipOnly = 'private';
+      }
+      // -------------------------------------------------------
+
       const stableId = `${targetPubkey}-${ipOnly}-${targetNetwork}`;
-      // ------------------------------------------------
 
       // 1. Determine Days
       let days = 1;
