@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Activity, Shield, Zap, CheckCircle2, Lock, Server, Globe, Database, RotateCw, Clock } from 'lucide-react';
-import { calculateVitalityScore } from '../../../lib/xandeum-brain'; 
+// IMPORT FROM THE MATH FILE, NOT BRAIN
+import { calculateVitalityScore } from '../../../lib/xandeum-math'; 
 import { LogicWrapper } from '../layout/LogicWrapper';
 
 const REFRESH_INTERVAL_SEC = 600; // 10 Minutes
@@ -169,13 +170,13 @@ export function EngineeringChapter() {
                             className="relative flex flex-col items-center justify-center w-72 h-72 md:w-96 md:h-96 rounded-full border-8 border-zinc-900 bg-[#010101] shadow-[0_0_100px_rgba(34,197,94,0.02)] group transition-all active:scale-95 disabled:opacity-80"
                         >
                             <div className={`absolute inset-0 rounded-full border-t-2 border-green-500/20 ${metrics.isProbing ? 'animate-spin' : 'animate-spin [animation-duration:12s]'}`}></div>
-                            
+
                             <Activity size={48} className={`mb-4 transition-colors duration-700 ${metrics.latency && metrics.latency < 100 ? 'text-green-500' : 'text-yellow-500'}`} />
                             <div className="text-7xl md:text-9xl font-black text-white font-mono tracking-tighter">
                                 {metrics.latency ?? '--'}
                             </div>
                             <div className="text-[10px] font-black text-zinc-600 uppercase mt-2 tracking-[0.5em] font-mono">MS Latency</div>
-                            
+
                             <div className="absolute -bottom-6 bg-zinc-900 border border-zinc-800 px-6 py-3 rounded-full text-[10px] font-black text-zinc-400 shadow-2xl flex items-center gap-3 group-hover:border-blue-500 group-hover:text-blue-400 transition-all uppercase tracking-widest">
                                 {metrics.isProbing ? <RotateCw size={12} className="animate-spin" /> : <div className="w-2 h-2 rounded-full bg-green-500"></div>}
                                 {metrics.isProbing ? 'Syncing...' : 'Force Refresh'}
