@@ -4,7 +4,6 @@ import { Node } from '../../../types';
 import { getSafeIp, getSafeVersion, compareVersions } from '../../../utils/nodeHelpers';
 import { formatUptime } from '../../../utils/formatters';
 import { supabase } from '../../../lib/supabase';
-// NEW: Import the Vitality Hook
 import { useNodeVitality } from '../../../hooks/useNodeVitality';
 import { NodeHistoryPoint } from '../../../hooks/useNodeHistory';
 
@@ -23,7 +22,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
   const [firstSeen, setFirstSeen] = useState<string>('Loading...');
   const [resetCount, setResetCount] = useState<number | null>(null);
   const [lastResetDate, setLastResetDate] = useState<string | null>(null);
-  const [historyBuffer, setHistoryBuffer] = useState<NodeHistoryPoint[]>([]); // Small buffer for vitality logic
+  const [historyBuffer, setHistoryBuffer] = useState<NodeHistoryPoint[]>([]); 
 
   // --- USE VITALITY HOOK ---
   const vitality = useNodeVitality(node, historyBuffer);
@@ -88,11 +87,17 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
 
               if (!histError && recentHistory) {
                   // 1. Pass to State for Vitality Hook
+                  // FIX: Added 'reputation: 0' to match NodeHistoryPoint interface
                   const mappedHistory = recentHistory.map((r: any) => ({
                       date: r.created_at,
                       uptime: r.uptime,
                       health: r.health,
-                      credits: 0, storage_committed: 0, storage_used: 0, rank: 0, network: network
+                      credits: 0, 
+                      storage_committed: 0, 
+                      storage_used: 0, 
+                      rank: 0, 
+                      network: network,
+                      reputation: 0 
                   }));
                   setHistoryBuffer(mappedHistory);
 
