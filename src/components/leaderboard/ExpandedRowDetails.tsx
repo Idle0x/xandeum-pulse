@@ -15,25 +15,17 @@ const TIME_OPTIONS = [
 
 export const ExpandedRowDetails = ({ node }: { node: Node }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [showDebug, setShowDebug] = useState(false); // <--- DEBUG STATE
-  
+  const [showDebug, setShowDebug] = useState(false);
   const [timeRange, setTimeRange] = useState<typeof TIME_OPTIONS[number]['value']>('24H');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
-  // View State
   const [viewMode, setViewMode] = useState<'CHART' | 'TABLE'>('CHART');
-
-  // Chart Controls
-  const [chartMode, setChartMode] = useState<'ACCUMULATION' | 'VELOCITY'>('ACCUMULATION');
+  const [chartMode, setChartMode] = useState<'ACCUMULATION' | 'VELOCITY'>('ACCUMULATION'); // Mode State
   const [isModeDropdownOpen, setIsModeDropdownOpen] = useState(false);
   const [showRank, setShowRank] = useState(false); 
 
   const { history, loading } = useNodeHistory(isOpen ? node : undefined, timeRange);
 
-  // Logic to determine resolution label based on our aggregation rules
-  const resolutionLabel = ['24H', '3D', '7D'].includes(timeRange) 
-    ? 'Hourly Resolution' 
-    : 'Daily Resolution';
+  const resolutionLabel = ['24H', '3D', '7D'].includes(timeRange) ? 'Hourly Resolution' : 'Daily Resolution';
 
   const cleanHistory = useMemo(() => {
       if (!history) return [];
@@ -50,20 +42,43 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
       };
   }, [cleanHistory]);
 
+  // --- 4-COLOR RIBBON LOGIC ---
   const Ribbon = () => {
       if (loading) return <div className="w-full h-full bg-zinc-900/50 animate-pulse" />;
       if (!cleanHistory || cleanHistory.length < 2) return <div className="w-full h-full bg-zinc-900/30" />;
+      
       return (
         <div className="flex items-center justify-start h-full w-full overflow-hidden">
             {cleanHistory.slice(1).map((day, i) => {
                 const prev = cleanHistory[i];
-                const earnedDelta = day.credits - prev.credits;
-                const earnedMore = earnedDelta > 0;
+                const yieldVal = day.credits - prev.credits;
+                const health = day.health || 0;
+
+                // 1. Determine Color State
+                let bgColor = '#3f3f46'; // Default Grey (Zinc-700) - Stagnant & Offline
+                let opacity = 0.3;
+
+                if (yieldVal > 0) {
+                    // GREEN: Growth
+                    bgColor = '#10b981'; // Emerald-500
+                    opacity = 0.8; 
+                } else if (yieldVal < 0) {
+                    // RED: Penalty/Slashing
+                    bgColor = '#f43f5e'; // Rose-500
+                    opacity = 0.9;
+                } else if (yieldVal === 0 && health > 0) {
+                    // YELLOW: Online but Stagnant (Warning)
+                    bgColor = '#eab308'; // Yellow-500
+                    opacity = 0.6;
+                }
+                // Else: Grey (Yield 0 & Health 0) -> Already set as default
+
                 return (
                     <div 
                         key={i} 
-                        className={`flex-1 max-w-[4px] h-full ${earnedMore ? 'bg-emerald-500 opacity-80' : 'bg-zinc-800 opacity-50'} border-r border-black/20`}
-                        title={`${new Date(day.date).toLocaleDateString()}: +${earnedDelta}`}
+                        className="flex-1 max-w-[4px] h-full border-r border-black/20 transition-all hover:scale-y-125 hover:brightness-125"
+                        style={{ backgroundColor: bgColor, opacity: opacity }}
+                        title={`${new Date(day.date).toLocaleDateString()}: ${yieldVal > 0 ? '+' : ''}${yieldVal} (Health: ${health})`}
                     />
                 );
             })}
@@ -75,8 +90,6 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
 
   return (
     <div className="border-t border-zinc-800/50 pt-0.5 mt-0.5 bg-gradient-to-b from-zinc-900/10 to-zinc-900/30">
-       
-       {/* TOGGLE ROW */}
        <div className="flex items-center justify-center w-full relative">
            <button 
                 onClick={() => setIsOpen(!isOpen)} 
@@ -85,8 +98,6 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                 {isOpen ? 'Hide History' : 'Show Historical Earnings'}
                 {isOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
            </button>
-           
-           {/* BUG ICON TOGGLE (Only visible when expanded or hovered) */}
            {isOpen && (
                <button 
                    onClick={(e) => { e.stopPropagation(); setShowDebug(!showDebug); }}
@@ -100,17 +111,13 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
 
        {isOpen && (
            <div className="px-2 pb-2 pt-1 animate-in slide-in-from-top-1 duration-200">
-
-               {/* --- DEBUGGER INJECTION --- */}
                {showDebug && <NodeDebugger node={node} />}
 
                {/* TOP CONTROLS */}
                <div className="flex justify-between items-center mb-1 relative z-30">
                    <div className="flex items-baseline gap-2">
                        <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Consistency Map</span>
-                       <span className="text-[8px] font-medium text-zinc-500 opacity-70">
-                           {resolutionLabel}
-                       </span>
+                       <span className="text-[8px] font-medium text-zinc-500 opacity-70">{resolutionLabel}</span>
                    </div>
 
                    <div className="relative">
@@ -142,7 +149,7 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                    <Ribbon />
                </div>
 
-               {/* CHART / TABLE CONTROLS */}
+               {/* CHART CONTROLS */}
                <div className="flex justify-between items-center mb-1 px-1 relative z-20">
                    {viewMode === 'CHART' ? (
                         <button 
@@ -173,7 +180,7 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                                    <button onClick={() => { setChartMode('ACCUMULATION'); setIsModeDropdownOpen(false); }} className={`w-full text-left px-2 py-1.5 text-[8px] font-bold uppercase tracking-wider hover:bg-zinc-900 ${chartMode === 'ACCUMULATION' ? 'text-yellow-500 bg-zinc-900' : 'text-zinc-500'}`}>
                                        Total Accumulation
                                    </button>
-                                   <button onClick={() => { setChartMode('VELOCITY'); setIsModeDropdownOpen(false); }} className={`w-full text-left px-2 py-1.5 text-[8px] font-bold uppercase tracking-wider hover:bg-zinc-900 ${chartMode === 'VELOCITY' ? 'text-yellow-500 bg-zinc-900' : 'text-zinc-500'}`}>
+                                   <button onClick={() => { setChartMode('VELOCITY'); setIsModeDropdownOpen(false); }} className={`w-full text-left px-2 py-1.5 text-[8px] font-bold uppercase tracking-wider hover:bg-zinc-900 ${chartMode === 'VELOCITY' ? 'text-emerald-500 bg-zinc-900' : 'text-zinc-500'}`}>
                                        Yield Velocity
                                    </button>
                                </div>
@@ -188,7 +195,7 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                        <DualAxisGrowthChart 
                             history={cleanHistory} 
                             loading={loading} 
-                            mode={chartMode}    
+                            mode={chartMode} // PASSING THE MODE
                             showRank={showRank}
                             timeRange={timeRange}
                         />
@@ -211,7 +218,6 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                                        {reversedHistory.map((point, i) => {
                                            const prevPoint = reversedHistory[i + 1];
                                            const yieldAmount = prevPoint ? point.credits - prevPoint.credits : 0;
-
                                            return (
                                                <tr key={i} className="hover:bg-zinc-900/30 transition-colors">
                                                    <td className="py-1 px-2 text-zinc-400">
@@ -219,8 +225,8 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                                                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                                                        })}
                                                    </td>
-                                                   <td className="py-1 px-2 text-right text-zinc-600 italic">
-                                                       {yieldAmount > 0 ? '+' : ''}{yieldAmount > 0 ? yieldAmount.toLocaleString() : '-'}
+                                                   <td className={`py-1 px-2 text-right italic ${yieldAmount > 0 ? 'text-emerald-500' : yieldAmount < 0 ? 'text-rose-500' : 'text-zinc-600'}`}>
+                                                       {yieldAmount > 0 ? '+' : ''}{yieldAmount.toLocaleString()}
                                                    </td>
                                                    <td className="py-1 px-2 text-right font-bold text-yellow-500/90">
                                                        {point.credits.toLocaleString()}
