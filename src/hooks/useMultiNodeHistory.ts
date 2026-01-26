@@ -25,16 +25,26 @@ export const useMultiNodeHistory = (nodes: Node[], timeRange: HistoryTimeRange =
       if (timeRange === 'ALL') days = 365;
 
       const requests = nodes.map(async (node) => {
-          const ipOnly = node.address && node.address.includes(':') 
-            ? node.address.split(':')[0] 
-            : (node.address || '0.0.0.0');
-          
+          const targetAddress = node.address || '0.0.0.0';
           const network = node.network || 'MAINNET';
+
+          // --- STABLE ID LOGIC (Synced with runMonitor) ---
+          let ipOnly = '0.0.0.0';
+
+          if (targetAddress.toLowerCase().includes('private')) {
+             ipOnly = 'private';
+          } else {
+             ipOnly = targetAddress.includes(':') 
+               ? targetAddress.split(':')[0] 
+               : targetAddress;
+          }
+
           const stableId = `${node.pubkey}-${ipOnly}-${network}`;
+          // ------------------------------------------------
 
           try {
             const data = await getNodeHistoryAction(stableId, network, days);
-            
+
             const cleanData = (data || []).map((row: any) => ({
               created_at: row.created_at,
               health: Number(row.health || 0),
