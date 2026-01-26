@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { getNodeHistoryAction } from '../../app/actions/getHistory'; 
 import { Node } from '../../types';
-import { consolidateHistory } from '../../utils/historyAggregator'; // <--- IMPORT THIS to test logic
+import { consolidateHistory } from '../../utils/historyAggregator'; 
 
 export const NodeDebugger = ({ node }: { node: Node }) => {
   const [report, setReport] = useState<any>(null);
@@ -19,13 +19,13 @@ export const NodeDebugger = ({ node }: { node: Node }) => {
         step3_mapping: { status: 'PENDING', validDates: 0, invalidDates: 0 },
         step4_filtering: { status: 'PENDING', kept: 0, dropped: 0, reason: '' },
         step5_consolidation: { status: 'PENDING', input: 0, output: 0 },
-        final_chart_ready: { status: 'PENDING', points: 0, spanMinutes: 0 }
+        // FIX: Initialize as string '0' so toFixed(2) is accepted later
+        final_chart_ready: { status: 'PENDING', points: 0, spanMinutes: '0' }
       };
 
       try {
         // --- STEP 1: ID GENERATION ---
         const targetAddress = node.address || '0.0.0.0';
-        const networkProp = node.network; // Allow undefined to see what happens
         const defaultNetwork = node.network || 'MAINNET';
         
         let ipOnly = '0.0.0.0';
@@ -40,7 +40,7 @@ export const NodeDebugger = ({ node }: { node: Node }) => {
         
         log.step1_ids = { 
             status: 'OK', 
-            details: `ID: ${stableId}\nNode Network Prop: ${JSON.stringify(networkProp)}` 
+            details: `ID: ${stableId}\nNode Network Prop: ${JSON.stringify(node.network)}` 
         };
 
         // --- STEP 2: RAW FETCH (Simulate Server Action) ---
@@ -79,9 +79,6 @@ export const NodeDebugger = ({ node }: { node: Node }) => {
             };
 
             // --- STEP 4: NETWORK FILTERING SIMULATION ---
-            // This mimics the 'cleanHistory' useMemo in ExpandedRowDetails
-            // logic: return history.filter((h: any) => h.network ? h.network === node.network : true);
-            
             const filteredData = mappedData.filter((h: any) => {
                 // strict check against prop
                 if (node.network) return h.network === node.network;
@@ -96,8 +93,6 @@ export const NodeDebugger = ({ node }: { node: Node }) => {
             };
 
             // --- STEP 5: CONSOLIDATION SIMULATION ---
-            // This checks if 'consolidateHistory' is compressing data too aggressively
-            // We mimic the format expected by consolidateHistory
             const preConsolidate = filteredData.map(d => ({
                 date: d.created_at, // strictly mimic the hook
                 health: Number(d.health || 0),
@@ -114,7 +109,6 @@ export const NodeDebugger = ({ node }: { node: Node }) => {
             };
 
             // --- STEP 6: CHART READINESS ---
-            // Why is the chart failing?
             if (consolidated.length > 0) {
                 const firstTime = new Date(consolidated[0].date).getTime();
                 const lastTime = new Date(consolidated[consolidated.length - 1].date).getTime();
@@ -126,7 +120,7 @@ export const NodeDebugger = ({ node }: { node: Node }) => {
                 log.final_chart_ready = {
                     status: chartStatus,
                     points: consolidated.length,
-                    spanMinutes: spanMinutes.toFixed(2)
+                    spanMinutes: spanMinutes.toFixed(2) // Now valid because initial type is string
                 };
             }
         }
