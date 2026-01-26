@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NodeHistoryPoint, HistoryTimeRange } from '../../../hooks/useNodeHistory';
-import { X, TrendingUp, TrendingDown, Minus, RefreshCw, Activity, WifiOff, Wifi, ThermometerSun, AlertTriangle } from 'lucide-react';
+import { 
+  X, TrendingUp, TrendingDown, Minus, RefreshCw, Activity, 
+  WifiOff, Wifi, ThermometerSun, AlertTriangle, Database, Coins, Clock 
+} from 'lucide-react';
 import { analyzePointVitality } from '../../../utils/vitalityHelpers';
+import { formatBytes, formatUptime } from '../../../utils/formatters';
 
 interface StabilityRibbonProps {
   history: NodeHistoryPoint[];
@@ -11,24 +15,185 @@ interface StabilityRibbonProps {
   color?: string; 
 }
 
+// --- SUB-COMPONENT: VITALITY SNAPSHOT CARD (The Forensic Tooltip) ---
+const VitalitySnapshotCard = ({ 
+  point, 
+  prevPoint, 
+  oneHourAgoPoint, 
+  onClose,
+  positionClass 
+}: { 
+  point: NodeHistoryPoint, 
+  prevPoint: NodeHistoryPoint | undefined, 
+  oneHourAgoPoint: NodeHistoryPoint | undefined,
+  onClose: () => void,
+  positionClass: string
+}) => {
+    // 1. Forensic Analysis
+    const vitality = analyzePointVitality(point, prevPoint, oneHourAgoPoint);
+    
+    // 2. Calculations & Trends
+    const health = point.health || 0;
+    const prevHealth = prevPoint?.health || 0;
+    const healthDelta = health - prevHealth;
+
+    const credits = point.credits || 0;
+    const prevCredits = prevPoint?.credits || 0;
+    const creditDelta = credits - prevCredits; // Velocity
+
+    const storage = point.storage_committed || 0;
+    const prevStorage = prevPoint?.storage_committed || 0;
+    const storageDelta = storage - prevStorage;
+
+    const Icon = {
+        OFFLINE: WifiOff,
+        STAGNANT: Activity,
+        UNSTABLE: AlertTriangle,
+        WARMUP: ThermometerSun,
+        ONLINE: Wifi
+    }[vitality.state] || Wifi;
+
+    // Helper for Trend Rendering
+    const Trend = ({ val, unit = '', inverse = false }: { val: number, unit?: string, inverse?: boolean }) => {
+        if (val === 0) return <span className="text-zinc-600 ml-1"><Minus size={8} /></span>;
+        const isPos = val > 0;
+        const isGood = inverse ? !isPos : isPos; // For uptime/restarts, logic might differ, but generally + is green
+        const color = isGood ? 'text-emerald-400' : 'text-rose-400';
+        const Icon = isPos ? TrendingUp : TrendingDown;
+        return (
+            <span className={`flex items-center gap-0.5 ml-1.5 text-[9px] font-bold ${color}`}>
+                <Icon size={8} />
+                {Math.abs(val).toLocaleString()}{unit}
+            </span>
+        );
+    };
+
+    return (
+        <div className={`absolute bottom-full mb-2.5 ${positionClass} z-50 animate-in fade-in zoom-in-95 duration-200`}>
+            <div className="bg-[#09090b] border border-zinc-800 rounded-xl shadow-2xl p-3 w-64 relative backdrop-blur-xl">
+                 {/* Pointer Arrow */}
+                 <div className={`absolute -bottom-1.5 w-3 h-3 bg-[#09090b] border-b border-r border-zinc-800 transform rotate-45 ${positionClass.includes('left-4') ? 'left-4' : positionClass.includes('right-4') ? 'right-4' : 'left-1/2 -translate-x-1/2'}`}></div>
+
+                 {/* Header: Date & Close */}
+                 <div className="flex justify-between items-start mb-3 pb-2 border-b border-zinc-800/50">
+                    <div className="flex flex-col">
+                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">HISTORICAL SNAPSHOT</span>
+                        <span className="text-xs font-mono text-zinc-300 font-medium">
+                            {new Date(point.date).toLocaleString(undefined, { 
+                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                            })}
+                        </span>
+                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="text-zinc-600 hover:text-zinc-300 transition-colors"><X size={12}/></button>
+                 </div>
+
+                 {/* VITALITY SCORE HEADER */}
+                 <div className="flex items-center justify-between mb-3 bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
+                    <div className="flex items-center gap-2">
+                        <div className={`p-1.5 rounded-md ${vitality.color} bg-opacity-20 border border-white/5`}>
+                            <Icon size={14} className={vitality.textColor} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className={`text-[10px] font-black uppercase ${vitality.textColor}`}>{vitality.label}</span>
+                            <span className="text-[8px] text-zinc-500 font-medium">System Status</span>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <div className="flex items-baseline justify-end gap-1">
+                            <span className={`text-xl font-black ${health >= 80 ? 'text-emerald-400' : health >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>
+                                {health}
+                            </span>
+                            <span className="text-[9px] font-bold text-zinc-500">/100</span>
+                        </div>
+                        {healthDelta !== 0 && (
+                            <div className={`text-[8px] font-bold text-right ${healthDelta > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                {healthDelta > 0 ? '+' : ''}{healthDelta} pts
+                            </div>
+                        )}
+                    </div>
+                 </div>
+
+                 {/* VECTOR GRID */}
+                 <div className="grid grid-cols-2 gap-2">
+                    
+                    {/* 1. ECONOMY (Credits) */}
+                    <div className="p-2 rounded bg-zinc-900/30 border border-zinc-800/50 flex flex-col justify-between">
+                        <div className="flex items-center gap-1.5 mb-1 text-zinc-500">
+                            <Coins size={10} />
+                            <span className="text-[8px] font-bold uppercase tracking-wide">Economy</span>
+                        </div>
+                        <div>
+                            <div className="text-[11px] font-mono font-bold text-zinc-200">
+                                {credits.toLocaleString()}
+                            </div>
+                            <div className="flex items-center mt-0.5">
+                                <span className="text-[8px] text-zinc-600 font-medium uppercase">Delta</span>
+                                <Trend val={creditDelta} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 2. STORAGE (Committed) */}
+                    <div className="p-2 rounded bg-zinc-900/30 border border-zinc-800/50 flex flex-col justify-between">
+                        <div className="flex items-center gap-1.5 mb-1 text-zinc-500">
+                            <Database size={10} />
+                            <span className="text-[8px] font-bold uppercase tracking-wide">Storage</span>
+                        </div>
+                        <div>
+                            <div className="text-[11px] font-mono font-bold text-zinc-200">
+                                {formatBytes(storage)}
+                            </div>
+                            <div className="flex items-center mt-0.5">
+                                <span className="text-[8px] text-zinc-600 font-medium uppercase">Delta</span>
+                                <Trend val={storageDelta} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 3. OPERATIONS (Uptime) */}
+                    <div className="col-span-2 p-2 rounded bg-zinc-900/30 border border-zinc-800/50 flex items-center justify-between">
+                         <div className="flex flex-col">
+                            <div className="flex items-center gap-1.5 mb-1 text-zinc-500">
+                                <Clock size={10} />
+                                <span className="text-[8px] font-bold uppercase tracking-wide">Session Uptime</span>
+                            </div>
+                            <div className="text-[11px] font-mono font-bold text-zinc-200">
+                                {formatUptime(point.uptime)}
+                            </div>
+                         </div>
+                         {/* Restart Indicator */}
+                         {vitality.state === 'UNSTABLE' || vitality.state === 'WARMUP' ? (
+                             <div className="px-2 py-1 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[9px] font-bold uppercase flex items-center gap-1">
+                                <RefreshCw size={8} /> Restart Detected
+                             </div>
+                         ) : (
+                             <div className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold uppercase flex items-center gap-1">
+                                <Activity size={8} /> Stable Pulse
+                             </div>
+                         )}
+                    </div>
+
+                 </div>
+            </div>
+        </div>
+    );
+};
+
+
+// --- MAIN COMPONENT ---
 export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D', color: customColor }: StabilityRibbonProps) => {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // --- 1. GLOBAL DISMISSAL (Click Outside) ---
+  // Global Dismissal
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setSelectedIdx(null);
       }
     };
-
-    if (selectedIdx !== null) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    if (selectedIdx !== null) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [selectedIdx]);
 
   const slots = Array.from({ length: days });
@@ -43,108 +208,44 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
     );
   }
 
-  // Sort history chronologically (Oldest -> Newest) to iterate correctly
+  // Sort Chronologically
   const sortedHistory = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   
-  // We need the last N days (slots), but we need the FULL history available to look up context (like 1 hour ago)
-  // So we don't just slice the array yet. We calculate indices.
+  // Slice for View Window
   const startIndex = Math.max(0, sortedHistory.length - days);
   const displayData = sortedHistory.slice(startIndex);
 
-  // --- HELPERS ---
-  const formatHealth = (val: number) => Number(val.toFixed(2));
-
-  const getDateLabel = (dateStr: string) => {
-      const date = new Date(dateStr);
-      if (timeRange === '24H' || timeRange === '3D' || timeRange === '7D') {
-          return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-      }
-      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  };
-
-  // --- ICON MAPPING ---
-  const StateIcons = {
-      OFFLINE: WifiOff,
-      STAGNANT: Activity,
-      UNSTABLE: AlertTriangle,
-      WARMUP: ThermometerSun,
-      ONLINE: Wifi
-  };
-
-  // --- RENDER SELECTED TOOLTIP ---
+  // Render Tooltip Logic
   const renderTooltip = () => {
       if (selectedIdx === null) return null;
-
-      // Map ribbon slot index to the actual data point
-      const pointIndex = selectedIdx; // displayData is already sliced to match slots
+      const pointIndex = selectedIdx; 
       const point = displayData[pointIndex];
       
-      // We need to look up context from the FULL sortedHistory
-      // The point in displayData[i] corresponds to sortedHistory[startIndex + i]
       const absoluteIndex = startIndex + pointIndex;
       const prevPoint = sortedHistory[absoluteIndex - 1];
 
-      // Find ~1 hour ago point for stagnation check
+      // Context Lookups
       const pointTime = new Date(point.date).getTime();
       const oneHourAgoPoint = sortedHistory.find(p => {
           const t = new Date(p.date).getTime();
-          return (pointTime - t) > 3600000 && (pointTime - t) < 4000000; // Look for approx 1h window
+          return (pointTime - t) > 3600000 && (pointTime - t) < 4000000;
       });
 
       if (!point) return null;
 
-      // Run Forensic Analysis
-      const vitality = analyzePointVitality(point, prevPoint, oneHourAgoPoint);
-      const Icon = StateIcons[vitality.state as keyof typeof StateIcons];
-
-      // Trend Calculation
-      const diff = prevPoint ? point.health - prevPoint.health : 0;
-      const TrendIcon = diff > 0 ? TrendingUp : diff < 0 ? TrendingDown : Minus;
-      const trendColor = diff > 0 ? 'text-green-400' : diff < 0 ? 'text-red-400' : 'text-zinc-500';
-
-      // Edge Positioning
+      // Smart Positioning
       let positionClass = "-translate-x-1/2 left-1/2"; 
-      if (selectedIdx < 4) positionClass = "left-0 translate-x-0"; 
-      if (selectedIdx > days - 5) positionClass = "right-0 translate-x-0"; 
+      if (selectedIdx < 4) positionClass = "left-0 translate-x-0 left-4"; 
+      if (selectedIdx > displayData.length - 5) positionClass = "right-0 translate-x-0 right-4"; 
 
       return (
-          <div className={`absolute bottom-full mb-2 ${positionClass} z-50 animate-in fade-in zoom-in-95 duration-200`}>
-              <div className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl p-3 w-56 relative">
-                  <div className={`absolute -bottom-1.5 w-3 h-3 bg-zinc-900 border-b border-r border-zinc-700 transform rotate-45 ${selectedIdx < 4 ? 'left-4' : selectedIdx > days - 5 ? 'right-4' : 'left-1/2 -translate-x-1/2'}`}></div>
-                  
-                  <div className="relative z-10 flex flex-col gap-2">
-                      <div className="flex justify-between items-start">
-                          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">SNAPSHOT</span>
-                          <button onClick={(e) => { e.stopPropagation(); setSelectedIdx(null); }} className="text-zinc-500 hover:text-white"><X size={12}/></button>
-                      </div>
-
-                      {/* Health Score */}
-                      <div className="flex items-baseline gap-2">
-                          <span className={`text-2xl font-black ${point.health >= 80 ? 'text-green-400' : point.health >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
-                              {formatHealth(point.health)}
-                          </span>
-                          <span className="text-xs font-bold text-zinc-500">%</span>
-                      </div>
-
-                      {/* Forensic State Badge */}
-                      <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                          <div className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded border border-white/5 bg-white/5 ${vitality.textColor}`}>
-                              <Icon size={10} />
-                              <span className="text-[9px] font-black uppercase">{vitality.label}</span>
-                          </div>
-
-                          <div className={`flex items-center gap-1 text-[9px] font-bold ${trendColor}`}>
-                              <TrendIcon size={10} />
-                              {diff > 0 ? '+' : ''}{formatHealth(diff)}
-                          </div>
-                      </div>
-
-                      <div className="text-[9px] font-mono text-zinc-500 text-right mt-0.5">
-                          {getDateLabel(point.date)}
-                      </div>
-                  </div>
-              </div>
-          </div>
+          <VitalitySnapshotCard 
+             point={point} 
+             prevPoint={prevPoint} 
+             oneHourAgoPoint={oneHourAgoPoint}
+             onClose={() => setSelectedIdx(null)}
+             positionClass={positionClass}
+          />
       );
   };
 
@@ -155,33 +256,35 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
       {renderTooltip()}
 
       {/* INTERACTIVE RIBBON */}
-      <div className="flex gap-[2px] w-full h-2 md:h-3">
+      <div className="flex gap-[2px] w-full h-2 md:h-3 items-end">
         {slots.map((_, i) => {
-          // Align slots to the END of the data array (Right Aligned)
-          // If we have 10 data points and 30 slots, the first 20 slots are empty.
-          // slot 0 -> data[length - 30] (undefined)
-          // slot 29 -> data[length - 1] (last point)
-          
+          // Right-Align Logic
           const dataIndex = displayData.length - (days - i);
           const point = displayData[dataIndex];
-          const isSelected = selectedIdx === i;
+          const isSelected = selectedIdx === dataIndex;
 
           let finalColor = 'bg-zinc-800/30';
-          
+          let heightClass = 'h-full';
+          let isEvent = false;
+
           if (point) {
              const absoluteIndex = startIndex + dataIndex;
              const prevPoint = sortedHistory[absoluteIndex - 1];
-             
-             // Look up 1-hour context for coloring logic
              const pointTime = new Date(point.date).getTime();
-             const oneHourAgoPoint = sortedHistory.find(p => {
-                  const t = new Date(p.date).getTime();
-                  return (pointTime - t) > 3600000 && (pointTime - t) < 4000000;
-             });
+             const oneHourAgoPoint = sortedHistory.find(p => (pointTime - new Date(p.date).getTime()) > 3600000);
 
              const vitality = analyzePointVitality(point, prevPoint, oneHourAgoPoint);
-             
              finalColor = vitality.color;
+
+             // Visual Height Variation based on Score (Vitality Density)
+             // Score < 50 = 60% height, Score > 80 = 100% height
+             // This gives a subtle "skyline" effect where dips are visible
+             if (point.health < 50) heightClass = 'h-[60%]';
+             else if (point.health < 80) heightClass = 'h-[80%]';
+
+             // Event Marker Logic
+             if (vitality.state === 'UNSTABLE' || vitality.state === 'WARMUP') isEvent = true;
+
              if (customColor) finalColor = customColor; 
           }
 
@@ -191,15 +294,21 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
           return (
             <div 
               key={i} 
-              onClick={(e) => { e.stopPropagation(); point && setSelectedIdx(isSelected ? null : i); }}
+              onClick={(e) => { e.stopPropagation(); point && setSelectedIdx(isSelected ? null : dataIndex); }}
               className={`
-                  flex-1 rounded-[1px] transition-all duration-200 relative group
+                  flex-1 rounded-[1px] transition-all duration-300 relative group
                   ${!customColor ? finalColor : ''} 
-                  ${point ? 'cursor-pointer hover:opacity-100 hover:scale-y-150 origin-bottom' : 'opacity-20 cursor-default'}
-                  ${isSelected ? 'opacity-100 scale-y-150 ring-1 ring-white/50 z-10 shadow-[0_0_10px_rgba(255,255,255,0.3)]' : 'opacity-80'}
+                  ${heightClass}
+                  ${point ? 'cursor-pointer hover:opacity-100 hover:scale-y-125 origin-bottom' : 'opacity-20 cursor-default'}
+                  ${isSelected ? 'opacity-100 scale-y-125 ring-1 ring-white/50 z-10 shadow-[0_0_10px_rgba(255,255,255,0.3)]' : 'opacity-80'}
               `} 
               style={style}
-            />
+            >
+                {/* Micro Event Dot */}
+                {isEvent && (
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -mt-1 w-[2px] h-[2px] bg-white rounded-full shadow-sm animate-pulse"></div>
+                )}
+            </div>
           );
         })}
       </div>
