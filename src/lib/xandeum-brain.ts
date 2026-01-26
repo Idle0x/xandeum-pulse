@@ -6,6 +6,7 @@ import {
   compareVersions, 
   calculateVitalityScore 
 } from './xandeum-math';
+import { fetchNodeHistoryReport, HistoryContext } from '../utils/historyAggregator';
 
 // --- CONFIGURATION ---
 
@@ -157,14 +158,15 @@ async function resolveLocations(ips: string[]) {
 export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<{ nodes: EnrichedNode[], stats: any }> {
 
   // ---------------------------------------------------------
-  // PHASE 1: COLLECTION (Dual Hero + Orchestrator)
+  // PHASE 1: COLLECTION (Dual Hero + Orchestrator + History)
   // ---------------------------------------------------------
 
-  const [rawPrivateNodes, operatorNode, rawPublicNodes, creditsData] = await Promise.all([
+  const [rawPrivateNodes, operatorNode, rawPublicNodes, creditsData, historyReport] = await Promise.all([
     fetchPrivateMainnetNodes(),      // Hero A (Private)
     fetchOperatorNode(),             // Operator Injection
     publicOrchestrator.fetchNodes(), // Hero B + Passive Discovery (Public)
-    fetchCredits()
+    fetchCredits(),
+    fetchNodeHistoryReport()         // Historical Forensics (24h Report Card)
   ]);
 
   // Inject Operator
@@ -289,7 +291,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   });
 
   // ---------------------------------------------------------
-  // PHASE 3: SCORING & STATS (UNCHANGED)
+  // PHASE 3: SCORING & STATS (UPGRADED with Temporal Vitality)
   // ---------------------------------------------------------
 
   const rawVersionCounts: Record<string, number> = {};
@@ -315,10 +317,24 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     const loc = geoCache.get(ip) || node.location;
     const medianCreditsForScore = node.network === 'MAINNET' ? medianMainnet : medianDevnet;
 
+    // LOOK UP HISTORICAL CONTEXT (Report Card)
+    // We construct the ID to match how it is stored in the DB (usually Pubkey-IP-Network)
+    // Fallback: Default Neutral History
+    let nodeHistory: HistoryContext = { restarts_24h: 0, yield_velocity_24h: 0, consistency_score: 1 };
+    
+    // Attempt standard Stable ID formats
+    const stableId = `${node.pubkey}-${ip}-${node.network}`;
+    
+    if (historyReport.has(stableId)) {
+        nodeHistory = historyReport.get(stableId)!;
+    }
+
+    // CALCULATE VITALITY WITH FORENSICS
     const vitality = calculateVitalityScore(
       node.storage_committed, node.storage_used, node.uptime,
       node.version, consensusVersion, sortedCleanVersions,
-      medianCreditsForScore, node.credits, medianStorage, isCreditsApiOnline
+      medianCreditsForScore, node.credits, medianStorage, isCreditsApiOnline,
+      nodeHistory // Passing the 24h Report Card
     );
 
     return {
