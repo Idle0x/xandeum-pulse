@@ -42,29 +42,50 @@ export const CapacityEvolutionChart = ({
   // --- DYNAMIC X-AXIS FORMATTER ---
   const formatXAxis = useCallback((tickItem: string) => {
     const date = new Date(tickItem);
-    
-    // 1. If viewing just today/24h, we care about the TIME
     if (timeRange === '24H') {
        return date.toLocaleTimeString(undefined, { 
           hour: '2-digit', 
           minute: '2-digit',
-          hour12: false // 14:30 is cleaner than 2:30 PM for charts
+          hour12: false 
        });
     }
-
-    // 2. For longer ranges (7D, 30D, ALL), we care about the DATE
     return date.toLocaleDateString(undefined, { 
        month: 'short', 
        day: 'numeric' 
     });
   }, [timeRange]);
 
-  // --- REFINED Y-AXIS DOMAIN LOGIC ---
+  // --- REFINED Y-AXIS DOMAIN LOGIC (User Vision: 5% Top, 10% Bottom) ---
   const getDomain = useCallback((args: any): [number, number] => {
     const [dataMin, dataMax] = args;
+    
+    // Safety check for invalid data
     if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 1];
-    const lowerBound = Math.max(0, dataMin * 0.90);
-    const upperBound = dataMax * 1.05;
+
+    // 1. Calculate the Range (Delta)
+    const range = dataMax - dataMin;
+    
+    // 2. EDGE CASE: Flat Line (Range is 0)
+    // If the data is completely flat (e.g. consistently 50TB), 
+    // we manually create a +/- 5% buffer around the value so it doesn't look like a wall.
+    if (range === 0) {
+        if (dataMax === 0) return [0, 10]; // If value is 0, show 0-10 scale
+        return [dataMax * 0.9, dataMax * 1.05]; // If value is >0, apply your 10/5 ratio
+    }
+
+    // 3. APPLY YOUR VISION (5% Top, 10% Bottom)
+    // We calculate padding based on the RANGE, not the value.
+    const topPadding = range * 0.05;    // 5% of the movement
+    const bottomPadding = range * 0.10; // 10% of the movement
+
+    let lowerBound = dataMin - bottomPadding;
+    let upperBound = dataMax + topPadding;
+    
+    // 4. ANCHOR TO ZERO (Crucial for "Used" stats)
+    // If the calculated lower bound dips below 0, snap it to 0.
+    // This keeps the chart grounded.
+    if (lowerBound < 0) lowerBound = 0;
+
     return [lowerBound, upperBound];
   }, []);
 
@@ -146,17 +167,17 @@ export const CapacityEvolutionChart = ({
                </defs>
 
                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.5} />
-               
+
                <XAxis 
                   dataKey="date" 
                   axisLine={false} 
                   tickLine={false} 
                   tick={{fontSize: 9, fill: '#71717a'}} 
                   minTickGap={30} 
-                  tickFormatter={formatXAxis} // <--- Updated here
+                  tickFormatter={formatXAxis} 
                   height={15}
                />
-               
+
                <YAxis 
                   axisLine={false} 
                   tickLine={false} 
