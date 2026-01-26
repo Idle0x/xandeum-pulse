@@ -12,7 +12,9 @@ export interface NodeHistoryPoint {
   credits: number;
   reputation: number;
   rank: number;
-  network: string; 
+  network: string;
+  // NEW: Critical for Vitality Genome
+  version?: string; 
 }
 
 export type HistoryTimeRange = '24H' | '3D' | '7D' | '30D' | 'ALL';
@@ -24,7 +26,7 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
 
   useEffect(() => {
     let isMounted = true;
-    if (!node || !node.pubkey) return; // network might be undefined, default to MAINNET
+    if (!node || !node.pubkey) return; 
 
     const targetNetwork = node.network || 'MAINNET';
     const targetAddress = node.address || '0.0.0.0'; 
@@ -33,23 +35,16 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
     async function fetchNodeHistory() {
       setLoading(true);
 
-      // --- STABLE ID LOGIC (SYNCED WITH DEBUGGER & SCRIPT) ---
+      // --- STABLE ID LOGIC ---
       let ipOnly = '0.0.0.0';
-
       if (targetAddress.toLowerCase().includes('private')) {
          ipOnly = 'private';
       } else {
-         ipOnly = targetAddress.includes(':') 
-           ? targetAddress.split(':')[0] 
-           : targetAddress;
+         ipOnly = targetAddress.includes(':') ? targetAddress.split(':')[0] : targetAddress;
       }
-
-      // THE MISSING LINK: GHOST FALLBACK
-      // If the address is empty/null/0.0.0.0, force 'private' to match DB
       if (!ipOnly || ipOnly === '0.0.0.0' || ipOnly === '') {
           ipOnly = 'private';
       }
-      // -------------------------------------------------------
 
       const stableId = `${targetPubkey}-${ipOnly}-${targetNetwork}`;
 
@@ -66,7 +61,7 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
 
         if (!isMounted) return;
 
-        // 3. Map Data
+        // 3. Map Data (ADDED VERSION HERE)
         const rawPoints = (data || []).map((row: any) => ({
           date: row.created_at, 
           health: Number(row.health || 0),
@@ -75,7 +70,8 @@ export const useNodeHistory = (node: Node | undefined, timeRange: HistoryTimeRan
           storage_used: Number(row.storage_used || 0),
           credits: Number(row.credits || 0), 
           rank: Number(row.rank || 0),
-          network: row.network || targetNetwork
+          network: row.network || targetNetwork,
+          version: row.version // Pass the version string
         }));
 
         // 4. Aggregate
