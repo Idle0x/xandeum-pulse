@@ -1,6 +1,11 @@
 import axios from 'axios';
 import geoip from 'geoip-lite';
 import { publicOrchestrator } from './rpc-orchestrator';
+import { 
+  cleanSemver, 
+  compareVersions, 
+  calculateVitalityScore 
+} from './xandeum-math';
 
 // --- CONFIGURATION ---
 
@@ -48,97 +53,12 @@ export interface EnrichedNode {
   health_rank?: number;
 }
 
-// --- HELPERS (Scoring & Versioning - UNCHANGED) ---
-
-export const cleanSemver = (v: string) => {
-  if (!v) return '0.0.0';
-  const mainVer = v.split('-')[0];
-  return mainVer.replace(/[^0-9.]/g, '');
-};
-
-export const compareVersions = (v1: string, v2: string) => {
-  const p1 = cleanSemver(v1).split('.').map(Number);
-  const p2 = cleanSemver(v2).split('.').map(Number);
-  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
-    const n1 = p1[i] || 0;
-    const n2 = p2[i] || 0;
-    if (n1 > n2) return 1;
-    if (n1 < n2) return -1;
-  }
-  return 0;
-};
-
-export const calculateSigmoidScore = (value: number, midpoint: number, steepness: number) =>
-  100 / (1 + Math.exp(-steepness * (value - midpoint)));
-
-export const calculateLogScore = (value: number, median: number, maxScore: number = 100) => {
-  if (median === 0) return value > 0 ? maxScore : 0;
-  return Math.min(maxScore, (maxScore / 2) * Math.log2((value / median) + 1));
-};
-
-export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedCleanVersions: string[]) => {
-  const cleanNode = cleanSemver(nodeVersion);
-  const cleanConsensus = cleanSemver(consensusVersion);
-
-  if (compareVersions(cleanNode, cleanConsensus) >= 0) return 100;
-  const consensusIndex = sortedCleanVersions.indexOf(cleanConsensus);
-  const nodeIndex = sortedCleanVersions.indexOf(cleanNode);
-  if (nodeIndex === -1) return 0;
-  const distance = nodeIndex - consensusIndex;
-  if (distance <= 0) return 100;
-  if (distance === 1) return 90;
-  if (distance === 2) return 70;
-  if (distance === 3) return 50;
-  if (distance === 4) return 30;
-  if (distance === 5) return 10;
-  return Math.max(0, 10 - (distance - 5));
-};
-
-export const calculateVitalityScore = (
-  storageCommitted: number, storageUsed: number, uptimeSeconds: number,
-  version: string, consensusVersion: string, sortedCleanVersions: string[],
-  medianCredits: number, credits: number | null, medianStorage: number,
-  isCreditsApiOnline: boolean
-) => {
-  if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
-
-  const uptimeDays = uptimeSeconds / 86400;
-  let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
-  if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20);
-
-  const baseStorageScore = calculateLogScore(storageCommitted, medianStorage, 100);
-  const utilizationBonus = storageUsed > 0 ? Math.min(15, 5 * Math.log2((storageUsed / (1024 ** 3)) + 2)) : 0;
-  const totalStorageScore = baseStorageScore + utilizationBonus;
-
-  const versionScore = getVersionScoreByRank(version, consensusVersion, sortedCleanVersions);
-
-  let total = 0;
-  let reputationScore: number | null = null;
-
-  if (credits !== null && medianCredits > 0) {
-    reputationScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
-    total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15));
-  } else if (isCreditsApiOnline) {
-    reputationScore = 0;
-    total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (0 * 0.20) + (versionScore * 0.15));
-  } else {
-    total = Math.round((uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20));
-    reputationScore = null;
-  }
-
-  return {
-    total: Math.max(0, Math.min(100, total)),
-    breakdown: { uptime: Math.round(uptimeScore), version: Math.round(versionScore), reputation: reputationScore, storage: Math.round(totalStorageScore) }
-  };
-};
-
 // --- FETCHING (Hero A: Private) ---
 
 async function fetchPrivateMainnetNodes() {
   const privateUrl = process.env.XANDEUM_PRIVATE_RPC_URL;
   if (!privateUrl) { console.warn("XANDEUM_PRIVATE_RPC_URL is not set."); return []; }
 
-  // Serve cache if within 15 seconds (Robustness for Private Blips)
   if (Date.now() - privateMainnetCache.timestamp < 15000 && privateMainnetCache.data.length > 0) {
       return privateMainnetCache.data;
   }
@@ -147,14 +67,12 @@ async function fetchPrivateMainnetNodes() {
   try {
     const res = await axios.post(privateUrl, payload, { timeout: TIMEOUT_RPC });
     if (res.data?.result?.pods && Array.isArray(res.data.result.pods)) {
-      // Update Cache
       privateMainnetCache = { data: res.data.result.pods, timestamp: Date.now() };
       return res.data.result.pods;
     }
   } catch (e) {
     const errMsg = (e as any).message;
     console.warn("Private Mainnet RPC Failed:", errMsg);
-    // On failure, return stale cache if available
     if (privateMainnetCache.data.length > 0) return privateMainnetCache.data;
   }
   return [];
@@ -179,7 +97,7 @@ async function fetchOperatorNode() {
         rpc_port: 6000,
         pubkey: operatorPubkey,
         is_public: false,
-        version: "1.2.0", // Manual override
+        version: "1.2.0",
         uptime: stats.uptime,
         storage_committed: stats.file_size,
         storage_used: 0,
@@ -235,18 +153,13 @@ async function resolveLocations(ips: string[]) {
 
 export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<{ nodes: EnrichedNode[], stats: any }> {
 
-  // ---------------------------------------------------------
-  // PHASE 1: COLLECTION (Dual Hero + Orchestrator)
-  // ---------------------------------------------------------
-
   const [rawPrivateNodes, operatorNode, rawPublicNodes, creditsData] = await Promise.all([
-    fetchPrivateMainnetNodes(),      // Hero A (Private)
-    fetchOperatorNode(),             // Operator Injection
-    publicOrchestrator.fetchNodes(), // Hero B + Passive Discovery (Public)
+    fetchPrivateMainnetNodes(),
+    fetchOperatorNode(),
+    publicOrchestrator.fetchNodes(),
     fetchCredits()
   ]);
 
-  // Inject Operator
   if (operatorNode) {
     const exists = rawPrivateNodes.find((p: any) => p.pubkey === operatorNode.pubkey);
     if (!exists) rawPrivateNodes.unshift(operatorNode);
@@ -277,12 +190,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   const medianMainnet = mainnetValues.sort((a, b) => a - b)[Math.floor(mainnetValues.length / 2)] || 0;
   const medianDevnet = devnetValues.sort((a, b) => a - b)[Math.floor(devnetValues.length / 2)] || 0;
 
-  // ---------------------------------------------------------
-  // PHASE 2: FINGERPRINTING & DEDUPLICATION (UPDATED)
-  // ---------------------------------------------------------
-
   const processedNodes: EnrichedNode[] = [];
-
   const getFingerprint = (p: any, assumedNetwork: 'MAINNET' | 'DEVNET') => {
     const key = p.pubkey || p.public_key;
     const rawCredVal = assumedNetwork === 'MAINNET' ? mainnetCreditMap.get(key) : devnetCreditMap.get(key);
@@ -290,10 +198,8 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     return `${key}|${p.address}|${p.storage_committed}|${p.storage_used}|${p.version}|${p.is_public}|${credits}`;
   };
 
-  // UPDATED: Using Set for strict existence check (no uptime comparison)
   const mainnetFingerprints = new Set<string>();
 
-  // A. PROCESS PRIVATE RPC (ANCHOR) -> ALWAYS MAINNET
   rawPrivateNodes.forEach((pod: any) => {
     const pubkey = pod.pubkey || pod.public_key;
     const ip = pod.address.split(':')[0];
@@ -316,24 +222,15 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       location: { lat: loc.lat, lon: loc.lon, countryName: (loc as any).country || (loc as any).countryName || 'Unknown', countryCode: loc.countryCode, city: loc.city }
     };
     processedNodes.push(node);
-    
-    // UPDATED: Simply add to Set
-    const fingerprint = getFingerprint(pod, 'MAINNET');
-    mainnetFingerprints.add(fingerprint);
+    mainnetFingerprints.add(getFingerprint(pod, 'MAINNET'));
   });
 
-  // B. PROCESS PUBLIC SWARM (Strict Subtraction)
   rawPublicNodes.forEach((pod: any) => {
     const potentialMainnetFingerprint = getFingerprint(pod, 'MAINNET');
     const publicUptime = Number(pod.uptime) || 0;
 
-    // 1. Check if this node is a duplicate Mainnet node
-    // UPDATED: Strict check. If it exists in Private RPC, skip it. No uptime logic.
-    if (mainnetFingerprints.has(potentialMainnetFingerprint)) {
-      return; 
-    }
+    if (mainnetFingerprints.has(potentialMainnetFingerprint)) return;
 
-    // 2. It is either Devnet OR a Mainnet node that Private RPC missed
     const pubkey = pod.pubkey || pod.public_key;
     const ip = pod.address.split(':')[0];
     const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
@@ -367,10 +264,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     processedNodes.push(node);
   });
 
-  // ---------------------------------------------------------
-  // PHASE 3: SCORING & STATS (UNCHANGED)
-  // ---------------------------------------------------------
-
   const rawVersionCounts: Record<string, number> = {};
   const uniqueCleanVersionsSet = new Set<string>();
 
@@ -394,6 +287,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     const loc = geoCache.get(ip) || node.location;
     const medianCreditsForScore = node.network === 'MAINNET' ? medianMainnet : medianDevnet;
 
+    // Use shared math function
     const vitality = calculateVitalityScore(
       node.storage_committed, node.storage_used, node.uptime,
       node.version, consensusVersion, sortedCleanVersions,
