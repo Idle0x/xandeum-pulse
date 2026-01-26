@@ -1,9 +1,8 @@
 import { useState, useMemo } from 'react';
-import { ChevronDown, ChevronUp, Eye, EyeOff, History, LineChart, Bug } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, History, LineChart } from 'lucide-react';
 import { Node } from '../../types';
 import { useNodeHistory } from '../../hooks/useNodeHistory';
 import { DualAxisGrowthChart } from './DualAxisGrowthChart';
-import { NodeDebugger } from '../debug/NodeDebugger';
 
 const TIME_OPTIONS = [
     { label: '24H', value: '24H' },
@@ -15,11 +14,14 @@ const TIME_OPTIONS = [
 
 export const ExpandedRowDetails = ({ node }: { node: Node }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [showDebug, setShowDebug] = useState(false);
   const [timeRange, setTimeRange] = useState<typeof TIME_OPTIONS[number]['value']>('24H');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  
+  // View State
   const [viewMode, setViewMode] = useState<'CHART' | 'TABLE'>('CHART');
-  const [chartMode, setChartMode] = useState<'ACCUMULATION' | 'VELOCITY'>('ACCUMULATION'); // Mode State
+  
+  // Chart Controls
+  const [chartMode, setChartMode] = useState<'ACCUMULATION' | 'VELOCITY'>('ACCUMULATION');
   const [isModeDropdownOpen, setIsModeDropdownOpen] = useState(false);
   const [showRank, setShowRank] = useState(false); 
 
@@ -71,7 +73,6 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                     bgColor = '#eab308'; // Yellow-500
                     opacity = 0.6;
                 }
-                // Else: Grey (Yield 0 & Health 0) -> Already set as default
 
                 return (
                     <div 
@@ -90,6 +91,8 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
 
   return (
     <div className="border-t border-zinc-800/50 pt-0.5 mt-0.5 bg-gradient-to-b from-zinc-900/10 to-zinc-900/30">
+       
+       {/* TOGGLE ROW */}
        <div className="flex items-center justify-center w-full relative">
            <button 
                 onClick={() => setIsOpen(!isOpen)} 
@@ -98,20 +101,10 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                 {isOpen ? 'Hide History' : 'Show Historical Earnings'}
                 {isOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
            </button>
-           {isOpen && (
-               <button 
-                   onClick={(e) => { e.stopPropagation(); setShowDebug(!showDebug); }}
-                   className={`absolute right-2 p-1 rounded hover:bg-zinc-800 transition-colors ${showDebug ? 'text-fuchsia-400 bg-fuchsia-900/20' : 'text-zinc-700 hover:text-zinc-500'}`}
-                   title="Toggle Debug Mode"
-               >
-                   <Bug size={10} />
-               </button>
-           )}
        </div>
 
        {isOpen && (
            <div className="px-2 pb-2 pt-1 animate-in slide-in-from-top-1 duration-200">
-               {showDebug && <NodeDebugger node={node} />}
 
                {/* TOP CONTROLS */}
                <div className="flex justify-between items-center mb-1 relative z-30">
@@ -149,7 +142,7 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                    <Ribbon />
                </div>
 
-               {/* CHART CONTROLS */}
+               {/* CHART / TABLE CONTROLS */}
                <div className="flex justify-between items-center mb-1 px-1 relative z-20">
                    {viewMode === 'CHART' ? (
                         <button 
@@ -195,7 +188,7 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                        <DualAxisGrowthChart 
                             history={cleanHistory} 
                             loading={loading} 
-                            mode={chartMode} // PASSING THE MODE
+                            mode={chartMode} 
                             showRank={showRank}
                             timeRange={timeRange}
                         />
