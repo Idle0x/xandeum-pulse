@@ -23,15 +23,15 @@ interface RpcNode {
 }
 
 interface CreditNode {
-  pod_id: string;
+  pod_id?: string;
+  pubkey?: string; // Fallback
+  id?: string;     // Fallback
   credits: number;
 }
 
 // --- HELPERS ---
 function getConsensusMetrics(nodeList: any[]) {
   if (!nodeList || nodeList.length === 0) return { version: '0.0.0', score: 0 };
-
-  // Only count active nodes (non-ghosts) for consensus versioning
   const activeNodes = nodeList.filter(n => (n.uptime || 0) > 0);
   if (activeNodes.length === 0) return { version: '0.0.0', score: 0 };
 
@@ -67,8 +67,11 @@ function getFinancialMetrics(nodeRows: any[]) {
   return { total, avg, dominance: parseFloat(dominance.toFixed(2)) };
 }
 
+// Helper to safely extract ID regardless of API variations
+const getSafeKey = (c: CreditNode) => c.pod_id || c.pubkey || c.id || 'unknown';
+
 async function runMonitor() {
-  console.log("xx 🏥 Starting Unified Network Indexer...");
+  console.log("xx 🏥 Starting Pulse Monitor (Strict Network Separation Mode)...");
 
   try {
     // 1. Parallel Fetching
@@ -89,14 +92,23 @@ async function runMonitor() {
       return [];
     };
 
-    const mainnetCredits = parseCredits(mainnetCreditsRes);
-    const devnetCredits = parseCredits(devnetCreditsRes);
+    const rawMainnetCredits = parseCredits(mainnetCreditsRes);
+    const rawDevnetCredits = parseCredits(devnetCreditsRes);
 
+    // 2. STRICTLY SEPARATE MAPS (Fixes the Overwrite Bug)
     const mainnetCreditMap = new Map<string, number>();
-    mainnetCredits.forEach(c => mainnetCreditMap.set(c.pod_id, c.credits));
+    rawMainnetCredits.forEach(c => {
+        const key = getSafeKey(c);
+        if (key !== 'unknown') mainnetCreditMap.set(key, c.credits);
+    });
 
     const devnetCreditMap = new Map<string, number>();
-    devnetCredits.forEach(c => devnetCreditMap.set(c.pod_id, c.credits));
+    rawDevnetCredits.forEach(c => {
+        const key = getSafeKey(c);
+        if (key !== 'unknown') devnetCreditMap.set(key, c.credits);
+    });
+
+    console.log(`xx Loaded Maps: Mainnet (${mainnetCreditMap.size}), Devnet (${devnetCreditMap.size})`);
 
     const supabase = getServiceSupabase();
     if (!supabase) {
@@ -104,28 +116,32 @@ async function runMonitor() {
       process.exit(0);
     }
 
-    // --- 2. THE MERGE ---
+    // --- 3. THE MERGE ---
     const uniqueNodeRows: any[] = [];
-    const seenPubkeys = new Set<string>();
+    const seenRpcPubkeys = new Set<string>(); // To prevent duplicates in processing
 
+    // Container Buckets for Stats
     const finalAllNodes: any[] = [];
     const finalMainnet: any[] = [];
     const finalDevnet: any[] = [];
 
-    // Process Public Nodes (RPC)
+    // --- PHASE A: PROCESS PUBLIC NODES (RPC) ---
     for (const rpcNode of rpcNodes) {
       const pubkey = rpcNode.pubkey;
       const net = rpcNode.network || 'MAINNET';
       
       let creditVal = 0;
+      
+      // LOOKUP STRICTLY IN MATCHING NETWORK MAP
       if (net === 'MAINNET') {
         creditVal = mainnetCreditMap.get(pubkey) || 0;
-        mainnetCreditMap.delete(pubkey); 
+        mainnetCreditMap.delete(pubkey); // Remove so we know it's "claimed"
       } else {
         creditVal = devnetCreditMap.get(pubkey) || 0;
-        devnetCreditMap.delete(pubkey); 
+        devnetCreditMap.delete(pubkey); // Remove so we know it's "claimed"
       }
 
+      // Priority: API Credits > RPC Credits
       const finalCredits = creditVal > 0 ? creditVal : (rpcNode.credits || 0);
 
       const processedNode = { ...rpcNode, credits: finalCredits, is_ghost: false };
@@ -133,7 +149,17 @@ async function runMonitor() {
       if (net === 'MAINNET') finalMainnet.push(processedNode);
       if (net === 'DEVNET') finalDevnet.push(processedNode);
 
-      const ipOnly = rpcNode.address ? rpcNode.address.split(':')[0] : '0.0.0.0';
+      // --- ID GENERATION (Updated to handle "Semi-Ghosts") ---
+      // If a node is RPC but has no IP, force "private" to match Frontend logic
+      let ipOnly = '0.0.0.0';
+      const rawAddr = rpcNode.address;
+      
+      if (!rawAddr || rawAddr === '' || rawAddr.startsWith('0.0.0.0') || rawAddr === 'null') {
+         ipOnly = 'private'; // FORCE PRIVATE
+      } else {
+         ipOnly = rawAddr.split(':')[0];
+      }
+
       const stableId = `${pubkey}-${ipOnly}-${net}`; 
 
       uniqueNodeRows.push({
@@ -149,50 +175,61 @@ async function runMonitor() {
         created_at: new Date().toISOString()
       });
 
-      seenPubkeys.add(pubkey);
+      seenRpcPubkeys.add(pubkey);
     }
 
-    // Process Ghost Nodes (Remaining Credits)
-    const processGhosts = (map: Map<string, number>, network: string, bucket: any[]) => {
-      for (const [pubkey, credits] of map.entries()) {
-        if (seenPubkeys.has(pubkey)) continue;
-
+    // --- PHASE B: PROCESS GHOST NODES (REMAINING CREDITS) ---
+    
+    // 1. Process Remaining MAINNET Ghosts
+    for (const [pubkey, credits] of mainnetCreditMap.entries()) {
+        // Even if we saw this pubkey on Devnet RPC, it is a valid Mainnet Ghost here
+        // We do NOT check seenRpcPubkeys globally, because a node can exist on both nets.
+        
         const ghostNode = {
           pubkey: pubkey,
-          network: network,
-          address: 'private', // MARKED AS PRIVATE
-          health: 0,
-          uptime: 0,
-          credits: credits,
-          is_ghost: true
+          network: 'MAINNET', // STRICTLY MAINNET
+          address: 'private',
+          health: 0, uptime: 0, credits: credits, is_ghost: true
         };
 
         finalAllNodes.push(ghostNode);
-        bucket.push(ghostNode);
-
-        const stableId = `${pubkey}-private-${network}`; // GHOST ID
+        finalMainnet.push(ghostNode);
 
         uniqueNodeRows.push({
-          node_id: stableId,
+          node_id: `${pubkey}-private-MAINNET`,
           pubkey: pubkey,
-          network: network,
-          health: 0,
-          credits: credits,
-          storage_committed: 0,
-          storage_used: 0,
-          uptime: 0,
-          rank: 0,
+          network: 'MAINNET',
+          health: 0, credits: credits, 
+          storage_committed: 0, storage_used: 0, uptime: 0, rank: 0,
           created_at: new Date().toISOString()
         });
-      }
-    };
+    }
 
-    processGhosts(mainnetCreditMap, 'MAINNET', finalMainnet);
-    processGhosts(devnetCreditMap, 'DEVNET', finalDevnet);
+    // 2. Process Remaining DEVNET Ghosts
+    for (const [pubkey, credits] of devnetCreditMap.entries()) {
+        const ghostNode = {
+          pubkey: pubkey,
+          network: 'DEVNET', // STRICTLY DEVNET
+          address: 'private',
+          health: 0, uptime: 0, credits: credits, is_ghost: true
+        };
+
+        finalAllNodes.push(ghostNode);
+        finalDevnet.push(ghostNode);
+
+        uniqueNodeRows.push({
+          node_id: `${pubkey}-private-DEVNET`,
+          pubkey: pubkey,
+          network: 'DEVNET',
+          health: 0, credits: credits, 
+          storage_committed: 0, storage_used: 0, uptime: 0, rank: 0,
+          created_at: new Date().toISOString()
+        });
+    }
 
     console.log(`xx Metrics: ${rpcNodes.length} Public + ${uniqueNodeRows.length - rpcNodes.length} Ghosts processed.`);
 
-    // --- 3. AGGREGATES ---
+    // --- 4. AGGREGATES ---
     const calcStats = (nodes: any[]) => {
       let cap = 0, used = 0, healthSum = 0, healthCount = 0, stabSum = 0, stabCount = 0;
       
@@ -228,7 +265,7 @@ async function runMonitor() {
     const mainnetFin = getFinancialMetrics(uniqueNodeRows.filter(n => n.network === 'MAINNET'));
     const devnetFin = getFinancialMetrics(uniqueNodeRows.filter(n => n.network === 'DEVNET'));
 
-    // --- 4. INSERT ---
+    // --- 5. INSERT ---
     const { error: netError } = await supabase.from('network_snapshots').insert({
       total_nodes: finalAllNodes.length,
       total_capacity: globalStats.cap,
