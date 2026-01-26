@@ -3,9 +3,9 @@ import {
   compareVersions, 
   calculateVitalityScore,
   getVersionScoreByRank
-} from '../../src/lib/xandeum-brain';
+} from '../../src/lib/xandeum-math'; // <--- UPDATED IMPORT PATH
 
-describe('Xandeum Brain (Unit Logic)', () => {
+describe('Xandeum Math (Unit Logic)', () => {
 
   // --- 1. SEMVER PRECISION TESTS ---
   describe('Version Normalization', () => {
@@ -56,7 +56,8 @@ describe('Xandeum Brain (Unit Logic)', () => {
         SORTED_VERSIONS,
         MEDIAN_CREDITS,
         10000, // High Credits
-        MEDIAN_STORAGE
+        MEDIAN_STORAGE,
+        true // API Online
       );
 
       expect(result.total).toBe(0);
@@ -73,7 +74,8 @@ describe('Xandeum Brain (Unit Logic)', () => {
         SORTED_VERSIONS,
         MEDIAN_CREDITS,
         null, // <--- API IS OFFLINE (Null)
-        MEDIAN_STORAGE
+        MEDIAN_STORAGE,
+        false // Is Credits API Online? False
       );
 
       // Should still generate a score, just re-weighted
@@ -92,7 +94,8 @@ describe('Xandeum Brain (Unit Logic)', () => {
         SORTED_VERSIONS,
         MEDIAN_CREDITS,
         5000,
-        MEDIAN_STORAGE
+        MEDIAN_STORAGE,
+        true
       );
 
       // Sigmoid curve should punish low uptime heavily
@@ -109,7 +112,8 @@ describe('Xandeum Brain (Unit Logic)', () => {
         SORTED_VERSIONS,
         MEDIAN_CREDITS,
         10000, // High Credits
-        MEDIAN_STORAGE
+        MEDIAN_STORAGE,
+        true
       );
 
       // Score might cap at 100 or be very close
@@ -133,8 +137,8 @@ describe('Xandeum Brain (Unit Logic)', () => {
     test('DEATH ZONE: 6 versions behind receives severe penalty', () => {
       // 1.5.0 -> 1.4 -> 1.3 -> 1.2 -> 1.1 -> 1.0 (5 steps away)
       const score = getVersionScoreByRank('1.0.0', CONSENSUS, LIST);
+      // Distance is 5. Score is 10. 10 < 20.
       expect(score).toBeLessThan(20);
     });
   });
-
 });
