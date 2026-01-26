@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
-import { ChevronDown, ChevronUp, Eye, EyeOff, History, LineChart } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, History, LineChart, Bug } from 'lucide-react';
 import { Node } from '../../types';
 import { useNodeHistory } from '../../hooks/useNodeHistory';
 import { DualAxisGrowthChart } from './DualAxisGrowthChart';
+import { NodeDebugger } from './NodeDebugger'; // <--- IMPORT THE DEBUGGER
 
 const TIME_OPTIONS = [
     { label: '24H', value: '24H' },
@@ -14,6 +15,8 @@ const TIME_OPTIONS = [
 
 export const ExpandedRowDetails = ({ node }: { node: Node }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showDebug, setShowDebug] = useState(false); // <--- DEBUG STATE
+  
   const [timeRange, setTimeRange] = useState<typeof TIME_OPTIONS[number]['value']>('24H');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
@@ -68,21 +71,38 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
       );
   };
 
-  // Helper to get reversed history for the table view
   const reversedHistory = useMemo(() => [...cleanHistory].reverse(), [cleanHistory]);
 
   return (
     <div className="border-t border-zinc-800/50 pt-0.5 mt-0.5 bg-gradient-to-b from-zinc-900/10 to-zinc-900/30">
-       <button 
-         onClick={() => setIsOpen(!isOpen)} 
-         className={`w-full flex items-center justify-center gap-2 py-1.5 text-[9px] font-bold uppercase tracking-widest transition-colors ${isOpen ? 'text-zinc-300' : 'text-zinc-600 hover:text-zinc-400'}`}
-       >
-          {isOpen ? 'Hide History' : 'Show Historical Earnings'}
-          {isOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-       </button>
+       
+       {/* TOGGLE ROW */}
+       <div className="flex items-center justify-center w-full relative">
+           <button 
+                onClick={() => setIsOpen(!isOpen)} 
+                className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-[9px] font-bold uppercase tracking-widest transition-colors ${isOpen ? 'text-zinc-300' : 'text-zinc-600 hover:text-zinc-400'}`}
+           >
+                {isOpen ? 'Hide History' : 'Show Historical Earnings'}
+                {isOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+           </button>
+           
+           {/* BUG ICON TOGGLE (Only visible when expanded or hovered) */}
+           {isOpen && (
+               <button 
+                   onClick={(e) => { e.stopPropagation(); setShowDebug(!showDebug); }}
+                   className={`absolute right-2 p-1 rounded hover:bg-zinc-800 transition-colors ${showDebug ? 'text-fuchsia-400 bg-fuchsia-900/20' : 'text-zinc-700 hover:text-zinc-500'}`}
+                   title="Toggle Debug Mode"
+               >
+                   <Bug size={10} />
+               </button>
+           )}
+       </div>
 
        {isOpen && (
            <div className="px-2 pb-2 pt-1 animate-in slide-in-from-top-1 duration-200">
+
+               {/* --- DEBUGGER INJECTION --- */}
+               {showDebug && <NodeDebugger node={node} />}
 
                {/* TOP CONTROLS */}
                <div className="flex justify-between items-center mb-1 relative z-30">
@@ -162,7 +182,7 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                    )}
                </div>
 
-               {/* MAIN VISUALIZATION AREA (Swaps between Chart and Table) */}
+               {/* MAIN VISUALIZATION AREA */}
                <div className="h-32 border border-zinc-800/40 rounded-lg bg-black/20 p-1 relative overflow-hidden">
                    {viewMode === 'CHART' ? (
                        <DualAxisGrowthChart 
@@ -183,19 +203,15 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                                    <thead className="sticky top-0 bg-zinc-950/90 backdrop-blur border-b border-zinc-800 text-zinc-500 uppercase z-10">
                                        <tr>
                                            <th className="text-left py-1.5 px-2 font-bold tracking-wider">Timestamp</th>
-                                           {/* Added Yield Header - Right Aligned to group with Credits */}
                                            <th className="text-right py-1.5 px-2 font-bold tracking-wider text-zinc-600/80">Yield</th>
                                            <th className="text-right py-1.5 px-2 font-bold tracking-wider">Credits</th>
                                        </tr>
                                    </thead>
                                    <tbody className="divide-y divide-zinc-900/50">
-                                       {/* Rendering from helper to keep mapping clean */}
                                        {reversedHistory.map((point, i) => {
-                                           // Calculate Yield relative to the previous chronological entry
-                                           // reversedHistory[i+1] is the data point from the "day before" current point
                                            const prevPoint = reversedHistory[i + 1];
                                            const yieldAmount = prevPoint ? point.credits - prevPoint.credits : 0;
-                                           
+
                                            return (
                                                <tr key={i} className="hover:bg-zinc-900/30 transition-colors">
                                                    <td className="py-1 px-2 text-zinc-400">
@@ -203,12 +219,9 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                                                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                                                        })}
                                                    </td>
-                                                   
-                                                   {/* New Yield Column */}
                                                    <td className="py-1 px-2 text-right text-zinc-600 italic">
                                                        {yieldAmount > 0 ? '+' : ''}{yieldAmount > 0 ? yieldAmount.toLocaleString() : '-'}
                                                    </td>
-
                                                    <td className="py-1 px-2 text-right font-bold text-yellow-500/90">
                                                        {point.credits.toLocaleString()}
                                                    </td>
@@ -237,7 +250,6 @@ export const ExpandedRowDetails = ({ node }: { node: Node }) => {
                             {stats.creditChange > 0 ? '+' : ''}{stats.creditChange.toLocaleString()}
                         </span>
 
-                        {/* TOGGLE BUTTON */}
                         <button 
                             onClick={() => setViewMode(viewMode === 'CHART' ? 'TABLE' : 'CHART')}
                             className={`ml-1 p-1 rounded hover:bg-zinc-800 transition-colors ${viewMode === 'TABLE' ? 'text-yellow-500 bg-zinc-900' : 'text-zinc-600 hover:text-zinc-400'}`}
