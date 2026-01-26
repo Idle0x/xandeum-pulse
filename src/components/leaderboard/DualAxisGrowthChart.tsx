@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import {
   LineChart,
   Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
@@ -12,45 +14,71 @@ import {
 export const DualAxisGrowthChart = ({ 
   history, 
   loading, 
-  mode, 
+  mode, // 'ACCUMULATION' or 'VELOCITY'
   showRank, 
   timeRange 
 }: any) => {
 
   const data = useMemo(() => {
       if (!history || history.length === 0) return [];
-      return [...history].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [history]);
+      
+      // 1. Sort Chronologically
+      const sorted = [...history].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // FIX: CALCULATE DOMAIN MANUALLY FOR FLATLINE SUPPORT
+      // 2. If Velocity Mode, calculate daily yield
+      if (mode === 'VELOCITY') {
+          return sorted.map((item, i) => {
+              const prev = sorted[i - 1];
+              // First point has 0 yield, others have (Current - Previous)
+              const yieldVal = prev ? item.credits - prev.credits : 0;
+              return { ...item, yield: yieldVal };
+          });
+      }
+
+      return sorted;
+  }, [history, mode]);
+
+  // DYNAMIC DOMAIN SCALING (Fixes Flatlines)
   const domainSettings = useMemo(() => {
       if (data.length === 0) return { min: 0, max: 100 };
 
-      const values = data.map((d: any) => d.credits);
+      // Choose which key to measure based on mode
+      const key = mode === 'VELOCITY' ? 'yield' : 'credits';
+      const values = data.map((d: any) => d[key]);
+      
       const minVal = Math.min(...values);
       const maxVal = Math.max(...values);
 
-      // If Flatline (0 Variance), create a forced buffer so Recharts can draw it
+      // Flatline Fix (Variance == 0)
       if (minVal === maxVal) {
           return {
               min: Math.max(0, minVal - 10),
               max: maxVal + 10
           };
       }
+      // Standard Auto-scale
       return { min: 'auto', max: 'auto' };
-  }, [data]);
+  }, [data, mode]);
 
   if (loading) return <div className="w-full h-full flex items-center justify-center text-[9px] text-zinc-600 animate-pulse">Loading Chart...</div>;
-  
-  if (!data || data.length === 0) {
-      return <div className="w-full h-full flex items-center justify-center text-[9px] text-zinc-600">No Data Available</div>;
-  }
+  if (!data || data.length === 0) return <div className="w-full h-full flex items-center justify-center text-[9px] text-zinc-600">No Data Available</div>;
+
+  const ChartComponent = mode === 'VELOCITY' ? AreaChart : LineChart;
+  // Velocity = Emerald (Green), Accumulation = Amber (Gold)
+  const mainColor = mode === 'VELOCITY' ? '#10b981' : '#eab308'; 
 
   return (
     <div className="w-full h-full min-h-[100px]">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data}>
+        <ChartComponent data={data}>
             <defs>
+                {/* VELOCITY GRADIENT (Green) */}
+                <linearGradient id="colorYield" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/> {/* 30% Opacity */}
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                </linearGradient>
+
+                {/* ACCUMULATION GRADIENT (Gold) */}
                 <linearGradient id="colorCredits" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#eab308" stopOpacity={0.3}/>
                     <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
@@ -77,7 +105,7 @@ export const DualAxisGrowthChart = ({
                 yAxisId="right"
                 orientation="right"
                 domain={[domainSettings.min, domainSettings.max]} 
-                tick={{ fontSize: 9, fill: '#eab308' }}
+                tick={{ fontSize: 9, fill: mainColor }}
                 axisLine={false}
                 tickLine={false}
                 width={40}
@@ -88,24 +116,37 @@ export const DualAxisGrowthChart = ({
                 contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', borderRadius: '4px', fontSize: '10px' }}
                 itemStyle={{ color: '#e4e4e7' }}
                 labelStyle={{ color: '#a1a1aa', marginBottom: '2px' }}
-                // FIX: Changed 'name: string' to 'name: any' to handle potential undefined values from Recharts
                 formatter={(value: any, name: any) => [
                     value.toLocaleString(), 
+                    mode === 'VELOCITY' && name === 'yield' ? 'Yield' :
                     name === 'credits' ? 'Credits' : 'Rank'
                 ]}
                 labelFormatter={(label) => new Date(label).toLocaleString()}
             />
 
-            <Line 
-                yAxisId="right"
-                type="monotone" 
-                dataKey="credits" 
-                stroke="#eab308" 
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4, fill: '#eab308' }}
-                animationDuration={500}
-            />
+            {/* CONDITIONAL RENDERING BASED ON MODE */}
+            {mode === 'VELOCITY' ? (
+                <Area
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="yield"
+                    stroke="#10b981"
+                    fill="url(#colorYield)"
+                    strokeWidth={2}
+                    animationDuration={500}
+                />
+            ) : (
+                <Line 
+                    yAxisId="right"
+                    type="monotone" 
+                    dataKey="credits" 
+                    stroke="#eab308" 
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4, fill: '#eab308' }}
+                    animationDuration={500}
+                />
+            )}
 
             {showRank && (
                  <Line 
@@ -118,7 +159,7 @@ export const DualAxisGrowthChart = ({
                     opacity={0.5}
                  />
             )}
-        </LineChart>
+        </ChartComponent>
       </ResponsiveContainer>
     </div>
   );
