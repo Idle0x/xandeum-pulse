@@ -28,7 +28,7 @@ export const useMultiNodeHistory = (nodes: Node[], timeRange: HistoryTimeRange =
           const targetAddress = node.address || '0.0.0.0';
           const network = node.network || 'MAINNET';
 
-          // --- STABLE ID LOGIC (Synced with runMonitor) ---
+          // --- STABLE ID LOGIC (SYNCED WITH DEBUGGER & SCRIPT) ---
           let ipOnly = '0.0.0.0';
 
           if (targetAddress.toLowerCase().includes('private')) {
@@ -39,8 +39,13 @@ export const useMultiNodeHistory = (nodes: Node[], timeRange: HistoryTimeRange =
                : targetAddress;
           }
 
+          // THE MISSING LINK: GHOST FALLBACK
+          if (!ipOnly || ipOnly === '0.0.0.0' || ipOnly === '') {
+              ipOnly = 'private';
+          }
+          // -------------------------------------------------------
+
           const stableId = `${node.pubkey}-${ipOnly}-${network}`;
-          // ------------------------------------------------
 
           try {
             const data = await getNodeHistoryAction(stableId, network, days);
