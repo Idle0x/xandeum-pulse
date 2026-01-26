@@ -101,7 +101,7 @@ export default function Home() {
   // --- NEW: INITIALIZE NETWORK FROM URL ---
   useEffect(() => {
     if (!router.isReady) return;
-    
+
     // Check if 'network' query param exists
     const { network } = router.query;
     if (network) {
@@ -127,25 +127,30 @@ export default function Home() {
   }, [searchQuery, networkFilter, sortBy, sortOrder]);
 
 
-  // --- ADVANCED DEEP LINKING LOGIC ---
+  // --- ADVANCED DEEP LINKING LOGIC (FIXED) ---
   useEffect(() => {
+    // 1. Basic Guard Clauses
     if (loading || !router.isReady || !router.query.open || nodes.length === 0) return;
 
     const targetKey = router.query.open as string;
-    const targetNetwork = router.query.network as string; // This might be used by the new sync logic too
+    
+    // 2. Strict Guard Clause
+    // We strictly check ONLY the pubkey (targetKey).
+    // Even if 'router.query' changes due to network switching, this check 
+    // prevents the logic from running again for the same node.
+    if (lastProcessedDeepLink.current === targetKey) return;
+
+    const targetNetwork = router.query.network as string; 
     const targetAddr = router.query.focusAddr as string;
 
-    const requestSignature = `${targetKey}-${targetNetwork}-${targetAddr}`;
-
-    // Prevent infinite loop if already handled
-    if (lastProcessedDeepLink.current === requestSignature) return;
-
+    // 3. Find the Node
     let match = nodes.find(n => 
         n.pubkey === targetKey && 
         (!targetNetwork || n.network === targetNetwork) &&
         (!targetAddr || n.address === targetAddr)
     );
-    // Fallbacks
+
+    // Fallbacks if specific network/address constraints fail
     if (!match && targetNetwork) {
         match = nodes.find(n => n.pubkey === targetKey && n.network === targetNetwork);
     }
@@ -153,17 +158,17 @@ export default function Home() {
         match = nodes.find(n => n.pubkey === targetKey);
     }
 
+    // 4. Execute Open Logic
     if (match) {
-        lastProcessedDeepLink.current = requestSignature;
-        // If node is hidden by current filter, force update filter using our new helper
+        // Mark this specific PubKey as processed immediately
+        lastProcessedDeepLink.current = targetKey;
+
+        // If the node exists but is hidden by the current filter, switch to ALL
         if (match.network !== networkFilter && networkFilter !== 'ALL') {
-             // We don't use updateNetwork here to avoid overwriting the 'open' query param flow immediately, 
-             // but we could. For safety in deep linking, simple state set is often safer unless we want to persist 'ALL'
-             // Let's use updateNetwork to keep URL clean and synced.
-             // However, deep linking logic often has its own complex URL params. 
-             // Let's stick to setNetworkFilter('ALL') here to avoid fighting the router if it's already navigating
+             // We use setNetworkFilter directly to avoid fighting the router if navigation is in progress
              setNetworkFilter('ALL'); 
         }
+        
         setSelectedNode(match);
     }
   }, [loading, router.isReady, router.query, nodes, networkFilter]);
@@ -204,7 +209,7 @@ export default function Home() {
     if (networkFilter === 'ALL') next = 'MAINNET';
     else if (networkFilter === 'MAINNET') next = 'DEVNET';
     else next = 'ALL';
-    
+
     updateNetwork(next);
   };
 
