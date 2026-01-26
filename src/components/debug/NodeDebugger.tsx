@@ -2,223 +2,224 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { getNodeHistoryAction } from '../../app/actions/getHistory'; 
 import { Node } from '../../types';
-import { consolidateHistory } from '../../utils/historyAggregator'; 
+
+// --- TYPES ---
+type CheckStatus = 'PASS' | 'FAIL' | 'WARN' | 'INFO';
+
+interface DiagnosticCheck {
+  id: string;
+  category: 'INPUT' | 'LOGIC' | 'DATABASE' | 'DATA_INTEGRITY' | 'CHART';
+  label: string;
+  status: CheckStatus;
+  message: string;
+  value?: string | number | boolean;
+}
 
 export const NodeDebugger = ({ node }: { node: Node }) => {
-  const [report, setReport] = useState<any>(null);
+  const [checks, setChecks] = useState<DiagnosticCheck[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function runDeepDiagnostics() {
+    async function runAllScenarios() {
       if (!node) return;
       setLoading(true);
-
-      const log = {
-        step1_ids: { status: 'PENDING', details: '' },
-        step2_fetch: { status: 'PENDING', count: 0, sample: null },
-        step3_mapping: { status: 'PENDING', validDates: 0, invalidDates: 0 },
-        step4_filtering: { status: 'PENDING', kept: 0, dropped: 0, reason: '' },
-        step5_consolidation: { status: 'PENDING', input: 0, output: 0 },
-        // FIX: Initialize as string '0' so toFixed(2) is accepted later
-        final_chart_ready: { status: 'PENDING', points: 0, spanMinutes: '0' }
+      setError(null);
+      
+      const results: DiagnosticCheck[] = [];
+      const addCheck = (cat: DiagnosticCheck['category'], label: string, status: CheckStatus, msg: string, val?: any) => {
+        results.push({ id: label.toLowerCase().replace(/\s/g, '_'), category: cat, label, status, message: msg, value: val });
       };
 
       try {
-        // --- STEP 1: ID GENERATION ---
-        const targetAddress = node.address || '0.0.0.0';
-        const defaultNetwork = node.network || 'MAINNET';
+        // =====================================================================
+        // CATEGORY 1: INPUT INTEGRITY (React Props)
+        // =====================================================================
         
-        let ipOnly = '0.0.0.0';
-        if (targetAddress.toLowerCase().includes('private')) {
-           ipOnly = 'private';
-        } else {
-           ipOnly = targetAddress.includes(':') ? targetAddress.split(':')[0] : targetAddress;
-           if (!ipOnly || ipOnly === '0.0.0.0') ipOnly = 'private';
+        // 1. Node Object Existence
+        addCheck('INPUT', 'Node Exists', node ? 'PASS' : 'FAIL', node ? 'Node object received' : 'Node object is null/undefined');
+
+        // 2. Pubkey Presence
+        addCheck('INPUT', 'Pubkey Valid', node?.pubkey ? 'PASS' : 'FAIL', node?.pubkey ? 'Pubkey found' : 'Missing Pubkey', node?.pubkey);
+
+        // 3. Network Prop
+        const net = node?.network;
+        addCheck('INPUT', 'Network Defined', net ? 'PASS' : 'WARN', net ? `Network is "${net}"` : 'Network prop is undefined (Defaulting to MAINNET)');
+
+        // 4. Address State
+        const addr = node?.address;
+        if (addr === null) addCheck('INPUT', 'Address State', 'INFO', 'Address is explicitly NULL');
+        else if (addr === undefined) addCheck('INPUT', 'Address State', 'INFO', 'Address is UNDEFINED');
+        else if (addr === '') addCheck('INPUT', 'Address State', 'WARN', 'Address is EMPTY STRING');
+        else addCheck('INPUT', 'Address State', 'PASS', 'Address string present', addr);
+
+
+        // =====================================================================
+        // CATEGORY 2: LOGIC & IDENTITY (The Translation Layer)
+        // =====================================================================
+
+        // 5. Logic: Private Keyword Detection
+        const isExplicitPrivate = addr?.toLowerCase().includes('private');
+        addCheck('LOGIC', 'Private Keyword', isExplicitPrivate ? 'INFO' : 'INFO', isExplicitPrivate ? 'Found "private" in address' : 'No "private" keyword found');
+
+        // 6. Logic: Port Stripping
+        let ipSegment = '0.0.0.0';
+        if (addr) {
+             ipSegment = addr.includes(':') ? addr.split(':')[0] : addr;
         }
+        addCheck('LOGIC', 'IP Parsing', 'INFO', `Parsed IP segment: ${ipSegment}`);
 
-        const stableId = `${node.pubkey}-${ipOnly}-${defaultNetwork}`;
-        
-        log.step1_ids = { 
-            status: 'OK', 
-            details: `ID: ${stableId}\nNode Network Prop: ${JSON.stringify(node.network)}` 
-        };
-
-        // --- STEP 2: RAW FETCH (Simulate Server Action) ---
-        // We use the 24H logic (days=1) because that's the default view
-        const rawData = await getNodeHistoryAction(stableId, defaultNetwork, 1); 
-
-        if (!Array.isArray(rawData)) {
-            throw new Error("Server returned non-array");
+        // 7. Logic: Ghost Fallback Trigger
+        let finalIp = ipSegment;
+        if (isExplicitPrivate || !addr || addr === '0.0.0.0') {
+            finalIp = 'private';
         }
+        const usedFallback = finalIp === 'private' && !isExplicitPrivate;
+        addCheck('LOGIC', 'Ghost Fallback', usedFallback ? 'WARN' : 'PASS', usedFallback ? 'Triggered Ghost Fallback (Address was null/empty)' : 'Standard logic used', finalIp);
 
-        log.step2_fetch = { 
-            status: rawData.length > 0 ? 'OK' : 'EMPTY', 
-            count: rawData.length,
-            sample: rawData.length > 0 ? rawData[0] : null
-        };
+        // 8. Logic: Stable ID Generation
+        const targetNet = net || 'MAINNET';
+        const stableId = `${node?.pubkey}-${finalIp}-${targetNet}`;
+        addCheck('LOGIC', 'Stable ID', 'PASS', 'Generated ID successfully', stableId);
 
-        if (rawData.length > 0) {
-            // --- STEP 3: MAPPING SIMULATION ---
-            // This mimics exactly what useNodeHistory does
-            const mappedData = rawData.map((row: any) => {
-                const dateObj = new Date(row.created_at);
-                const isValidDate = !isNaN(dateObj.getTime());
-                return {
-                    ...row,
-                    dateObj,
-                    isValidDate,
-                    network: row.network || defaultNetwork
-                };
-            });
 
-            const validCount = mappedData.filter(d => d.isValidDate).length;
-            log.step3_mapping = {
-                status: validCount === mappedData.length ? 'OK' : 'WARNING',
-                validDates: validCount,
-                invalidDates: mappedData.length - validCount
-            };
+        // =====================================================================
+        // CATEGORY 3: DATABASE FETCH (The Server Action)
+        // =====================================================================
 
-            // --- STEP 4: NETWORK FILTERING SIMULATION ---
-            const filteredData = mappedData.filter((h: any) => {
-                // strict check against prop
-                if (node.network) return h.network === node.network;
-                return true; 
-            });
+        const startTime = performance.now();
+        const data = await getNodeHistoryAction(stableId, targetNet, 7); // 7 Days fetch
+        const duration = performance.now() - startTime;
 
-            log.step4_filtering = {
-                status: filteredData.length > 0 ? 'OK' : 'FAIL',
-                kept: filteredData.length,
-                dropped: mappedData.length - filteredData.length,
-                reason: filteredData.length === 0 ? `Mismatch: Row '${mappedData[0]?.network}' !== Prop '${node.network}'` : 'Match'
-            };
+        // 9. Fetch Success
+        addCheck('DATABASE', 'Fetch Status', Array.isArray(data) ? 'PASS' : 'FAIL', Array.isArray(data) ? 'Returned Array' : 'Returned non-array or error');
 
-            // --- STEP 5: CONSOLIDATION SIMULATION ---
-            const preConsolidate = filteredData.map(d => ({
-                date: d.created_at, // strictly mimic the hook
-                health: Number(d.health || 0),
-                credits: Number(d.credits || 0),
-                network: d.network
-            }));
+        // 10. Fetch Latency
+        addCheck('DATABASE', 'Latency', duration < 1000 ? 'PASS' : 'WARN', `${Math.round(duration)}ms`, Math.round(duration));
 
-            const consolidated = consolidateHistory(preConsolidate, '24H');
+        // 11. Row Count
+        const count = Array.isArray(data) ? data.length : 0;
+        addCheck('DATABASE', 'Row Count', count > 0 ? 'PASS' : 'FAIL', `${count} records found`, count);
+
+
+        if (count > 0) {
+            const first = data[0];
+            const last = data[data.length - 1];
+
+            // =====================================================================
+            // CATEGORY 4: DATA INTEGRITY (The Rows)
+            // =====================================================================
+
+            // 12. Network Column Match
+            const networkMatch = first.network === targetNet;
+            addCheck('DATA_INTEGRITY', 'Network Col Match', networkMatch ? 'PASS' : 'FAIL', `DB Network "${first.network}" vs Prop "${targetNet}"`);
+
+            // 13. ID Match
+            const idMatch = first.node_id === stableId;
+            addCheck('DATA_INTEGRITY', 'ID Col Match', idMatch ? 'PASS' : 'FAIL', idMatch ? 'IDs match' : `DB ID "${first.node_id}" mismatch`);
+
+            // 14. Credits Type Check
+            const creditType = typeof first.credits;
+            addCheck('DATA_INTEGRITY', 'Credits Type', creditType === 'number' ? 'PASS' : 'WARN', `Type is ${creditType} (Chart expects number)`);
+
+            // 15. Credits Value Check
+            const hasCredits = first.credits > 0;
+            addCheck('DATA_INTEGRITY', 'Credits Value', hasCredits ? 'PASS' : 'WARN', `Value: ${first.credits}`);
+
+            // 16. Health Check
+            addCheck('DATA_INTEGRITY', 'Health Value', 'INFO', `Health: ${first.health}`);
+
+            // 17. Date Parsing
+            const parsedDate = new Date(first.created_at);
+            const validDate = !isNaN(parsedDate.getTime());
+            addCheck('DATA_INTEGRITY', 'Date Parsing', validDate ? 'PASS' : 'FAIL', validDate ? 'Date parses correctly' : 'Invalid Date format');
+
             
-            log.step5_consolidation = {
-                status: consolidated.length > 0 ? 'OK' : 'FAIL',
-                input: preConsolidate.length,
-                output: consolidated.length
-            };
+            // =====================================================================
+            // CATEGORY 5: CHART READINESS (Visualization)
+            // =====================================================================
 
-            // --- STEP 6: CHART READINESS ---
-            if (consolidated.length > 0) {
-                const firstTime = new Date(consolidated[0].date).getTime();
-                const lastTime = new Date(consolidated[consolidated.length - 1].date).getTime();
-                const spanMinutes = (lastTime - firstTime) / 1000 / 60;
-                
-                let chartStatus = 'OK';
-                if (consolidated.length < 2) chartStatus = 'INSUFFICIENT_POINTS';
-                
-                log.final_chart_ready = {
-                    status: chartStatus,
-                    points: consolidated.length,
-                    spanMinutes: spanMinutes.toFixed(2) // Now valid because initial type is string
-                };
+            // 18. Minimum Points
+            addCheck('CHART', 'Min Points', count >= 2 ? 'PASS' : 'FAIL', count >= 2 ? 'Enough points for line' : 'Need 2+ points for line');
+
+            // 19. Time Span
+            const timeSpanMs = new Date(last.created_at).getTime() - new Date(first.created_at).getTime();
+            const minutes = timeSpanMs / 1000 / 60;
+            addCheck('CHART', 'Time Span', minutes > 1 ? 'PASS' : 'FAIL', `${minutes.toFixed(2)} mins span`, minutes);
+
+            // 20. Variance (Flatline Check)
+            const variance = last.credits - first.credits;
+            addCheck('CHART', 'Variance', variance !== 0 ? 'PASS' : 'WARN', variance === 0 ? 'Flatline (0 Growth)' : `Growth: ${variance}`);
+
+            // 21. Monotonicity (Does it go down?)
+            let isMonotonic = true;
+            for(let i=1; i<data.length; i++) {
+                if(data[i].credits < data[i-1].credits) isMonotonic = false;
             }
-        }
+            addCheck('CHART', 'Monotonic', isMonotonic ? 'PASS' : 'WARN', isMonotonic ? 'Credits always increase' : 'Credits decrease at some point');
 
-        setReport(log);
+            // 22. Ghost Logic Consistency
+            if (finalIp === 'private') {
+                const healthZero = Number(first.health) === 0;
+                addCheck('CHART', 'Ghost Logic', healthZero ? 'PASS' : 'WARN', healthZero ? 'Ghost has 0 Health (Correct)' : 'Ghost has >0 Health (Unusual)');
+            }
+
+        } else {
+            // Fail all data checks if no data
+            addCheck('DATA_INTEGRITY', 'Data Missing', 'FAIL', 'Cannot check integrity on 0 rows');
+            addCheck('CHART', 'Impossible', 'FAIL', 'Cannot render chart with 0 rows');
+        }
 
       } catch (err: any) {
-        console.error("Debug Error", err);
-        setReport({ error: err.message });
-      } finally {
-        setLoading(false);
+        console.error("Debug Fatal", err);
+        setError(err.message);
+        addCheck('DATABASE', 'Exception', 'FAIL', err.message);
       }
+
+      setChecks(results);
+      setLoading(false);
     }
 
-    runDeepDiagnostics();
+    runAllScenarios();
   }, [node]);
 
-  if (!report && loading) return <div className="text-[10px] animate-pulse text-fuchsia-400 p-2">Running Pipeline Trace...</div>;
-  if (!report) return null;
+  if (loading) return <div className="text-xs text-fuchsia-500 animate-pulse p-4">Running 24-Point Comprehensive Audit...</div>;
+  if (error) return <div className="text-red-500 p-4 border border-red-800 bg-red-900/20 rounded">Fatal Error: {error}</div>;
 
   return (
-    <div className="mx-2 mt-2 mb-4 p-3 bg-zinc-950 border border-zinc-800 rounded-lg text-[10px] font-mono shadow-xl relative overflow-hidden">
-      
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-3 border-b border-zinc-800 pb-2">
-        <h3 className="text-white font-bold flex items-center gap-2 text-xs">
-           🧬 DATA PIPELINE INSPECTOR
-        </h3>
+    <div className="mx-2 mt-2 mb-4 bg-zinc-950 border border-zinc-800 rounded-lg shadow-2xl overflow-hidden font-mono text-[10px]">
+      <div className="bg-zinc-900 p-2 border-b border-zinc-800 flex justify-between items-center">
+          <h3 className="text-zinc-300 font-bold">🛠 COMPREHENSIVE DIAGNOSTICS</h3>
+          <span className="text-zinc-500">{checks.length} Checks Run</span>
       </div>
-
-      {report.error ? (
-          <div className="text-red-400 font-bold p-2 bg-red-900/20 rounded">
-              CRITICAL FAIL: {report.error}
-          </div>
-      ) : (
-          <div className="space-y-3">
-              
-              {/* 1. FETCH */}
-              <div className="grid grid-cols-[80px_1fr] gap-2 items-start">
-                  <div className={`font-bold ${report.step2_fetch.count > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      1. FETCH
-                  </div>
-                  <div>
-                      <div className="text-zinc-300">Found {report.step2_fetch.count} raw records.</div>
-                      {report.step2_fetch.sample && (
-                          <div className="mt-1 p-1 bg-zinc-900 rounded border border-zinc-800 text-[9px] text-zinc-500 break-all">
-                              SAMPLE: {JSON.stringify(report.step2_fetch.sample).slice(0, 100)}...
-                          </div>
-                      )}
-                  </div>
-              </div>
-
-              {/* 2. FILTERING (Common Fail Point) */}
-              <div className="grid grid-cols-[80px_1fr] gap-2 items-start">
-                  <div className={`font-bold ${report.step4_filtering.status === 'OK' ? 'text-green-400' : 'text-red-400'}`}>
-                      2. FILTER
-                  </div>
-                  <div>
-                      <div className="text-zinc-300">
-                          Kept {report.step4_filtering.kept} / Dropped {report.step4_filtering.dropped}
-                      </div>
-                      {report.step4_filtering.dropped > 0 && (
-                          <div className="text-orange-400 italic">
-                             Warning: {report.step4_filtering.reason}
-                          </div>
-                      )}
-                      <div className="text-[9px] text-zinc-600 mt-1">
-                          (Checks if DB 'network' matches UI Node 'network')
-                      </div>
-                  </div>
-              </div>
-
-              {/* 3. CHART READY (The Output) */}
-              <div className="grid grid-cols-[80px_1fr] gap-2 items-start border-t border-zinc-800 pt-2">
-                  <div className={`font-bold ${report.final_chart_ready.status === 'OK' ? 'text-blue-400' : 'text-yellow-400'}`}>
-                      3. CHART
-                  </div>
-                  <div>
-                      <div className="text-white font-bold">
-                          Final Points: {report.final_chart_ready.points}
-                      </div>
-                      {report.final_chart_ready.status === 'INSUFFICIENT_POINTS' && (
-                          <div className="text-yellow-400 font-bold bg-yellow-900/20 p-1 rounded mt-1">
-                              ⚠️ INSUFFICIENT DATA
-                              <div className="font-normal text-yellow-200/70 mt-1">
-                                  Charts need at least 2 distinct points to draw a line. 
-                                  You currently have {report.final_chart_ready.points}.
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-zinc-800">
+          {['INPUT', 'LOGIC', 'DATABASE', 'DATA_INTEGRITY', 'CHART'].map((cat) => (
+              <div key={cat} className="p-2">
+                  <h4 className="text-zinc-500 font-bold mb-2 border-b border-zinc-800/50 pb-1">{cat} LAYER</h4>
+                  <div className="space-y-1.5">
+                      {checks.filter(c => c.category === cat).map((check, idx) => (
+                          <div key={idx} className="flex justify-between items-start gap-2">
+                              <span className="text-zinc-400 shrink-0">{check.label}:</span>
+                              <div className="text-right">
+                                  <span className={`font-bold px-1 rounded ${
+                                      check.status === 'PASS' ? 'text-green-400 bg-green-900/20' : 
+                                      check.status === 'FAIL' ? 'text-red-400 bg-red-900/20' : 
+                                      check.status === 'WARN' ? 'text-yellow-400 bg-yellow-900/20' : 
+                                      'text-blue-400'
+                                  }`}>
+                                      {check.status}
+                                  </span>
+                                  <div className="text-[9px] text-zinc-600 leading-tight mt-0.5 max-w-[150px] ml-auto break-words">
+                                      {check.message}
+                                  </div>
                               </div>
                           </div>
-                      )}
-                      <div className="text-zinc-500 mt-1">
-                          Time Span: {report.final_chart_ready.spanMinutes} minutes
-                      </div>
+                      ))}
                   </div>
               </div>
-
-          </div>
-      )}
+          ))}
+      </div>
     </div>
   );
 };
