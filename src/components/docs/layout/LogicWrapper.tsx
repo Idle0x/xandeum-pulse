@@ -1,4 +1,6 @@
 import { ReactNode, useRef, useState, useEffect } from 'react';
+// --- ADD THIS IMPORT ---
+import { LogicTerminal } from './LogicTerminal'; 
 
 interface LogicWrapperProps {
     children: ReactNode;
