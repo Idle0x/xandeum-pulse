@@ -19,7 +19,7 @@ export const DualAxisGrowthChart = ({
 
   const data = useMemo(() => {
       if (!history || history.length === 0) return [];
-      return [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      return [...history].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [history]);
 
   // FIX: CALCULATE DOMAIN MANUALLY FOR FLATLINE SUPPORT
@@ -76,7 +76,7 @@ export const DualAxisGrowthChart = ({
             <YAxis 
                 yAxisId="right"
                 orientation="right"
-                domain={[domainSettings.min, domainSettings.max]} // <--- APPLIED FIX
+                domain={[domainSettings.min, domainSettings.max]} 
                 tick={{ fontSize: 9, fill: '#eab308' }}
                 axisLine={false}
                 tickLine={false}
@@ -88,7 +88,8 @@ export const DualAxisGrowthChart = ({
                 contentStyle={{ backgroundColor: '#09090b', borderColor: '#27272a', borderRadius: '4px', fontSize: '10px' }}
                 itemStyle={{ color: '#e4e4e7' }}
                 labelStyle={{ color: '#a1a1aa', marginBottom: '2px' }}
-                formatter={(value: any, name: string) => [
+                // FIX: Changed 'name: string' to 'name: any' to handle potential undefined values from Recharts
+                formatter={(value: any, name: any) => [
                     value.toLocaleString(), 
                     name === 'credits' ? 'Credits' : 'Rank'
                 ]}
