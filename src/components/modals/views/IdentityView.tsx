@@ -43,7 +43,6 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
     let frozenDate = '';
     const isStagnant = vitality.label === 'STAGNANT';
     const isWarmingUp = vitality.label === 'WARMING UP';
-    // FIX: Check for 'ONLINE' which is the actual label returned by the hook
     const isActive = vitality.label === 'ONLINE' || vitality.label === 'ACTIVE';
 
     if (isStagnant && historyBuffer.length > 0) {
@@ -69,7 +68,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
         if (isStagnant) {
             // SCENARIO: Frozen / Hung
             continuityLabel = "Suspended";
-            continuitySub = "Uptime halted"; // Fixed redundancy
+            continuitySub = "Uptime halted";
             continuityColor = "text-orange-400";
             continuityIconColor = "text-orange-500";
         } 
@@ -99,7 +98,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                 // SCENARIO: Normal Operation (Promoted to Green)
                 continuityLabel = "Operational";
                 continuitySub = `Minor resets detected (${resetCount})`;
-                continuityColor = "text-green-400"; // Acceptable stability
+                continuityColor = "text-green-400"; 
                 continuityIconColor = "text-green-500";
             } else {
                 // SCENARIO: Volatile
@@ -192,7 +191,6 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                       for (let i = 1; i < recentHistory.length; i++) {
                           const prev = recentHistory[i-1].uptime || 0;
                           const curr = recentHistory[i].uptime || 0;
-                          // If current is less than prev by at least 10 mins (600s), it's a reset
                           if (curr < prev && (prev - curr) > 600) {
                               resets++;
                               lastReset = recentHistory[i].created_at;
@@ -271,12 +269,18 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
         {/* --- GRID LAYOUT --- */}
         <div className="grid grid-cols-2 gap-3">
 
-             {/* ROW 1: Public Key */}
+             {/* ROW 1: Public Key & RPC Endpoint (Side-by-Side, Truncated) */}
              <FieldCard 
                 label="Public Key" 
                 val={node?.pubkey || 'Unknown'} 
                 id="pubkey" 
-                fullWidth 
+                // Removed fullWidth
+             />
+             <FieldCard 
+                label="RPC Endpoint" 
+                val={`http://${getSafeIp(node)}:6000`} 
+                id="rpc" 
+                // Removed fullWidth
              />
 
              {/* ROW 2: IP & Version */}
@@ -332,14 +336,6 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                     </div>
                 </div>
              </div>
-
-             {/* ROW 5: RPC */}
-             <FieldCard 
-                label="RPC Endpoint" 
-                val={`http://${getSafeIp(node)}:6000`} 
-                id="rpc" 
-                fullWidth
-             />
         </div>
 
         {/* STATUS FOOTER */}
