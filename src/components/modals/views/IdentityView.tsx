@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, Check, Copy, CheckCircle, AlertTriangle, Calendar, Activity } from 'lucide-react';
 import { Node } from '../../../types';
 import { getSafeIp, getSafeVersion, compareVersions } from '../../../utils/nodeHelpers';
@@ -17,7 +17,7 @@ interface IdentityViewProps {
 
 export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: IdentityViewProps) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  
+
   // Metadata State
   const [firstSeen, setFirstSeen] = useState<string>('Loading...');
   const [resetCount, setResetCount] = useState<number | null>(null);
@@ -37,13 +37,68 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
   const cleanConsensus = mostCommonVersion.replace(/[^0-9.]/g, '');
   const isLatest = cleanVer === cleanConsensus || compareVersions(cleanVer, cleanConsensus) > 0;
 
+  // --- LOGIC: CONTEXT-AWARE DIAGNOSTICS ---
+  const diagnostics = useMemo(() => {
+    // 1. Calculate "Frozen Since" (Find earliest snapshot with same uptime)
+    let frozenDate = '';
+    const isStagnant = vitality.label === 'STAGNANT';
+
+    if (isStagnant && historyBuffer.length > 0) {
+        const currentUptime = node.uptime || 0;
+        // Find the first snapshot in our 24h buffer where uptime matches current (hung state start)
+        const frozenPoint = historyBuffer.find(h => h.uptime === currentUptime);
+        
+        if (frozenPoint) {
+            frozenDate = `Frozen since ${new Date(frozenPoint.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} (${new Date(frozenPoint.date).toLocaleTimeString(undefined, { hour: '2-digit', minute:'2-digit' })})`;
+        } else {
+            frozenDate = "Uptime counter frozen"; // Fallback
+        }
+    }
+
+    // 2. Calculate Context-Aware Reset Label
+    let resetLabel = resetCount === null ? '...' : `${resetCount} Events`;
+    let resetSub = lastResetDate ? `Last: ${lastResetDate}` : '';
+    let resetColor = 'text-zinc-300';
+    let resetIconColor = 'text-zinc-500';
+
+    if (resetCount === 0) {
+        if (isStagnant) {
+            // SCENARIO: 0 Resets but Hung (Bad)
+            resetLabel = "Session Hung";
+            resetSub = "Restart may be required";
+            resetColor = "text-orange-400";
+            resetIconColor = "text-orange-500";
+        } else {
+            // SCENARIO: 0 Resets and Active (Good)
+            resetLabel = "Stable Session";
+            resetSub = "Continuous operation";
+            resetColor = "text-green-400";
+            resetIconColor = "text-green-500";
+        }
+    } else if (resetCount !== null) {
+        if (resetCount <= 4) {
+            // SCENARIO: 1-4 Resets (Acceptable)
+            resetColor = "text-zinc-300"; // Neutral
+            resetIconColor = "text-zinc-500";
+        } else {
+            // SCENARIO: 5+ Resets (Warning)
+            resetColor = "text-orange-400";
+            resetIconColor = "text-orange-500";
+            resetSub = "High Frequency";
+        }
+    }
+
+    return { frozenDate, resetLabel, resetSub, resetColor, resetIconColor };
+  }, [vitality.label, historyBuffer, resetCount, lastResetDate, node.uptime]);
+
+
   useEffect(() => {
       async function fetchIdentityMeta() {
           if (!node || !node.pubkey) return;
 
           const targetAddress = node.address || '0.0.0.0';
           const network = node.network || 'MAINNET';
-          
+
           let ipOnly = '0.0.0.0';
           if (targetAddress.toLowerCase().includes('private')) {
              ipOnly = 'private';
@@ -53,7 +108,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
           if (!ipOnly || ipOnly === '0.0.0.0' || ipOnly === '') {
               ipOnly = 'private';
           }
-          
+
           const stableId = `${node.pubkey}-${ipOnly}-${network}`;
 
           try {
@@ -74,20 +129,25 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                   setFirstSeen('Unknown');
               }
 
-              // B. FETCH HISTORY FOR DIAGNOSTICS (Last 24 Hours)
-              const oneDayAgo = new Date();
-              oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+              // B. FETCH HISTORY FOR DIAGNOSTICS (Last 30 Days for Resets)
+              // Note: We fetch 30 days for resets logic, but hook might only buffer 24h for charts.
+              // For accuracy, we'll request a wider range for reset detection if needed, 
+              // but sticking to 24h/1d logic as per your established hook pattern is safer for perf.
+              // Let's assume we look at 7 days for better reset context if possible, 
+              // otherwise 1 day is what we have buffered.
+              
+              const historyWindow = new Date();
+              historyWindow.setDate(historyWindow.getDate() - 30); // 30 Days as requested
 
               const { data: recentHistory, error: histError } = await supabase
                   .from('node_snapshots')
                   .select('created_at, uptime, health')
                   .eq('node_id', stableId)
-                  .gte('created_at', oneDayAgo.toISOString())
+                  .gte('created_at', historyWindow.toISOString())
                   .order('created_at', { ascending: true });
 
               if (!histError && recentHistory) {
-                  // 1. Pass to State for Vitality Hook
-                  // FIX: Added 'reputation: 0' to match NodeHistoryPoint interface
+                  // 1. Pass to State (We map to standardized format)
                   const mappedHistory = recentHistory.map((r: any) => ({
                       date: r.created_at,
                       uptime: r.uptime,
@@ -101,13 +161,14 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                   }));
                   setHistoryBuffer(mappedHistory);
 
-                  // 2. Calculate Resets
+                  // 2. Calculate Resets (Logic: Uptime drops significantly)
                   if (recentHistory.length > 1) {
                       let resets = 0;
                       let lastReset = null;
                       for (let i = 1; i < recentHistory.length; i++) {
                           const prev = recentHistory[i-1].uptime || 0;
                           const curr = recentHistory[i].uptime || 0;
+                          // If current is less than prev by at least 10 mins (600s), it's a reset
                           if (curr < prev && (prev - curr) > 600) {
                               resets++;
                               lastReset = recentHistory[i].created_at;
@@ -133,14 +194,14 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
 
   // Helper Card Component
   const FieldCard = ({ 
-      label, val, id, color, icon: Icon, fullWidth = false, statusBadge, subVal 
+      label, val, id, color, icon: Icon, fullWidth = false, statusBadge, subVal, iconColor
   }: { 
-      label: string, val: string, id?: string, color?: string, icon?: any, fullWidth?: boolean, statusBadge?: React.ReactNode, subVal?: string
+      label: string, val: string, id?: string, color?: string, icon?: any, fullWidth?: boolean, statusBadge?: React.ReactNode, subVal?: string, iconColor?: string
   }) => (
     <div className={`relative group p-3 rounded-xl border transition-all duration-300 flex flex-col justify-between ${fullWidth ? 'col-span-2' : 'col-span-1'} ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900/40 border-zinc-800/60 hover:border-zinc-700 hover:bg-zinc-900/60'}`}>
         <div className="flex justify-between items-start mb-1">
             <span className="text-[9px] font-bold uppercase text-zinc-500 tracking-wider">{label}</span>
-            {Icon && <Icon size={12} className="text-zinc-600" />}
+            {Icon && <Icon size={12} className={iconColor || "text-zinc-600"} />}
         </div>
         <div className="flex items-center justify-between gap-2 mt-1">
              {statusBadge ? (
@@ -224,13 +285,14 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
              {/* ROW 4: Resets & STATUS (Vitality) */}
              <FieldCard 
                 label="Session Resets (30d)" 
-                val={resetCount === null ? '...' : `${resetCount} Events`}
-                subVal={lastResetDate ? `Last: ${lastResetDate}` : resetCount === 0 ? 'Stable' : ''}
+                val={diagnostics.resetLabel}
+                subVal={diagnostics.resetSub}
                 icon={Activity}
-                color={resetCount === 0 ? 'text-green-400' : resetCount && resetCount > 5 ? 'text-orange-400' : 'text-zinc-300'}
+                color={diagnostics.resetColor}
+                iconColor={diagnostics.resetIconColor}
              />
-             
-             {/* VITALITY STATUS CARD */}
+
+             {/* VITALITY STATUS CARD (Updated) */}
              <div className={`relative group p-3 rounded-xl border transition-all duration-300 col-span-1 flex flex-col justify-between ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900/40 border-zinc-800/60 hover:border-zinc-700'}`}>
                 <div className="flex justify-between items-start mb-1">
                     <span className="text-[9px] font-bold uppercase text-zinc-500 tracking-wider">Status</span>
@@ -240,9 +302,9 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                         <vitality.icon size={12} className={zenMode ? 'text-white' : vitality.color} />
                         <span className={`text-[10px] font-bold uppercase ${zenMode ? 'text-white' : vitality.color}`}>{vitality.label}</span>
                     </div>
-                    {/* Reason / Sub-value */}
+                    {/* Reason / Sub-value (DYNAMIC DIAGNOSTIC) */}
                     <div className="text-[8px] font-bold text-zinc-600 truncate pr-1" title={vitality.reason}>
-                        {vitality.reason}
+                        {vitality.label === 'STAGNANT' ? diagnostics.frozenDate : vitality.reason}
                     </div>
                 </div>
              </div>
