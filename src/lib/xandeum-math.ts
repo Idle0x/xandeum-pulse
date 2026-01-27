@@ -2,7 +2,7 @@
 
 // --- HELPER INTERFACES ---
 export interface HistoryContext {
-  restarts_24h: number;
+  restarts_7d: number;      // Changed from 24h to 7d for accuracy
   yield_velocity_24h: number;
   consistency_score: number;
 }
@@ -25,12 +25,12 @@ export const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
+// NEW: 30-Day Midpoint Sigmoid
 export const calculateSigmoidScore = (value: number, midpoint: number, steepness: number) =>
   100 / (1 + Math.exp(-steepness * (value - midpoint)));
 
 export const calculateLogScore = (value: number, median: number, maxScore: number = 100) => {
   if (median === 0) return value > 0 ? maxScore : 0;
-  // Logarithmic Scale: 100 points at ~4x Median. 50 points at Median.
   return Math.min(maxScore, (maxScore / 2) * Math.log2((value / median) + 1));
 };
 
@@ -38,23 +38,24 @@ export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: str
   const cleanNode = cleanSemver(nodeVersion);
   const cleanConsensus = cleanSemver(consensusVersion);
 
-  if (compareVersions(cleanNode, cleanConsensus) >= 0) return 100;
+  if (compareVersions(cleanNode, cleanConsensus) >= 0) return 100; // Current or Newer
+  
   const consensusIndex = sortedCleanVersions.indexOf(cleanConsensus);
   const nodeIndex = sortedCleanVersions.indexOf(cleanNode);
-  if (nodeIndex === -1) return 0;
-  const distance = nodeIndex - consensusIndex;
   
-  if (distance <= 0) return 100;
-  if (distance === 1) return 90;
-  if (distance === 2) return 70;
-  if (distance === 3) return 50;
-  if (distance === 4) return 30;
-  return 10;
+  if (nodeIndex === -1) return 0; // Unknown version
+  const distance = nodeIndex - consensusIndex;
+
+  // The "Sunset" Gate
+  if (distance <= 0) return 100; // Match
+  if (distance === 1) return 80; // N-1
+  if (distance === 2) return 40; // N-2 (Severe Warning)
+  return 0; // N-3+ (Obsolete)
 };
 
 /**
- * THE TEMPORAL VITALITY MODEL
- * Scores a node based on Snapshot Data AND Historical Context.
+ * THE PROFESSIONAL VITALITY MODEL
+ * Philosophy: "Resilience over Accumulation"
  */
 export const calculateVitalityScore = (
   storageCommitted: number, 
@@ -67,72 +68,81 @@ export const calculateVitalityScore = (
   credits: number | null, 
   medianStorage: number,
   isCreditsApiOnline: boolean,
-  history: HistoryContext = { restarts_24h: 0, yield_velocity_24h: 0, consistency_score: 1 } // Default if no history
+  history: HistoryContext = { restarts_7d: 0, yield_velocity_24h: 0, consistency_score: 1 } 
 ) => {
-  // 1. GATEKEEPER RULE: No storage committed = No Score.
-  if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 } };
+  // 1. HARD GATE: No storage = No Score.
+  if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0, penalties: { restarts: 0, consistency: 1, restarts_7d_count: 0 } } };
 
-  // --- COMPONENT 1: UPTIME (Stability) ---
+  // --- PILLAR 1: UPTIME (The Veteran Curve) ---
+  // Midpoint shifted to 30 days. 
   const uptimeDays = uptimeSeconds / 86400;
-  let uptimeScore = calculateSigmoidScore(uptimeDays, 7, 0.2);
-  
-  // Rule: New Node Cap (< 24h)
-  if (uptimeDays < 1) uptimeScore = Math.min(uptimeScore, 20);
+  const uptimeScore = calculateSigmoidScore(uptimeDays, 30, 0.15); 
 
-  // Rule: Progressive Restart Penalty (Forensic Slash)
-  // -2.5 points per restart, capped at -20 (8 restarts)
-  const restartPenalty = Math.min(20, history.restarts_24h * 2.5);
-  uptimeScore = Math.max(0, uptimeScore - restartPenalty);
-
-  // --- COMPONENT 2: STORAGE (Capacity) ---
+  // --- PILLAR 2: STORAGE (Capacity + Utility) ---
   const baseStorageScore = calculateLogScore(storageCommitted, medianStorage, 100);
-  // Bonus: Usage is proof of utility.
   const utilizationBonus = storageUsed > 0 ? Math.min(15, 5 * Math.log2((storageUsed / (1024 ** 3)) + 2)) : 0;
   const totalStorageScore = baseStorageScore + utilizationBonus;
 
-  // --- COMPONENT 3: VERSION (Compliance) ---
+  // --- PILLAR 3: VERSION (The Sunset Gate) ---
   const versionScore = getVersionScoreByRank(version, consensusVersion, sortedCleanVersions);
 
-  // --- COMPONENT 4: REPUTATION (Wealth + Velocity) ---
+  // --- PILLAR 4: REPUTATION (Wealth + Velocity) ---
   let reputationScore: number | null = null;
-  let total = 0;
-
+  
   if (credits !== null && medianCredits > 0) {
-    // Base Wealth Score
     let rawRepScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
 
-    // Rule: Yield Velocity Bonus/Decay
-    // If earning nothing (0 velocity) -> Decay (Rich Zombie)
-    if (history.yield_velocity_24h === 0 && credits > 100) {
-       rawRepScore *= 0.9; // 10% Decay for stagnation
+    // ZOMBIE CHECK: If earning nothing today, max rep is capped at 50%
+    if (history.yield_velocity_24h === 0) {
+       rawRepScore = Math.min(50, rawRepScore); 
     }
-    // If earning actively (> 0) -> Small Efficiency Bonus
-    if (history.yield_velocity_24h > 0) {
-       rawRepScore = Math.min(100, rawRepScore + 5);
-    }
-    
     reputationScore = rawRepScore;
-
-    // Standard Weights: U(35) + S(30) + R(20) + V(15)
-    total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15));
   } else if (isCreditsApiOnline) {
-    // API is Online but this node has NO credits -> Reputation 0
-    reputationScore = 0;
-    total = Math.round((uptimeScore * 0.35) + (totalStorageScore * 0.30) + (0 * 0.20) + (versionScore * 0.15));
+    reputationScore = 0; // API online, node has no credits
   } else {
-    // API Failure -> Re-weight: U(45) + S(35) + V(20)
-    total = Math.round((uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20));
-    reputationScore = null;
+    reputationScore = null; // API offline
   }
 
-  // Final Clamp
+  // --- RAW CALCULATION ---
+  // Weights: U(35) + S(30) + R(20) + V(15)
+  let rawTotal = 0;
+  
+  if (reputationScore !== null) {
+      rawTotal = (uptimeScore * 0.35) + (totalStorageScore * 0.30) + (reputationScore * 0.20) + (versionScore * 0.15);
+  } else {
+      // Re-weight if Rep is offline: U(45) + S(35) + V(20)
+      rawTotal = (uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20);
+  }
+
+  // --- THE PENALTIES (The Teeth) ---
+
+  // A. Quadratic Restart Penalty (Capped at -36)
+  // 1 restart = -1, 3 = -9, 6+ = -36.
+  const rawRestartPenalty = Math.pow(history.restarts_7d, 2);
+  const restartPenalty = Math.min(36, rawRestartPenalty);
+
+  // B. Consistency Damper (Multiplier)
+  // 0.9 consistency -> 0.81 multiplier
+  const consistencyMult = Math.pow(history.consistency_score, 2);
+
+  // Final Formula
+  let netScore = (rawTotal - restartPenalty) * consistencyMult;
+  
+  // Floor at 0, Cap at 100
+  netScore = Math.max(0, Math.min(100, netScore));
+
   return {
-    total: Math.max(0, Math.min(100, total)),
+    total: Math.round(netScore),
     breakdown: { 
       uptime: Math.round(uptimeScore), 
       version: Math.round(versionScore), 
       reputation: reputationScore !== null ? Math.round(reputationScore) : null, 
-      storage: Math.round(totalStorageScore) 
+      storage: Math.round(totalStorageScore),
+      penalties: {
+        restarts: restartPenalty,
+        consistency: Number(consistencyMult.toFixed(2)),
+        restarts_7d_count: history.restarts_7d
+      }
     }
   };
 };
