@@ -5,23 +5,46 @@ import { useNetworkHistory } from '../../hooks/useNetworkHistory';
 
 interface StatsOverviewProps {
   nodes: RankedNode[];
+  networkStats: any; // <--- ADDED PROP
   networkFilter: string;
   onOpenAnalytics: () => void;
 }
 
-export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }: StatsOverviewProps) {
+export default function StatsOverview({ nodes, networkStats, networkFilter, onOpenAnalytics }: StatsOverviewProps) {
   // 1. Strict 24H Context
   const { history, loading } = useNetworkHistory('24H');
 
   // 2. Current "Live" Stats
   const current = useMemo(() => {
-      const totalCredits = nodes.reduce((sum, n) => sum + n.credits, 0);
-      const avgCredits = nodes.length > 0 ? Math.round(totalCredits / nodes.length) : 0;
-      const top10 = nodes.slice(0, 10).reduce((sum, n) => sum + n.credits, 0);
-      const dominance = totalCredits > 0 ? (top10 / totalCredits) * 100 : 0;
+      // Logic: If filter is ALL, use the Global True Total from useNetworkData
+      // If filter is specific, use the network-specific True Total
+      let liveTotalCredits = 0;
+      let liveCount = nodes.length;
+
+      if (networkFilter === 'MAINNET') {
+          liveTotalCredits = networkStats?.mainnet?.credits || 0;
+      } else if (networkFilter === 'DEVNET') {
+          liveTotalCredits = networkStats?.devnet?.credits || 0;
+      } else {
+          // COMBINED/ALL
+          liveTotalCredits = networkStats?.totalCredits || 0;
+      }
+
+      // Fallback: If networkStats isn't ready, use node reduction (but this shouldn't happen often)
+      if (liveTotalCredits === 0 && nodes.length > 0) {
+          liveTotalCredits = nodes.reduce((sum, n) => sum + n.credits, 0);
+      }
+
+      const avgCredits = liveCount > 0 ? Math.round(liveTotalCredits / liveCount) : 0;
       
-      return { count: nodes.length, totalCredits, avgCredits, dominance };
-  }, [nodes]);
+      // Dominance is tricky: We only know top 10 from the visible list. 
+      // Ideally, the top 10 are visible. If a ghost is top 10, this might be slightly off, 
+      // but it's better than the Total Credits being wrong.
+      const top10 = nodes.slice(0, 10).reduce((sum, n) => sum + n.credits, 0);
+      const dominance = liveTotalCredits > 0 ? (top10 / liveTotalCredits) * 100 : 0;
+
+      return { count: liveCount, totalCredits: liveTotalCredits, avgCredits, dominance };
+  }, [nodes, networkStats, networkFilter]);
 
   // 3. Historical Baseline (Yesterday)
   const baseline = useMemo(() => {
@@ -34,19 +57,36 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
       let pct = 0;
 
       if (baseline && !hideTrend) {
-          if (deltaType === 'CREDITS') delta = rawValue - (baseline.total_credits || 0);
-          if (deltaType === 'AVG') delta = rawValue - (baseline.avg_credits || 0);
-          if (deltaType === 'DOM') delta = rawValue - (baseline.top10_dominance || 0);
-
-          const base = deltaType === 'CREDITS' ? baseline.total_credits :
-                       deltaType === 'AVG' ? baseline.avg_credits :
-                       baseline.top10_dominance;
-                       
-          pct = base > 0 ? (delta / base) * 100 : 0;
+          if (deltaType === 'CREDITS') {
+             // Handle Filtering for Baseline too
+             const baselineVal = networkFilter === 'MAINNET' ? (baseline.mainnet_credits || 0) :
+                                 networkFilter === 'DEVNET' ? (baseline.devnet_credits || 0) :
+                                 (baseline.total_credits || 0);
+             delta = rawValue - baselineVal;
+             pct = baselineVal > 0 ? (delta / baselineVal) * 100 : 0;
+          }
+          else if (deltaType === 'AVG') {
+              const baselineVal = networkFilter === 'MAINNET' ? (baseline.mainnet_avg_credits || 0) :
+                                  networkFilter === 'DEVNET' ? (baseline.devnet_avg_credits || 0) :
+                                  (baseline.avg_credits || 0);
+              delta = rawValue - baselineVal;
+              pct = baselineVal > 0 ? (delta / baselineVal) * 100 : 0;
+          }
+          else if (deltaType === 'DOM') {
+              const baselineVal = networkFilter === 'MAINNET' ? (baseline.mainnet_dominance || 0) :
+                                  networkFilter === 'DEVNET' ? (baseline.devnet_dominance || 0) :
+                                  (baseline.top10_dominance || 0);
+              delta = rawValue - baselineVal;
+              pct = baselineVal > 0 ? (delta / baselineVal) * 100 : 0;
+          }
       }
 
       const isPos = delta > 0;
       const isNeg = delta < 0;
+      
+      // Fix: If delta is tiny (floating point noise), treat as neutral
+      const isNeutral = Math.abs(delta) < 1; 
+      
       const trendColor = isPos ? 'text-green-500' : isNeg ? 'text-red-500' : 'text-zinc-500';
       const Arrow = isPos ? TrendingUp : isNeg ? TrendingDown : Minus;
 
@@ -69,13 +109,13 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
                 <div className={`text-lg font-black tracking-tight font-mono ${valueColor}`}>
                     {value}
                 </div>
-                
+
                 {/* Ticker (Same Line) - Conditional Render */}
                 {!hideTrend && (
-                    <div className={`flex items-center gap-1 text-[9px] font-mono font-bold ${trendColor}`}>
+                    <div className={`flex items-center gap-1 text-[9px] font-mono font-bold ${isNeutral ? 'text-zinc-500' : trendColor}`}>
                         {!loading ? (
                             <>
-                                <Arrow size={8} strokeWidth={3} />
+                                {isNeutral ? <Minus size={8} /> : <Arrow size={8} strokeWidth={3} />}
                                 <span>{Math.abs(pct).toFixed(1)}%</span>
                                 <span className="opacity-60 font-medium">
                                     ({delta > 0 ? '+' : ''}{subValue(delta)})
@@ -106,7 +146,7 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
                 deltaType="COUNT"
                 subValue={(d: number) => d}
                 valueColor="text-white"
-                hideTrend={true} // HIDDEN AS REQUESTED
+                hideTrend={true} 
             />
             <TickerCard 
                 icon={Wallet} 
@@ -136,7 +176,7 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
                 valueColor="text-blue-500"
             />
         </div>
-        
+
         {/* FOOTER LEGEND */}
         <div className="flex justify-end mt-1.5 px-1">
             <span className="text-[9px] text-zinc-600 font-medium uppercase tracking-widest opacity-80">
