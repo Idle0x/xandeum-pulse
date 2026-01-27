@@ -3,7 +3,7 @@ import {
   compareVersions, 
   calculateVitalityScore,
   getVersionScoreByRank
-} from '../../src/lib/xandeum-math'; // <--- UPDATED IMPORT PATH
+} from '../../src/lib/xandeum-math'; 
 
 describe('Xandeum Math (Unit Logic)', () => {
 
@@ -106,7 +106,7 @@ describe('Xandeum Math (Unit Logic)', () => {
       const result = calculateVitalityScore(
         5000, // High Storage
         2000,
-        86400 * 30, // 30 Days Uptime
+        86400 * 120, // <--- UPDATED: 120 Days (Veteran Status) needed for max points
         LATEST_VER, // Latest Version
         CONSENSUS_VER,
         SORTED_VERSIONS,
@@ -116,7 +116,6 @@ describe('Xandeum Math (Unit Logic)', () => {
         true
       );
 
-      // Score might cap at 100 or be very close
       expect(result.total).toBeGreaterThanOrEqual(95);
     });
   });
@@ -130,15 +129,16 @@ describe('Xandeum Math (Unit Logic)', () => {
       expect(getVersionScoreByRank('1.5.0', CONSENSUS, LIST)).toBe(100);
     });
 
-    test('1 Version behind receives 90 pts (Soft Penalty)', () => {
-      expect(getVersionScoreByRank('1.4.0', CONSENSUS, LIST)).toBe(90);
+    test('1 Version behind receives 80 pts (Two Strikes Rule)', () => {
+      // <--- UPDATED: Expectation changed from 90 to 80
+      expect(getVersionScoreByRank('1.4.0', CONSENSUS, LIST)).toBe(80);
     });
 
-    test('DEATH ZONE: 6 versions behind receives severe penalty', () => {
-      // 1.5.0 -> 1.4 -> 1.3 -> 1.2 -> 1.1 -> 1.0 (5 steps away)
-      const score = getVersionScoreByRank('1.0.0', CONSENSUS, LIST);
-      // Distance is 5. Score is 10. 10 < 20.
-      expect(score).toBeLessThan(20);
+    test('DEATH ZONE: 3+ versions behind receives 0 pts', () => {
+       // N-2 is 40. N-3 is 0.
+       // 1.5 -> 1.4(N-1) -> 1.3(N-2) -> 1.2(N-3)
+       const score = getVersionScoreByRank('1.2.0', CONSENSUS, LIST);
+       expect(score).toBe(0);
     });
   });
 });
