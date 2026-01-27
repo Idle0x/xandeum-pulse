@@ -1,14 +1,32 @@
 import { NodeHistoryPoint } from '../hooks/useNodeHistory';
 
-// Define the "Forensic States"
-export type VitalityState = 'OFFLINE' | 'STAGNANT' | 'UNSTABLE' | 'TRAUMA' | 'WARMUP' | 'ONLINE';
+// --- TYPES ---
+
+export type VitalityArchetype = 
+  | 'CRITICAL'    // Dead or Useless (Rose)
+  | 'TRAUMA'      // Online but Penalized (Violet)
+  | 'DRIFT'       // Stagnant/Old (Amber)
+  | 'INCUBATION'  // New/Warming Up (Blue)
+  | 'PRISTINE'    // Perfect (Emerald)
+  | 'ONLINE';     // Standard (Emerald/Zinc)
+
+export interface PinConfig {
+  show: boolean;
+  color: string; // Tailwind class
+  label?: string;
+}
 
 export interface VitalityAnalysis {
-  state: VitalityState;
-  color: string;     // Tailwind bg class
-  textColor: string; // Tailwind text class
+  archetype: VitalityArchetype;
+  baseColor: string;
+  textColor: string;
   label: string;
+  // The Pin System
+  topPin: PinConfig;
+  bottomPin: PinConfig;
 }
+
+// --- LOGIC ENGINE ---
 
 export const analyzePointVitality = (
   point: NodeHistoryPoint, 
@@ -16,66 +34,98 @@ export const analyzePointVitality = (
   oneHourAgoPoint?: NodeHistoryPoint
 ): VitalityAnalysis => {
   
-  // 1. PRIORITY 1: OFFLINE (The Void)
-  if (point.uptime === 0 || point.health === 0) {
-    return { 
-      state: 'OFFLINE', 
-      color: 'bg-zinc-800', 
-      textColor: 'text-zinc-500', 
-      label: 'OFFLINE' 
-    };
+  const health = point.health || 0;
+  const uptime = point.uptime || 0;
+  const credits = point.credits || 0;
+  
+  // Safe extraction of nested props if they exist (future proofing)
+  const penalties = (point as any).healthBreakdown?.penalties || { restarts: 0, consistency: 1 };
+  const breakdown = (point as any).healthBreakdown || {};
+
+  // --- 1. DETERMINE ARCHETYPE (The Base Color) ---
+  let archetype: VitalityArchetype = 'ONLINE';
+  let baseColor = 'bg-zinc-700';
+  let textColor = 'text-zinc-400';
+  let label = 'OPERATIONAL';
+
+  // LOGIC VECTOR 1: CRITICAL (Dead)
+  if (uptime === 0 || health < 20) {
+    archetype = 'CRITICAL';
+    baseColor = 'bg-rose-600';
+    textColor = 'text-rose-500';
+    label = 'CRITICAL FAILURE';
+  }
+  // LOGIC VECTOR 2: TRAUMA (Penalized)
+  // Logic: Online (>24h uptime) but Health is crushed (<50) OR explicit penalty > 10
+  else if (penalties.restarts > 10 || (uptime > 86400 && health < 50)) {
+    archetype = 'TRAUMA';
+    baseColor = 'bg-violet-500';
+    textColor = 'text-violet-400';
+    label = 'TRAUMA STATE';
+  }
+  // LOGIC VECTOR 3: INCUBATION (New Node)
+  // Logic: Health Low (<60) ONLY because Uptime is Low (< 7 days)
+  else if (health < 60 && uptime < 604800) {
+    archetype = 'INCUBATION';
+    baseColor = 'bg-blue-600';
+    textColor = 'text-blue-400';
+    label = 'INCUBATION PHASE';
+  }
+  // LOGIC VECTOR 4: DRIFT (Stagnant)
+  // Logic: Credits exist but didn't move (Zombie) OR Version score is low
+  else if ((prevPoint && credits > 0 && point.credits === prevPoint.credits) || (breakdown.version !== undefined && breakdown.version < 10)) {
+    archetype = 'DRIFT';
+    baseColor = 'bg-amber-600';
+    textColor = 'text-amber-500';
+    label = 'DRIFT DETECTED';
+  }
+  // LOGIC VECTOR 5: PRISTINE (Perfect)
+  else if (health >= 80) {
+    archetype = 'PRISTINE';
+    baseColor = 'bg-emerald-500';
+    textColor = 'text-emerald-400';
+    label = 'PRISTINE HEALTH';
+  }
+  // DEFAULT
+  else {
+    archetype = 'ONLINE';
+    baseColor = 'bg-emerald-600/60'; // Slightly muted green for "Okay"
+    textColor = 'text-emerald-500';
+    label = 'OPERATIONAL';
   }
 
-  // 2. PRIORITY 2: TRAUMA (High Penalty)
-  // If the node has active penalties > 10 points (meaning > 3 restarts recently)
-  // Note: We check if penalties exist on the point object
-  const penalty = (point as any).penalties?.restarts || 0;
-  if (penalty > 10) {
-      return {
-          state: 'TRAUMA',
-          color: 'bg-violet-500', // Neon Violet for "Damaged"
-          textColor: 'text-violet-400',
-          label: 'TRAUMA DETECTED'
-      };
+  // --- 2. DETERMINE PINS (The Events) ---
+  
+  // TOP PIN: Reliability/Consistency
+  // Trigger: Explicit low consistency OR inferred data gap
+  const topPin: PinConfig = { show: false, color: 'bg-white' };
+  if (penalties.consistency < 0.9) {
+      topPin.show = true;
+      topPin.color = 'bg-white'; // White dot = "Missing Data"
+      topPin.label = 'Consistency Gap';
   }
 
-  // 3. PRIORITY 3: UNSTABLE (Recent Restart)
-  // Check if uptime dropped significantly in the last hour
-  if (oneHourAgoPoint && point.uptime < (oneHourAgoPoint.uptime - 100)) {
-    return { 
-      state: 'UNSTABLE', 
-      color: 'bg-rose-500', 
-      textColor: 'text-rose-400', 
-      label: 'UNSTABLE' 
-    };
+  // BOTTOM PIN: Events (Activity)
+  // Priority: Restart (Red) > Update (Blue) > Stagnation (Yellow)
+  const bottomPin: PinConfig = { show: false, color: 'bg-transparent' };
+  
+  const isRestart = prevPoint && point.uptime < (prevPoint.uptime - 100);
+  const isUpdate = prevPoint && point.version !== prevPoint.version;
+  const isStagnant = prevPoint && credits > 0 && point.credits === prevPoint.credits;
+
+  if (isRestart) {
+      bottomPin.show = true;
+      bottomPin.color = 'bg-rose-300'; // Muted Red
+      bottomPin.label = 'Restart Event';
+  } else if (isUpdate) {
+      bottomPin.show = true;
+      bottomPin.color = 'bg-blue-300'; // Muted Blue
+      bottomPin.label = 'System Update';
+  } else if (isStagnant) {
+      bottomPin.show = true;
+      bottomPin.color = 'bg-amber-200'; // Muted Yellow
+      bottomPin.label = 'Zero Yield';
   }
 
-  // 4. PRIORITY 4: ZOMBIE (Stagnant)
-  // Credits exist but didn't increase
-  if (prevPoint && point.credits > 0 && (point.credits === prevPoint.credits)) {
-    return { 
-      state: 'STAGNANT', 
-      color: 'bg-amber-600', 
-      textColor: 'text-amber-500', 
-      label: 'STAGNANT YIELD' 
-    };
-  }
-
-  // 5. PRIORITY 5: WARMUP (New Node)
-  if (point.uptime < 86400) {
-    return { 
-      state: 'WARMUP', 
-      color: 'bg-blue-500', 
-      textColor: 'text-blue-400', 
-      label: 'WARMUP PHASE' 
-    };
-  }
-
-  // 6. PRIORITY 6: HEALTHY
-  return { 
-    state: 'ONLINE', 
-    color: 'bg-emerald-500', 
-    textColor: 'text-emerald-400', 
-    label: 'OPERATIONAL' 
-  };
+  return { archetype, baseColor, textColor, label, topPin, bottomPin };
 };
