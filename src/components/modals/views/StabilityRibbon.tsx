@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { NodeHistoryPoint, HistoryTimeRange } from '../../../hooks/useNodeHistory';
 import { 
   X, Clock, Coins, Minus, Zap, 
-  Activity, AlertTriangle, CheckCircle, ThermometerSun
+  Activity, AlertTriangle, CheckCircle, ThermometerSun, 
+  Crown, Stethoscope
 } from 'lucide-react';
 import { analyzePointVitality } from '../../../utils/vitalityHelpers';
 import { formatUptime } from '../../../utils/formatters';
@@ -38,8 +39,8 @@ const VitalitySnapshotCard = ({
         TRAUMA: Zap,
         DRIFT: Activity,
         INCUBATION: ThermometerSun,
-        PRISTINE: CheckCircle,
-        ONLINE: CheckCircle
+        ELITE: Crown,
+        STANDARD: CheckCircle
     }[analysis.archetype] || Activity;
 
     return (
@@ -59,10 +60,10 @@ const VitalitySnapshotCard = ({
                     <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="text-zinc-600 hover:text-zinc-300 transition-colors -mt-1 -mr-1 p-1"><X size={12} className="md:w-3.5 md:h-3.5"/></button>
                  </div>
 
-                 {/* ARCHETYPE BANNER: Compact Padding */}
-                 <div className="flex items-center justify-between mb-1.5 md:mb-3 bg-zinc-900/50 p-1.5 md:p-2 rounded-lg border border-zinc-800/50">
+                 {/* ARCHETYPE BANNER: Inline Style for BG Color */}
+                 <div className="flex items-center justify-between mb-1.5 md:mb-3 p-1.5 md:p-2 rounded-lg border border-white/5" style={{ backgroundColor: `${analysis.baseColor}20`, borderColor: `${analysis.baseColor}40` }}>
                     <div className="flex items-center gap-1.5 md:gap-2">
-                        <div className={`p-1 md:p-1.5 rounded-md ${analysis.baseColor} bg-opacity-20 border border-white/5`}>
+                        <div className="p-1 md:p-1.5 rounded-md bg-black/20">
                             {/* Responsive Icon Size */}
                             <Icon className={`${analysis.textColor} w-3 h-3 md:w-3.5 md:h-3.5`} />
                         </div>
@@ -76,17 +77,13 @@ const VitalitySnapshotCard = ({
                     </div>
                  </div>
 
-                 {/* EVENTS: Tiny Tags */}
-                 {(analysis.topPin.show || analysis.bottomPin.show) && (
-                     <div className="mb-1.5 md:mb-3 flex flex-wrap gap-1">
-                         {analysis.topPin.show && (
-                             <span className="px-1 md:px-1.5 py-0.5 rounded text-[7px] md:text-[8px] font-bold uppercase bg-zinc-800 text-zinc-300 border border-zinc-700">{analysis.topPin.label || 'Issue'}</span>
-                         )}
-                         {analysis.bottomPin.show && (
-                             <span className="px-1 md:px-1.5 py-0.5 rounded text-[7px] md:text-[8px] font-bold uppercase bg-zinc-800 text-zinc-300 border border-zinc-700">{analysis.bottomPin.label || 'Event'}</span>
-                         )}
-                     </div>
-                 )}
+                 {/* ACTIVE VECTORS (Debug/Forensics) */}
+                 <div className="mb-1.5 md:mb-3 flex flex-wrap gap-1">
+                     {analysis.vectors.slice(0, 3).map(v => (
+                         <span key={v} className="px-1 py-0.5 rounded text-[6px] font-mono text-zinc-500 bg-zinc-900 border border-zinc-800">{v}</span>
+                     ))}
+                     {analysis.vectors.length > 3 && <span className="text-[6px] text-zinc-600 self-center">+{analysis.vectors.length - 3}</span>}
+                 </div>
 
                  {/* METRICS: Denser Grid */}
                  <div className="grid grid-cols-2 gap-1.5 md:gap-2">
@@ -127,7 +124,7 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
 
   const slots = Array.from({ length: days });
 
-  // RESTORED DIMENSIONS: h-2 on mobile (8px), h-3 on desktop (12px)
+  // FIXED DIMENSIONS: h-2 (8px) on mobile, h-3 (12px) on desktop
   if (loading) return <div className="flex gap-[2px] w-full animate-pulse h-2 md:h-3">{slots.map((_, i) => <div key={i} className="flex-1 bg-zinc-800 rounded-[1px] opacity-20" />)}</div>;
 
   const sortedHistory = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -143,7 +140,6 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
       const prevPoint = sortedHistory[absoluteIndex - 1];
       const oneHourAgoPoint = sortedHistory.find(p => (new Date(point.date).getTime() - new Date(p.date).getTime()) > 3600000);
 
-      // Smart Positioning
       let positionClass = "-translate-x-1/2 left-1/2"; 
       if (selectedIdx < 4) positionClass = "left-0 translate-x-0 left-4"; 
       if (selectedIdx > displayData.length - 5) positionClass = "right-0 translate-x-0 right-4"; 
@@ -152,7 +148,6 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
   };
 
   return (
-    // RESTORED DIMENSIONS: h-2 on mobile (8px), h-3 on desktop (12px)
     <div className="flex flex-col gap-2 w-full relative h-2 md:h-3" ref={containerRef}>
       {renderTooltip()}
       <div className="flex gap-[2px] w-full h-full items-end">
@@ -161,7 +156,7 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
           const point = displayData[dataIndex];
           const isSelected = selectedIdx === dataIndex;
           
-          let baseColor = 'bg-zinc-800/30';
+          let baseColor = '#3f3f46'; // Fallback Zinc
           let topPin = { show: false, color: '' };
           let bottomPin = { show: false, color: '' };
 
@@ -184,19 +179,18 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
               key={i} 
               onClick={(e) => { e.stopPropagation(); point && setSelectedIdx(isSelected ? null : dataIndex); }}
               className={`
-                  flex-1 rounded-[1px] relative group h-full transition-all duration-200
-                  ${!customColor ? baseColor : ''} 
-                  ${point ? 'cursor-pointer hover:opacity-100 hover:scale-y-125 origin-bottom' : 'opacity-20 cursor-default'}
-                  ${isSelected ? 'opacity-100 scale-y-125 ring-1 ring-white/50 z-10 shadow-[0_0_10px_rgba(255,255,255,0.3)]' : 'opacity-80'}
+                  flex-1 rounded-[1px] relative group h-full transition-all duration-100
+                  ${point ? 'cursor-pointer hover:brightness-125' : 'cursor-default opacity-20 bg-zinc-800'}
+                  ${isSelected ? 'brightness-125 ring-1 ring-white/50 z-10' : ''}
               `} 
-              style={customColor && point ? { backgroundColor: customColor } : {}}
+              style={point ? { backgroundColor: baseColor } : {}}
             >
-                {/* TOP PIN (Consistency/Reliability) - Floats above */}
+                {/* TOP PIN - Floating Above */}
                 {topPin.show && (
                     <div className={`absolute -top-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${topPin.color} ring-1 ring-black/10`}></div>
                 )}
 
-                {/* BOTTOM PIN (Events) - Floats below */}
+                {/* BOTTOM PIN - Floating Below */}
                 {bottomPin.show && (
                     <div className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${bottomPin.color} ring-1 ring-black/20`}></div>
                 )}
