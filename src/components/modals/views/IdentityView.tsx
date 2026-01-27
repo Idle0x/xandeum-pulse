@@ -314,14 +314,14 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
              />
              <FieldCard 
                 label="Current Session" 
-                val={formatPreciseUptime(node?.uptime)} 
+                val={formatPreciseUptime(node?.uptime || 0)} 
                 color="text-zinc-300"
                 id="uptime"
              />
 
              {/* ROW 4: Session Continuity */}
              <FieldCard 
-                label={`Session Continuity (${formatPreciseUptime(node?.uptime)})`} // Label with uptime
+                label={`Session Continuity (${formatPreciseUptime(node?.uptime || 0)})`} // Fallback to 0
                 val={diagnostics.continuityLabel}
                 subVal={diagnostics.continuitySub}
                 icon={Activity}
