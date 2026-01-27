@@ -1,7 +1,5 @@
-// types/index.ts
-
 export interface Node {
-  uid?: string; // <--- NEW: Unique ID (Composite of Pubkey + Network)
+  uid?: string;
   address?: string;
   pubkey?: string;
   version?: string;
@@ -23,12 +21,19 @@ export interface Node {
     countryCode: string;
     city: string;
   };
+  // NEW: Professional Vitality Metrics
   health?: number;
   healthBreakdown?: {
     uptime: number;
     version: number;
     reputation: number | null;
     storage: number;
+    // NEW: Penalty Object
+    penalties?: {
+      restarts: number;        // Points subtracted (e.g. 36)
+      consistency: number;     // The multiplier (e.g. 0.81)
+      restarts_7d_count: number; // Raw count for UI
+    };
   };
   clusterStats?: {
     totalGlobal: number;
