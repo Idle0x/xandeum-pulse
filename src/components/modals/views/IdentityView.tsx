@@ -52,20 +52,21 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
 
   // --- LOGIC: SMART CONTINUITY ENGINE ---
   const diagnostics = useMemo(() => {
-    // 1. Calculate "Frozen Since"
+    // 1. Calculate "Frozen Since" (Find earliest snapshot with same uptime)
     let frozenDate = '';
     const isStagnant = vitality.label === 'STAGNANT';
     const isWarmingUp = vitality.label === 'WARMING UP';
-    const isActive = vitality.label === 'ONLINE' || vitality.label === 'ACTIVE';
+    const isActive = vitality.label === 'ACTIVE'; // LOGIC KEPT EXACTLY AS IS
 
     if (isStagnant && historyBuffer.length > 0) {
         const currentUptime = node.uptime || 0;
+        // Find the first snapshot in our buffer where uptime matches current (hung state start)
         const frozenPoint = historyBuffer.find(h => h.uptime === currentUptime);
         
         if (frozenPoint) {
             frozenDate = `Frozen since ${new Date(frozenPoint.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} (${new Date(frozenPoint.date).toLocaleTimeString(undefined, { hour: '2-digit', minute:'2-digit' })})`;
         } else {
-            frozenDate = "Uptime counter frozen"; 
+            frozenDate = "Uptime counter frozen"; // Fallback
         }
     }
 
@@ -75,6 +76,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
     let continuityColor = "text-zinc-300";
     let continuityIconColor = "text-zinc-500";
 
+    // Only proceed if we have a valid reset count (null means still loading)
     if (resetCount !== null) {
         if (isStagnant) {
             // SCENARIO: Frozen / Hung
@@ -91,7 +93,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                 continuityColor = "text-blue-400";
                 continuityIconColor = "text-blue-500";
             } else {
-                // SCENARIO: Recovering
+                // SCENARIO: Recovering from crash
                 continuityLabel = "Rebooting";
                 continuitySub = `Recovering (Resets: ${resetCount})`;
                 continuityColor = "text-blue-400";
@@ -106,10 +108,10 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                 continuityColor = "text-green-400";
                 continuityIconColor = "text-green-500";
             } else if (resetCount <= 4) {
-                // SCENARIO: Normal Operation
+                // SCENARIO: Normal Operation (Promoted to Green)
                 continuityLabel = "Operational";
                 continuitySub = `Minor resets detected (${resetCount})`;
-                continuityColor = "text-green-400"; 
+                continuityColor = "text-green-400"; // Acceptable stability
                 continuityIconColor = "text-green-500";
             } else {
                 // SCENARIO: Volatile
@@ -120,10 +122,10 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
             }
         } 
         else {
-            // SCENARIO: Offline / Unstable
+            // SCENARIO: Offline / Unstable / Unknown
             continuityLabel = "Unverified";
             continuitySub = "Signal lost";
-            continuityColor = "text-zinc-500"; 
+            continuityColor = "text-zinc-500"; // Dim
             continuityIconColor = "text-zinc-600";
         }
     }
@@ -202,6 +204,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                       for (let i = 1; i < recentHistory.length; i++) {
                           const prev = recentHistory[i-1].uptime || 0;
                           const curr = recentHistory[i].uptime || 0;
+                          // If current is less than prev by at least 10 mins (600s), it's a reset
                           if (curr < prev && (prev - curr) > 600) {
                               resets++;
                               lastReset = recentHistory[i].created_at;
@@ -313,7 +316,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                 color={zenMode ? 'text-zinc-400' : 'text-blue-400'}
              />
              <FieldCard 
-                label="Current Session" 
+                label="Current Session (Uptime)"  // <-- 1. UPDATED LABEL
                 val={formatPreciseUptime(node?.uptime || 0)} 
                 color="text-zinc-300"
                 id="uptime"
@@ -321,7 +324,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
 
              {/* ROW 4: Session Continuity */}
              <FieldCard 
-                label={`Session Continuity (${formatPreciseUptime(node?.uptime || 0)})`} // Fallback to 0
+                label="Session Continuity"  // <-- 2. REVERTED LABEL (Plain)
                 val={diagnostics.continuityLabel}
                 subVal={diagnostics.continuitySub}
                 icon={Activity}
