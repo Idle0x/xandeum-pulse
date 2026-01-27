@@ -14,11 +14,11 @@ interface NetworkDataState {
     systemStatus: { credits: boolean; rpc: boolean };
     consensusVersion: '0.0.0' | string;
     medianStorage: number;
-    
+
     // --- NEW: Vitals & Financials ---
     totalCredits: number;
     avgStability: number; // Global Uptime Average
-    
+
     mainnet: {
         nodes: number;
         credits: number;
@@ -36,8 +36,8 @@ interface NetworkDataState {
   totalStorageCommitted: number;
   totalStorageUsed: number;
   medianCommitted: number;
-  networkHealth: string;     // Your existing calculation (Active Nodes %)
-  avgNetworkHealth: number;  // From API (Algo Score)
+  networkHealth: string;     
+  avgNetworkHealth: number;  
   networkConsensus: number;
 }
 
@@ -54,7 +54,6 @@ export const useNetworkData = (onNewNodes?: (count: number) => void) => {
       systemStatus: { credits: true, rpc: true },
       consensusVersion: '0.0.0',
       medianStorage: 0,
-      // Init New Fields
       totalCredits: 0,
       avgStability: 0,
       mainnet: { nodes: 0, credits: 0, avgStability: 0, capacity: 0 },
@@ -74,7 +73,7 @@ export const useNetworkData = (onNewNodes?: (count: number) => void) => {
     else setData(prev => ({ ...prev, isBackgroundSyncing: true }));
 
     try {
-      // 1. PARALLEL FETCH (The Fix: Get Credits + Nodes together)
+      // 1. PARALLEL FETCH
       const [res, creditsRes] = await Promise.all([
         axios.get(`/api/stats?mode=${mode}&t=${Date.now()}`),
         axios.get('/api/credits').catch(() => ({ data: { mainnet: [], devnet: [] } }))
@@ -84,18 +83,25 @@ export const useNetworkData = (onNewNodes?: (count: number) => void) => {
         let rawPods = res.data.result.pods as Node[];
         const stats = res.data.stats;
 
-        // 2. MERGE CREDITS (Before Sorting)
+        // 2. RAW CREDIT EXTRACTION (The Fix)
+        // We calculate total credits from the Raw API, not the filtered Pod list.
+        const rawMainnetCredits = (creditsRes.data.mainnet || []) as any[];
+        const rawDevnetCredits = (creditsRes.data.devnet || []) as any[];
+        
+        // Calculate TRUE totals (Public + Ghosts)
+        const trueMainnetTotal = rawMainnetCredits.reduce((sum, c) => sum + Number(c.credits || 0), 0);
+        const trueDevnetTotal = rawDevnetCredits.reduce((sum, c) => sum + Number(c.credits || 0), 0);
+        const trueGlobalTotal = trueMainnetTotal + trueDevnetTotal;
+
+        // 3. MERGE CREDITS FOR VISUAL LIST
         const creditMap = new Map<string, number>();
-        const rawCredits = [...(creditsRes.data.mainnet || []), ...(creditsRes.data.devnet || [])];
-        rawCredits.forEach((c: any) => {
+        [...rawMainnetCredits, ...rawDevnetCredits].forEach((c: any) => {
             const key = c.pod_id || c.pubkey;
             if (key) creditMap.set(key, Number(c.credits || 0));
         });
 
-        // Detect if credits API is completely offline (empty response)
-        const isCreditsApiOffline = creditsRes.data.mainnet.length === 0 && creditsRes.data.devnet.length === 0;
+        const isCreditsApiOffline = rawMainnetCredits.length === 0 && rawDevnetCredits.length === 0;
 
-        // Inject credits into the raw list so sorting works
         const podList = rawPods.map(node => {
             const creditValue = creditMap.get(node.pubkey || '');
             return {
@@ -104,10 +110,10 @@ export const useNetworkData = (onNewNodes?: (count: number) => void) => {
             };
         });
 
-        // --- Logic: Rank & Cluster Calculations (PRESERVED) ---
+        // --- Logic: Rank & Cluster Calculations ---
         const sortFn = (a: Node, b: Node) => {
           if ((b.credits || 0) !== (a.credits || 0))
-            return (b.credits || 0) - (a.credits || 0); // Now sorts by REAL credits
+            return (b.credits || 0) - (a.credits || 0);
           if ((b.health || 0) !== (a.health || 0)) return (b.health || 0) - (a.health || 0);
           return (a.pubkey || '').localeCompare(b.pubkey || '');
         };
@@ -152,25 +158,23 @@ export const useNetworkData = (onNewNodes?: (count: number) => void) => {
           };
         });
 
-        // --- Logic: Notifications (PRESERVED) ---
         if (mode === 'swarm' && processedNodes.length > data.nodes.length && data.nodes.length > 0) {
           if (onNewNodes) onNewNodes(processedNodes.length - data.nodes.length);
         }
 
-        // --- Logic: Aggregates ---
         const stableNodes = processedNodes.filter(n => (n.uptime || 0) > 86400).length;
         const consensusCount = processedNodes.filter(n => (n.version || 'Unknown') === (stats?.consensusVersion || '0.0.0')).length;
 
-        // --- NEW: Calculate Breakdown Stats (Client Side) ---
-        const calcStats = (nodes: Node[]) => ({
+        // --- CALC STATS (Capacity & Stability from RPC list, Credits from RAW list) ---
+        const calcStats = (nodes: Node[], trueCredits: number) => ({
             nodes: nodes.length,
-            credits: nodes.reduce((a, b) => a + (b.credits || 0), 0),
+            credits: trueCredits, // <--- USE TRUE CREDITS
             capacity: nodes.reduce((a, b) => a + (b.storage_committed || 0), 0),
             avgStability: nodes.length > 0 ? nodes.reduce((a, b) => a + (b.uptime || 0), 0) / nodes.length : 0
         });
 
-        const mainStats = calcStats(mainnetNodes);
-        const devStats = calcStats(devnetNodes);
+        const mainStats = calcStats(mainnetNodes, trueMainnetTotal);
+        const devStats = calcStats(devnetNodes, trueDevnetTotal);
         const globalStability = processedNodes.length > 0 
             ? processedNodes.reduce((a, b) => a + (b.uptime || 0), 0) / processedNodes.length 
             : 0;
@@ -181,11 +185,11 @@ export const useNetworkData = (onNewNodes?: (count: number) => void) => {
           isBackgroundSyncing: false,
           error: '',
           lastSync: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-          
+
           networkStats: {
               ...(stats || data.networkStats),
-              // Inject New Vitals
-              totalCredits: mainStats.credits + devStats.credits,
+              // Inject TRUE Vitals
+              totalCredits: trueGlobalTotal, // <--- USE TRUE GLOBAL TOTAL
               avgStability: globalStability,
               mainnet: mainStats,
               devnet: devStats
