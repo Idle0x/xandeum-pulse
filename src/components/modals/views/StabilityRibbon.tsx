@@ -127,7 +127,8 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
 
   const slots = Array.from({ length: days });
 
-  if (loading) return <div className="flex gap-[2px] w-full animate-pulse h-8 md:h-10">{slots.map((_, i) => <div key={i} className="flex-1 bg-zinc-800 rounded-[1px] opacity-20" />)}</div>;
+  // UPDATED HEIGHT: h-5 on mobile (20px), h-6 on desktop (24px)
+  if (loading) return <div className="flex gap-[2px] w-full animate-pulse h-5 md:h-6">{slots.map((_, i) => <div key={i} className="flex-1 bg-zinc-800 rounded-[1px] opacity-20" />)}</div>;
 
   const sortedHistory = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const startIndex = Math.max(0, sortedHistory.length - days);
@@ -151,7 +152,8 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
   };
 
   return (
-    <div className="flex flex-col gap-2 w-full relative h-8 md:h-10" ref={containerRef}>
+    // UPDATED HEIGHT: h-5 on mobile (20px), h-6 on desktop (24px)
+    <div className="flex flex-col gap-2 w-full relative h-5 md:h-6" ref={containerRef}>
       {renderTooltip()}
       <div className="flex gap-[2px] w-full h-full items-end">
         {slots.map((_, i) => {
@@ -191,12 +193,12 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
             >
                 {/* TOP PIN (Consistency/Reliability) */}
                 {topPin.show && (
-                    <div className={`absolute -top-1.5 left-1/2 -translate-x-1/2 w-[3px] h-[3px] rounded-full shadow-sm ${topPin.color}`}></div>
+                    <div className={`absolute -top-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${topPin.color} ring-1 ring-black/10`}></div>
                 )}
 
                 {/* BOTTOM PIN (Events) */}
                 {bottomPin.show && (
-                    <div className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-[3px] h-[3px] rounded-full shadow-sm ${bottomPin.color} ring-1 ring-black/20`}></div>
+                    <div className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${bottomPin.color} ring-1 ring-black/20`}></div>
                 )}
             </div>
           );
