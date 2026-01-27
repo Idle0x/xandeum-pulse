@@ -6,6 +6,7 @@ import { Trophy, ArrowLeft } from 'lucide-react';
 
 // --- HOOKS & TYPES ---
 import { useLeaderboardData } from '../hooks/useLeaderboardData';
+import { useNetworkData } from '../hooks/useNetworkData'; // <--- 1. IMPORT ADDED
 import { useStoincSimulator } from '../hooks/useStoincSimulator';
 import { NetworkType } from '../types/leaderboard';
 
@@ -21,11 +22,14 @@ export default function Leaderboard() {
 
   // 1. Fetch Data
   const { allNodes, loading, creditsOffline } = useLeaderboardData();
+  
+  // 2. Fetch Network Stats (for accurate totals)
+  const { networkStats } = useNetworkData(); // <--- 2. HOOK CALL ADDED
 
-  // 2. Initialize Simulator Logic
+  // 3. Initialize Simulator Logic
   const simController = useStoincSimulator(allNodes);
 
-  // 3. Page State (Filtering & UI)
+  // 4. Page State (Filtering & UI)
   const [networkFilter, setNetworkFilter] = useState<NetworkType | 'COMBINED'>('MAINNET');
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(100);
@@ -159,6 +163,7 @@ export default function Leaderboard() {
       {!loading && !creditsOffline && (
         <StatsOverview 
             nodes={filteredAndRanked} 
+            networkStats={networkStats} // <--- 3. PROP PASSED
             networkFilter={networkFilter} 
             onOpenAnalytics={() => setIsAnalyticsOpen(true)}
         />
