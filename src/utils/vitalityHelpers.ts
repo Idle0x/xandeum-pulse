@@ -38,40 +38,40 @@ export const analyzePointVitality = (
   const uptime = point.uptime || 0;
   const credits = point.credits || 0;
   
-  // Safe extraction of nested props if they exist (future proofing)
+  // Safe extraction of nested props
   const penalties = (point as any).healthBreakdown?.penalties || { restarts: 0, consistency: 1 };
   const breakdown = (point as any).healthBreakdown || {};
 
-  // --- 1. DETERMINE ARCHETYPE (The Base Color) ---
+  // --- 1. DETERMINE ARCHETYPE (The Base Color Logic Vector) ---
   let archetype: VitalityArchetype = 'ONLINE';
   let baseColor = 'bg-zinc-700';
   let textColor = 'text-zinc-400';
   let label = 'OPERATIONAL';
 
-  // LOGIC VECTOR 1: CRITICAL (Dead)
+  // PRIORITY 1: CRITICAL (Dead)
   if (uptime === 0 || health < 20) {
     archetype = 'CRITICAL';
     baseColor = 'bg-rose-600';
     textColor = 'text-rose-500';
     label = 'CRITICAL FAILURE';
   }
-  // LOGIC VECTOR 2: TRAUMA (Penalized)
-  // Logic: Online (>24h uptime) but Health is crushed (<50) OR explicit penalty > 10
+  // PRIORITY 2: TRAUMA (Penalized)
+  // Logic: Explicit penalties > 10 OR (Online > 24h BUT Health < 50)
   else if (penalties.restarts > 10 || (uptime > 86400 && health < 50)) {
     archetype = 'TRAUMA';
     baseColor = 'bg-violet-500';
     textColor = 'text-violet-400';
     label = 'TRAUMA STATE';
   }
-  // LOGIC VECTOR 3: INCUBATION (New Node)
-  // Logic: Health Low (<60) ONLY because Uptime is Low (< 7 days)
-  else if (health < 60 && uptime < 604800) {
+  // PRIORITY 3: INCUBATION (New Node)
+  // Logic: Health Low (<60) ONLY because Uptime is Low (< 7 days) and No Penalties
+  else if (health < 60 && uptime < 604800 && penalties.restarts <= 5) {
     archetype = 'INCUBATION';
     baseColor = 'bg-blue-600';
     textColor = 'text-blue-400';
     label = 'INCUBATION PHASE';
   }
-  // LOGIC VECTOR 4: DRIFT (Stagnant)
+  // PRIORITY 4: DRIFT (Stagnant)
   // Logic: Credits exist but didn't move (Zombie) OR Version score is low
   else if ((prevPoint && credits > 0 && point.credits === prevPoint.credits) || (breakdown.version !== undefined && breakdown.version < 10)) {
     archetype = 'DRIFT';
@@ -79,7 +79,7 @@ export const analyzePointVitality = (
     textColor = 'text-amber-500';
     label = 'DRIFT DETECTED';
   }
-  // LOGIC VECTOR 5: PRISTINE (Perfect)
+  // PRIORITY 5: PRISTINE (Perfect)
   else if (health >= 80) {
     archetype = 'PRISTINE';
     baseColor = 'bg-emerald-500';
@@ -94,18 +94,18 @@ export const analyzePointVitality = (
     label = 'OPERATIONAL';
   }
 
-  // --- 2. DETERMINE PINS (The Events) ---
+  // --- 2. DETERMINE PINS (The Micro-Events) ---
   
-  // TOP PIN: Reliability/Consistency
-  // Trigger: Explicit low consistency OR inferred data gap
+  // TOP PIN: Reliability/Consistency (Ghost Layer)
+  // Trigger: Consistency Score < 0.9
   const topPin: PinConfig = { show: false, color: 'bg-white' };
-  if (penalties.consistency < 0.9) {
+  if (penalties.consistency !== undefined && penalties.consistency < 0.9) {
       topPin.show = true;
-      topPin.color = 'bg-white'; // White dot = "Missing Data"
+      topPin.color = 'bg-white/80'; // White dot = "Missing Data"
       topPin.label = 'Consistency Gap';
   }
 
-  // BOTTOM PIN: Events (Activity)
+  // BOTTOM PIN: Events (Activity Layer)
   // Priority: Restart (Red) > Update (Blue) > Stagnation (Yellow)
   const bottomPin: PinConfig = { show: false, color: 'bg-transparent' };
   
