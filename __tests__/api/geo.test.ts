@@ -2,6 +2,12 @@ import { createMocks } from 'node-mocks-http';
 import handleGeoRequest from '../../src/pages/api/geo'; // ✅ Updated Path
 import * as XandeumBrain from '../../src/lib/xandeum-brain'; // ✅ Updated Path
 
+// Mock Supabase to avoid initialization error during imports chain
+jest.mock('../../src/lib/supabase', () => ({
+  supabase: {},
+  getServiceSupabase: jest.fn()
+}));
+
 // Mock the brain to return controlled data
 jest.mock('../../src/lib/xandeum-brain'); // ✅ Updated Path
 
