@@ -1,235 +1,129 @@
 import { useState, useMemo } from 'react';
-import { X, Server, GitBranch, CheckCircle, AlertCircle, ArrowUpCircle, Activity, ShieldCheck } from 'lucide-react';
-import { Node } from '../../../types';
-import { compareVersions } from '../../../utils/nodeHelpers';
-import { useNetworkHistory, HistoryTimeRange, NetworkHistoryPoint } from '../../../hooks/useNetworkHistory';
-import { HistoryChart } from '../../common/HistoryChart';
-import { ConsensusConvergenceChart } from './ConsensusConvergenceChart';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { HistoryTimeRange, NetworkHistoryPoint } from '../../../hooks/useNetworkHistory';
+import { ChevronDown, Loader2 } from 'lucide-react';
 
-interface ConsensusModalProps {
-  onClose: () => void;
-  nodes: Node[];
-  mostCommonVersion: string;
+interface ConsensusConvergenceChartProps {
+  history: NetworkHistoryPoint[];
+  loading: boolean;
+  timeRange: HistoryTimeRange;
+  onTimeRangeChange: (r: HistoryTimeRange) => void;
+  dataKey: keyof NetworkHistoryPoint;
+  color?: string; // Dynamic color support
 }
 
-export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
-  const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
-  const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
+export const ConsensusConvergenceChart = ({ 
+  history, 
+  loading, 
+  timeRange, 
+  onTimeRangeChange, 
+  dataKey,
+  color = '#22c55e' 
+}: ConsensusConvergenceChartProps) => {
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // 1. DATA FETCHING
-  const [timeRange, setTimeRange] = useState<HistoryTimeRange>('24H');
-  const { history: convHistory, loading: convLoading } = useNetworkHistory(timeRange);
+  const fluidData = useMemo(() => {
+    return history.map(point => ({
+      date: point.date,
+      value: Number(point[dataKey] || 0)
+    }));
+  }, [history, dataKey]);
 
-  // Sparkline data
-  const { history: trendHistory, loading: trendLoading } = useNetworkHistory('30D');
-
-  const consensusKey: keyof NetworkHistoryPoint = 
-    activeTab === 'MAINNET' ? 'mainnet_consensus_score' : 
-    activeTab === 'DEVNET' ? 'devnet_consensus_score' : 
-    'consensus_score';
-
-  const sparkData = trendHistory.map(p => ({ 
-    date: p.date, 
-    value: p[consensusKey] 
-  }));
-
-  // --- 2. DATA ENGINE ---
-  const data = useMemo(() => {
-    const filteredNodes = nodes.filter(n => 
-      activeTab === 'ALL' ? true : n.network === activeTab
-    );
-    const count = filteredNodes.length || 1;
-
-    const versionMap: Record<string, number> = {};
-    filteredNodes.forEach(n => {
-      const v = n.version || 'Unknown';
-      versionMap[v] = (versionMap[v] || 0) + 1;
-    });
-
-    const sortedVersions = Object.entries(versionMap).sort((a, b) => b[1] - a[1]);
-    const consensusVer = sortedVersions[0]?.[0] || '0.0.0';
-    const consensusCount = sortedVersions[0]?.[1] || 0;
-    const agreementScore = ((consensusCount / count) * 100).toFixed(1);
-
-    let lagging = 0;
-    let target = 0;
-    let leading = 0;
-
-    filteredNodes.forEach(n => {
-      const ver = n.version || '0.0.0';
-      if (ver === consensusVer) {
-        target++;
-      } else {
-        const cmp = compareVersions(ver, consensusVer);
-        if (cmp < 0) lagging++;
-        if (cmp > 0) leading++;
-      }
-    });
-
-    return {
-      count,
-      consensusVer,
-      agreementScore,
-      sortedVersions,
-      buckets: { lagging, target, leading }
-    };
-  }, [nodes, activeTab]);
-
-  const isStrong = parseFloat(data.agreementScore) > 66;
-  const chartColor = isStrong ? '#22c55e' : '#eab308'; // Green or Yellow
-
-  // Dynamic Theme for "Status" Border
-  const statusBorder = isStrong 
-     ? 'border-green-500/20 shadow-[0_0_15px_-3px_rgba(34,197,94,0.1)]' 
-     : 'border-yellow-500/20 shadow-[0_0_15px_-3px_rgba(234,179,8,0.1)]';
-
-  const theme = {
-    ALL: { text: 'text-purple-400', bg: 'bg-purple-500' },
-    MAINNET: { text: 'text-green-500', bg: 'bg-green-500' },
-    DEVNET: { text: 'text-blue-500', bg: 'bg-blue-500' },
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const score = payload[0].value;
+      const isStrong = score > 66;
+      return (
+        <div className="px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 shadow-xl text-[10px] backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+          <div className="text-zinc-500 mb-1.5 font-mono border-b border-zinc-800 pb-1">
+            {new Date(label).toLocaleDateString(undefined, {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'})}
+          </div>
+          <div className="font-bold font-mono flex items-center gap-1.5 transition-colors duration-500" style={{ color: isStrong ? '#22c55e' : '#eab308' }}>
+             <div className="w-1.5 h-1.5 rounded-full transition-colors duration-500" style={{ backgroundColor: isStrong ? '#22c55e' : '#eab308' }}></div>
+             {Number(score).toFixed(1)}% Alignment
+          </div>
+        </div>
+      );
+    }
+    return null;
   };
-  const activeTheme = theme[activeTab];
 
   return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[150] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#09090b] border border-zinc-800 rounded-3xl p-5 md:p-6 max-w-3xl w-full shadow-2xl animate-in zoom-in-95 fade-in duration-200 overflow-y-auto max-h-[90vh] custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+    <div className="w-full h-full flex flex-col rounded-xl border border-zinc-800 bg-black/40 p-3 relative group">
 
-        {/* HEADER */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-4">
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-lg border bg-opacity-10 border-zinc-800 transition-colors duration-500 ${activeTheme.bg}`}>
-              <Server size={20} className={`transition-colors duration-500 ${activeTheme.text}`} />
-            </div>
-            <div>
-              <h3 className="text-lg font-black text-white leading-tight">Consensus State</h3>
-              <p className="text-[10px] text-zinc-500 font-medium">Network alignment & version control</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 w-full md:w-auto">
-             <div className="flex-1 md:flex-none flex items-center bg-zinc-900 p-1 rounded-lg border border-zinc-800">
-                 {(['ALL', 'MAINNET', 'DEVNET'] as const).map((tab) => (
-                    <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 md:flex-none px-4 py-1.5 rounded-md text-[10px] font-bold transition-all duration-300 ${activeTab === tab ? (tab === 'ALL' ? 'bg-zinc-100 text-black shadow-sm' : tab === 'MAINNET' ? 'bg-green-500 text-black shadow-sm' : 'bg-blue-500 text-white shadow-sm') : 'text-zinc-500 hover:text-zinc-300'}`}>
-                       {tab}
-                    </button>
-                 ))}
-             </div>
-             <button onClick={onClose} className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20">
-                <X size={16} />
-             </button>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-
-          {/* ROW 1: COMPACT HERO METRICS */}
-          <div className="grid grid-cols-2 gap-3">
-
-             {/* CARD 1: CONSENSUS TARGET */}
-             <div className={`bg-zinc-900/50 border rounded-xl p-3 relative flex flex-col justify-between h-20 transition-all duration-500 ${statusBorder}`}>
-                <div className="flex justify-between items-center mb-1">
-                   <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5"><GitBranch size={10} /> Target Version</div>
-                   <div className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-950/50 border border-white/5 transition-colors duration-500 ${activeTheme.text}`}>{activeTab}</div>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-1 relative z-20 h-6 shrink-0">
+         <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Convergence</span>
+            <span className="text-[9px] text-zinc-600 hidden md:block transition-opacity duration-300">| Network Agreement %</span>
+         </div>
+         <div className="relative">
+            <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="flex items-center gap-1 px-2 py-0.5 rounded border border-zinc-800 bg-zinc-900/50 text-[9px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all">
+               {timeRange === 'ALL' ? 'MAX' : timeRange}
+               <ChevronDown size={10} />
+            </button>
+            {isDropdownOpen && (
+                <div className="absolute right-0 top-full mt-1 w-20 py-1 rounded border border-zinc-800 bg-black shadow-xl flex flex-col z-30 animate-in fade-in zoom-in-95 duration-100">
+                    {(['24H', '3D', '7D', '30D', 'ALL'] as const).map((r) => (
+                        <button key={r} onClick={() => { onTimeRangeChange(r); setIsDropdownOpen(false); }} className="px-2 py-1.5 text-left text-[9px] font-bold uppercase text-zinc-500 hover:bg-zinc-900 hover:text-white w-full">
+                            {r === 'ALL' ? 'MAX' : r}
+                        </button>
+                    ))}
                 </div>
-                <div className="flex items-baseline gap-1.5">
-                   <div className={`text-2xl font-black tracking-tighter truncate tabular-nums transition-colors duration-500 ${activeTab === 'ALL' ? 'text-white' : activeTheme.text}`} title={data.consensusVer}>
-                      {data.consensusVer}
-                   </div>
-                   <div className="text-[9px] text-zinc-600 font-bold uppercase">Active</div>
-                </div>
-             </div>
+            )}
+         </div>
+      </div>
 
-             {/* CARD 2: UNITY SCORE */}
-             <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 relative overflow-hidden group h-20 flex flex-col justify-between">
-                {/* Background Chart */}
-                <div className="absolute inset-0 z-0 opacity-10 transition-opacity pointer-events-none px-2 mt-4">
-                    <HistoryChart 
-                        data={sparkData} 
-                        color={chartColor} // Syncs with isStrong logic
-                        loading={trendLoading} 
-                        height={60} 
-                    />
-                </div>
+      {/* Chart */}
+      <div className="flex-1 w-full min-h-0 relative">
+         {loading && <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/10 backdrop-blur-[1px] transition-opacity duration-300"><Loader2 className="w-4 h-4 animate-spin text-zinc-600"/></div>}
 
-                <div className="flex justify-between items-center mb-1 relative z-10">
-                   <div className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider flex items-center gap-1.5"><ShieldCheck size={10} /> Unity Score</div>
-                   <div className={`text-[8px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-1 transition-all duration-500 ${
-                      isStrong ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
-                   }`}>
-                      {isStrong ? 'STRONG' : 'FRACTURED'}
-                   </div>
-                </div>
-                <div className="relative z-10 flex items-baseline gap-1">
-                   <span className="text-2xl font-black tracking-tighter text-white tabular-nums">{data.agreementScore}%</span>
-                   <span className="text-[9px] text-zinc-600 font-bold">Aligned</span>
-                </div>
-             </div>
-          </div>
+         <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={fluidData} margin={{ top: 5, right: 0, left: -2, bottom: 0 }}>
+               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.5} />
 
-          {/* ROW 2: CONVERGENCE CHART (Expanded Area) */}
-          <div className="h-60">
-             <ConsensusConvergenceChart 
-                history={convHistory} 
-                loading={convLoading} 
-                timeRange={timeRange} 
-                onTimeRangeChange={setTimeRange}
-                dataKey={consensusKey}
-                color={chartColor} // Passed dynamic color
-             />
-          </div>
+               <XAxis 
+                  dataKey="date" 
+                  tickFormatter={(val) => {
+                     const date = new Date(val);
+                     return timeRange === '24H' 
+                        ? date.toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' })
+                        : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                  }}
+                  tick={{ fontSize: 9, fill: '#52525b' }} 
+                  axisLine={false}
+                  tickLine={false}
+                  minTickGap={30}
+                  dy={5} 
+               />
 
-          {/* ROW 3: DETAILED DISTRIBUTION */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-             <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-3 flex flex-col justify-between">
-                <div className="text-[9px] text-zinc-500 uppercase font-bold mb-3 tracking-wider flex items-center gap-1.5"><Activity size={10} /> Lifecycle State</div>
-                <div className="grid grid-cols-3 gap-2 text-center h-full items-center">
-                   <div className="border-r border-zinc-800 last:border-0 opacity-60">
-                      <div className="text-lg font-black text-white leading-none mb-1">{data.buckets.lagging}</div>
-                      <div className="text-[7px] font-bold text-red-400 uppercase tracking-wider flex justify-center items-center gap-1"><AlertCircle size={8}/> Lagging</div>
-                   </div>
-                   <div className={`py-1 rounded-lg border transition-all duration-500 ${isStrong ? 'border-green-500/30 shadow-[0_0_10px_-2px_rgba(34,197,94,0.1)]' : 'border-zinc-700'} bg-zinc-900/40`}>
-                      <div className="text-lg font-black text-white leading-none mb-1">{data.buckets.target}</div>
-                      <div className={`text-[7px] font-bold uppercase tracking-wider flex justify-center items-center gap-1 transition-colors duration-500 ${activeTheme.text}`}><CheckCircle size={8}/> Synced</div>
-                   </div>
-                   <div className="opacity-60">
-                      <div className="text-lg font-black text-white leading-none mb-1">{data.buckets.leading}</div>
-                      <div className="text-[7px] font-bold text-cyan-400 uppercase tracking-wider flex justify-center items-center gap-1"><ArrowUpCircle size={8}/> Leading</div>
-                   </div>
-                </div>
-             </div>
+               <YAxis 
+                  domain={[0, 100]} 
+                  width={24} 
+                  tick={{ fontSize: 9, fill: '#52525b' }} 
+                  axisLine={false}
+                  tickLine={false}
+               />
 
-             {/* VERSION LIST */}
-             <div className={`border border-zinc-800 rounded-xl overflow-hidden flex flex-col max-h-40 transition-colors duration-500 ${activeTab === 'ALL' ? 'bg-purple-900/5' : activeTab === 'MAINNET' ? 'bg-green-900/5' : 'bg-blue-900/5'}`}>
-                 <div className="p-2 border-b border-zinc-800 flex justify-between items-center bg-black/20">
-                    <span className="text-[9px] text-zinc-500 uppercase font-bold">Version List</span>
-                    <span className="text-[8px] text-zinc-600 font-mono">{data.sortedVersions.length} Active</span>
-                 </div>
-                 <div className="overflow-y-auto p-2 space-y-1.5 scrollbar-thin scrollbar-thumb-zinc-800">
-                    {data.sortedVersions.map(([ver, count]) => {
-                       const isConsensus = ver === data.consensusVer;
-                       const percent = ((count / data.count) * 100).toFixed(1);
-                       const isExpanded = expandedVersion === ver;
-                       return (
-                          <div key={ver} className={`grid grid-cols-[1fr_auto_auto] items-center gap-4 p-1.5 rounded text-[9px] ${isConsensus ? 'bg-zinc-800/50 border border-zinc-700' : 'hover:bg-zinc-800/30 border border-transparent'}`}>
-                             <div 
-                                className={`font-mono font-bold truncate cursor-pointer hover:text-white transition-colors relative ${isConsensus ? 'text-white' : 'text-zinc-400'}`}
-                                onClick={() => setExpandedVersion(isExpanded ? null : ver)}
-                             >
-                                {ver}
-                                {isExpanded && <div className="absolute bottom-full left-0 mb-1 px-2 py-1 bg-black border border-zinc-700 rounded text-[9px] text-white whitespace-nowrap z-50 shadow-xl">{ver}</div>}
-                             </div>
-                             <div className="w-12 h-1 bg-zinc-800 rounded-full overflow-hidden">
-                                <div className={`h-full transition-colors duration-500 ${isConsensus ? activeTheme.bg : 'bg-zinc-600'}`} style={{ width: `${percent}%` }}></div>
-                             </div>
-                             <div className="text-right font-mono text-zinc-500 w-12"><span className="mr-1 text-zinc-400">{count}</span><span>{percent}%</span></div>
-                          </div>
-                       );
-                    })}
-                 </div>
-             </div>
-          </div>
+               <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3f3f46', strokeWidth: 1 }} />
 
-        </div>
+               <Line 
+                  type="monotone" 
+                  dataKey="value" 
+                  stroke={color} 
+                  strokeWidth={2} 
+                  dot={false}
+                  activeDot={{ r: 4, fill: color, stroke: '#000', strokeWidth: 2 }}
+                  isAnimationActive={true}
+                  animationDuration={1000}
+                  animationEasing="ease-in-out"
+                  style={{ 
+                    transition: 'stroke 1s ease',
+                    filter: `drop-shadow(0 0 6px ${color}40)` // Subtle neon glow
+                  }}
+               />
+            </LineChart>
+         </ResponsiveContainer>
       </div>
     </div>
   );
