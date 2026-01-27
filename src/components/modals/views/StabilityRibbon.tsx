@@ -1,3 +1,20 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { NodeHistoryPoint, HistoryTimeRange } from '../../../hooks/useNodeHistory';
+import { 
+  X, Clock, Coins, Minus, Zap, 
+  Activity, AlertTriangle, CheckCircle, ThermometerSun
+} from 'lucide-react';
+import { analyzePointVitality } from '../../../utils/vitalityHelpers';
+import { formatUptime } from '../../../utils/formatters';
+
+interface StabilityRibbonProps {
+  history: NodeHistoryPoint[];
+  loading: boolean;
+  days?: number; 
+  timeRange?: HistoryTimeRange;
+  color?: string; 
+}
+
 // --- SUB-COMPONENT: VITALITY SNAPSHOT CARD (The Forensic Tooltip) ---
 const VitalitySnapshotCard = ({ 
   point, 
@@ -91,4 +108,100 @@ const VitalitySnapshotCard = ({
             </div>
         </div>
     );
+};
+
+// --- MAIN EXPORT COMPONENT ---
+export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D', color: customColor }: StabilityRibbonProps) => {
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setSelectedIdx(null);
+      }
+    };
+    if (selectedIdx !== null) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [selectedIdx]);
+
+  const slots = Array.from({ length: days });
+
+  if (loading) return <div className="flex gap-[2px] w-full animate-pulse h-8 md:h-10">{slots.map((_, i) => <div key={i} className="flex-1 bg-zinc-800 rounded-[1px] opacity-20" />)}</div>;
+
+  const sortedHistory = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const startIndex = Math.max(0, sortedHistory.length - days);
+  const displayData = sortedHistory.slice(startIndex);
+
+  const renderTooltip = () => {
+      if (selectedIdx === null) return null;
+      const point = displayData[selectedIdx];
+      if (!point) return null;
+      
+      const absoluteIndex = startIndex + selectedIdx;
+      const prevPoint = sortedHistory[absoluteIndex - 1];
+      const oneHourAgoPoint = sortedHistory.find(p => (new Date(point.date).getTime() - new Date(p.date).getTime()) > 3600000);
+
+      // Smart Positioning
+      let positionClass = "-translate-x-1/2 left-1/2"; 
+      if (selectedIdx < 4) positionClass = "left-0 translate-x-0 left-4"; 
+      if (selectedIdx > displayData.length - 5) positionClass = "right-0 translate-x-0 right-4"; 
+
+      return <VitalitySnapshotCard point={point} prevPoint={prevPoint} oneHourAgoPoint={oneHourAgoPoint} onClose={() => setSelectedIdx(null)} positionClass={positionClass} />;
+  };
+
+  return (
+    <div className="flex flex-col gap-2 w-full relative h-8 md:h-10" ref={containerRef}>
+      {renderTooltip()}
+      <div className="flex gap-[2px] w-full h-full items-end">
+        {slots.map((_, i) => {
+          const dataIndex = displayData.length - (days - i);
+          const point = displayData[dataIndex];
+          const isSelected = selectedIdx === dataIndex;
+          
+          let baseColor = 'bg-zinc-800/30';
+          let topPin = { show: false, color: '' };
+          let bottomPin = { show: false, color: '' };
+
+          if (point) {
+             const absoluteIndex = startIndex + dataIndex;
+             const prevPoint = sortedHistory[absoluteIndex - 1];
+             const oneHourAgoPoint = sortedHistory.find(p => (new Date(point.date).getTime() - new Date(p.date).getTime()) > 3600000);
+
+             const analysis = analyzePointVitality(point, prevPoint, oneHourAgoPoint);
+             
+             baseColor = analysis.baseColor;
+             topPin = analysis.topPin;
+             bottomPin = analysis.bottomPin;
+
+             if (customColor) baseColor = customColor; 
+          }
+
+          return (
+            <div 
+              key={i} 
+              onClick={(e) => { e.stopPropagation(); point && setSelectedIdx(isSelected ? null : dataIndex); }}
+              className={`
+                  flex-1 rounded-[1px] relative group h-full transition-all duration-200
+                  ${!customColor ? baseColor : ''} 
+                  ${point ? 'cursor-pointer hover:brightness-125' : 'cursor-default'}
+                  ${isSelected ? 'brightness-125 ring-1 ring-white/50 z-10' : ''}
+              `} 
+              style={customColor && point ? { backgroundColor: customColor } : {}}
+            >
+                {/* TOP PIN (Consistency/Reliability) */}
+                {topPin.show && (
+                    <div className={`absolute -top-1.5 left-1/2 -translate-x-1/2 w-[3px] h-[3px] rounded-full shadow-sm ${topPin.color}`}></div>
+                )}
+
+                {/* BOTTOM PIN (Events) */}
+                {bottomPin.show && (
+                    <div className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-[3px] h-[3px] rounded-full shadow-sm ${bottomPin.color} ring-1 ring-black/20`}></div>
+                )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 };
