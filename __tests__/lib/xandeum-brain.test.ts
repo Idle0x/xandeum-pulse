@@ -113,7 +113,9 @@ describe('Xandeum Math (Unit Logic)', () => {
         MEDIAN_CREDITS,
         10000, // High Credits
         MEDIAN_STORAGE,
-        true
+        true,
+        // FIX: Provide explicit history with velocity > 0 to bypass Zombie Check
+        { restarts_7d: 0, yield_velocity_24h: 100, consistency_score: 1 } 
       );
 
       expect(result.total).toBeGreaterThanOrEqual(95);
