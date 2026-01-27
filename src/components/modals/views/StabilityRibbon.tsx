@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { NodeHistoryPoint, HistoryTimeRange } from '../../../hooks/useNodeHistory';
 import { 
   X, TrendingUp, TrendingDown, Minus, RefreshCw, Activity, 
-  WifiOff, Wifi, ThermometerSun, AlertTriangle, Database, Coins, Clock 
+  WifiOff, Wifi, ThermometerSun, AlertTriangle, Database, Coins, Clock,
+  Stethoscope, Zap
 } from 'lucide-react';
 import { analyzePointVitality } from '../../../utils/vitalityHelpers';
 import { formatBytes, formatUptime } from '../../../utils/formatters';
@@ -31,42 +32,25 @@ const VitalitySnapshotCard = ({
 }) => {
     // 1. Forensic Analysis
     const vitality = analyzePointVitality(point, prevPoint, oneHourAgoPoint);
-    
+
     // 2. Calculations & Trends
     const health = point.health || 0;
     const prevHealth = prevPoint?.health || 0;
     const healthDelta = health - prevHealth;
 
-    const credits = point.credits || 0;
-    const prevCredits = prevPoint?.credits || 0;
-    const creditDelta = credits - prevCredits; // Velocity
-
-    const storage = point.storage_committed || 0;
-    const prevStorage = prevPoint?.storage_committed || 0;
-    const storageDelta = storage - prevStorage;
+    // Safety checks for new properties (Handling the Penalty Object)
+    const penalties = (point as any).healthBreakdown?.penalties || { restarts: 0, consistency: 1, restarts_7d_count: 0 };
+    const restartCount = penalties.restarts_7d_count || 0;
+    const consistency = penalties.consistency !== undefined ? penalties.consistency : 1;
 
     const Icon = {
         OFFLINE: WifiOff,
         STAGNANT: Activity,
         UNSTABLE: AlertTriangle,
+        TRAUMA: Zap,
         WARMUP: ThermometerSun,
         ONLINE: Wifi
     }[vitality.state] || Wifi;
-
-    // Helper for Trend Rendering
-    const Trend = ({ val, unit = '', inverse = false }: { val: number, unit?: string, inverse?: boolean }) => {
-        if (val === 0) return <span className="text-zinc-600 ml-1"><Minus size={8} /></span>;
-        const isPos = val > 0;
-        const isGood = inverse ? !isPos : isPos; // For uptime/restarts, logic might differ, but generally + is green
-        const color = isGood ? 'text-emerald-400' : 'text-rose-400';
-        const Icon = isPos ? TrendingUp : TrendingDown;
-        return (
-            <span className={`flex items-center gap-0.5 ml-1.5 text-[9px] font-bold ${color}`}>
-                <Icon size={8} />
-                {Math.abs(val).toLocaleString()}{unit}
-            </span>
-        );
-    };
 
     return (
         <div className={`absolute bottom-full mb-2.5 ${positionClass} z-50 animate-in fade-in zoom-in-95 duration-200`}>
@@ -95,7 +79,6 @@ const VitalitySnapshotCard = ({
                         </div>
                         <div className="flex flex-col">
                             <span className={`text-[10px] font-black uppercase ${vitality.textColor}`}>{vitality.label}</span>
-                            <span className="text-[8px] text-zinc-500 font-medium">System Status</span>
                         </div>
                     </div>
                     <div className="text-right">
@@ -105,70 +88,58 @@ const VitalitySnapshotCard = ({
                             </span>
                             <span className="text-[9px] font-bold text-zinc-500">/100</span>
                         </div>
-                        {healthDelta !== 0 && (
-                            <div className={`text-[8px] font-bold text-right ${healthDelta > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                {healthDelta > 0 ? '+' : ''}{healthDelta} pts
-                            </div>
-                        )}
                     </div>
                  </div>
 
-                 {/* VECTOR GRID */}
+                 {/* METRICS GRID */}
                  <div className="grid grid-cols-2 gap-2">
-                    
-                    {/* 1. ECONOMY (Credits) */}
+
+                    {/* 1. OPERATIONS (Uptime) */}
+                    <div className="p-2 rounded bg-zinc-900/30 border border-zinc-800/50 flex flex-col justify-between">
+                        <div className="flex items-center gap-1.5 mb-1 text-zinc-500">
+                            <Clock size={10} />
+                            <span className="text-[8px] font-bold uppercase tracking-wide">Uptime</span>
+                        </div>
+                        <div className="text-[11px] font-mono font-bold text-zinc-200">
+                            {formatUptime(point.uptime)}
+                        </div>
+                    </div>
+
+                    {/* 2. ECONOMY (Credits) */}
                     <div className="p-2 rounded bg-zinc-900/30 border border-zinc-800/50 flex flex-col justify-between">
                         <div className="flex items-center gap-1.5 mb-1 text-zinc-500">
                             <Coins size={10} />
-                            <span className="text-[8px] font-bold uppercase tracking-wide">Economy</span>
+                            <span className="text-[8px] font-bold uppercase tracking-wide">Credits</span>
                         </div>
-                        <div>
-                            <div className="text-[11px] font-mono font-bold text-zinc-200">
-                                {credits.toLocaleString()}
-                            </div>
-                            <div className="flex items-center mt-0.5">
-                                <span className="text-[8px] text-zinc-600 font-medium uppercase">Delta</span>
-                                <Trend val={creditDelta} />
-                            </div>
+                        <div className="text-[11px] font-mono font-bold text-zinc-200">
+                            {(point.credits || 0).toLocaleString()}
                         </div>
                     </div>
 
-                    {/* 2. STORAGE (Committed) */}
-                    <div className="p-2 rounded bg-zinc-900/30 border border-zinc-800/50 flex flex-col justify-between">
-                        <div className="flex items-center gap-1.5 mb-1 text-zinc-500">
-                            <Database size={10} />
-                            <span className="text-[8px] font-bold uppercase tracking-wide">Storage</span>
-                        </div>
-                        <div>
-                            <div className="text-[11px] font-mono font-bold text-zinc-200">
-                                {formatBytes(storage)}
-                            </div>
-                            <div className="flex items-center mt-0.5">
-                                <span className="text-[8px] text-zinc-600 font-medium uppercase">Delta</span>
-                                <Trend val={storageDelta} />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 3. OPERATIONS (Uptime) */}
-                    <div className="col-span-2 p-2 rounded bg-zinc-900/30 border border-zinc-800/50 flex items-center justify-between">
-                         <div className="flex flex-col">
-                            <div className="flex items-center gap-1.5 mb-1 text-zinc-500">
-                                <Clock size={10} />
-                                <span className="text-[8px] font-bold uppercase tracking-wide">Session Uptime</span>
-                            </div>
-                            <div className="text-[11px] font-mono font-bold text-zinc-200">
-                                {formatUptime(point.uptime)}
-                            </div>
+                    {/* 3. NEW: DIAGNOSTICS ROW (The Forensic Data) */}
+                    <div className="col-span-2 p-2 rounded bg-zinc-900/30 border border-zinc-800/50">
+                         <div className="flex items-center gap-1.5 mb-2 text-zinc-500 border-b border-zinc-800 pb-1">
+                             <Stethoscope size={10} />
+                             <span className="text-[8px] font-bold uppercase tracking-wide">Diagnostics & Penalties</span>
                          </div>
-                         {/* Restart Indicator */}
-                         {vitality.state === 'UNSTABLE' || vitality.state === 'WARMUP' ? (
-                             <div className="px-2 py-1 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[9px] font-bold uppercase flex items-center gap-1">
-                                <RefreshCw size={8} /> Restart Detected
-                             </div>
-                         ) : (
-                             <div className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold uppercase flex items-center gap-1">
-                                <Activity size={8} /> Stable Pulse
+                         
+                         <div className="flex justify-between items-center text-[10px]">
+                             <span className="text-zinc-400">7-Day Restarts</span>
+                             <span className={`font-mono font-bold ${restartCount > 3 ? 'text-rose-400' : 'text-zinc-200'}`}>
+                                 {restartCount}
+                             </span>
+                         </div>
+                         
+                         <div className="flex justify-between items-center text-[10px] mt-1">
+                             <span className="text-zinc-400">Consistency Factor</span>
+                             <span className={`font-mono font-bold ${consistency < 0.9 ? 'text-amber-400' : 'text-zinc-200'}`}>
+                                 {consistency.toFixed(2)}x
+                             </span>
+                         </div>
+
+                         {penalties.restarts > 0 && (
+                             <div className="mt-2 text-[9px] text-rose-400 font-bold bg-rose-500/10 px-2 py-1 rounded border border-rose-500/20 text-center flex items-center justify-center gap-1">
+                                 <Minus size={8} /> {penalties.restarts} PTS PENALTY APPLIED
                              </div>
                          )}
                     </div>
@@ -210,7 +181,7 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
 
   // Sort Chronologically
   const sortedHistory = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  
+
   // Slice for View Window
   const startIndex = Math.max(0, sortedHistory.length - days);
   const displayData = sortedHistory.slice(startIndex);
@@ -220,7 +191,7 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
       if (selectedIdx === null) return null;
       const pointIndex = selectedIdx; 
       const point = displayData[pointIndex];
-      
+
       const absoluteIndex = startIndex + pointIndex;
       const prevPoint = sortedHistory[absoluteIndex - 1];
 
@@ -251,7 +222,7 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
 
   return (
     <div className="flex flex-col gap-2 w-full relative" ref={containerRef}>
-      
+
       {/* TOOLTIP LAYER */}
       {renderTooltip()}
 
@@ -266,6 +237,7 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
           let finalColor = 'bg-zinc-800/30';
           let heightClass = 'h-full';
           let isEvent = false;
+          let consistencyOpacity = 1; // Default to solid
 
           if (point) {
              const absoluteIndex = startIndex + dataIndex;
@@ -273,22 +245,30 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
              const pointTime = new Date(point.date).getTime();
              const oneHourAgoPoint = sortedHistory.find(p => (pointTime - new Date(p.date).getTime()) > 3600000);
 
+             // 1. Get State Color (Violet, Amber, Green, etc.)
              const vitality = analyzePointVitality(point, prevPoint, oneHourAgoPoint);
              finalColor = vitality.color;
 
-             // Visual Height Variation based on Score (Vitality Density)
-             // Score < 50 = 60% height, Score > 80 = 100% height
-             // This gives a subtle "skyline" effect where dips are visible
+             // 2. Visual Height Variation based on Score
              if (point.health < 50) heightClass = 'h-[60%]';
              else if (point.health < 80) heightClass = 'h-[80%]';
 
-             // Event Marker Logic
-             if (vitality.state === 'UNSTABLE' || vitality.state === 'WARMUP') isEvent = true;
+             // 3. Event Marker (Small dot for significant state changes)
+             if (vitality.state === 'UNSTABLE' || vitality.state === 'WARMUP' || vitality.state === 'TRAUMA') isEvent = true;
+
+             // 4. CONSISTENCY OPACITY (The Ghosting Effect)
+             const breakdown = (point as any).healthBreakdown || {};
+             if (breakdown.penalties && breakdown.penalties.consistency !== undefined) {
+                 // Ensure it doesn't disappear completely (min 0.3)
+                 consistencyOpacity = Math.max(0.3, breakdown.penalties.consistency); 
+             }
 
              if (customColor) finalColor = customColor; 
           }
 
-          const style: React.CSSProperties = {};
+          const style: React.CSSProperties = { 
+              opacity: isSelected ? 1 : (point ? consistencyOpacity : 0.2) 
+          };
           if (customColor && point) style.backgroundColor = customColor;
 
           return (
@@ -299,14 +279,14 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
                   flex-1 rounded-[1px] transition-all duration-300 relative group
                   ${!customColor ? finalColor : ''} 
                   ${heightClass}
-                  ${point ? 'cursor-pointer hover:opacity-100 hover:scale-y-125 origin-bottom' : 'opacity-20 cursor-default'}
-                  ${isSelected ? 'opacity-100 scale-y-125 ring-1 ring-white/50 z-10 shadow-[0_0_10px_rgba(255,255,255,0.3)]' : 'opacity-80'}
+                  ${point ? 'cursor-pointer hover:scale-y-125 origin-bottom' : 'cursor-default'}
+                  ${isSelected ? 'scale-y-125 ring-1 ring-white/50 z-10 shadow-[0_0_10px_rgba(255,255,255,0.3)]' : ''}
               `} 
               style={style}
             >
                 {/* Micro Event Dot */}
                 {isEvent && (
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -mt-1 w-[2px] h-[2px] bg-white rounded-full shadow-sm animate-pulse"></div>
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -mt-1 w-[2px] h-[2px] bg-white rounded-full shadow-sm"></div>
                 )}
             </div>
           );
