@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { HistoryTimeRange, NetworkHistoryPoint } from '../../../hooks/useNetworkHistory';
 import { ChevronDown, Loader2 } from 'lucide-react';
 
@@ -9,7 +9,7 @@ interface ConsensusConvergenceChartProps {
   timeRange: HistoryTimeRange;
   onTimeRangeChange: (r: HistoryTimeRange) => void;
   dataKey: keyof NetworkHistoryPoint;
-  color?: string; // New: Dynamic color support
+  color?: string; // Dynamic color support
 }
 
 export const ConsensusConvergenceChart = ({ 
@@ -18,12 +18,10 @@ export const ConsensusConvergenceChart = ({
   timeRange, 
   onTimeRangeChange, 
   dataKey,
-  color = '#22c55e' // Default green
+  color = '#22c55e' 
 }: ConsensusConvergenceChartProps) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // --- FLUID DATA MAPPING ---
-  // Map dynamic source keys to a static 'value' key to enable Recharts interpolation
   const fluidData = useMemo(() => {
     return history.map(point => ({
       date: point.date,
@@ -52,7 +50,7 @@ export const ConsensusConvergenceChart = ({
 
   return (
     <div className="w-full h-full flex flex-col rounded-xl border border-zinc-800 bg-black/40 p-3 relative group">
-      
+
       {/* Header */}
       <div className="flex justify-between items-center mb-1 relative z-20 h-6 shrink-0">
          <div className="flex items-center gap-2">
@@ -66,7 +64,7 @@ export const ConsensusConvergenceChart = ({
             </button>
             {isDropdownOpen && (
                 <div className="absolute right-0 top-full mt-1 w-20 py-1 rounded border border-zinc-800 bg-black shadow-xl flex flex-col z-30 animate-in fade-in zoom-in-95 duration-100">
-                    {(['24H', '7D', '30D', 'ALL'] as const).map((r) => (
+                    {(['24H', '3D', '7D', '30D', 'ALL'] as const).map((r) => (
                         <button key={r} onClick={() => { onTimeRangeChange(r); setIsDropdownOpen(false); }} className="px-2 py-1.5 text-left text-[9px] font-bold uppercase text-zinc-500 hover:bg-zinc-900 hover:text-white w-full">
                             {r === 'ALL' ? 'MAX' : r}
                         </button>
@@ -79,17 +77,9 @@ export const ConsensusConvergenceChart = ({
       {/* Chart */}
       <div className="flex-1 w-full min-h-0 relative">
          {loading && <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/10 backdrop-blur-[1px] transition-opacity duration-300"><Loader2 className="w-4 h-4 animate-spin text-zinc-600"/></div>}
-         
+
          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={fluidData} margin={{ top: 5, right: 0, left: -2, bottom: 0 }}>
-               <defs>
-                  {/* Single ID 'unityGrad' allows CSS transitions on the stops */}
-                  <linearGradient id="unityGrad" x1="0" y1="0" x2="0" y2="1">
-                     <stop offset="5%" stopColor={color} stopOpacity={0.2} style={{ transition: 'stop-color 1s ease' }}/>
-                     <stop offset="95%" stopColor={color} stopOpacity={0} style={{ transition: 'stop-color 1s ease' }}/>
-                  </linearGradient>
-               </defs>
-               
+            <LineChart data={fluidData} margin={{ top: 5, right: 0, left: -2, bottom: 0 }}>
                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.5} />
 
                <XAxis 
@@ -117,22 +107,22 @@ export const ConsensusConvergenceChart = ({
 
                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3f3f46', strokeWidth: 1 }} />
 
-               <Area 
+               <Line 
                   type="monotone" 
                   dataKey="value" 
                   stroke={color} 
-                  strokeWidth={1.5} 
-                  fill="url(#unityGrad)" 
-                  
-                  // Animation Configuration
+                  strokeWidth={2} 
+                  dot={false}
+                  activeDot={{ r: 4, fill: color, stroke: '#000', strokeWidth: 2 }}
                   isAnimationActive={true}
                   animationDuration={1000}
                   animationEasing="ease-in-out"
-                  
-                  // CSS Transition for the stroke color
-                  style={{ transition: 'stroke 1s ease' }}
+                  style={{ 
+                    transition: 'stroke 1s ease',
+                    filter: `drop-shadow(0 0 6px ${color}40)` // Subtle neon glow
+                  }}
                />
-            </AreaChart>
+            </LineChart>
          </ResponsiveContainer>
       </div>
     </div>
