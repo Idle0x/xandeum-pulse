@@ -1,57 +1,81 @@
 import { NodeHistoryPoint } from '../hooks/useNodeHistory';
 
-export type VitalityState = 'OFFLINE' | 'STAGNANT' | 'UNSTABLE' | 'WARMUP' | 'ONLINE';
+// Define the "Forensic States"
+export type VitalityState = 'OFFLINE' | 'STAGNANT' | 'UNSTABLE' | 'TRAUMA' | 'WARMUP' | 'ONLINE';
 
-export interface VitalityConfig {
+export interface VitalityAnalysis {
   state: VitalityState;
-  color: string;
+  color: string;     // Tailwind bg class
+  textColor: string; // Tailwind text class
   label: string;
-  textColor: string;
-  icon?: any;
 }
 
-/**
- * PURE FORENSIC ANALYSIS
- * Determines the state of a node at a specific point in time based on historical context.
- */
 export const analyzePointVitality = (
   point: NodeHistoryPoint, 
-  prevPoint: NodeHistoryPoint | undefined,
-  oneHourAgoPoint: NodeHistoryPoint | undefined
-): VitalityConfig => {
+  prevPoint?: NodeHistoryPoint,
+  oneHourAgoPoint?: NodeHistoryPoint
+): VitalityAnalysis => {
   
-  // 1. OFFLINE CHECK (The Dead Zone)
-  if (!point || point.health === 0) {
-    return { state: 'OFFLINE', color: 'bg-zinc-800', label: 'OFFLINE', textColor: 'text-zinc-500' };
+  // 1. PRIORITY 1: OFFLINE (The Void)
+  if (point.uptime === 0 || point.health === 0) {
+    return { 
+      state: 'OFFLINE', 
+      color: 'bg-zinc-800', 
+      textColor: 'text-zinc-500', 
+      label: 'OFFLINE' 
+    };
   }
 
-  const currUptime = point.uptime || 0;
-  const prevUptime = prevPoint?.uptime || 0;
-
-  // 2. UNSTABLE CHECK (The Crash Event)
-  // If uptime dropped significantly compared to the immediate previous point
-  if (prevPoint && currUptime < prevUptime - 60) {
-     return { state: 'UNSTABLE', color: 'bg-orange-500', label: 'CRASH/RESET', textColor: 'text-orange-400' };
+  // 2. PRIORITY 2: TRAUMA (High Penalty)
+  // If the node has active penalties > 10 points (meaning > 3 restarts recently)
+  // Note: We check if penalties exist on the point object
+  const penalty = (point as any).penalties?.restarts || 0;
+  if (penalty > 10) {
+      return {
+          state: 'TRAUMA',
+          color: 'bg-violet-500', // Neon Violet for "Damaged"
+          textColor: 'text-violet-400',
+          label: 'TRAUMA DETECTED'
+      };
   }
 
-  // 3. STAGNANT CHECK (The Zombie Process)
-  // If we have a point from ~1 hour ago, and the uptime hasn't moved, but time has passed.
-  if (oneHourAgoPoint) {
-      const timeDiffSeconds = (new Date(point.date).getTime() - new Date(oneHourAgoPoint.date).getTime()) / 1000;
-      const uptimeDiff = currUptime - oneHourAgoPoint.uptime;
-      
-      // If 1 hour passed real-time, but uptime grew less than 60 seconds
-      if (timeDiffSeconds > 3000 && uptimeDiff < 60 && currUptime > 1000) {
-          return { state: 'STAGNANT', color: 'bg-yellow-500', label: 'STAGNANT', textColor: 'text-yellow-400' };
-      }
+  // 3. PRIORITY 3: UNSTABLE (Recent Restart)
+  // Check if uptime dropped significantly in the last hour
+  if (oneHourAgoPoint && point.uptime < (oneHourAgoPoint.uptime - 100)) {
+    return { 
+      state: 'UNSTABLE', 
+      color: 'bg-rose-500', 
+      textColor: 'text-rose-400', 
+      label: 'UNSTABLE' 
+    };
   }
 
-  // 4. WARMUP CHECK (The Boot Phase)
-  // If uptime is less than 30 minutes
-  if (currUptime < 30 * 60) {
-      return { state: 'WARMUP', color: 'bg-blue-500', label: 'WARMING UP', textColor: 'text-blue-400' };
+  // 4. PRIORITY 4: ZOMBIE (Stagnant)
+  // Credits exist but didn't increase
+  if (prevPoint && point.credits > 0 && (point.credits === prevPoint.credits)) {
+    return { 
+      state: 'STAGNANT', 
+      color: 'bg-amber-600', 
+      textColor: 'text-amber-500', 
+      label: 'STAGNANT YIELD' 
+    };
   }
 
-  // 5. ONLINE CHECK (Stable)
-  return { state: 'ONLINE', color: 'bg-green-500', label: 'STABLE', textColor: 'text-green-400' };
+  // 5. PRIORITY 5: WARMUP (New Node)
+  if (point.uptime < 86400) {
+    return { 
+      state: 'WARMUP', 
+      color: 'bg-blue-500', 
+      textColor: 'text-blue-400', 
+      label: 'WARMUP PHASE' 
+    };
+  }
+
+  // 6. PRIORITY 6: HEALTHY
+  return { 
+    state: 'ONLINE', 
+    color: 'bg-emerald-500', 
+    textColor: 'text-emerald-400', 
+    label: 'OPERATIONAL' 
+  };
 };
