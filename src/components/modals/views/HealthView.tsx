@@ -36,6 +36,10 @@ export const HealthView = ({
   const bd = node.healthBreakdown || { uptime: health, version: health, reputation: health, storage: health };
   const avgs = networkStats?.avgBreakdown || { uptime: 0, version: 0, reputation: 0, storage: 0 };
 
+  // NEW: Extract Penalty Data safely
+  const penalties = (node.healthBreakdown as any)?.penalties || { restarts: 0, consistency: 1, restarts_7d_count: 0 };
+  const hasPenalty = penalties.restarts > 0 || penalties.consistency < 0.95;
+
   const isUntracked = (node as any).isUntracked;
   const isApiOffline = node.credits === null;
   const isReputationInvalid = isUntracked || isApiOffline;
@@ -65,8 +69,7 @@ export const HealthView = ({
       return Math.max(0, Math.round(total - Math.round(bonus)));
   };
 
-  // --- NEW: Calculate ribbon density based on Time Range ---
-  // This ensures the visual blocks in the ribbon match the data density
+  // Calculate ribbon density based on Time Range
   const getRibbonSlots = () => {
     switch(timeRange) {
         case '24H': return 24;  // 24 Hourly slots
@@ -162,6 +165,30 @@ export const HealthView = ({
                 />
             </div>
         </div>
+
+        {/* --- NEW: PENALTY BANNER (Conditional) --- */}
+        {hasPenalty && (
+           <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+               <div className="flex flex-col">
+                   <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">Active Penalties</span>
+                   <span className="text-[9px] text-zinc-400">Score reduced due to instability</span>
+               </div>
+               <div className="flex items-center gap-3">
+                   {penalties.restarts > 0 && (
+                       <div className="flex flex-col items-end">
+                           <span className="text-sm font-black text-rose-400">-{penalties.restarts}</span>
+                           <span className="text-[8px] font-bold text-rose-500/70 uppercase">Restart Trauma</span>
+                       </div>
+                   )}
+                   {penalties.consistency < 0.95 && (
+                       <div className="flex flex-col items-end">
+                           <span className="text-sm font-black text-amber-400">{penalties.consistency.toFixed(2)}x</span>
+                           <span className="text-[8px] font-bold text-amber-500/70 uppercase">Consistency</span>
+                       </div>
+                   )}
+               </div>
+           </div>
+        )}
 
         {/* --- ROW 3: HISTORY CHART (Bottom) --- */}
         <div className="min-h-[250px] shrink-0 pb-2">
