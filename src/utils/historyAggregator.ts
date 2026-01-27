@@ -47,12 +47,12 @@ export const consolidateHistory = (data: any[], timeRange: string) => {
       date: dateStr,
       health: Math.round(avgHealth),
       uptime: avgUptime,
-      
+
       // LAST VALUE for these (Accumulators)
       credits: lastPoint.credits,
       storage_committed: lastPoint.storage_committed,
       storage_used: lastPoint.storage_used,
-      
+
       // NEW: Preserve the Version String
       version: lastPoint.version,
 
@@ -126,9 +126,9 @@ export const consolidateNetworkHistory = (data: any[], timeRange: string) => {
 // ==========================================
 
 export interface HistoryContext {
-  restarts_24h: number;
-  yield_velocity_24h: number; 
-  consistency_score: number;  
+  restarts_7d: number;       // The rolling 7-day count for quadratic penalties
+  yield_velocity_24h: number; // Credits earned in strictly the last 24h
+  consistency_score: number;  // Ratio of expected snapshots vs actual
 }
 
 export type NetworkHistoryReport = Map<string, HistoryContext>;
@@ -136,13 +136,14 @@ export type NetworkHistoryReport = Map<string, HistoryContext>;
 export async function fetchNodeHistoryReport(): Promise<NetworkHistoryReport> {
   const report = new Map<string, HistoryContext>();
 
-  const oneDayAgo = new Date();
-  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+  // STEP 1: Fetch 7 Days of data (168 hours) to support the "Veterans & Penalty" logic
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
   const { data: snapshots, error } = await supabase
     .from('node_snapshots')
     .select('node_id, uptime, credits, created_at')
-    .gte('created_at', oneDayAgo.toISOString())
+    .gte('created_at', sevenDaysAgo.toISOString())
     .order('created_at', { ascending: true });
 
   if (error || !snapshots) {
@@ -156,31 +157,50 @@ export async function fetchNodeHistoryReport(): Promise<NetworkHistoryReport> {
     grouped[s.node_id].push(s);
   });
 
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  const now = new Date().getTime();
+
   Object.entries(grouped).forEach(([nodeId, history]) => {
-    let restarts = 0;
-    let minCredits = history[0]?.credits || 0;
-    let maxCredits = history[0]?.credits || 0;
+    let restarts7d = 0;
+    
+    // Forensics for 24h Velocity
+    let minCredits24h = -1;
+    let maxCredits24h = 0;
 
     for (let i = 1; i < history.length; i++) {
-      const prev = history[i-1].uptime;
-      const curr = history[i].uptime;
+      const prev = history[i-1];
+      const curr = history[i];
+      const currTime = new Date(curr.created_at).getTime();
 
-      if (curr < prev - 60) {
-        restarts++;
+      // 1. Count Restarts (Logic: Uptime dropped significantly)
+      // We check for a drop > 60s to avoid minor jitter
+      if (curr.uptime < prev.uptime - 60) {
+        restarts7d++;
       }
 
-      const cred = history[i].credits || 0;
-      if (cred !== null) {
-          if (cred < minCredits) minCredits = cred;
-          if (cred > maxCredits) maxCredits = cred;
+      // 2. Track 24h Yield Velocity
+      // Only consider snapshots within the last 24 hours for the "Zombie" check
+      if ((now - currTime) <= oneDayMs) {
+          const cred = curr.credits || 0;
+          if (minCredits24h === -1) minCredits24h = cred;
+          if (cred < minCredits24h) minCredits24h = cred;
+          if (cred > maxCredits24h) maxCredits24h = cred;
       }
     }
 
-    const consistency = Math.min(1, history.length / 20); 
+    // 3. Consistency Score
+    // Ratio of Expected Snapshots (Approx 1 per hour).
+    // In 7 days, we expect ~168 snapshots.
+    // We use a looser expectation (0.8 factor) to account for minor RPC blips.
+    const expected = 168;
+    const consistency = Math.min(1, history.length / (expected * 0.8));
+
+    // Calculate final velocity (handling edge case where no data exists in 24h)
+    const velocity = minCredits24h === -1 ? 0 : Math.max(0, maxCredits24h - minCredits24h);
 
     report.set(nodeId, {
-      restarts_24h: restarts,
-      yield_velocity_24h: Math.max(0, maxCredits - minCredits),
+      restarts_7d: restarts7d,
+      yield_velocity_24h: velocity,
       consistency_score: consistency
     });
   });
