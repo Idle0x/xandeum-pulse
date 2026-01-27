@@ -46,14 +46,10 @@ export const NetworkStatusChart = ({
   }, [activeMetric, healthKey, stabilityKey]);
 
   // --- FLUID DATA MAPPING ---
-  // We map the dynamic source keys to static keys ('primary', 'secondary')
-  // This tricks Recharts into "morphing" the existing line instead of destroying/recreating it.
   const fluidData = useMemo(() => {
     return history.map(point => ({
       date: point.date,
-      // Map the dynamic metric to a static key 'primary'
       primary: Number(point[config.sourceKey] || 0), 
-      // Map the node count to a static key 'secondary'
       secondary: point[countKey]
     }));
   }, [history, config.sourceKey, countKey]);
@@ -73,11 +69,12 @@ export const NetworkStatusChart = ({
                </span>
                <span>{Number(payload[0].value).toFixed(1)}%</span>
              </div>
-             
+
              {showNodeCount && payload[1] && (
                <div className="font-bold font-mono text-blue-400 flex items-center justify-between">
                  <span className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                    {/* Dashed line legend icon */}
+                    <div className="w-3 h-0.5 border-t border-dashed border-blue-500"></div>
                     Node Count
                  </span>
                  <span>{payload[1].value}</span>
@@ -92,7 +89,7 @@ export const NetworkStatusChart = ({
 
   return (
     <div className="w-full h-full flex flex-col rounded-xl border border-zinc-800 bg-black/40 p-3 relative group">
-      
+
       {/* HEADER */}
       <div className="flex flex-col mb-2 relative z-20 shrink-0 gap-1">
          <div className="flex justify-between items-start">
@@ -140,7 +137,7 @@ export const NetworkStatusChart = ({
                     </button>
                     {isTimeOpen && (
                         <div className="absolute right-0 top-full mt-1 w-20 py-1 rounded border border-zinc-800 bg-black shadow-xl flex flex-col z-30 animate-in fade-in zoom-in-95 duration-100">
-                            {(['24H', '7D', '30D', 'ALL'] as const).map((r) => (
+                            {(['24H', '3D', '7D', '30D', 'ALL'] as const).map((r) => (
                                 <button key={r} onClick={() => { onTimeRangeChange(r); setIsTimeOpen(false); }} className="px-2 py-1.5 text-left text-[9px] font-bold uppercase text-zinc-500 hover:bg-zinc-900 hover:text-white w-full">
                                     {r === 'ALL' ? 'MAX' : r}
                                 </button>
@@ -158,7 +155,6 @@ export const NetworkStatusChart = ({
          <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={fluidData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                <defs>
-                  {/* We use a single ID 'fluidGradient' so the DOM element persists and colors animate via the prop changes */}
                   <linearGradient id="fluidGradient" x1="0" y1="0" x2="0" y2="1">
                      <stop offset="5%" stopColor={config.color} stopOpacity={0.2} style={{ transition: 'stop-color 1s ease' }} />
                      <stop offset="95%" stopColor={config.color} stopOpacity={0} style={{ transition: 'stop-color 1s ease' }} />
@@ -206,7 +202,7 @@ export const NetworkStatusChart = ({
 
                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3f3f46', strokeWidth: 1 }} />
 
-               {/* PRIMARY METRIC: Fluid Morphing */}
+               {/* PRIMARY METRIC: Area Chart */}
                <Area 
                   yAxisId="left" 
                   type="monotone" 
@@ -214,29 +210,26 @@ export const NetworkStatusChart = ({
                   stroke={config.color} 
                   strokeWidth={1.5} 
                   fill="url(#fluidGradient)" 
-                  
-                  // ANIMATION CONFIGURATION
                   isAnimationActive={true} 
                   animationDuration={1000}
                   animationEasing="ease-in-out"
-                  
-                  // Style prop for color transition on the stroke
                   style={{ transition: 'stroke 1s ease' }}
                />
 
-               {/* SECONDARY METRIC: Node Count */}
+               {/* SECONDARY METRIC: Broken Line for Node Count */}
                {showNodeCount && (
                    <Line 
                         yAxisId="right" 
                         type="monotone" 
                         dataKey="secondary" 
                         stroke="#3b82f6" 
-                        strokeWidth={1.5} 
+                        strokeWidth={2}
+                        strokeDasharray="4 4" // BROKEN LINE EFFECT
                         dot={false} 
                         isAnimationActive={true} 
                         animationDuration={1000}
                         animationEasing="ease-in-out"
-                        strokeOpacity={0.7}
+                        strokeOpacity={0.8}
                    />
                )}
             </AreaChart>
