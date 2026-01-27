@@ -127,8 +127,8 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
 
   const slots = Array.from({ length: days });
 
-  // UPDATED HEIGHT: h-5 on mobile (20px), h-6 on desktop (24px)
-  if (loading) return <div className="flex gap-[2px] w-full animate-pulse h-5 md:h-6">{slots.map((_, i) => <div key={i} className="flex-1 bg-zinc-800 rounded-[1px] opacity-20" />)}</div>;
+  // RESTORED DIMENSIONS: h-2 on mobile (8px), h-3 on desktop (12px)
+  if (loading) return <div className="flex gap-[2px] w-full animate-pulse h-2 md:h-3">{slots.map((_, i) => <div key={i} className="flex-1 bg-zinc-800 rounded-[1px] opacity-20" />)}</div>;
 
   const sortedHistory = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const startIndex = Math.max(0, sortedHistory.length - days);
@@ -152,8 +152,8 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
   };
 
   return (
-    // UPDATED HEIGHT: h-5 on mobile (20px), h-6 on desktop (24px)
-    <div className="flex flex-col gap-2 w-full relative h-5 md:h-6" ref={containerRef}>
+    // RESTORED DIMENSIONS: h-2 on mobile (8px), h-3 on desktop (12px)
+    <div className="flex flex-col gap-2 w-full relative h-2 md:h-3" ref={containerRef}>
       {renderTooltip()}
       <div className="flex gap-[2px] w-full h-full items-end">
         {slots.map((_, i) => {
@@ -186,19 +186,19 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
               className={`
                   flex-1 rounded-[1px] relative group h-full transition-all duration-200
                   ${!customColor ? baseColor : ''} 
-                  ${point ? 'cursor-pointer hover:brightness-125' : 'cursor-default'}
-                  ${isSelected ? 'brightness-125 ring-1 ring-white/50 z-10' : ''}
+                  ${point ? 'cursor-pointer hover:opacity-100 hover:scale-y-125 origin-bottom' : 'opacity-20 cursor-default'}
+                  ${isSelected ? 'opacity-100 scale-y-125 ring-1 ring-white/50 z-10 shadow-[0_0_10px_rgba(255,255,255,0.3)]' : 'opacity-80'}
               `} 
               style={customColor && point ? { backgroundColor: customColor } : {}}
             >
-                {/* TOP PIN (Consistency/Reliability) */}
+                {/* TOP PIN (Consistency/Reliability) - Floats above */}
                 {topPin.show && (
                     <div className={`absolute -top-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${topPin.color} ring-1 ring-black/10`}></div>
                 )}
 
-                {/* BOTTOM PIN (Events) */}
+                {/* BOTTOM PIN (Events) - Floats below */}
                 {bottomPin.show && (
-                    <div className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${bottomPin.color} ring-1 ring-black/20`}></div>
+                    <div className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${bottomPin.color} ring-1 ring-black/20`}></div>
                 )}
             </div>
           );
