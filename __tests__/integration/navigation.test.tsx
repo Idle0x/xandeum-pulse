@@ -12,6 +12,26 @@ jest.mock('../../src/components/WelcomeCurtain', () => ({
   WelcomeCurtain: () => <div data-testid="curtain-mocked" />
 }));
 
+// Mock Supabase to avoid initialization error (IdentityView uses it)
+jest.mock('../../src/lib/supabase', () => ({
+  supabase: {
+    from: jest.fn(() => ({
+      select: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          order: jest.fn(() => ({
+            limit: jest.fn(() => ({
+              single: jest.fn(() => Promise.resolve({ data: {}, error: null }))
+            })),
+            gte: jest.fn(() => ({
+               order: jest.fn(() => Promise.resolve({ data: [], error: null }))
+            }))
+          }))
+        }))
+      }))
+    }))
+  }
+}));
+
 // Mock the Database History hooks to avoid Supabase connection errors
 jest.mock('../../src/hooks/useNetworkHistory', () => ({
   useNetworkHistory: () => ({
@@ -57,7 +77,7 @@ const SAMPLE_NODE = {
 describe('Xandeum Pulse - Inspector Integration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Mock both API endpoints
     mockedAxios.get.mockImplementation((url: string) => {
       if (url.includes('/api/credits')) {
