@@ -68,7 +68,8 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
         if (isStagnant) {
             // SCENARIO: Frozen / Hung
             continuityLabel = "Suspended";
-            continuitySub = frozenDate || "Process hung"; // Use the precise diagnostic calculated above
+            // FIX: Removed redundancy. Instead of showing the date again, we explain the consequence.
+            continuitySub = "Uptime halted"; 
             continuityColor = "text-orange-400";
             continuityIconColor = "text-orange-500";
         } 
@@ -325,7 +326,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                         <vitality.icon size={12} className={zenMode ? 'text-white' : vitality.color} />
                         <span className={`text-[10px] font-bold uppercase ${zenMode ? 'text-white' : vitality.color}`}>{vitality.label}</span>
                     </div>
-                    {/* Reason / Sub-value */}
+                    {/* Reason / Sub-value (DYNAMIC DIAGNOSTIC) */}
                     <div className="text-[8px] font-bold text-zinc-600 truncate pr-1" title={vitality.reason}>
                         {/* If stagnant, we show the precise frozen date, else the vitality reason */}
                         {vitality.label === 'STAGNANT' ? diagnostics.frozenDate : vitality.reason}
