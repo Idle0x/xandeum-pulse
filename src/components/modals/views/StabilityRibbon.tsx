@@ -40,7 +40,7 @@ const VitalitySnapshotCard = ({
         DRIFT: Activity,
         INCUBATION: ThermometerSun,
         ELITE: Crown,
-        STANDARD: CheckCircle
+        ACTIVE: CheckCircle
     }[analysis.archetype] || Activity;
 
     return (
@@ -156,7 +156,7 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
           const point = displayData[dataIndex];
           const isSelected = selectedIdx === dataIndex;
           
-          let baseColor = '#3f3f46'; // Fallback Zinc
+          let baseColor = '#06b6d4'; // Fallback Active (Cyan)
           let topPin = { show: false, color: '' };
           let bottomPin = { show: false, color: '' };
 
