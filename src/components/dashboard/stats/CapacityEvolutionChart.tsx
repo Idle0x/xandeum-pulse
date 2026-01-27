@@ -27,7 +27,7 @@ export const CapacityEvolutionChart = ({
           label: 'Capacity', 
           gradientId: 'gradCommitted',
           bg: 'bg-purple-500',
-          text: 'text-purple-400'
+          text: 'text-purple-500'
         }
       : { 
           key: usedKey, 
@@ -55,35 +55,24 @@ export const CapacityEvolutionChart = ({
     });
   }, [timeRange]);
 
-  // --- REFINED Y-AXIS DOMAIN LOGIC (User Vision: 5% Top, 10% Bottom) ---
+  // --- REFINED Y-AXIS DOMAIN LOGIC ---
   const getDomain = useCallback((args: any): [number, number] => {
     const [dataMin, dataMax] = args;
-    
-    // Safety check for invalid data
     if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 1];
 
-    // 1. Calculate the Range (Delta)
     const range = dataMax - dataMin;
-    
-    // 2. EDGE CASE: Flat Line (Range is 0)
-    // If the data is completely flat (e.g. consistently 50TB), 
-    // we manually create a +/- 5% buffer around the value so it doesn't look like a wall.
+
     if (range === 0) {
-        if (dataMax === 0) return [0, 10]; // If value is 0, show 0-10 scale
-        return [dataMax * 0.9, dataMax * 1.05]; // If value is >0, apply your 10/5 ratio
+        if (dataMax === 0) return [0, 10]; 
+        return [dataMax * 0.9, dataMax * 1.05]; 
     }
 
-    // 3. APPLY YOUR VISION (5% Top, 10% Bottom)
-    // We calculate padding based on the RANGE, not the value.
-    const topPadding = range * 0.05;    // 5% of the movement
-    const bottomPadding = range * 0.10; // 10% of the movement
+    const topPadding = range * 0.05;    
+    const bottomPadding = range * 0.10; 
 
     let lowerBound = dataMin - bottomPadding;
     let upperBound = dataMax + topPadding;
-    
-    // 4. ANCHOR TO ZERO (Crucial for "Used" stats)
-    // If the calculated lower bound dips below 0, snap it to 0.
-    // This keeps the chart grounded.
+
     if (lowerBound < 0) lowerBound = 0;
 
     return [lowerBound, upperBound];
@@ -120,7 +109,7 @@ export const CapacityEvolutionChart = ({
             <div className="flex bg-zinc-900/80 rounded border border-zinc-800/50 p-0.5">
                <button 
                   onClick={() => setViewMode('COMMITTED')}
-                  className={`px-2 py-0.5 text-[9px] font-bold rounded transition-all duration-300 ${viewMode === 'COMMITTED' ? 'bg-purple-500/20 text-purple-400 shadow-[0_0_10px_-4px_rgba(168,85,247,0.5)]' : 'text-zinc-600 hover:text-zinc-400'}`}
+                  className={`px-2 py-0.5 text-[9px] font-bold rounded transition-all duration-300 ${viewMode === 'COMMITTED' ? 'bg-purple-500/20 text-purple-500 shadow-[0_0_10px_-4px_rgba(168,85,247,0.5)]' : 'text-zinc-600 hover:text-zinc-400'}`}
                >
                   Committed
                </button>
@@ -139,7 +128,8 @@ export const CapacityEvolutionChart = ({
             </button>
             {isDropdownOpen && (
                 <div className="absolute right-0 top-full mt-1 w-20 py-1 rounded border border-zinc-800 bg-black shadow-xl flex flex-col z-30">
-                    {(['24H', '7D', '30D', 'ALL'] as const).map((r) => (
+                    {/* Added '3D' to the array */}
+                    {(['24H', '3D', '7D', '30D', 'ALL'] as const).map((r) => (
                         <button key={r} onClick={() => { onTimeRangeChange(r); setIsDropdownOpen(false); }} className="px-2 py-1.5 text-left text-[9px] font-bold uppercase text-zinc-500 hover:bg-zinc-900 hover:text-white">
                             {r === 'ALL' ? 'MAX' : r}
                         </button>
