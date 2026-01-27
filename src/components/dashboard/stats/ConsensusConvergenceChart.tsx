@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { HistoryTimeRange, NetworkHistoryPoint } from '../../../hooks/useNetworkHistory';
 import { ChevronDown, Loader2 } from 'lucide-react';
 
@@ -9,7 +9,7 @@ interface ConsensusConvergenceChartProps {
   timeRange: HistoryTimeRange;
   onTimeRangeChange: (r: HistoryTimeRange) => void;
   dataKey: keyof NetworkHistoryPoint;
-  color?: string; // Dynamic color support
+  color?: string; 
 }
 
 export const ConsensusConvergenceChart = ({ 
@@ -64,6 +64,7 @@ export const ConsensusConvergenceChart = ({
             </button>
             {isDropdownOpen && (
                 <div className="absolute right-0 top-full mt-1 w-20 py-1 rounded border border-zinc-800 bg-black shadow-xl flex flex-col z-30 animate-in fade-in zoom-in-95 duration-100">
+                    {/* Added '3D' */}
                     {(['24H', '3D', '7D', '30D', 'ALL'] as const).map((r) => (
                         <button key={r} onClick={() => { onTimeRangeChange(r); setIsDropdownOpen(false); }} className="px-2 py-1.5 text-left text-[9px] font-bold uppercase text-zinc-500 hover:bg-zinc-900 hover:text-white w-full">
                             {r === 'ALL' ? 'MAX' : r}
@@ -79,7 +80,14 @@ export const ConsensusConvergenceChart = ({
          {loading && <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/10 backdrop-blur-[1px] transition-opacity duration-300"><Loader2 className="w-4 h-4 animate-spin text-zinc-600"/></div>}
 
          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={fluidData} margin={{ top: 5, right: 0, left: -2, bottom: 0 }}>
+            <AreaChart data={fluidData} margin={{ top: 5, right: 0, left: -2, bottom: 0 }}>
+               <defs>
+                  <linearGradient id="unityGrad" x1="0" y1="0" x2="0" y2="1">
+                     <stop offset="5%" stopColor={color} stopOpacity={0.2} style={{ transition: 'stop-color 1s ease' }}/>
+                     <stop offset="95%" stopColor={color} stopOpacity={0} style={{ transition: 'stop-color 1s ease' }}/>
+                  </linearGradient>
+               </defs>
+
                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.5} />
 
                <XAxis 
@@ -107,22 +115,18 @@ export const ConsensusConvergenceChart = ({
 
                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3f3f46', strokeWidth: 1 }} />
 
-               <Line 
+               <Area 
                   type="monotone" 
                   dataKey="value" 
                   stroke={color} 
-                  strokeWidth={2} 
-                  dot={false}
-                  activeDot={{ r: 4, fill: color, stroke: '#000', strokeWidth: 2 }}
+                  strokeWidth={1.5} 
+                  fill="url(#unityGrad)" 
                   isAnimationActive={true}
                   animationDuration={1000}
                   animationEasing="ease-in-out"
-                  style={{ 
-                    transition: 'stroke 1s ease',
-                    filter: `drop-shadow(0 0 6px ${color}40)` // Subtle neon glow
-                  }}
+                  style={{ transition: 'stroke 1s ease' }}
                />
-            </LineChart>
+            </AreaChart>
          </ResponsiveContainer>
       </div>
     </div>
