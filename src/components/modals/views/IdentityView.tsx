@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, Check, Copy, CheckCircle, AlertTriangle, Calendar, Activity } from 'lucide-react';
 import { Node } from '../../../types';
 import { getSafeIp, getSafeVersion, compareVersions } from '../../../utils/nodeHelpers';
-import { formatUptime } from '../../../utils/formatters';
+// We don't import formatUptime from utils because we need a custom high-precision version here
 import { supabase } from '../../../lib/supabase';
 import { useNodeVitality } from '../../../hooks/useNodeVitality';
 import { NodeHistoryPoint } from '../../../hooks/useNodeHistory';
@@ -14,6 +14,19 @@ interface IdentityViewProps {
   onBack: () => void;
   mostCommonVersion: string;
 }
+
+// --- HELPER: HIGH PRECISION UPTIME ---
+// Shows minutes for short durations (e.g., "15m" instead of "0h")
+const formatPreciseUptime = (seconds: number) => {
+  if (!seconds) return '0m';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const d = Math.floor(h / 24);
+
+  if (d > 0) return `${d}d ${h % 24}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+};
 
 export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: IdentityViewProps) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -39,7 +52,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
 
   // --- LOGIC: SMART CONTINUITY ENGINE ---
   const diagnostics = useMemo(() => {
-    // 1. Calculate "Frozen Since" (Find earliest snapshot with same uptime)
+    // 1. Calculate "Frozen Since"
     let frozenDate = '';
     const isStagnant = vitality.label === 'STAGNANT';
     const isWarmingUp = vitality.label === 'WARMING UP';
@@ -47,13 +60,12 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
 
     if (isStagnant && historyBuffer.length > 0) {
         const currentUptime = node.uptime || 0;
-        // Find the first snapshot in our buffer where uptime matches current (hung state start)
         const frozenPoint = historyBuffer.find(h => h.uptime === currentUptime);
         
         if (frozenPoint) {
             frozenDate = `Frozen since ${new Date(frozenPoint.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} (${new Date(frozenPoint.date).toLocaleTimeString(undefined, { hour: '2-digit', minute:'2-digit' })})`;
         } else {
-            frozenDate = "Uptime counter frozen"; // Fallback
+            frozenDate = "Uptime counter frozen"; 
         }
     }
 
@@ -63,12 +75,11 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
     let continuityColor = "text-zinc-300";
     let continuityIconColor = "text-zinc-500";
 
-    // Only proceed if we have a valid reset count (null means still loading)
     if (resetCount !== null) {
         if (isStagnant) {
             // SCENARIO: Frozen / Hung
             continuityLabel = "Suspended";
-            continuitySub = "Uptime halted";
+            continuitySub = "Uptime halted"; 
             continuityColor = "text-orange-400";
             continuityIconColor = "text-orange-500";
         } 
@@ -80,7 +91,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                 continuityColor = "text-blue-400";
                 continuityIconColor = "text-blue-500";
             } else {
-                // SCENARIO: Recovering from crash
+                // SCENARIO: Recovering
                 continuityLabel = "Rebooting";
                 continuitySub = `Recovering (Resets: ${resetCount})`;
                 continuityColor = "text-blue-400";
@@ -95,7 +106,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                 continuityColor = "text-green-400";
                 continuityIconColor = "text-green-500";
             } else if (resetCount <= 4) {
-                // SCENARIO: Normal Operation (Promoted to Green)
+                // SCENARIO: Normal Operation
                 continuityLabel = "Operational";
                 continuitySub = `Minor resets detected (${resetCount})`;
                 continuityColor = "text-green-400"; 
@@ -109,10 +120,10 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
             }
         } 
         else {
-            // SCENARIO: Offline / Unstable / Unknown
+            // SCENARIO: Offline / Unstable
             continuityLabel = "Unverified";
             continuitySub = "Signal lost";
-            continuityColor = "text-zinc-500"; // Dim
+            continuityColor = "text-zinc-500"; 
             continuityIconColor = "text-zinc-600";
         }
     }
@@ -269,18 +280,16 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
         {/* --- GRID LAYOUT --- */}
         <div className="grid grid-cols-2 gap-3">
 
-             {/* ROW 1: Public Key & RPC Endpoint (Side-by-Side, Truncated) */}
+             {/* ROW 1: Public Key & RPC (Split) */}
              <FieldCard 
                 label="Public Key" 
                 val={node?.pubkey || 'Unknown'} 
                 id="pubkey" 
-                // Removed fullWidth
              />
              <FieldCard 
                 label="RPC Endpoint" 
                 val={`http://${getSafeIp(node)}:6000`} 
                 id="rpc" 
-                // Removed fullWidth
              />
 
              {/* ROW 2: IP & Version */}
@@ -305,14 +314,14 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
              />
              <FieldCard 
                 label="Current Session" 
-                val={formatUptime(node?.uptime)} 
+                val={formatPreciseUptime(node?.uptime)} 
                 color="text-zinc-300"
                 id="uptime"
              />
 
-             {/* ROW 4: Session Continuity (Smart Matrix) */}
+             {/* ROW 4: Session Continuity */}
              <FieldCard 
-                label="Session Continuity" 
+                label={`Session Continuity (${formatPreciseUptime(node?.uptime)})`} // Label with uptime
                 val={diagnostics.continuityLabel}
                 subVal={diagnostics.continuitySub}
                 icon={Activity}
