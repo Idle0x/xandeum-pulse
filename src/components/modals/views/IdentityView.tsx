@@ -37,15 +37,17 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
   const cleanConsensus = mostCommonVersion.replace(/[^0-9.]/g, '');
   const isLatest = cleanVer === cleanConsensus || compareVersions(cleanVer, cleanConsensus) > 0;
 
-  // --- LOGIC: CONTEXT-AWARE DIAGNOSTICS ---
+  // --- LOGIC: SMART CONTINUITY ENGINE ---
   const diagnostics = useMemo(() => {
     // 1. Calculate "Frozen Since" (Find earliest snapshot with same uptime)
     let frozenDate = '';
     const isStagnant = vitality.label === 'STAGNANT';
+    const isWarmingUp = vitality.label === 'WARMING UP';
+    const isActive = vitality.label === 'ACTIVE';
 
     if (isStagnant && historyBuffer.length > 0) {
         const currentUptime = node.uptime || 0;
-        // Find the first snapshot in our 24h buffer where uptime matches current (hung state start)
+        // Find the first snapshot in our buffer where uptime matches current (hung state start)
         const frozenPoint = historyBuffer.find(h => h.uptime === currentUptime);
         
         if (frozenPoint) {
@@ -55,41 +57,68 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
         }
     }
 
-    // 2. Calculate Context-Aware Reset Label
-    let resetLabel = resetCount === null ? '...' : `${resetCount} Events`;
-    let resetSub = lastResetDate ? `Last: ${lastResetDate}` : '';
-    let resetColor = 'text-zinc-300';
-    let resetIconColor = 'text-zinc-500';
+    // 2. Calculate Session Continuity Matrix
+    let continuityLabel = "Loading...";
+    let continuitySub = "";
+    let continuityColor = "text-zinc-300";
+    let continuityIconColor = "text-zinc-500";
 
-    if (resetCount === 0) {
+    // Only proceed if we have a valid reset count (null means still loading)
+    if (resetCount !== null) {
         if (isStagnant) {
-            // SCENARIO: 0 Resets but Hung (Bad)
-            resetLabel = "Session Hung";
-            resetSub = "Restart may be required";
-            resetColor = "text-orange-400";
-            resetIconColor = "text-orange-500";
-        } else {
-            // SCENARIO: 0 Resets and Active (Good)
-            resetLabel = "Stable Session";
-            resetSub = "Continuous operation";
-            resetColor = "text-green-400";
-            resetIconColor = "text-green-500";
-        }
-    } else if (resetCount !== null) {
-        if (resetCount <= 4) {
-            // SCENARIO: 1-4 Resets (Acceptable)
-            resetColor = "text-zinc-300"; // Neutral
-            resetIconColor = "text-zinc-500";
-        } else {
-            // SCENARIO: 5+ Resets (Warning)
-            resetColor = "text-orange-400";
-            resetIconColor = "text-orange-500";
-            resetSub = "High Frequency";
+            // SCENARIO: Frozen / Hung
+            continuityLabel = "Suspended";
+            continuitySub = frozenDate || "Process hung"; // Use the precise diagnostic calculated above
+            continuityColor = "text-orange-400";
+            continuityIconColor = "text-orange-500";
+        } 
+        else if (isWarmingUp) {
+            if (resetCount === 0) {
+                // SCENARIO: Fresh Boot
+                continuityLabel = "Initializing";
+                continuitySub = "System stabilizing";
+                continuityColor = "text-blue-400";
+                continuityIconColor = "text-blue-500";
+            } else {
+                // SCENARIO: Recovering from crash
+                continuityLabel = "Rebooting";
+                continuitySub = `Recovering (Resets: ${resetCount})`;
+                continuityColor = "text-blue-400";
+                continuityIconColor = "text-blue-500";
+            }
+        } 
+        else if (isActive) {
+            if (resetCount === 0) {
+                // SCENARIO: Perfect Stability
+                continuityLabel = "Seamless";
+                continuitySub = "No interruptions (30d)";
+                continuityColor = "text-green-400";
+                continuityIconColor = "text-green-500";
+            } else if (resetCount <= 4) {
+                // SCENARIO: Normal Operation (Promoted to Green)
+                continuityLabel = "Operational";
+                continuitySub = `Minor resets detected (${resetCount})`;
+                continuityColor = "text-green-400"; // Acceptable stability
+                continuityIconColor = "text-green-500";
+            } else {
+                // SCENARIO: Volatile
+                continuityLabel = "Volatile";
+                continuitySub = `High frequency (${resetCount})`;
+                continuityColor = "text-orange-400";
+                continuityIconColor = "text-orange-500";
+            }
+        } 
+        else {
+            // SCENARIO: Offline / Unstable / Unknown
+            continuityLabel = "Unverified";
+            continuitySub = "Signal lost";
+            continuityColor = "text-zinc-500"; // Dim
+            continuityIconColor = "text-zinc-600";
         }
     }
 
-    return { frozenDate, resetLabel, resetSub, resetColor, resetIconColor };
-  }, [vitality.label, historyBuffer, resetCount, lastResetDate, node.uptime]);
+    return { frozenDate, continuityLabel, continuitySub, continuityColor, continuityIconColor };
+  }, [vitality.label, historyBuffer, resetCount, node.uptime]);
 
 
   useEffect(() => {
@@ -129,15 +158,9 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                   setFirstSeen('Unknown');
               }
 
-              // B. FETCH HISTORY FOR DIAGNOSTICS (Last 30 Days for Resets)
-              // Note: We fetch 30 days for resets logic, but hook might only buffer 24h for charts.
-              // For accuracy, we'll request a wider range for reset detection if needed, 
-              // but sticking to 24h/1d logic as per your established hook pattern is safer for perf.
-              // Let's assume we look at 7 days for better reset context if possible, 
-              // otherwise 1 day is what we have buffered.
-              
+              // B. FETCH HISTORY FOR DIAGNOSTICS (Last 30 Days)
               const historyWindow = new Date();
-              historyWindow.setDate(historyWindow.getDate() - 30); // 30 Days as requested
+              historyWindow.setDate(historyWindow.getDate() - 30); 
 
               const { data: recentHistory, error: histError } = await supabase
                   .from('node_snapshots')
@@ -147,7 +170,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                   .order('created_at', { ascending: true });
 
               if (!histError && recentHistory) {
-                  // 1. Pass to State (We map to standardized format)
+                  // 1. Pass to State
                   const mappedHistory = recentHistory.map((r: any) => ({
                       date: r.created_at,
                       uptime: r.uptime,
@@ -161,7 +184,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                   }));
                   setHistoryBuffer(mappedHistory);
 
-                  // 2. Calculate Resets (Logic: Uptime drops significantly)
+                  // 2. Calculate Resets
                   if (recentHistory.length > 1) {
                       let resets = 0;
                       let lastReset = null;
@@ -282,17 +305,17 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                 id="uptime"
              />
 
-             {/* ROW 4: Resets & STATUS (Vitality) */}
+             {/* ROW 4: Session Continuity (Smart Matrix) */}
              <FieldCard 
-                label="Session Resets (30d)" 
-                val={diagnostics.resetLabel}
-                subVal={diagnostics.resetSub}
+                label="Session Continuity" 
+                val={diagnostics.continuityLabel}
+                subVal={diagnostics.continuitySub}
                 icon={Activity}
-                color={diagnostics.resetColor}
-                iconColor={diagnostics.resetIconColor}
+                color={diagnostics.continuityColor}
+                iconColor={diagnostics.continuityIconColor}
              />
 
-             {/* VITALITY STATUS CARD (Updated) */}
+             {/* VITALITY STATUS CARD */}
              <div className={`relative group p-3 rounded-xl border transition-all duration-300 col-span-1 flex flex-col justify-between ${zenMode ? 'bg-black border-zinc-700' : 'bg-zinc-900/40 border-zinc-800/60 hover:border-zinc-700'}`}>
                 <div className="flex justify-between items-start mb-1">
                     <span className="text-[9px] font-bold uppercase text-zinc-500 tracking-wider">Status</span>
@@ -302,8 +325,9 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
                         <vitality.icon size={12} className={zenMode ? 'text-white' : vitality.color} />
                         <span className={`text-[10px] font-bold uppercase ${zenMode ? 'text-white' : vitality.color}`}>{vitality.label}</span>
                     </div>
-                    {/* Reason / Sub-value (DYNAMIC DIAGNOSTIC) */}
+                    {/* Reason / Sub-value */}
                     <div className="text-[8px] font-bold text-zinc-600 truncate pr-1" title={vitality.reason}>
+                        {/* If stagnant, we show the precise frozen date, else the vitality reason */}
                         {vitality.label === 'STAGNANT' ? diagnostics.frozenDate : vitality.reason}
                     </div>
                 </div>
