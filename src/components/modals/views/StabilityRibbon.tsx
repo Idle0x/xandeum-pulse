@@ -15,7 +15,7 @@ interface StabilityRibbonProps {
   color?: string; 
 }
 
-// --- SUB-COMPONENT: VITALITY SNAPSHOT CARD (The Forensic Tooltip) ---
+// --- SUB-COMPONENT: VITALITY SNAPSHOT CARD (Mobile Optimized) ---
 const VitalitySnapshotCard = ({ 
   point, 
   prevPoint, 
@@ -110,7 +110,7 @@ const VitalitySnapshotCard = ({
     );
 };
 
-// --- MAIN EXPORT COMPONENT ---
+// --- MAIN COMPONENT ---
 export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D', color: customColor }: StabilityRibbonProps) => {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
