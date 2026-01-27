@@ -42,6 +42,12 @@ export interface EnrichedNode {
     version: number;
     reputation: number | null;
     storage: number;
+    // NEW: Penalty Object
+    penalties?: {
+      restarts: number;
+      consistency: number;
+      restarts_7d_count: number;
+    };
   };
   location: {
     lat: number;
@@ -166,7 +172,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     fetchOperatorNode(),             // Operator Injection
     publicOrchestrator.fetchNodes(), // Hero B + Passive Discovery (Public)
     fetchCredits(),
-    fetchNodeHistoryReport()         // Historical Forensics (24h Report Card)
+    fetchNodeHistoryReport()         // Historical Forensics (7-Day Report Card)
   ]);
 
   // Inject Operator
@@ -320,11 +326,11 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     // LOOK UP HISTORICAL CONTEXT (Report Card)
     // We construct the ID to match how it is stored in the DB (usually Pubkey-IP-Network)
     // Fallback: Default Neutral History
-    let nodeHistory: HistoryContext = { restarts_24h: 0, yield_velocity_24h: 0, consistency_score: 1 };
-    
+    let nodeHistory: HistoryContext = { restarts_7d: 0, yield_velocity_24h: 0, consistency_score: 1 };
+
     // Attempt standard Stable ID formats
     const stableId = `${node.pubkey}-${ip}-${node.network}`;
-    
+
     if (historyReport.has(stableId)) {
         nodeHistory = historyReport.get(stableId)!;
     }
@@ -334,7 +340,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       node.storage_committed, node.storage_used, node.uptime,
       node.version, consensusVersion, sortedCleanVersions,
       medianCreditsForScore, node.credits, medianStorage, isCreditsApiOnline,
-      nodeHistory // Passing the 24h Report Card
+      nodeHistory // Passing the 7-Day Report Card
     );
 
     return {
