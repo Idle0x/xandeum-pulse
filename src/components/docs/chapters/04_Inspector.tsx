@@ -1,20 +1,26 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Activity, Database, Hash, Hand, Search, Info, Wifi, WifiOff, CheckCircle2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Activity, Search, Wifi, WifiOff, Database, Server, Info } from 'lucide-react';
 import { LogicWrapper } from '../layout/LogicWrapper';
 
 const VITALITY_LOGIC_SNIPPET = `
-const computeVitality = (uptime, storage, credits, version, isOnline) => {
-  // Sigmoid curve: creates a "Trust Barrier" at the 7-day mark
-  const uptimeScore = 100 / (1 + Math.exp(-0.2 * (uptime - 7)));
+const computeVitality = (uptime, storage, credits, isOnline) => {
+  // 1. Sigmoid Curve for Uptime (Non-linear trust)
+  // Penalizes recent downtime heavily
+  const uScore = 100 / (1 + Math.exp(-0.2 * (uptime - 7)));
   
-  // Weights: Hardware (40%), Reputation (30%), Stability (30%)
-  let score = (storage * 0.40) + (isOnline ? credits * 0.30 : 0) + (uptimeScore * 0.30);
+  // 2. Weighted Matrix
+  // Hardware (40%), Reputation (30%), Stability (30%)
+  let score = (storage * 0.40) + 
+              (isOnline ? credits * 0.30 : 0) + 
+              (uScore * 0.30);
   
-  // Failover Logic: If API is offline, reputation is voided; hardware weight increases.
-  if (!isOnline) score = (storage * 0.65) + (uptimeScore * 0.35);
+  // 3. Failover Protocol
+  // If API offline, ignore reputation, boost hardware weight
+  if (!isOnline) {
+      score = (storage * 0.65) + (uScore * 0.35);
+  }
   
-  // Version Consensus: 15% penalty for outdated protocol versions
-  return version === 'v3.2.0' ? score : score * 0.85;
+  return Math.min(100, Math.round(score));
 };
 `;
 
@@ -25,190 +31,155 @@ export function InspectorChapter() {
             code={VITALITY_LOGIC_SNIPPET} 
             githubPath="src/logic/vitality-engine.ts"
         >
-            <div className="flex flex-col gap-16">
-                {/* Header: Professional Explanation */}
-                <div className="text-center animate-in fade-in slide-in-from-bottom-4">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 text-red-400 text-[10px] font-bold uppercase tracking-widest mb-4">
-                        <Search size={12}/> Diagnostics Suite
-                    </div>
-                    <h2 className="text-4xl font-bold text-white mb-8 tracking-tight">Granular Diagnostics</h2>
-                    
-                    <div className="max-w-4xl mx-auto text-left space-y-6">
-                        <p className="text-zinc-300 text-base leading-relaxed">
-                            The <strong>Inspector System</strong> operates as the platform's investigative core. It fetches raw telemetry via the <code>useNetworkData</code> hook and translates it into three distinct perspectives: <strong>Health</strong>, <strong>Storage</strong>, and <strong>Identity</strong>. By utilizing non-linear algorithms, it filters out ephemeral network noise to provide a definitive "Ground Truth" for every node in the fleet.
-                        </p>
-                        <p className="text-zinc-300 text-base leading-relaxed">
-                            The simulation below replicates the actual <strong>Vitality Engine</strong> logic. It demonstrates how the system reacts when upstream APIs go offline, triggering a failover to optimistic caching. In this state, the engine re-prioritizes hardware commitment (Storage) over live reputation, ensuring that the dashboard remains functional even during total network desynchronization.
-                        </p>
-                    </div>
-                </div>
-                
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-                    {/* Visual Feature Breakdown */}
-                    <div className="lg:col-span-4 space-y-4">
-                        <div className="p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 group hover:border-green-500/30 transition-all">
-                            <div className="flex items-center gap-4 mb-3">
-                                <div className="p-2 bg-green-500/10 rounded-xl text-green-500"><Activity size={20}/></div>
-                                <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Health</h3>
-                            </div>
-                            <p className="text-[11px] text-zinc-500 leading-relaxed">Combines uptime sigmoid curves with version consensus. If the node version is outdated, the vitality score is slashed by 15%.</p>
-                        </div>
-
-                        <div className="p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 group hover:border-purple-500/30 transition-all">
-                            <div className="flex items-center gap-4 mb-3">
-                                <div className="p-2 bg-purple-500/10 rounded-xl text-purple-500"><Database size={20}/></div>
-                                <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Storage</h3>
-                            </div>
-                            <p className="text-[11px] text-zinc-500 leading-relaxed">The heaviest weight in the vitality formula. High commitment relative to the network average triggers a multiplier bonus.</p>
-                        </div>
-
-                        <div className="p-6 rounded-3xl bg-zinc-900/20 border border-zinc-800 group hover:border-indigo-500/30 transition-all">
-                            <div className="flex items-center gap-4 mb-3">
-                                <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-500"><Hash size={20}/></div>
-                                <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Identity</h3>
-                            </div>
-                            <p className="text-[11px] text-zinc-500 leading-relaxed">Unique node fingerprinting. It ensures the 30-day history remains linked to the hardware, even if the IP or Version changes.</p>
-                        </div>
-                    </div>
-                    
-                    {/* The 4-Pillar Simulation Widget */}
-                    <div className="lg:col-span-8 h-full">
-                        <VitalitySimulator />
-                    </div>
-                </div>
-            </div>
+            <VitalitySimulator />
         </LogicWrapper>
     )
 }
 
 function VitalitySimulator() {
-    // 1. STATE MACHINE
+    // State
     const [isOnline, setIsOnline] = useState(true);
-    const [uptime, setUptime] = useState(14);
-    const [storage, setStorage] = useState(60); 
-    const [credits, setCredits] = useState(45); 
-    const [version, setVersion] = useState('v3.2.0');
+    const [uptime, setUptime] = useState(14); // Days
+    const [storage, setStorage] = useState(60); // % vs Leader
+    const [credits, setCredits] = useState(45); // % vs Avg
 
-    // 2. VITALITY FORMULA RESTORATION
+    // Live Calculation
     const totalScore = useMemo(() => {
-        // Sigmoid for Uptime
-        const uScore = Math.min(100, Math.round(100 / (1 + Math.exp(-0.2 * (uptime - 7)))));
+        const uScore = 100 / (1 + Math.exp(-0.2 * (uptime - 7)));
+        let raw = (storage * 0.40) + (isOnline ? credits * 0.30 : 0) + (uScore * 0.30);
         
-        // Base weightings (40/30/30)
-        let sWeight = storage * 0.40;
-        let cWeight = isOnline ? (credits * 0.30) : 0; 
-        let uWeight = uScore * 0.30;
-        
-        let raw = sWeight + cWeight + uWeight;
-
-        // Offline Penalty/Adjustment: Heavy weight on hardware reliability
         if (!isOnline) {
             raw = (storage * 0.65) + (uScore * 0.35);
         }
-
-        // Version Penalty
-        if (version !== 'v3.2.0') raw *= 0.85;
-
         return Math.min(100, Math.round(raw));
-    }, [uptime, storage, credits, version, isOnline]);
+    }, [uptime, storage, credits, isOnline]);
 
     return (
-        <div className="bg-[#050505] border border-zinc-800 rounded-[2.5rem] p-8 md:p-12 shadow-2xl relative overflow-hidden h-full flex flex-col">
+        <div className="h-full bg-[#050505] border border-zinc-800 rounded-[2.5rem] p-8 md:p-12 shadow-2xl flex flex-col justify-between relative overflow-hidden">
             
-            {/* API STATUS TOGGLE */}
-            <div className="flex justify-between items-center mb-12">
-                <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full animate-pulse ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-                        API STATUS: {isOnline ? 'ONLINE (UPLINK ACTIVE)' : 'OFFLINE (CACHE MODE)'}
-                    </span>
+            {/* Top Bar: Network Status */}
+            <div className="flex justify-between items-start mb-12 relative z-10">
+                <div>
+                    <div className="inline-flex items-center gap-2 text-red-400 mb-2">
+                        <Search size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Diagnostics Suite</span>
+                    </div>
+                    <h3 className="text-3xl font-black text-white tracking-tighter">Vitality Inspector</h3>
                 </div>
+
+                {/* API Toggle Button */}
                 <button 
                     onClick={() => setIsOnline(!isOnline)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-bold border transition-all active:scale-95
-                    ${isOnline ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-red-400' : 'bg-red-500/10 border-red-500 text-red-500'}`}
+                    className={`
+                        flex items-center gap-3 px-5 py-2.5 rounded-full text-[10px] font-bold border transition-all active:scale-95
+                        ${isOnline 
+                            ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600' 
+                            : 'bg-red-500/10 border-red-500 text-red-500 animate-pulse'}
+                    `}
                 >
                     {isOnline ? <Wifi size={14}/> : <WifiOff size={14}/>}
-                    {isOnline ? 'FORCE FAILOVER' : 'RECONNECT API'}
+                    {isOnline ? 'NETWORK: ONLINE' : 'NETWORK: SEVERED'}
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-                {/* PILLAR CONTROLS */}
-                <div className="space-y-6">
-                    <SimulatorSlider label="Uptime Stability" val={uptime} setVal={setUptime} unit="Days" color="text-blue-400" accent="accent-blue-500" />
-                    <SimulatorSlider label="Storage Commitment" val={storage} setVal={setStorage} unit="%" color="text-purple-400" accent="accent-purple-500" />
-                    <SimulatorSlider label="Network Credits" val={credits} setVal={setCredits} unit="Cr" color="text-yellow-500" accent="accent-yellow-500" disabled={!isOnline} />
-                    
-                    <div>
-                        <div className="text-[9px] font-black text-zinc-600 uppercase mb-3 tracking-widest font-mono">Protocol Version</div>
-                        <div className="grid grid-cols-3 gap-2">
-                            {['v3.0.1', 'v3.1.2', 'v3.2.0'].map(v => (
-                                <button 
-                                    key={v}
-                                    onClick={() => setVersion(v)}
-                                    className={`py-2 rounded-lg text-[10px] font-bold border transition-all font-mono
-                                    ${version === v ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-600'}`}
-                                >
-                                    {v}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+            {/* Main Control Deck */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center relative z-10">
+                
+                {/* Left: The Faders */}
+                <div className="space-y-8">
+                    <SimulatorSlider 
+                        label="Uptime Consistency" 
+                        val={uptime} setVal={setUptime} max={30} unit="Days" 
+                        icon={Activity} color="text-blue-400" accent="bg-blue-500"
+                    />
+                    <SimulatorSlider 
+                        label="Storage Commitment" 
+                        val={storage} setVal={setStorage} max={100} unit="%" 
+                        icon={Database} color="text-purple-400" accent="bg-purple-500"
+                    />
+                    <SimulatorSlider 
+                        label="Reputation Credits" 
+                        val={credits} setVal={setCredits} max={100} unit="Cr" 
+                        icon={Server} color="text-yellow-500" accent="bg-yellow-500"
+                        disabled={!isOnline}
+                    />
                 </div>
 
-                {/* THE GAUGE */}
-                <div className="flex flex-col items-center">
-                    <div className="relative flex flex-col items-center justify-center w-56 h-56 rounded-full border-8 border-zinc-900 shadow-2xl group">
-                        <svg className="absolute inset-0 w-full h-full -rotate-90">
-                            <circle cx="112" cy="112" r="104" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-zinc-900" />
+                {/* Right: The Gauge */}
+                <div className="flex flex-col items-center justify-center">
+                    <div className="relative w-64 h-64">
+                        {/* Gauge BG */}
+                        <svg className="w-full h-full -rotate-90 transform">
+                            <circle cx="128" cy="128" r="110" stroke="#18181b" strokeWidth="12" fill="transparent" />
                             <circle 
-                                cx="112" cy="112" r="104" stroke="currentColor" strokeWidth="8" fill="transparent" 
-                                strokeDasharray={653}
-                                strokeDashoffset={653 - (653 * totalScore) / 100}
-                                className={`transition-all duration-1000 ease-out ${totalScore > 80 ? 'text-green-500' : totalScore > 50 ? 'text-yellow-500' : 'text-red-500'}`}
+                                cx="128" cy="128" r="110" stroke="currentColor" strokeWidth="12" fill="transparent" 
+                                strokeDasharray={691}
+                                strokeDashoffset={691 - (691 * totalScore) / 100}
+                                strokeLinecap="round"
+                                className={`transition-all duration-1000 ease-out ${totalScore > 80 ? 'text-green-500 drop-shadow-[0_0_10px_rgba(34,197,94,0.5)]' : totalScore > 50 ? 'text-yellow-500' : 'text-red-500'}`}
                             />
                         </svg>
-
-                        <div className="relative z-10 flex flex-col items-center">
-                            <span className="text-6xl font-black text-white tracking-tighter">{totalScore}</span>
-                            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-1">Vitality Score</span>
+                        
+                        {/* Center Text */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                            <span className="text-7xl font-black text-white tracking-tighter tabular-nums">
+                                {totalScore}
+                            </span>
+                            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mt-2">
+                                Health Score
+                            </span>
                         </div>
-                    </div>
-
-                    <div className="mt-8 flex items-center gap-2 text-[9px] font-mono text-zinc-600">
-                        <CheckCircle2 size={12} className={totalScore > 80 ? 'text-green-500' : 'text-zinc-800'} />
-                        {totalScore > 80 ? 'CONSENSUS ALIGNED' : 'UNDERPERFORMING'}
                     </div>
                 </div>
             </div>
 
-            {/* LOGIC ANNOTATION */}
-            <div className="mt-12 p-4 bg-zinc-900/30 rounded-2xl border border-zinc-800 flex items-start gap-4">
-                <Info size={18} className="text-zinc-500 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-zinc-500 leading-relaxed italic">
+            {/* Footer Alert */}
+            <div className={`
+                mt-12 p-4 rounded-xl border flex items-start gap-4 transition-all duration-500
+                ${!isOnline ? 'bg-red-900/10 border-red-500/20' : 'bg-zinc-900/30 border-zinc-800'}
+            `}>
+                <Info size={16} className={!isOnline ? 'text-red-500' : 'text-zinc-500'} />
+                <p className="text-[11px] text-zinc-400 leading-relaxed">
                     {!isOnline 
-                        ? "CRASH PROTECTION ACTIVE: Reputation-based credits are being ignored to prevent data corruption. The score now reflects pure hardware reliability + cache persistence." 
-                        : "LIVE SYNC ACTIVE: The Neural Core is currently merging RPC telemetry with historical reputation credits to generate a complete Vitality profile."
+                        ? <span className="text-red-400 font-bold">FAILOVER ACTIVE: </span> 
+                        : <span className="text-blue-400 font-bold">LIVE SYNC: </span>
+                    }
+                    {!isOnline 
+                        ? "Upstream RPC unresponsive. Scoring logic has voided 'Reputation' credits to prevent stale data corruption. Relying purely on hardware metrics."
+                        : "Neural Core is actively merging RPC telemetry with historical credit data."
                     }
                 </p>
             </div>
+
         </div>
     )
 }
 
-function SimulatorSlider({ label, val, setVal, unit, color, accent, disabled = false }: any) {
+function SimulatorSlider({ label, val, setVal, max, unit, icon: Icon, color, accent, disabled }: any) {
     return (
-        <div className={`transition-opacity duration-300 ${disabled ? 'opacity-20 pointer-events-none grayscale' : 'opacity-100'}`}>
-            <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-2 font-mono">
-                <span className={color}>{label}</span>
-                <span className="text-white font-mono">{val}{unit}</span>
+        <div className={`transition-all duration-300 ${disabled ? 'opacity-30 grayscale pointer-events-none' : 'opacity-100'}`}>
+            <div className="flex justify-between items-end mb-3">
+                <div className="flex items-center gap-2">
+                    <Icon size={14} className={color}/>
+                    <span className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider">{label}</span>
+                </div>
+                <span className="text-xs font-mono font-bold text-white bg-zinc-900 px-2 py-1 rounded border border-zinc-800">
+                    {val}{unit}
+                </span>
             </div>
-            <input 
-                type="range" min="0" max={unit === 'Days' ? 30 : 100} 
-                value={val} onChange={(e) => setVal(Number(e.target.value))}
-                className={`w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer ${accent}`}
-            />
+            
+            {/* Custom Range Input Styling */}
+            <div className="relative h-2 bg-zinc-900 rounded-full border border-zinc-800 group">
+                <div 
+                    className={`absolute top-0 left-0 h-full rounded-full ${accent} transition-all duration-150`} 
+                    style={{ width: `${(val / max) * 100}%` }}
+                ></div>
+                <input 
+                    type="range" min="0" max={max} 
+                    value={val} onChange={(e) => setVal(Number(e.target.value))}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+            </div>
         </div>
     )
 }
