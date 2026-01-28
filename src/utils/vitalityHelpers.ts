@@ -33,22 +33,27 @@ const calculateVectors = (
   prevPoint?: NodeHistoryPoint
 ) => {
   const uptime = point.uptime || 0;
-  
+
   // Safe extraction
   const bd = (point as any).healthBreakdown || {};
   const penalties = bd.penalties || { restarts: 0, consistency: 1, restarts_7d_count: 0 };
-  
+
   // --- 1. STATUS VECTORS ---
   const V_OFFLINE = uptime === 0;
   const V_SYNCING = uptime > 0 && uptime < 900; // < 15 mins
 
-  // FROZEN UPTIME CHECK (The "Hung" Node)
+  // --- FROZEN UPTIME CHECK (The "Hung" Node) ---
+  // LOGIC UPDATE: We use a 30-minute buffer (1,800,000ms) to ensure fairness.
+  // If the snapshot interval is short (e.g. 5 mins), we don't want to flag "Frozen"
+  // just because of a minor polling delay.
   let V_FROZEN_UPTIME = false;
   if (prevPoint && !V_OFFLINE) {
       const timeDelta = new Date(point.date).getTime() - new Date(prevPoint.date).getTime();
       const uptimeDelta = point.uptime - prevPoint.uptime;
-      // If time moved forward (> 1 min) but uptime didn't move (0), it's frozen
-      if (timeDelta > 60000 && uptimeDelta === 0) {
+      
+      // 1. Time has advanced significantly (> 30 mins)
+      // 2. Uptime has NOT moved at all (strictly 0)
+      if (timeDelta > 1800000 && uptimeDelta === 0) {
           V_FROZEN_UPTIME = true;
       }
   }
@@ -72,15 +77,16 @@ const calculateVectors = (
   // --- 4. ECONOMIC VECTORS ---
   const credits = point.credits; // Can be null
   const prevCredits = prevPoint?.credits ?? 0;
-  
+
   const V_UNTRACKED = credits === null || credits === undefined;
-  
+
   // Velocity logic: strictly 0 means stagnant
   const valCredits = credits || 0;
   const velocity = prevPoint ? (valCredits - prevCredits) : 0;
-  
+
   const V_PRODUCING = velocity > 0;
-  const V_STAGNANT = !V_UNTRACKED && velocity === 0; // Only flag stagnant if tracked
+  // Only flag stagnant if we are tracked AND not producing AND not frozen (Frozen takes precedence)
+  const V_STAGNANT = !V_UNTRACKED && velocity === 0 && !V_FROZEN_UPTIME; 
 
   // --- 5. TIME/PENALTY VECTORS ---
   const V_PENALIZED = penalties.restarts > 0;
@@ -100,9 +106,9 @@ const calculateVectors = (
 export const analyzePointVitality = (
   point: NodeHistoryPoint, 
   prevPoint?: NodeHistoryPoint,
-  oneHourAgoPoint?: NodeHistoryPoint
+  oneHourAgoPoint?: NodeHistoryPoint // Kept for interface compatibility, but logic uses prevPoint
 ): VitalityAnalysis => {
-  
+
   const v = calculateVectors(point, prevPoint);
   const activeVectors = Object.entries(v).filter(([_, val]) => val).map(([key]) => key);
 
@@ -130,8 +136,10 @@ export const analyzePointVitality = (
     archetype = 'DRIFT';
     baseColor = '#d97706'; // Amber-600
     textColor = 'text-amber-500';
+    
+    // Explicit Labels for clarity
     if (v.V_FROZEN_UPTIME) label = 'FROZEN STATE';
-    else if (v.V_STAGNANT) label = 'ZOMBIE STATE';
+    else if (v.V_STAGNANT) label = 'ZOMBIE STATE'; // Online but no rewards
     else if (v.V_LAGGING) label = 'VERSION LAG';
     else if (v.V_OBSOLETE) label = 'OBSOLETE (ACTIVE)';
     else label = 'CONSISTENCY DRIFT';
@@ -170,10 +178,10 @@ export const analyzePointVitality = (
 
   // BOTTOM PIN: Events
   const bottomPin: PinConfig = { show: false, color: 'bg-transparent' };
-  
+
   const isRestart = prevPoint && point.uptime < (prevPoint.uptime - 100);
   const isUpdate = prevPoint && point.version !== prevPoint.version;
-  
+
   if (isRestart) {
       bottomPin.show = true;
       bottomPin.color = 'bg-rose-400'; 
@@ -182,6 +190,11 @@ export const analyzePointVitality = (
       bottomPin.show = true;
       bottomPin.color = 'bg-blue-400';
       bottomPin.label = 'Update';
+  } else if (v.V_FROZEN_UPTIME) {
+      // Priority over stagnancy
+      bottomPin.show = true;
+      bottomPin.color = 'bg-amber-500';
+      bottomPin.label = 'Hung';
   } else if (v.V_STAGNANT) {
       bottomPin.show = true;
       bottomPin.color = 'bg-amber-300';
