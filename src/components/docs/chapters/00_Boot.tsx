@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Cpu, Github, Twitter, ArrowRight, BookOpen, GraduationCap, LayoutDashboard } from 'lucide-react';
+import { Cpu, Github, Twitter, ArrowRight, BookOpen, GraduationCap, LayoutDashboard, Wrench } from 'lucide-react';
 
 // Navigation Data
 const MODULES = [
     { id: 'manual', label: 'Field Manual', icon: BookOpen, desc: 'Technical documentation & protocols.' },
+    { id: 'engineering', label: 'Engineering', icon: Cpu, desc: 'System architecture & integrity.' },
     { id: 'school', label: 'Flight School', icon: GraduationCap, desc: 'Interactive tutorials & guides.' },
     { id: 'deck', label: 'Command Deck', icon: LayoutDashboard, desc: 'Live operational dashboard.' }
 ];
 
-export function BootChapter({ onStart }: { onStart: () => void }) {
+export function BootChapter({ onStart }: { onStart: (sectionId: string) => void }) {
     const [mounted, setMounted] = useState(false);
     const [activeTab, setActiveTab] = useState('manual');
 
@@ -35,8 +36,8 @@ export function BootChapter({ onStart }: { onStart: () => void }) {
                     </div>
                 </div>
 
-                {/* 2. Visible Tab Switcher (The Fix) */}
-                <div className={`flex items-center gap-1 p-1 bg-zinc-900/50 border border-zinc-800 rounded-full backdrop-blur-md mb-10 transition-all duration-1000 delay-100 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                {/* 2. Visible Tab Switcher */}
+                <div className={`flex flex-wrap justify-center gap-1 p-1 bg-zinc-900/50 border border-zinc-800 rounded-full backdrop-blur-md mb-10 transition-all duration-1000 delay-100 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
                     {MODULES.map((mod) => (
                         <button
                             key={mod.id}
@@ -60,22 +61,43 @@ export function BootChapter({ onStart }: { onStart: () => void }) {
                 <h1 className={`text-6xl md:text-9xl font-black text-white tracking-tighter mb-8 leading-[0.85] transition-all duration-1000 delay-200 ${mounted ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
                     PULSE <br />
                     <span className="text-transparent bg-clip-text bg-gradient-to-b from-blue-400 via-blue-600 to-zinc-900">
-                        {activeModule.label.split(' ')[1].toUpperCase()}
+                        {activeModule.label.toUpperCase()}
                     </span>
                 </h1>
 
                 {/* Dynamic Description */}
                 <p className={`text-lg md:text-xl text-zinc-400 leading-relaxed max-w-xl mx-auto font-light mb-12 tracking-wide transition-all duration-500 delay-300 ${mounted ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
                     {activeModule.desc}
-                    {activeTab === 'manual' && <span className="text-zinc-100 font-medium block mt-2">Audit health. Synchronize topology. Verify yield.</span>}
-                    {activeTab === 'school' && <span className="text-zinc-100 font-medium block mt-2">Master the basics. Earn operator badges.</span>}
-                    {activeTab === 'deck' && <span className="text-zinc-100 font-medium block mt-2">Live metrics. Active alerts. Performance charts.</span>}
+                    
+                    {activeTab === 'manual' && (
+                        <span className="text-zinc-100 font-medium block mt-2 animate-in fade-in slide-in-from-bottom-2">
+                            Audit health. Synchronize topology. Verify yield.
+                        </span>
+                    )}
+                    
+                    {activeTab === 'engineering' && (
+                        <span className="text-zinc-100 font-medium block mt-2 animate-in fade-in slide-in-from-bottom-2">
+                            Latency probes. Forensic context. System audit.
+                        </span>
+                    )}
+
+                    {activeTab === 'school' && (
+                        <span className="text-zinc-100 font-medium block mt-2 animate-in fade-in slide-in-from-bottom-2">
+                            Master the basics. Earn operator badges.
+                        </span>
+                    )}
+                    
+                    {activeTab === 'deck' && (
+                        <span className="text-zinc-100 font-medium block mt-2 animate-in fade-in slide-in-from-bottom-2">
+                            Live metrics. Active alerts. Performance charts.
+                        </span>
+                    )}
                 </p>
 
                 {/* 4. Direct Call to Action */}
                 <div className={`transition-all duration-1000 delay-500 ${mounted ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
                     <button 
-                        onClick={onStart}
+                        onClick={() => onStart(activeTab)}
                         className="group relative px-10 py-5 bg-white text-black rounded-full font-bold text-sm tracking-[0.15em] uppercase overflow-hidden hover:scale-105 transition-all duration-500 shadow-[0_0_60px_-15px_rgba(255,255,255,0.5)] active:scale-95"
                     >
                         <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-zinc-200 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
