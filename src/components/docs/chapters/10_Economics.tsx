@@ -4,33 +4,20 @@ import { TrendingUp, BarChart2, Code2, Terminal } from 'lucide-react';
 const STOINC_CODE = `
 // lib/xandeum-economics.ts
 
-export const ERA_BOOSTS = { 'DeepSouth': 16, 'South': 10, /* ... */ 'North': 1.25 };
-
 export function calculateStoinc(inputs: StoincInputs) {
-  // 1. CALCULATE BASE CREDITS
-  // Formula: Nodes * Storage * Perf * Stake
-  const userBaseCredits = inputs.nodeCount * storageInGB * inputs.performance * inputs.stake;
-
-  // 2. GEOMETRIC STACKING LOGIC
+  // 1. GEOMETRIC STACKING: Compound multipliers instead of adding
   let product = 1;
   Object.entries(inputs.boosts).forEach(([name, count]) => {
       const val = ERA_BOOSTS[name] || 1;
-      // Multiply val 'count' times (Compounding)
-      for(let i=0; i<count; i++) product *= val;
+      for(let i=0; i<count; i++) product *= val; // Multiply 'count' times
   });
 
-  // 3. NORMALIZE FAIRNESS
-  // Root of product based on fleet size prevents 'whale' dominance
+  // 2. NORMALIZE: Root based on fleet size prevents 'whale' dominance
+  // If you run 10 nodes, we take the 10th root of your total boost
   const geoMean = Math.pow(product, 1 / Math.max(1, inputs.nodeCount));
   
-  // Final Yield Power
-  const boostedCredits = userBaseCredits * geoMean;
-
-  return { 
-    userBaseCredits, 
-    geoMean, 
-    boostedCredits 
-  };
+  // 3. FINAL YIELD POWER
+  return inputs.userBaseCredits * geoMean;
 }
 `;
 
@@ -145,7 +132,7 @@ function AnimatedChart({ type, value, label, color, delay }: any) {
 
     return (
         <div 
-            className="w-full h-48 bg-zinc-900/20 border border-zinc-800 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between group hover:border-zinc-700 transition-colors animate-in fade-in slide-in-from-bottom-4 duration-700"
+            className="w-full h-40 bg-zinc-900/20 border border-zinc-800 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between group hover:border-zinc-700 transition-colors animate-in fade-in slide-in-from-bottom-4 duration-700"
             style={{ animationDelay: `${delay}ms` }}
         >
             <div className="relative z-10 flex justify-between items-start">
@@ -156,7 +143,7 @@ function AnimatedChart({ type, value, label, color, delay }: any) {
             </div>
 
             {/* The Animated Graph */}
-            <div className="absolute bottom-0 left-0 right-0 h-32 opacity-60">
+            <div className="absolute bottom-0 left-0 right-0 h-24 opacity-60">
                 <svg className="w-full h-full" preserveAspectRatio="none">
                     {/* The Line */}
                     <path 
@@ -210,12 +197,10 @@ function CodeBlock({ code, path }: { code: string, path: string }) {
         if (!isTyping) return;
         let i = 0;
         const interval = setInterval(() => {
-            // Speed up typing for large blocks
-            const chunk = 5; 
-            setDisplayedCode(code.slice(0, i + chunk));
-            i += chunk;
+            setDisplayedCode(code.slice(0, i + 1)); // Single character typing
+            i += 1;
             if (i > code.length) clearInterval(interval);
-        }, 5);
+        }, 10);
         return () => clearInterval(interval);
     }, [isTyping, code]);
 
