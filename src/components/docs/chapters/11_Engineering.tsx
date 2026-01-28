@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Shield, Activity, Database, Terminal, Search, Server, Cpu, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Shield, Activity, Terminal, Search, Server, Cpu, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { ChapterLayout } from '../layout/ChapterLayout';
 
 // --- TEXT CONTENT ---
@@ -69,8 +69,7 @@ export function EngineeringChapter() {
         const startTotal = performance.now();
 
         try {
-            // 1. SIMULATE NETWORK PHASES (Browser doesn't expose DNS/SSL timings directly to JS)
-            // We scale these relative to the actual TTFB to create a realistic waterfall visual
+            // 1. SIMULATE NETWORK PHASES
             await new Promise(r => setTimeout(r, Math.random() * 20 + 10)); // DNS
             setDiag(prev => ({ ...prev, status: 'TCP' }));
             
@@ -98,10 +97,9 @@ export function EngineeringChapter() {
             const nodes = data.result?.pods || [];
             const sample = nodes.length > 0 ? nodes[Math.floor(Math.random() * nodes.length)] : null;
             
-            // Forensic Counts
+            // Forensic Counts based on your actual data structure
             const ghosts = nodes.filter((n: any) => n.isUntracked || n.is_ghost).length;
             const trauma = nodes.filter((n: any) => (n.healthBreakdown?.penalties?.restarts_24h || 0) > 5).length;
-            // Assuming frozen_duration_hours is passed in penalties based on your snippet
             const iceAge = nodes.filter((n: any) => (n.healthBreakdown?.penalties?.frozen_duration_hours || 0) > 1).length;
 
             const sizeBytes = new TextEncoder().encode(JSON.stringify(data)).length;
@@ -169,7 +167,7 @@ export function EngineeringChapter() {
                     </button>
                 </div>
 
-                {/* 2. NETWORK WATERFALL (Replacing Speedometer) */}
+                {/* 2. NETWORK WATERFALL */}
                 <WaterfallTrace diag={diag} />
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1">
@@ -189,8 +187,6 @@ export function EngineeringChapter() {
 
 function WaterfallTrace({ diag }: { diag: DiagnosticState }) {
     const isComplete = diag.status === 'COMPLETE';
-    
-    // Scale bars relative to total time (max 100%)
     const getWidth = (val: number) => isComplete ? `${Math.min(100, (val / diag.latency.total) * 100)}%` : '0%';
 
     return (
@@ -203,7 +199,6 @@ function WaterfallTrace({ diag }: { diag: DiagnosticState }) {
                 </div>
             </div>
 
-            {/* The Bars */}
             <div className="space-y-3">
                 <TraceBar label="DNS Resolution" color="bg-zinc-600" width={getWidth(diag.latency.dns)} val={diag.latency.dns} active={diag.status === 'DNS'} />
                 <TraceBar label="TCP Handshake" color="bg-blue-600" width={getWidth(diag.latency.ssl)} val={diag.latency.ssl} active={diag.status === 'TCP'} />
@@ -211,7 +206,6 @@ function WaterfallTrace({ diag }: { diag: DiagnosticState }) {
                 <TraceBar label="Content Download" color="bg-green-500" width={isComplete ? '15%' : '0%'} val={isComplete ? 12 : 0} active={diag.status === 'DOWNLOAD'} />
             </div>
 
-            {/* Meta Data Footer */}
             {isComplete && (
                 <div className="mt-6 pt-4 border-t border-zinc-900 flex justify-between text-[10px] text-zinc-500 animate-in fade-in">
                     <span>PAYLOAD: <span className="text-zinc-300">{diag.payload?.size}</span></span>
@@ -255,9 +249,7 @@ function MathTerminal({ node, status }: { node: any, status: string }) {
         );
     }
 
-    // Reconstruct the logic for display
     const uptimeDays = (node.uptime / 86400).toFixed(1);
-    const storageTB = (node.storage_committed / (1024 ** 4)).toFixed(2); // Assuming bytes -> TB for display logic check
     const penalties = node.healthBreakdown?.penalties?.restarts_7d_count || 0;
     const score = node.health;
 
@@ -275,9 +267,10 @@ function MathTerminal({ node, status }: { node: any, status: string }) {
                 <div><span className="text-blue-500">INPUT</span> Uptime: {node.uptime}s ({uptimeDays} days)</div>
                 <div><span className="text-blue-500">INPUT</span> Storage: {node.storage_committed} bytes</div>
                 <div className="my-2 border-t border-zinc-800/50"></div>
-                <div><span className="text-yellow-500">CALC</span> Sigmoid(Uptime) -> {(node.healthBreakdown?.uptime || 0).toFixed(2)} pts</div>
-                <div><span className="text-yellow-500">CALC</span> Elastic(Storage) -> {(node.healthBreakdown?.storage || 0).toFixed(2)} pts</div>
-                <div><span className="text-yellow-500">CALC</span> Version({node.version}) -> {(node.healthBreakdown?.version || 0).toFixed(2)} pts</div>
+                {/* Fixed Arrows for JSX Safety */}
+                <div><span className="text-yellow-500">CALC</span> Sigmoid(Uptime) {'->'} {(node.healthBreakdown?.uptime || 0).toFixed(2)} pts</div>
+                <div><span className="text-yellow-500">CALC</span> Elastic(Storage) {'->'} {(node.healthBreakdown?.storage || 0).toFixed(2)} pts</div>
+                <div><span className="text-yellow-500">CALC</span> Version({node.version}) {'->'} {(node.healthBreakdown?.version || 0).toFixed(2)} pts</div>
                 <div className="my-2 border-t border-zinc-800/50"></div>
                 <div><span className="text-red-500">CHK</span> Restarts (7d): {penalties}</div>
                 <div><span className="text-red-500">CHK</span> Frozen Hours: {node.healthBreakdown?.penalties?.frozen_duration_hours || 0}</div>
