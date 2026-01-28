@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { ArrowLeft, Check, Copy, CheckCircle, AlertTriangle, Calendar, Activity } from 'lucide-react';
 import { Node } from '../../../types';
 import { getSafeIp, getSafeVersion, compareVersions } from '../../../utils/nodeHelpers';
 // We don't import formatUptime from utils because we need a custom high-precision version here
-import { supabase } from '../../../lib/supabase';
 import { useNodeVitality } from '../../../hooks/useNodeVitality';
 import { NodeHistoryPoint } from '../../../hooks/useNodeHistory';
 
@@ -13,10 +12,12 @@ interface IdentityViewProps {
   zenMode: boolean;
   onBack: () => void;
   mostCommonVersion: string;
+  // NEW: Accept cached history from parent
+  history: NodeHistoryPoint[];
+  historyLoading?: boolean;
 }
 
 // --- HELPER: HIGH PRECISION UPTIME ---
-// Shows minutes for short durations (e.g., "15m" instead of "0h")
 const formatPreciseUptime = (seconds: number) => {
   if (!seconds) return '0m';
   const h = Math.floor(seconds / 3600);
@@ -28,17 +29,61 @@ const formatPreciseUptime = (seconds: number) => {
   return `${m}m`;
 };
 
-export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: IdentityViewProps) => {
+export const IdentityView = ({ 
+  node, 
+  zenMode, 
+  onBack, 
+  mostCommonVersion, 
+  history = [], 
+  historyLoading = false 
+}: IdentityViewProps) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  // Metadata State
-  const [firstSeen, setFirstSeen] = useState<string>('Loading...');
-  const [resetCount, setResetCount] = useState<number | null>(null);
-  const [lastResetDate, setLastResetDate] = useState<string | null>(null);
-  const [historyBuffer, setHistoryBuffer] = useState<NodeHistoryPoint[]>([]); 
+  // --- DERIVED METADATA (Replaces useEffect/State) ---
+  const meta = useMemo(() => {
+    if (!history || history.length === 0) {
+      return { 
+        firstSeen: historyLoading ? 'Loading...' : 'Unknown', 
+        resetCount: null, 
+        lastResetDate: null 
+      };
+    }
+
+    // Sort chronological just to be safe
+    const sorted = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    // 1. First Seen (Based on available history buffer)
+    const firstPoint = sorted[0];
+    const firstSeenDate = new Date(firstPoint.date).toLocaleDateString(undefined, {
+       year: 'numeric', month: 'short', day: 'numeric'
+    });
+
+    // 2. Calculate Resets
+    let resets = 0;
+    let lastResetStr = null;
+    
+    if (sorted.length > 1) {
+        for (let i = 1; i < sorted.length; i++) {
+            const prev = sorted[i-1].uptime || 0;
+            const curr = sorted[i].uptime || 0;
+            // Detect Restart: Current uptime is significantly less than previous
+            if (curr < prev && (prev - curr) > 600) {
+                resets++;
+                lastResetStr = sorted[i].date;
+            }
+        }
+    }
+
+    const lastResetDate = lastResetStr 
+       ? new Date(lastResetStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) 
+       : null;
+
+    return { firstSeen: firstSeenDate, resetCount: resets, lastResetDate };
+  }, [history, historyLoading]);
 
   // --- USE VITALITY HOOK ---
-  const vitality = useNodeVitality(node, historyBuffer);
+  // Now uses the passed history prop directly
+  const vitality = useNodeVitality(node, history);
 
   const copyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
@@ -58,10 +103,11 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
     const isWarmingUp = vitality.label === 'WARMING UP';
     const isActive = vitality.label === 'ONLINE' || vitality.label === 'ACTIVE';
 
-    if (isStagnant && historyBuffer.length > 0) {
+    if (isStagnant && history.length > 0) {
         const currentUptime = node.uptime || 0;
-        const frozenPoint = historyBuffer.find(h => h.uptime === currentUptime);
-        
+        // Find the exact point in history where this uptime first appeared
+        const frozenPoint = history.find(h => h.uptime === currentUptime);
+
         if (frozenPoint) {
             frozenDate = `Frozen since ${new Date(frozenPoint.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} (${new Date(frozenPoint.date).toLocaleTimeString(undefined, { hour: '2-digit', minute:'2-digit' })})`;
         } else {
@@ -75,7 +121,11 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
     let continuityColor = "text-zinc-300";
     let continuityIconColor = "text-zinc-500";
 
-    if (resetCount !== null) {
+    const resets = meta.resetCount;
+
+    if (historyLoading) {
+        continuityLabel = "Loading...";
+    } else if (resets !== null) {
         if (isStagnant) {
             // SCENARIO: Frozen / Hung
             continuityLabel = "Suspended";
@@ -84,7 +134,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
             continuityIconColor = "text-orange-500";
         } 
         else if (isWarmingUp) {
-            if (resetCount === 0) {
+            if (resets === 0) {
                 // SCENARIO: Fresh Boot
                 continuityLabel = "Initializing";
                 continuitySub = "System stabilizing";
@@ -93,28 +143,28 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
             } else {
                 // SCENARIO: Recovering
                 continuityLabel = "Rebooting";
-                continuitySub = `Recovering (Resets: ${resetCount})`;
+                continuitySub = `Recovering (Resets: ${resets})`;
                 continuityColor = "text-blue-400";
                 continuityIconColor = "text-blue-500";
             }
         } 
         else if (isActive) {
-            if (resetCount === 0) {
+            if (resets === 0) {
                 // SCENARIO: Perfect Stability
                 continuityLabel = "Seamless";
                 continuitySub = "No interruptions (30d)";
                 continuityColor = "text-green-400";
                 continuityIconColor = "text-green-500";
-            } else if (resetCount <= 4) {
+            } else if (resets <= 4) {
                 // SCENARIO: Normal Operation
                 continuityLabel = "Operational";
-                continuitySub = `Minor resets detected (${resetCount})`;
+                continuitySub = `Minor resets detected (${resets})`;
                 continuityColor = "text-green-400"; 
                 continuityIconColor = "text-green-500";
             } else {
                 // SCENARIO: Volatile
                 continuityLabel = "Volatile";
-                continuitySub = `High frequency (${resetCount})`;
+                continuitySub = `High frequency (${resets})`;
                 continuityColor = "text-orange-400";
                 continuityIconColor = "text-orange-500";
             }
@@ -122,108 +172,16 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
         else {
             // SCENARIO: Offline / Unstable
             continuityLabel = "Unverified";
-            continuitySub = ""; // REMOVED SUBTEXT AS REQUESTED
+            continuitySub = ""; 
             continuityColor = "text-zinc-500"; 
             continuityIconColor = "text-zinc-600";
         }
+    } else {
+        continuityLabel = "No Data";
     }
 
     return { frozenDate, continuityLabel, continuitySub, continuityColor, continuityIconColor };
-  }, [vitality.label, historyBuffer, resetCount, node.uptime]);
-
-
-  useEffect(() => {
-      async function fetchIdentityMeta() {
-          if (!node || !node.pubkey) return;
-
-          const targetAddress = node.address || '0.0.0.0';
-          const network = node.network || 'MAINNET';
-
-          let ipOnly = '0.0.0.0';
-          if (targetAddress.toLowerCase().includes('private')) {
-             ipOnly = 'private';
-          } else {
-             ipOnly = targetAddress.includes(':') ? targetAddress.split(':')[0] : targetAddress;
-          }
-          if (!ipOnly || ipOnly === '0.0.0.0' || ipOnly === '') {
-              ipOnly = 'private';
-          }
-
-          const stableId = `${node.pubkey}-${ipOnly}-${network}`;
-
-          try {
-              // A. FETCH FIRST SEEN
-              const { data: firstData, error: firstError } = await supabase
-                  .from('node_snapshots')
-                  .select('created_at')
-                  .eq('node_id', stableId)
-                  .order('created_at', { ascending: true })
-                  .limit(1)
-                  .single();
-
-              if (!firstError && firstData) {
-                  setFirstSeen(new Date(firstData.created_at).toLocaleDateString(undefined, {
-                      year: 'numeric', month: 'short', day: 'numeric'
-                  }));
-              } else {
-                  setFirstSeen('Unknown');
-              }
-
-              // B. FETCH HISTORY FOR DIAGNOSTICS (Last 30 Days)
-              const historyWindow = new Date();
-              historyWindow.setDate(historyWindow.getDate() - 30); 
-
-              const { data: recentHistory, error: histError } = await supabase
-                  .from('node_snapshots')
-                  .select('created_at, uptime, health')
-                  .eq('node_id', stableId)
-                  .gte('created_at', historyWindow.toISOString())
-                  .order('created_at', { ascending: true });
-
-              if (!histError && recentHistory) {
-                  // 1. Pass to State
-                  const mappedHistory = recentHistory.map((r: any) => ({
-                      date: r.created_at,
-                      uptime: r.uptime,
-                      health: r.health,
-                      credits: 0, 
-                      storage_committed: 0, 
-                      storage_used: 0, 
-                      rank: 0, 
-                      network: network,
-                      reputation: 0 
-                  }));
-                  setHistoryBuffer(mappedHistory);
-
-                  // 2. Calculate Resets
-                  if (recentHistory.length > 1) {
-                      let resets = 0;
-                      let lastReset = null;
-                      for (let i = 1; i < recentHistory.length; i++) {
-                          const prev = recentHistory[i-1].uptime || 0;
-                          const curr = recentHistory[i].uptime || 0;
-                          if (curr < prev && (prev - curr) > 600) {
-                              resets++;
-                              lastReset = recentHistory[i].created_at;
-                          }
-                      }
-                      setResetCount(resets);
-                      if (lastReset) {
-                          setLastResetDate(new Date(lastReset).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
-                      }
-                  } else {
-                      setResetCount(0);
-                  }
-              }
-
-          } catch (err) {
-              console.error("Identity Fetch Error:", err);
-              setFirstSeen('Error');
-          }
-      }
-
-      fetchIdentityMeta();
-  }, [node]);
+  }, [vitality.label, history, meta.resetCount, node.uptime, historyLoading]);
 
   // Helper Card Component
   const FieldCard = ({ 
@@ -308,7 +266,7 @@ export const IdentityView = ({ node, zenMode, onBack, mostCommonVersion }: Ident
              {/* ROW 3: Tracking & Uptime */}
              <FieldCard 
                 label="Tracking Since" 
-                val={firstSeen} 
+                val={meta.firstSeen} 
                 icon={Calendar}
                 color={zenMode ? 'text-zinc-400' : 'text-blue-400'}
              />
