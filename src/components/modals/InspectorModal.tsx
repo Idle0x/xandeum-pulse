@@ -458,6 +458,8 @@ export const InspectorModal = ({
                             zenMode={zenMode} 
                             onBack={() => setModalView('overview')} 
                             mostCommonVersion={mostCommonVersion} 
+                            history={history} // ADDED THIS
+                            historyLoading={historyLoading} // ADDED THIS
                          />
                        )}
                     </div>
