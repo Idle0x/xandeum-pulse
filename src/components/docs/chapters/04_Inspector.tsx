@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { 
   Activity, Search, Wifi, WifiOff, Database, Server, Info, 
   Crown, Zap, ThermometerSun, AlertTriangle, ShieldCheck, 
-  GitBranch, TrendingUp
+  GitBranch, TrendingUp, CheckCircle 
 } from 'lucide-react';
 import { ChapterLayout } from '../layout/ChapterLayout';
 
@@ -211,7 +211,7 @@ export function InspectorChapter() {
             chapterNumber="07"
             title="Inspector Engine"
             subtitle="Forensic diagnostics and multi-variate vitality scoring."
-            textData={[]} // Custom render below
+            textData={[]} // Custom Grid Render
             codeSnippet={VITALITY_CODE}
             githubPath="src/logic/xandeum-math.ts"
         >
@@ -247,7 +247,7 @@ export function InspectorChapter() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
                     <div className="prose prose-invert order-2 lg:order-1">
                         <h3 className="text-xl font-bold text-zinc-100 flex items-center gap-2 mb-4">
-                            <Stethoscope size={20} className="text-amber-400" />
+                            <Activity size={20} className="text-amber-400" />
                             Forensic Archetypes
                         </h3>
                         <p className="text-zinc-400 leading-relaxed text-sm md:text-base">
@@ -265,6 +265,3 @@ export function InspectorChapter() {
         </ChapterLayout>
     );
 }
-
-// Helper for icon
-import { Stethoscope } from 'lucide-react';
