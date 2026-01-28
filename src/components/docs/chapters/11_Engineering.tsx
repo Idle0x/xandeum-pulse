@@ -2,18 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { Shield, Activity, Terminal, Search, Server, Cpu, AlertTriangle, CheckCircle2, GitMerge, Download, Globe, Clock, Database } from 'lucide-react';
 import { ChapterLayout } from '../layout/ChapterLayout';
 
-// --- TEXT CONTENT ---
-const ENG_TEXT = [
-    {
-        title: "Hyper-Parallel Aggregation",
-        content: "Pulse serves as an active Orchestration Engine, executing a simultaneous 5-vector fetch strategy. Rather than a sequential load, the Neural Core races the Private 'Hero' RPC against the Public Swarm while concurrently pulling credit data (Mainnet/Devnet) and historical forensics."
-    },
-    {
-        title: "Forensic Deduplication",
-        content: "To prove data integrity, the engine performs real-time Fingerprint Deduplication. It generates a unique composite key (Pubkey + IP + Storage + Version) for every incoming signal. This allows the system to identify collision events where the Private Hero and Public Swarm report the same node, automatically dropping the slower signal to prevent double-counting."
-    }
-];
-
 const ENG_CODE = `
 // Identity Deduplication Logic
 const getFingerprint = (p, network) => {
@@ -84,8 +72,7 @@ export function EngineeringChapter() {
             const res = await fetch('/api/stats?mode=fast');
             const ttfb = performance.now() - startFetch;
             
-            setDiag(prev => ({ 
-                ...prev, 
+            setDiag(prev => ({ ...prev, 
                 status: 'DOWNLOAD',
                 latency: { ...prev.latency, ttfb: Math.round(ttfb) }
             }));
@@ -133,54 +120,88 @@ export function EngineeringChapter() {
             chapterNumber="10"
             title="System Internals"
             subtitle="Live forensic audit of the RPC orchestration layer."
-            textData={ENG_TEXT}
+            textData={[]} // MANUAL RENDER FOR BETTER LAYOUT
             codeSnippet={ENG_CODE}
             githubPath="src/lib/diagnostics.ts"
         >
-            <div className="h-full bg-[#080808] p-4 md:p-6 flex flex-col gap-6 font-mono text-xs">
-                
-                {/* 1. CONTROL HEADER */}
-                <div className="flex justify-between items-center bg-zinc-900/30 p-4 rounded-2xl border border-zinc-800 shadow-lg">
-                    <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg border ${diag.status === 'ERROR' ? 'bg-red-900/20 border-red-500 text-red-500' : 'bg-blue-900/20 border-blue-500/30 text-blue-400'}`}>
-                            <Activity size={18}/>
-                        </div>
-                        <div>
-                            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Diagnostic State</div>
-                            <div className="font-bold text-white flex items-center gap-2">
-                                {diag.status === 'IDLE' ? 'READY' : diag.status === 'COMPLETE' ? 'TRACE COMPLETE' : 'AGGREGATING...'}
-                                {diag.status !== 'IDLE' && diag.status !== 'COMPLETE' && diag.status !== 'ERROR' && (
-                                    <span className="flex h-2 w-2 relative">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                                    </span>
-                                )}
-                            </div>
+            <div className="flex flex-col gap-16 pb-8">
+
+                {/* ===================================================
+                    SECTION 1: HYPER-PARALLEL AGGREGATION
+                   =================================================== */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+                    <div className="prose prose-invert">
+                        <h3 className="text-xl font-bold text-zinc-100 flex items-center gap-2 mb-4">
+                            <GitMerge size={20} className="text-blue-400" />
+                            Hyper-Parallel Aggregation
+                        </h3>
+                        <p className="text-zinc-400 leading-relaxed text-sm md:text-base">
+                            Pulse serves as an active <strong>Orchestration Engine</strong>, executing a simultaneous 5-vector fetch strategy. Rather than a sequential load, the Neural Core races the Private 'Hero' RPC against the Public Swarm while concurrently pulling credit data (Mainnet/Devnet) and historical forensics.
+                        </p>
+                        <div className="mt-6 flex flex-col gap-4">
+                            {/* Control Button moved here for context */}
+                            <button 
+                                onClick={runDiagnostics}
+                                disabled={diag.status !== 'IDLE' && diag.status !== 'COMPLETE' && diag.status !== 'ERROR'}
+                                className="w-full md:w-auto px-6 py-3 bg-zinc-100 hover:bg-white text-black font-bold rounded-xl transition-all disabled:opacity-50 active:scale-95 shadow-lg flex items-center justify-center gap-2"
+                            >
+                                <Activity size={16} className={diag.status === 'IDLE' ? '' : 'animate-spin'} />
+                                {diag.status === 'IDLE' ? 'INITIATE LIVE TRACE' : 'TRACING NETWORK...'}
+                            </button>
                         </div>
                     </div>
-                    <button 
-                        onClick={runDiagnostics}
-                        disabled={diag.status !== 'IDLE' && diag.status !== 'COMPLETE' && diag.status !== 'ERROR'}
-                        className="px-6 py-2 bg-zinc-100 hover:bg-white text-black font-bold rounded-lg transition-all disabled:opacity-50 active:scale-95 shadow-lg"
-                    >
-                        {diag.status === 'IDLE' ? 'RUN AUDIT' : 'RERUN TRACE'}
-                    </button>
+
+                    <div className="flex flex-col gap-4">
+                        <PipelineMonitor diag={diag} />
+                        <WaterfallTrace diag={diag} />
+                    </div>
                 </div>
 
-                {/* 2. NEW: PIPELINE MONITOR (Orchestration) */}
-                <PipelineMonitor diag={diag} />
+                {/* Divider */}
+                <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-800 to-transparent"></div>
 
-                {/* 3. ORIGINAL: WATERFALL TRACE (Latency) */}
-                <WaterfallTrace diag={diag} />
+                {/* ===================================================
+                    SECTION 2: FORENSIC AUDIT
+                   =================================================== */}
+                <div className="flex flex-col gap-8">
+                    <div className="prose prose-invert max-w-2xl">
+                        <h3 className="text-xl font-bold text-zinc-100 flex items-center gap-2 mb-4">
+                            <Search size={20} className="text-amber-400" />
+                            Forensic Audit
+                        </h3>
+                        <p className="text-zinc-400 leading-relaxed text-sm md:text-base">
+                            To prove data integrity, this tool grabs a live node from the stream and replays the Vitality Score math in the browser. It also scans the dataset for <strong>Rapid Instability</strong> (flapping) and <strong>Stale Telemetry</strong> (frozen state) signatures defined in the backend logic.
+                        </p>
+                    </div>
 
-                {/* 4. ORIGINAL: SPLIT GRID (Math & Forensics) */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[280px]">
-                    <MathTerminal node={diag.payload?.sampleNode} status={diag.status} />
-                    <ForensicFlags flags={diag.payload?.flags} status={diag.status} />
+                    {/* Split Grid: Math vs Flags */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <MathTerminal node={diag.payload?.sampleNode} status={diag.status} />
+                        <ForensicFlags flags={diag.payload?.flags} status={diag.status} />
+                    </div>
                 </div>
 
-                {/* 5. NEW: DEDUPLICATION CONSOLE (Filtering) */}
-                <DeduplicationLog count={diag.payload?.nodeCount} status={diag.status} />
+                {/* Divider */}
+                <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-800 to-transparent"></div>
+
+                {/* ===================================================
+                    SECTION 3: FORENSIC DEDUPLICATION
+                   =================================================== */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 items-start">
+                    <div className="prose prose-invert lg:col-span-1">
+                        <h3 className="text-xl font-bold text-zinc-100 flex items-center gap-2 mb-4">
+                            <Shield size={20} className="text-emerald-400" />
+                            Fingerprint Deduplication
+                        </h3>
+                        <p className="text-zinc-400 leading-relaxed text-sm">
+                            The engine performs real-time <strong>Fingerprint Deduplication</strong>. It generates a unique composite key <code>(Pubkey + IP + Storage + Version)</code> for every incoming signal. This allows the system to identify collision events where the Private Hero and Public Swarm report the same node, automatically dropping the slower signal.
+                        </p>
+                    </div>
+
+                    <div className="lg:col-span-2">
+                        <DeduplicationLog count={diag.payload?.nodeCount} status={diag.status} />
+                    </div>
+                </div>
 
             </div>
         </ChapterLayout>
@@ -233,13 +254,13 @@ function PipelineMonitor({ diag }: { diag: DiagnosticState }) {
     );
 }
 
-// 2. WATERFALL TRACE (ORIGINAL - KEPT EXACTLY)
+// 2. WATERFALL TRACE (ORIGINAL)
 function WaterfallTrace({ diag }: { diag: DiagnosticState }) {
     const isComplete = diag.status === 'COMPLETE';
     const getWidth = (val: number) => isComplete ? `${Math.min(100, (val / diag.latency.total) * 100)}%` : '0%';
 
     return (
-        <div className="bg-black border border-zinc-800 rounded-2xl p-6 relative overflow-hidden">
+        <div className="bg-black border border-zinc-800 rounded-2xl p-6 relative overflow-hidden shadow-lg">
             <div className="flex justify-between items-end mb-4">
                 <div className="text-zinc-500 uppercase tracking-widest font-bold text-[10px] flex items-center gap-2">
                     <Clock size={14} /> Request Latency
@@ -313,7 +334,7 @@ function DeduplicationLog({ count, status }: { count: number | undefined, status
     }, [logs]);
 
     return (
-        <div className="bg-black border border-zinc-800 rounded-2xl p-4 h-32 overflow-hidden flex flex-col shadow-inner">
+        <div className="bg-black border border-zinc-800 rounded-2xl p-4 h-48 overflow-hidden flex flex-col shadow-inner">
             <div className="flex items-center gap-2 text-zinc-500 mb-2 border-b border-zinc-900 pb-2">
                 <Terminal size={12} />
                 <span className="text-[10px] font-bold uppercase tracking-widest">Deduplication Engine</span>
@@ -328,11 +349,11 @@ function DeduplicationLog({ count, status }: { count: number | undefined, status
     );
 }
 
-// 4. MATH TERMINAL (ORIGINAL - KEPT EXACTLY)
+// 4. MATH TERMINAL (ORIGINAL)
 function MathTerminal({ node, status }: { node: any, status: string }) {
     if (status === 'IDLE' || status === 'DNS' || status === 'TCP' || status === 'SSL') {
         return (
-            <div className="bg-black border border-zinc-800 rounded-2xl p-6 flex items-center justify-center text-zinc-600 text-[10px] uppercase tracking-widest h-full shadow-lg">
+            <div className="bg-black border border-zinc-800 rounded-2xl p-6 flex items-center justify-center text-zinc-600 text-[10px] uppercase tracking-widest h-full min-h-[240px] shadow-lg">
                 <span className="animate-pulse">Awaiting Audit Target...</span>
             </div>
         );
@@ -340,7 +361,7 @@ function MathTerminal({ node, status }: { node: any, status: string }) {
 
     if (!node) {
         return (
-            <div className="bg-black border border-zinc-800 rounded-2xl p-6 flex items-center justify-center text-zinc-600 text-[10px] uppercase tracking-widest h-full shadow-lg">
+            <div className="bg-black border border-zinc-800 rounded-2xl p-6 flex items-center justify-center text-zinc-600 text-[10px] uppercase tracking-widest h-full min-h-[240px] shadow-lg">
                 Analysis Pending...
             </div>
         );
@@ -351,7 +372,7 @@ function MathTerminal({ node, status }: { node: any, status: string }) {
     const score = node.health;
 
     return (
-        <div className="bg-[#0c0c0e] border border-zinc-800 rounded-2xl p-0 overflow-hidden flex flex-col h-full shadow-lg">
+        <div className="bg-[#0c0c0e] border border-zinc-800 rounded-2xl p-0 overflow-hidden flex flex-col h-full shadow-lg min-h-[240px]">
             <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-900/50 flex justify-between items-center">
                 <div className="flex items-center gap-2 text-zinc-400">
                     <Cpu size={12}/> 
@@ -366,7 +387,7 @@ function MathTerminal({ node, status }: { node: any, status: string }) {
                 <div><span className="text-blue-500">INPUT</span> Storage: {node.storage_committed} bytes</div>
                 
                 <div className="my-2 border-t border-zinc-800/50"></div>
-                {/* Fixed Arrows for JSX Safety */}
+                
                 <div><span className="text-yellow-500">CALC</span> Sigmoid(Uptime) {'->'} {(node.healthBreakdown?.uptime || 0).toFixed(2)} pts</div>
                 <div><span className="text-yellow-500">CALC</span> Elastic(Storage) {'->'} {(node.healthBreakdown?.storage || 0).toFixed(2)} pts</div>
                 <div><span className="text-yellow-500">CALC</span> Version({node.version}) {'->'} {(node.healthBreakdown?.version || 0).toFixed(2)} pts</div>
@@ -382,12 +403,12 @@ function MathTerminal({ node, status }: { node: any, status: string }) {
     );
 }
 
-// 5. FORENSIC FLAGS (ORIGINAL - KEPT EXACTLY)
+// 5. FORENSIC FLAGS (ORIGINAL)
 function ForensicFlags({ flags, status }: { flags: any, status: string }) {
     const isReady = status === 'COMPLETE';
 
     return (
-        <div className="bg-black border border-zinc-800 rounded-2xl p-6 h-full flex flex-col justify-between shadow-lg">
+        <div className="bg-black border border-zinc-800 rounded-2xl p-6 h-full flex flex-col justify-between shadow-lg min-h-[240px]">
             <div className="flex items-center gap-2 text-zinc-500 mb-6">
                 <Search size={14}/>
                 <span className="text-[10px] font-bold uppercase tracking-widest">Network Anomaly Scan</span>
