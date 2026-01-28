@@ -23,7 +23,6 @@ describe('Xandeum Math (Unit Logic)', () => {
 
   describe('Version Comparison', () => {
     test('Should identify newer versions correctly', () => {
-      // 1.5.0 is newer than 1.4.9
       expect(compareVersions('1.5.0', '1.4.9')).toBe(1);
     });
 
@@ -41,10 +40,20 @@ describe('Xandeum Math (Unit Logic)', () => {
 
     // Mock Data Constants
     const MEDIAN_STORAGE = 1000;
+    const P95_STORAGE = 5000; // NEW: Added P95
     const MEDIAN_CREDITS = 5000;
     const LATEST_VER = '1.5.0';
     const CONSENSUS_VER = '1.5.0';
     const SORTED_VERSIONS = ['1.5.0', '1.4.0', '1.3.0'];
+
+    // NEW: Default Context for Tests
+    const MOCK_CONTEXT = {
+        restarts_7d: 0,
+        restarts_24h: 0,
+        yield_velocity_24h: 100,
+        consistency_score: 1,
+        frozen_duration_hours: 0
+    };
 
     test('GATEKEEPER RULE: Storage 0 should result in Health 0', () => {
       const result = calculateVitalityScore(
@@ -57,7 +66,9 @@ describe('Xandeum Math (Unit Logic)', () => {
         MEDIAN_CREDITS,
         10000, // High Credits
         MEDIAN_STORAGE,
-        true // API Online
+        P95_STORAGE, // NEW ARG
+        true, // API Online
+        MOCK_CONTEXT // NEW ARG
       );
 
       expect(result.total).toBe(0);
@@ -66,21 +77,21 @@ describe('Xandeum Math (Unit Logic)', () => {
 
     test('CRASH PROTOCOL: Should handle NULL credits (API Offline)', () => {
       const result = calculateVitalityScore(
-        2000, // Good Storage
+        2000, 
         1000, 
-        864000, // Good Uptime
+        864000, 
         LATEST_VER,
         CONSENSUS_VER,
         SORTED_VERSIONS,
         MEDIAN_CREDITS,
         null, // <--- API IS OFFLINE (Null)
         MEDIAN_STORAGE,
-        false // Is Credits API Online? False
+        P95_STORAGE, // NEW ARG
+        false, // Is Credits API Online? False
+        MOCK_CONTEXT // NEW ARG
       );
 
-      // Should still generate a score, just re-weighted
       expect(result.total).toBeGreaterThan(0);
-      // Reputation breakdown should be explicitly null to trigger UI badge
       expect(result.breakdown.reputation).toBeNull(); 
     });
 
@@ -95,27 +106,28 @@ describe('Xandeum Math (Unit Logic)', () => {
         MEDIAN_CREDITS,
         5000,
         MEDIAN_STORAGE,
-        true
+        P95_STORAGE, // NEW ARG
+        true,
+        MOCK_CONTEXT // NEW ARG
       );
 
-      // Sigmoid curve should punish low uptime heavily
       expect(result.breakdown.uptime).toBeLessThan(30);
     });
 
     test('PERFECT NODE: Should achieve 100 score', () => {
       const result = calculateVitalityScore(
-        5000, // High Storage
+        5000, 
         2000,
-        86400 * 120, // <--- UPDATED: 120 Days (Veteran Status) needed for max points
-        LATEST_VER, // Latest Version
+        86400 * 120, 
+        LATEST_VER, 
         CONSENSUS_VER,
         SORTED_VERSIONS,
         MEDIAN_CREDITS,
-        10000, // High Credits
+        10000, 
         MEDIAN_STORAGE,
+        P95_STORAGE, // NEW ARG
         true,
-        // FIX: Provide explicit history with velocity > 0 to bypass Zombie Check
-        { restarts_7d: 0, yield_velocity_24h: 100, consistency_score: 1 } 
+        MOCK_CONTEXT // NEW ARG
       );
 
       expect(result.total).toBeGreaterThanOrEqual(95);
@@ -132,13 +144,10 @@ describe('Xandeum Math (Unit Logic)', () => {
     });
 
     test('1 Version behind receives 80 pts (Two Strikes Rule)', () => {
-      // <--- UPDATED: Expectation changed from 90 to 80
       expect(getVersionScoreByRank('1.4.0', CONSENSUS, LIST)).toBe(80);
     });
 
     test('DEATH ZONE: 3+ versions behind receives 0 pts', () => {
-       // N-2 is 40. N-3 is 0.
-       // 1.5 -> 1.4(N-1) -> 1.3(N-2) -> 1.2(N-3)
        const score = getVersionScoreByRank('1.2.0', CONSENSUS, LIST);
        expect(score).toBe(0);
     });
