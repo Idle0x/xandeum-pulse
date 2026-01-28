@@ -315,6 +315,10 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
 
   const storageArray = processedNodes.map(p => p.storage_committed).sort((a, b) => a - b);
   const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
+  
+  // NEW: Calculate P95 Storage for Elite Scoring
+  const p95Index = Math.floor(storageArray.length * 0.95);
+  const p95Storage = storageArray.length ? storageArray[p95Index] : 1;
 
   await resolveLocations([...new Set(processedNodes.map(p => p.address.split(':')[0]))]);
 
@@ -324,9 +328,14 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     const medianCreditsForScore = node.network === 'MAINNET' ? medianMainnet : medianDevnet;
 
     // LOOK UP HISTORICAL CONTEXT (Report Card)
-    // We construct the ID to match how it is stored in the DB (usually Pubkey-IP-Network)
-    // Fallback: Default Neutral History
-    let nodeHistory: HistoryContext = { restarts_7d: 0, yield_velocity_24h: 0, consistency_score: 1 };
+    // Updated default to match new ForensicContext
+    let nodeHistory: HistoryContext = { 
+        restarts_7d: 0, 
+        restarts_24h: 0, 
+        yield_velocity_24h: 0, 
+        consistency_score: 1,
+        frozen_duration_hours: 0
+    };
 
     // Attempt standard Stable ID formats
     const stableId = `${node.pubkey}-${ip}-${node.network}`;
@@ -339,8 +348,10 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     const vitality = calculateVitalityScore(
       node.storage_committed, node.storage_used, node.uptime,
       node.version, consensusVersion, sortedCleanVersions,
-      medianCreditsForScore, node.credits, medianStorage, isCreditsApiOnline,
-      nodeHistory // Passing the 7-Day Report Card
+      medianCreditsForScore, node.credits, medianStorage, 
+      p95Storage, // Passing P95
+      isCreditsApiOnline,
+      nodeHistory // Passing the Forensic Report Card
     );
 
     return {
