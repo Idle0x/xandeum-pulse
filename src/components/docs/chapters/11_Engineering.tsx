@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Shield, Activity, Terminal, Search, Server, Cpu, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { ChapterLayout } from '../layout/ChapterLayout';
 
@@ -10,7 +10,7 @@ const ENG_TEXT = [
     },
     {
         title: "Forensic Audit",
-        content: "To prove data integrity, this tool grabs a live node from the stream and replays the Vitality Score math in the browser. It also scans the dataset for 'Trauma' (rapid restarts) and 'Ice Age' (frozen state) signatures defined in the backend logic."
+        content: "To prove data integrity, this tool grabs a live node from the stream and replays the Vitality Score math in the browser. It also scans the dataset for 'Rapid Instability' (flapping) and 'Stale Telemetry' (frozen state) signatures defined in the backend logic."
     }
 ];
 
@@ -18,11 +18,11 @@ const ENG_CODE = `
 // Real-time Forensic Scan
 const scanNetwork = (nodes) => {
   return {
-    ghosts: nodes.filter(n => n.isUntracked).length,
-    trauma: nodes.filter(n => 
+    unverified: nodes.filter(n => n.isUntracked).length, // Missing Credits
+    flapping: nodes.filter(n => 
       n.healthBreakdown.penalties.restarts_24h > 5
     ).length,
-    iceAge: nodes.filter(n => 
+    stale: nodes.filter(n => 
       n.healthBreakdown.penalties.frozen_hours > 1
     ).length
   };
@@ -42,11 +42,11 @@ interface DiagnosticState {
         size: string;
         nodeCount: number;
         heroStatus: boolean;
-        sampleNode: any | null; // For the Math Audit
+        sampleNode: any | null;
         flags: {
-            ghosts: number;
-            trauma: number;
-            iceAge: number;
+            unverified: number;
+            flapping: number;
+            stale: number;
         }
     } | null;
 }
@@ -97,10 +97,12 @@ export function EngineeringChapter() {
             const nodes = data.result?.pods || [];
             const sample = nodes.length > 0 ? nodes[Math.floor(Math.random() * nodes.length)] : null;
             
-            // Forensic Counts based on your actual data structure
-            const ghosts = nodes.filter((n: any) => n.isUntracked || n.is_ghost).length;
-            const trauma = nodes.filter((n: any) => (n.healthBreakdown?.penalties?.restarts_24h || 0) > 5).length;
-            const iceAge = nodes.filter((n: any) => (n.healthBreakdown?.penalties?.frozen_duration_hours || 0) > 1).length;
+            // --- FORENSIC COUNTS ---
+            // Unverified: Nodes where isUntracked is true (Credits = NULL, different from 0)
+            const unverified = nodes.filter((n: any) => n.isUntracked || n.is_ghost).length;
+            
+            const flapping = nodes.filter((n: any) => (n.healthBreakdown?.penalties?.restarts_24h || 0) > 5).length;
+            const stale = nodes.filter((n: any) => (n.healthBreakdown?.penalties?.frozen_duration_hours || 0) > 1).length;
 
             const sizeBytes = new TextEncoder().encode(JSON.stringify(data)).length;
             const sizeKB = (sizeBytes / 1024).toFixed(2);
@@ -118,7 +120,7 @@ export function EngineeringChapter() {
                     nodeCount: nodes.length,
                     heroStatus: data.stats?.systemStatus?.rpc ?? true,
                     sampleNode: sample,
-                    flags: { ghosts, trauma, iceAge }
+                    flags: { unverified, flapping, stale }
                 }
             });
 
@@ -174,7 +176,7 @@ export function EngineeringChapter() {
                     {/* 3. MATH TERMINAL */}
                     <MathTerminal node={diag.payload?.sampleNode} status={diag.status} />
 
-                    {/* 4. FORENSIC FLAGS */}
+                    {/* 4. ANOMALY SCAN */}
                     <ForensicFlags flags={diag.payload?.flags} status={diag.status} />
                 </div>
 
@@ -265,15 +267,20 @@ function MathTerminal({ node, status }: { node: any, status: string }) {
             <div className="p-4 font-mono text-[10px] leading-6 text-zinc-400 overflow-y-auto custom-scrollbar">
                 <div><span className="text-blue-500">INPUT</span> Loaded Node: {node.pubkey.substring(0, 12)}...</div>
                 <div><span className="text-blue-500">INPUT</span> Uptime: {node.uptime}s ({uptimeDays} days)</div>
+                <div><span className="text-blue-500">INPUT</span> Credits: {node.credits === null ? 'MISSING' : node.credits.toLocaleString() + ' CR'}</div>
                 <div><span className="text-blue-500">INPUT</span> Storage: {node.storage_committed} bytes</div>
+                
                 <div className="my-2 border-t border-zinc-800/50"></div>
                 {/* Fixed Arrows for JSX Safety */}
                 <div><span className="text-yellow-500">CALC</span> Sigmoid(Uptime) {'->'} {(node.healthBreakdown?.uptime || 0).toFixed(2)} pts</div>
                 <div><span className="text-yellow-500">CALC</span> Elastic(Storage) {'->'} {(node.healthBreakdown?.storage || 0).toFixed(2)} pts</div>
                 <div><span className="text-yellow-500">CALC</span> Version({node.version}) {'->'} {(node.healthBreakdown?.version || 0).toFixed(2)} pts</div>
+                
                 <div className="my-2 border-t border-zinc-800/50"></div>
+                
                 <div><span className="text-red-500">CHK</span> Restarts (7d): {penalties}</div>
                 <div><span className="text-red-500">CHK</span> Frozen Hours: {node.healthBreakdown?.penalties?.frozen_duration_hours || 0}</div>
+                
                 <div className="mt-2"><span className="text-green-500 font-bold">FINAL SCORE: {score}/100</span></div>
             </div>
         </div>
@@ -287,30 +294,30 @@ function ForensicFlags({ flags, status }: { flags: any, status: string }) {
         <div className="bg-black border border-zinc-800 rounded-2xl p-6 h-full flex flex-col justify-between">
             <div className="flex items-center gap-2 text-zinc-500 mb-6">
                 <Search size={14}/>
-                <span className="text-[10px] font-bold uppercase tracking-widest">Forensic Context</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest">Network Anomaly Scan</span>
             </div>
 
             <div className="space-y-4">
                 <FlagRow 
-                    label="Trauma Protocol" 
-                    desc="Rapid Restart Detection (>5/24h)"
-                    count={isReady ? flags.trauma : '-'} 
+                    label="Rapid Instability" 
+                    desc="Nodes with >5 restarts in 24h"
+                    count={isReady ? flags.flapping : '-'} 
                     color="text-red-500"
                     bg="bg-red-500/10 border-red-500/20"
-                    active={isReady && flags.trauma > 0}
+                    active={isReady && flags.flapping > 0}
                 />
                 <FlagRow 
-                    label="Ice Age Protocol" 
-                    desc="Frozen Uptime Detection (>1h)"
-                    count={isReady ? flags.iceAge : '-'} 
+                    label="Stale Telemetry" 
+                    desc="Nodes with frozen uptime >1h"
+                    count={isReady ? flags.stale : '-'} 
                     color="text-blue-400"
                     bg="bg-blue-500/10 border-blue-500/20"
-                    active={isReady && flags.iceAge > 0}
+                    active={isReady && flags.stale > 0}
                 />
                 <FlagRow 
-                    label="Ghost Protocol" 
-                    desc="Untracked / Private Nodes"
-                    count={isReady ? flags.ghosts : '-'} 
+                    label="Unverified & Untracked" 
+                    desc="Not on credits API (Not 0)"
+                    count={isReady ? flags.unverified : '-'} 
                     color="text-zinc-400"
                     bg="bg-zinc-800/50 border-zinc-700"
                     active={isReady}
@@ -327,7 +334,10 @@ function FlagRow({ label, desc, count, color, bg, active }: any) {
                 <div className={`text-[10px] font-bold uppercase ${active ? color : 'text-zinc-500'}`}>{label}</div>
                 <div className="text-[9px] text-zinc-600">{desc}</div>
             </div>
-            <div className={`text-lg font-bold font-mono ${active ? color : 'text-zinc-600'}`}>{count}</div>
+            <div className="flex items-end gap-1">
+                <div className={`text-lg font-bold font-mono ${active ? color : 'text-zinc-600'}`}>{count}</div>
+                {active && <span className="text-[9px] text-zinc-500 mb-1">Nodes</span>}
+            </div>
         </div>
     );
 }
