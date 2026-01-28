@@ -90,12 +90,34 @@ export function EngineeringChapter() {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    // 3. LOGIC INTEGRITY CHECK
+    // 3. LOGIC INTEGRITY CHECK (UPDATED for 12 Args)
     const auditPassed = useMemo(() => {
         try {
-            const testCalc = calculateVitalityScore(1000, 500, 86400 * 10, '1.2.0', '1.2.0', ['1.2.0'], 100, 100, 1000, true);
+            const testCalc = calculateVitalityScore(
+                1000,           // 1. Storage Committed
+                500,            // 2. Storage Used
+                86400 * 10,     // 3. Uptime
+                '1.2.0',        // 4. Version
+                '1.2.0',        // 5. Consensus
+                ['1.2.0'],      // 6. Versions List
+                100,            // 7. Median Credits
+                100,            // 8. Credits
+                1000,           // 9. Median Storage
+                2000,           // 10. P95 Storage (NEW)
+                true,           // 11. API Online
+                {               // 12. Forensic Context (NEW)
+                    restarts_7d: 0,
+                    restarts_24h: 0,
+                    yield_velocity_24h: 10,
+                    consistency_score: 1,
+                    frozen_duration_hours: 0
+                }
+            );
             return testCalc.total > 0;
-        } catch { return false; }
+        } catch (e) { 
+            console.error("Audit Logic Failed:", e);
+            return false; 
+        }
     }, []);
 
     return (
