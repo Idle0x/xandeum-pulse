@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Sparkles, 
   GitMerge, 
@@ -6,9 +6,7 @@ import {
   ArrowRight, 
   Activity, 
   PieChart, 
-  Terminal,
-  Cpu,
-  CheckCircle2
+  Map as MapIcon,
 } from 'lucide-react';
 import { ChapterLayout } from '../layout/ChapterLayout';
 
@@ -21,8 +19,12 @@ const MATRIX = {
   bridges: ["which indicates that", "translating to a state where"]
 };
 
-// 1. Determine Context (Overview vs Market)
-const getLens = (tab) => tab === 'MARKET' ? 'INEQUALITY' : 'EFFICIENCY';
+// 1. Determine Context
+const getLens = (tab) => {
+  if (tab === 'MARKET SHARE') return 'INEQUALITY';
+  if (tab === 'TOPOLOGY') return 'JURISDICTION';
+  return 'EFFICIENCY';
+};
 
 // 2. Weave the Narrative
 function weaveNarrative(stats, context) {
@@ -40,7 +42,7 @@ function weaveNarrative(stats, context) {
 
 export function SynthesisChapter() {
     // --- SIMULATION 1 STATE: CONTEXT LENS ---
-    const [activeLens, setActiveLens] = useState<'OVERVIEW' | 'MARKET'>('OVERVIEW');
+    const [activeLens, setActiveLens] = useState<'OVERVIEW' | 'MARKET SHARE' | 'TOPOLOGY'>('OVERVIEW');
 
     // --- SIMULATION 2 STATE: TERMINAL ---
     const [termStep, setTermStep] = useState(0);
@@ -73,9 +75,9 @@ export function SynthesisChapter() {
             chapterNumber="09"
             title="Synthesis & Narrative Engine"
             subtitle="Context-aware orchestration and deterministic natural language generation."
-            textData={[]} // We are custom rendering the text to interleave simulations
+            textData={[]} // Custom rendering below
             codeSnippet={ENGINE_CODE}
-            githubPath="src/logic/narrative-engine.ts"
+            githubPath="lib/narrative-engine.ts"
         >
             <div className="flex flex-col gap-12 pb-12">
 
@@ -99,11 +101,11 @@ export function SynthesisChapter() {
                     <div className="flex flex-col md:flex-row gap-8 items-center justify-center relative z-10">
                         
                         {/* Input Node */}
-                        <div className="flex flex-col items-center gap-3">
+                        <div className="flex flex-col items-center gap-3 shrink-0">
                             <span className="text-[10px] font-mono uppercase text-zinc-500 tracking-widest">Raw Telemetry</span>
-                            <div className="w-32 h-32 bg-zinc-900 border border-zinc-700 rounded-xl flex flex-col items-center justify-center shadow-lg relative">
-                                <span className="text-4xl font-bold text-white mb-1">High</span>
-                                <span className="text-xs font-mono text-zinc-400">CREDITS</span>
+                            <div className="w-28 h-28 md:w-32 md:h-32 bg-zinc-900 border border-zinc-700 rounded-xl flex flex-col items-center justify-center shadow-lg relative">
+                                <span className="text-3xl md:text-4xl font-bold text-white mb-1">High</span>
+                                <span className="text-[10px] md:text-xs font-mono text-zinc-400">CREDITS</span>
                                 <div className="absolute -bottom-2 w-full flex justify-center">
                                     <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
                                 </div>
@@ -111,39 +113,55 @@ export function SynthesisChapter() {
                         </div>
 
                         {/* Arrows */}
-                        <div className="flex flex-col items-center justify-center h-24 w-12 md:h-12 md:w-24">
+                        <div className="flex flex-col items-center justify-center h-12 w-12 md:h-12 md:w-24">
                             <ArrowRight className="text-zinc-600 hidden md:block" />
                             <ArrowRight className="text-zinc-600 md:hidden rotate-90" />
                         </div>
 
                         {/* The Processor */}
-                        <div className="flex-1 w-full max-w-lg flex flex-col gap-4">
-                            <div className="flex justify-between bg-zinc-900/50 p-1 rounded-lg border border-zinc-800">
+                        <div className="flex-1 w-full max-w-xl flex flex-col gap-4">
+                            {/* Controls */}
+                            <div className="flex flex-wrap md:flex-nowrap gap-1 bg-zinc-900/50 p-1 rounded-lg border border-zinc-800">
                                 <button 
                                     onClick={() => setActiveLens('OVERVIEW')}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold uppercase transition-all ${activeLens === 'OVERVIEW' ? 'bg-blue-600 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-[10px] md:text-xs font-bold uppercase transition-all whitespace-nowrap ${activeLens === 'OVERVIEW' ? 'bg-blue-600 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
                                 >
-                                    <Activity size={14} /> Overview Lens
+                                    <Activity size={12} className="hidden sm:block" /> Overview
                                 </button>
                                 <button 
-                                    onClick={() => setActiveLens('MARKET')}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold uppercase transition-all ${activeLens === 'MARKET' ? 'bg-pink-600 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                    onClick={() => setActiveLens('MARKET SHARE')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-[10px] md:text-xs font-bold uppercase transition-all whitespace-nowrap ${activeLens === 'MARKET SHARE' ? 'bg-pink-600 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
                                 >
-                                    <PieChart size={14} /> Market Lens
+                                    <PieChart size={12} className="hidden sm:block" /> Market Share
+                                </button>
+                                <button 
+                                    onClick={() => setActiveLens('TOPOLOGY')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-[10px] md:text-xs font-bold uppercase transition-all whitespace-nowrap ${activeLens === 'TOPOLOGY' ? 'bg-emerald-600 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                >
+                                    <MapIcon size={12} className="hidden sm:block" /> Topology
                                 </button>
                             </div>
 
-                            <div className="bg-black border border-zinc-800 rounded-xl p-6 min-h-[100px] flex items-center justify-center relative overflow-hidden transition-all duration-300">
-                                <div className={`absolute inset-0 opacity-10 transition-colors duration-500 ${activeLens === 'OVERVIEW' ? 'bg-blue-500' : 'bg-pink-500'}`}></div>
-                                {activeLens === 'OVERVIEW' ? (
+                            {/* Output Box */}
+                            <div className="bg-black border border-zinc-800 rounded-xl p-6 min-h-[110px] flex items-center justify-center relative overflow-hidden transition-all duration-300">
+                                <div className={`absolute inset-0 opacity-10 transition-colors duration-500 ${activeLens === 'OVERVIEW' ? 'bg-blue-500' : activeLens === 'MARKET SHARE' ? 'bg-pink-500' : 'bg-emerald-500'}`}></div>
+                                
+                                {activeLens === 'OVERVIEW' && (
                                     <p className="text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                        <span className="text-blue-400 font-mono text-xs block mb-2">INTERPRETATION: EFFICIENCY</span>
-                                        <span className="text-zinc-200 font-medium">"Hardware configuration is optimal. Throughput is at maximum capacity."</span>
+                                        <span className="text-blue-400 font-mono text-[10px] md:text-xs block mb-2 tracking-widest">INTERPRETATION: EFFICIENCY</span>
+                                        <span className="text-zinc-200 font-medium text-sm md:text-base">"Hardware configuration is optimal. Throughput is at maximum capacity."</span>
                                     </p>
-                                ) : (
+                                )}
+                                {activeLens === 'MARKET SHARE' && (
                                     <p className="text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                        <span className="text-pink-400 font-mono text-xs block mb-2">INTERPRETATION: CENTRALIZATION</span>
-                                        <span className="text-zinc-200 font-medium">"Risk detected. Revenue concentration suggests an oligarchy structure."</span>
+                                        <span className="text-pink-400 font-mono text-[10px] md:text-xs block mb-2 tracking-widest">INTERPRETATION: CENTRALIZATION</span>
+                                        <span className="text-zinc-200 font-medium text-sm md:text-base">"Risk detected. Revenue concentration suggests an oligarchy structure."</span>
+                                    </p>
+                                )}
+                                {activeLens === 'TOPOLOGY' && (
+                                    <p className="text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                        <span className="text-emerald-400 font-mono text-[10px] md:text-xs block mb-2 tracking-widest">INTERPRETATION: GEOPOLITICAL</span>
+                                        <span className="text-zinc-200 font-medium text-sm md:text-base">"Strategic Asset. This node is a primary economic anchor for the regional cluster."</span>
                                     </p>
                                 )}
                             </div>
