@@ -1,242 +1,258 @@
-import { useState, useEffect } from 'react';
-import { 
-  Sparkles, 
-  GitMerge, 
-  BrainCircuit, 
-  ArrowRight, 
-  Activity, 
-  PieChart, 
-  Map as MapIcon,
-} from 'lucide-react';
+import { useState } from 'react';
+import { Globe, Database, Zap, Activity, MapPin, X, ChevronUp, BarChart3, Search } from 'lucide-react';
 import { ChapterLayout } from '../layout/ChapterLayout';
 
-// --- CODE SNIPPET FOR BOTTOM DRAWER ---
-const ENGINE_CODE = `
-// The Weaving Protocol: Stitching Math to Meaning
-const MATRIX = {
-  tech: ["Positive variance of +14%", "Delta exceeds baseline"],
-  simple: ["performing better than peers", "lifting the group average"],
-  bridges: ["which indicates that", "translating to a state where"]
-};
+// --- TEXT CONTENT ---
+const SPATIAL_TEXT = [
+    {
+        title: "Global Mesh Topology",
+        content: "The Map Interface is a full-spectrum command center for visualizing the physical distribution of the Xandeum network. Operators can toggle between three distinct view modes—Storage (Capacity), Health (Stability), and Credits (Earnings)—to analyze the grid's performance across different vectors."
+    },
+    {
+        title: "Interactive Regional Intelligence",
+        content: "Data is aggregated into interactive regional clusters. Clicking a region triggers a deep-dive analysis, opening a detail drawer that reveals X-Ray statistics, public/private node ratios, and the specific 'King Node'—the top-performing validator for that region based on the current active metric."
+    },
+    {
+        title: "Network Segmentation",
+        content: "The system supports instant filtering between Mainnet, Devnet, and All Networks. Combined with the Country Breakdown modal, this allows for granular inspection of jurisdictional density and centralization risks."
+    }
+];
 
-// 1. Determine Context
-const getLens = (tab) => {
-  if (tab === 'MARKET SHARE') return 'INEQUALITY';
-  if (tab === 'TOPOLOGY') return 'JURISDICTION';
-  return 'EFFICIENCY';
-};
+// --- CODE SNIPPET (From your pages/api/geo.ts) ---
+const SPATIAL_CODE = `
+// pages/api/geo.ts - Regional Tournament Logic
 
-// 2. Weave the Narrative
-function weaveNarrative(stats, context) {
-  // Select segments based on context intensity
-  const technical = stats.delta > 0 ? MATRIX.tech[0] : MATRIX.tech[1];
-  const simplified = stats.intensity === 'high' ? MATRIX.simple[1] : MATRIX.simple[0];
-  
-  // Select a random semantic bridge to keep it organic
-  const bridge = MATRIX.bridges[Math.floor(Math.random() * MATRIX.bridges.length)];
+// 1. Storage King
+if (storageGB > existing.bestNodes.storageVal) {
+    existing.bestNodes.storageVal = storageGB;
+    existing.bestNodes.storagePk = node.pubkey;
+    existing.bestNodes.storageAddr = node.address;
+}
 
-  // Output: "Positive variance of +14% which indicates that..."
-  return \`\${technical} \${bridge} \${simplified}.\`;
+// 2. Credits King (Smart Filtering)
+// We prefer nodes that are actively tracked over untracked ones
+const isBetter = (!isUntracked && currentKingUntracked) || 
+                 ((node.credits || 0) >= existing.bestNodes.creditsVal);
+
+if (isBetter) {
+    existing.bestNodes.creditsVal = node.credits;
+    existing.bestNodes.creditsPk = node.pubkey;
+}
+
+// 3. Health King
+if (node.health > existing.bestNodes.healthVal) {
+    existing.bestNodes.healthVal = node.health;
+    existing.bestNodes.healthPk = node.pubkey;
 }
 `;
 
-export function SynthesisChapter() {
-    // --- SIMULATION 1 STATE: CONTEXT LENS ---
-    const [activeLens, setActiveLens] = useState<'OVERVIEW' | 'MARKET SHARE' | 'TOPOLOGY'>('OVERVIEW');
+// --- SIMULATOR DATA ---
+const MOCK_REGIONS = [
+    { 
+        id: 'tokyo', name: 'Tokyo, JP', x: 80, y: 35, 
+        stats: { nodes: 12, storage: '4.5 PB', health: '98%', credits: '5.2M Cr' },
+        king: { pk: '8x...9A', label: 'ELITE TIER' }
+    },
+    { 
+        id: 'london', name: 'London, GB', x: 48, y: 25, 
+        stats: { nodes: 8, storage: '2.1 PB', health: '94%', credits: '3.1M Cr' },
+        king: { pk: '3y...B2', label: 'STANDARD' }
+    },
+    { 
+        id: 'nyc', name: 'New York, US', x: 28, y: 32, 
+        stats: { nodes: 15, storage: '3.8 PB', health: '96%', credits: '4.8M Cr' },
+        king: { pk: '7q...L9', label: 'ELITE TIER' }
+    }
+];
 
-    // --- SIMULATION 2 STATE: TERMINAL ---
-    const [termStep, setTermStep] = useState(0);
-    
-    // Terminal Animation Loop
-    useEffect(() => {
-        const sequence = [
-            { step: 0, duration: 1500 }, // Fetching
-            { step: 1, duration: 1500 }, // Analyzing
-            { step: 2, duration: 1500 }, // Selecting
-            { step: 3, duration: 4000 }, // Output (Long pause to read)
-        ];
+type ViewMode = 'STORAGE' | 'HEALTH' | 'CREDITS';
 
-        let currentStepIndex = 0;
-
-        const runStep = () => {
-            setTermStep(sequence[currentStepIndex].step);
-            const duration = sequence[currentStepIndex].duration;
-            
-            currentStepIndex = (currentStepIndex + 1) % sequence.length;
-            setTimeout(runStep, duration);
-        };
-
-        const timer = setTimeout(runStep, 100);
-        return () => clearTimeout(timer);
-    }, []);
-
+export function SpatialChapter() {
     return (
         <ChapterLayout
-            chapterNumber="09"
-            title="Synthesis & Narrative Engine"
-            subtitle="Context-aware orchestration and deterministic natural language generation."
-            textData={[]} // Custom rendering below
-            codeSnippet={ENGINE_CODE}
-            githubPath="lib/narrative-engine.ts"
+            chapterNumber="07"
+            title="Spatial Topology"
+            subtitle="Geographic clustering, regional tournaments, and mesh analysis."
+            textData={SPATIAL_TEXT}
+            codeSnippet={SPATIAL_CODE}
+            githubPath="src/pages/api/geo.ts"
         >
-            <div className="flex flex-col gap-12 pb-12">
-
-                {/* --- PARAGRAPH 1: THE SYNTHESIS ENGINE --- */}
-                <div className="prose prose-invert max-w-none">
-                    <h3 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
-                        <BrainCircuit size={20} className="text-blue-400" />
-                        Intelligence Orchestration
-                    </h3>
-                    <p className="text-zinc-400 leading-relaxed mt-4">
-                        The <strong>Synthesis Engine</strong> acts as the dashboard’s central cortex, functioning as both a state synchronizer and a context-aware filter. It orchestrates the connection between the map, charts, and data grids, ensuring that when a user focuses on a specific node, every component updates in unison. Crucially, it applies a <em>semantic lens</em> to the data based on the active tab; for example, analyzing "Credits" through an operational efficiency lens in the <em>Overview</em> tab, versus a wealth concentration lens in the <em>Market Share</em> tab. This ensures insights are always specific to the user's current goal.
-                    </p>
-                </div>
-
-                {/* --- SIMULATION 1: CONTEXT LENS --- */}
-                <div className="bg-[#050505] border border-zinc-800 rounded-2xl p-6 md:p-8 relative overflow-hidden shadow-2xl">
-                    <div className="absolute top-0 right-0 p-4 opacity-10">
-                        <GitMerge size={100} />
-                    </div>
-                    
-                    <div className="flex flex-col md:flex-row gap-8 items-center justify-center relative z-10">
-                        
-                        {/* Input Node */}
-                        <div className="flex flex-col items-center gap-3 shrink-0">
-                            <span className="text-[10px] font-mono uppercase text-zinc-500 tracking-widest">Raw Telemetry</span>
-                            <div className="w-28 h-28 md:w-32 md:h-32 bg-zinc-900 border border-zinc-700 rounded-xl flex flex-col items-center justify-center shadow-lg relative">
-                                <span className="text-3xl md:text-4xl font-bold text-white mb-1">High</span>
-                                <span className="text-[10px] md:text-xs font-mono text-zinc-400">CREDITS</span>
-                                <div className="absolute -bottom-2 w-full flex justify-center">
-                                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Arrows */}
-                        <div className="flex flex-col items-center justify-center h-12 w-12 md:h-12 md:w-24">
-                            <ArrowRight className="text-zinc-600 hidden md:block" />
-                            <ArrowRight className="text-zinc-600 md:hidden rotate-90" />
-                        </div>
-
-                        {/* The Processor */}
-                        <div className="flex-1 w-full max-w-xl flex flex-col gap-4">
-                            {/* Controls */}
-                            <div className="flex flex-wrap md:flex-nowrap gap-1 bg-zinc-900/50 p-1 rounded-lg border border-zinc-800">
-                                <button 
-                                    onClick={() => setActiveLens('OVERVIEW')}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-[10px] md:text-xs font-bold uppercase transition-all whitespace-nowrap ${activeLens === 'OVERVIEW' ? 'bg-blue-600 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                >
-                                    <Activity size={12} className="hidden sm:block" /> Overview
-                                </button>
-                                <button 
-                                    onClick={() => setActiveLens('MARKET SHARE')}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-[10px] md:text-xs font-bold uppercase transition-all whitespace-nowrap ${activeLens === 'MARKET SHARE' ? 'bg-pink-600 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                >
-                                    <PieChart size={12} className="hidden sm:block" /> Market Share
-                                </button>
-                                <button 
-                                    onClick={() => setActiveLens('TOPOLOGY')}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-[10px] md:text-xs font-bold uppercase transition-all whitespace-nowrap ${activeLens === 'TOPOLOGY' ? 'bg-emerald-600 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                >
-                                    <MapIcon size={12} className="hidden sm:block" /> Topology
-                                </button>
-                            </div>
-
-                            {/* Output Box */}
-                            <div className="bg-black border border-zinc-800 rounded-xl p-6 min-h-[110px] flex items-center justify-center relative overflow-hidden transition-all duration-300">
-                                <div className={`absolute inset-0 opacity-10 transition-colors duration-500 ${activeLens === 'OVERVIEW' ? 'bg-blue-500' : activeLens === 'MARKET SHARE' ? 'bg-pink-500' : 'bg-emerald-500'}`}></div>
-                                
-                                {activeLens === 'OVERVIEW' && (
-                                    <p className="text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                        <span className="text-blue-400 font-mono text-[10px] md:text-xs block mb-2 tracking-widest">INTERPRETATION: EFFICIENCY</span>
-                                        <span className="text-zinc-200 font-medium text-sm md:text-base">"Hardware configuration is optimal. Throughput is at maximum capacity."</span>
-                                    </p>
-                                )}
-                                {activeLens === 'MARKET SHARE' && (
-                                    <p className="text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                        <span className="text-pink-400 font-mono text-[10px] md:text-xs block mb-2 tracking-widest">INTERPRETATION: CENTRALIZATION</span>
-                                        <span className="text-zinc-200 font-medium text-sm md:text-base">"Risk detected. Revenue concentration suggests an oligarchy structure."</span>
-                                    </p>
-                                )}
-                                {activeLens === 'TOPOLOGY' && (
-                                    <p className="text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                        <span className="text-emerald-400 font-mono text-[10px] md:text-xs block mb-2 tracking-widest">INTERPRETATION: GEOPOLITICAL</span>
-                                        <span className="text-zinc-200 font-medium text-sm md:text-base">"Strategic Asset. This node is a primary economic anchor for the regional cluster."</span>
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* --- PARAGRAPH 2: THE NARRATIVE ENGINE --- */}
-                <div className="prose prose-invert max-w-none mt-4">
-                    <h3 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
-                        <Sparkles size={20} className="text-pink-400" />
-                        Narrative Generation
-                    </h3>
-                    <p className="text-zinc-400 leading-relaxed mt-4">
-                        Working in tandem is the <strong>Narrative Engine</strong>, a deterministic linguist that converts raw statistical variance—such as Standard Deviation and Gini Coefficients—into human-readable situation reports. Rather than using static templates, it employs a <em>"Combinatorial Weave"</em> technique. This logic stitches precise technical telemetry (e.g., <em>"Positive delta of +14%"</em>) with simplified semantic bridges (e.g., <em>"indicating that..."</em>), allowing the system to autonomously toggle between distinct personalities—Executive, Analyst, or Strategist—without sounding robotic.
-                    </p>
-                </div>
-
-                {/* --- SIMULATION 2: THE TERMINAL --- */}
-                <div className="bg-black border border-zinc-800 rounded-xl p-6 md:p-8 font-mono text-sm relative overflow-hidden shadow-2xl min-h-[240px] flex flex-col">
-                    {/* Header */}
-                    <div className="flex items-center gap-2 border-b border-zinc-900 pb-4 mb-4">
-                        <div className="flex gap-1.5">
-                            <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50"></div>
-                            <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
-                            <div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50"></div>
-                        </div>
-                        <span className="text-zinc-600 text-xs ml-2">narrative-engine — v2.0.4</span>
-                    </div>
-
-                    {/* Terminal Body */}
-                    <div className="flex-1 flex flex-col gap-3">
-                        {/* STEP 0: FETCH */}
-                        <div className={`flex items-center gap-3 transition-opacity duration-300 ${termStep >= 0 ? 'opacity-100' : 'opacity-0'}`}>
-                            <span className="text-zinc-500">{'>'}</span>
-                            <span className="text-blue-400">FETCHING_TELEMETRY...</span>
-                        </div>
-
-                        {/* STEP 1: ANALYZE */}
-                        <div className={`flex items-center gap-3 transition-opacity duration-300 ${termStep >= 1 ? 'opacity-100' : 'opacity-0'}`}>
-                            <span className="text-zinc-500">{'>'}</span>
-                            <div className="flex gap-4 text-xs">
-                                <span className="text-zinc-300">GINI: <span className="text-yellow-400">0.65 (HIGH)</span></span>
-                                <span className="text-zinc-300">TOP_3_SHARE: <span className="text-yellow-400">55%</span></span>
-                            </div>
-                        </div>
-
-                        {/* STEP 2: SELECT */}
-                        <div className={`flex items-center gap-3 transition-opacity duration-300 ${termStep >= 2 ? 'opacity-100' : 'opacity-0'}`}>
-                            <span className="text-zinc-500">{'>'}</span>
-                            <span className="text-purple-400">SELECTING_MODE: <span className="text-white bg-purple-500/20 px-1 rounded">ANALYST_WARNING</span></span>
-                        </div>
-
-                        {/* STEP 3: OUTPUT */}
-                        <div className={`mt-4 border-l-2 border-pink-500 pl-4 py-1 transition-all duration-500 ${termStep >= 3 ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'}`}>
-                            <p className="text-zinc-100 leading-relaxed">
-                                <span className="text-pink-500 font-bold mr-2">root@pulse:~$</span>
-                                "Oligarchy detected. The top 3 nodes control 55% of network resources, which indicates a high centralization risk."
-                                <span className="inline-block w-2 h-4 bg-pink-500 ml-2 animate-pulse align-middle"></span>
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Footer Progress */}
-                    <div className="mt-auto pt-4 flex items-center justify-between text-[10px] text-zinc-600 uppercase tracking-widest">
-                        <span>Status: {termStep === 3 ? 'IDLE' : 'PROCESSING'}</span>
-                        <div className="flex gap-1">
-                             {[0,1,2,3].map(s => (
-                                 <div key={s} className={`w-8 h-1 rounded-full transition-colors duration-300 ${termStep >= s ? 'bg-blue-500' : 'bg-zinc-800'}`}></div>
-                             ))}
-                        </div>
-                    </div>
-                </div>
-
-            </div>
+            <MapSimulator />
         </ChapterLayout>
     );
+}
+
+function MapSimulator() {
+    const [mode, setMode] = useState<ViewMode>('STORAGE');
+    const [network, setNetwork] = useState('ALL');
+    const [activeRegion, setActiveRegion] = useState<typeof MOCK_REGIONS[0] | null>(null);
+
+    // Dynamic Colors based on Mode
+    const getColor = () => {
+        if (mode === 'STORAGE') return 'text-purple-500 bg-purple-500';
+        if (mode === 'HEALTH') return 'text-green-500 bg-green-500';
+        return 'text-orange-500 bg-orange-500';
+    };
+
+    const getMetric = (r: typeof MOCK_REGIONS[0]) => {
+        if (mode === 'STORAGE') return r.stats.storage;
+        if (mode === 'HEALTH') return r.stats.health;
+        return r.stats.credits;
+    };
+
+    return (
+        <div className="h-full bg-[#050505] relative overflow-hidden flex flex-col font-sans">
+            
+            {/* 1. HEADER CONTROL BAR */}
+            <div className="absolute top-4 left-4 right-4 z-20 flex justify-between items-start pointer-events-none">
+                {/* View Toggles */}
+                <div className="flex bg-zinc-900/90 backdrop-blur-md p-1 rounded-xl border border-zinc-800 pointer-events-auto shadow-xl">
+                    <ModeBtn icon={Database} label="STORAGE" active={mode === 'STORAGE'} onClick={() => setMode('STORAGE')} color="text-purple-400" />
+                    <ModeBtn icon={Activity} label="HEALTH" active={mode === 'HEALTH'} onClick={() => setMode('HEALTH')} color="text-green-400" />
+                    <ModeBtn icon={Zap} label="CREDITS" active={mode === 'CREDITS'} onClick={() => setMode('CREDITS')} color="text-orange-400" />
+                </div>
+
+                {/* Region Trigger (Visual Only) */}
+                <div className="hidden md:flex bg-zinc-900/90 backdrop-blur-md px-3 py-2 rounded-xl border border-zinc-800 items-center gap-2 pointer-events-auto cursor-pointer hover:border-zinc-600 transition-colors">
+                    <div className="flex -space-x-1">
+                        <div className="w-4 h-4 rounded-full bg-zinc-700 border border-zinc-900"></div>
+                        <div className="w-4 h-4 rounded-full bg-zinc-600 border border-zinc-900"></div>
+                    </div>
+                    <span className="text-[10px] font-bold text-zinc-300">+24 Regions</span>
+                    <BarChart3 size={12} className="text-zinc-500"/>
+                </div>
+            </div>
+
+            {/* 2. NETWORK SWITCHER (Bottom Right) */}
+            <div className="absolute bottom-6 right-6 z-20 pointer-events-auto">
+                <div className="flex bg-zinc-900/90 backdrop-blur-md p-1 rounded-lg border border-zinc-800 shadow-xl">
+                    {['ALL', 'MAINNET', 'DEVNET'].map(n => (
+                        <button 
+                            key={n}
+                            onClick={() => setNetwork(n)}
+                            className={`px-3 py-1.5 rounded text-[9px] font-bold transition-all ${network === n ? 'bg-zinc-800 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        >
+                            {n}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* 3. THE MAP VISUAL */}
+            <div className={`
+                absolute inset-0 flex items-center justify-center transition-all duration-700 ease-in-out
+                ${activeRegion ? 'scale-125 opacity-40' : 'scale-100 opacity-100'}
+            `}>
+                <div className="relative w-full h-full max-w-2xl aspect-video opacity-80">
+                    {/* Abstract Grid Map */}
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-800/20 to-transparent"></div>
+                    <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(#3f3f46 1px, transparent 1px)', backgroundSize: '24px 24px', opacity: 0.1 }}></div>
+                    
+                    {/* Render Pins */}
+                    {MOCK_REGIONS.map(region => (
+                        <button 
+                            key={region.id}
+                            onClick={() => setActiveRegion(region)}
+                            className="absolute group z-10"
+                            style={{ left: `${region.x}%`, top: `${region.y}%` }}
+                        >
+                            <div className="relative flex flex-col items-center">
+                                {/* Ping Animation */}
+                                <div className={`absolute w-8 h-8 rounded-full opacity-20 animate-ping ${getColor()}`}></div>
+                                {/* Core Pin */}
+                                <div className={`w-3 h-3 rounded-full border-2 border-[#050505] shadow-lg transition-transform group-hover:scale-125 ${getColor()}`}></div>
+                                {/* Label */}
+                                <div className="absolute top-4 px-2 py-1 bg-black/80 border border-zinc-800 rounded text-[9px] font-bold text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                    {region.name}
+                                </div>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* 4. DETAIL DRAWER (Simulating LocationDrawer) */}
+            <div className={`
+                absolute bottom-0 left-0 right-0 bg-[#09090b] border-t border-zinc-800 transition-transform duration-500 ease-out z-30
+                ${activeRegion ? 'translate-y-0 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]' : 'translate-y-full'}
+            `}>
+                {activeRegion && (
+                    <div className="p-6 md:p-8 flex flex-col gap-6">
+                        {/* Drawer Header */}
+                        <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-xl bg-zinc-900 border border-zinc-800 ${getColor().split(' ')[0]}`}>
+                                    {mode === 'STORAGE' ? <Database size={18}/> : mode === 'HEALTH' ? <Activity size={18}/> : <Zap size={18}/>}
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                        {activeRegion.name}
+                                    </h3>
+                                    <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-2">
+                                        <Globe size={10}/> {activeRegion.stats.nodes} NODES ACTIVE
+                                    </div>
+                                </div>
+                            </div>
+                            <button onClick={() => setActiveRegion(null)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-500 transition-colors">
+                                <X size={16}/>
+                            </button>
+                        </div>
+
+                        {/* X-Ray Stats Grid */}
+                        <div className="grid grid-cols-3 gap-px bg-zinc-800/50 rounded-xl overflow-hidden border border-zinc-800">
+                            <StatBox label="Density" val={activeRegion.stats.nodes} />
+                            <StatBox label={mode} val={getMetric(activeRegion)} highlight />
+                            <StatBox label="Latency" val="12ms" />
+                        </div>
+
+                        {/* King Node Card */}
+                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 flex items-center justify-between group hover:border-zinc-700 transition-colors cursor-pointer">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-zinc-800 rounded-lg text-zinc-400">
+                                    <Search size={14}/>
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Region's Top Performer</span>
+                                        <span className="text-[8px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-bold">{activeRegion.king.label}</span>
+                                    </div>
+                                    <div className="font-mono text-sm text-white font-bold">{activeRegion.king.pk}</div>
+                                </div>
+                            </div>
+                            <div className="hidden md:block text-[9px] font-bold text-blue-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                                View Details &rarr;
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+        </div>
+    );
+}
+
+// --- SUB-COMPONENTS ---
+
+function ModeBtn({ icon: Icon, label, active, onClick, color }: any) {
+    return (
+        <button 
+            onClick={onClick}
+            className={`
+                flex items-center gap-2 px-3 py-2 rounded-lg transition-all
+                ${active ? 'bg-zinc-800 text-white shadow-md' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}
+            `}
+        >
+            <Icon size={14} className={active ? color.replace('text-', 'text-') : ''} />
+            <span className="text-[10px] font-bold tracking-wide">{label}</span>
+        </button>
+    )
+}
+
+function StatBox({ label, val, highlight }: any) {
+    return (
+        <div className="bg-[#09090b] p-4 flex flex-col items-center justify-center text-center">
+            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1">{label}</span>
+            <span className={`text-sm font-bold font-mono ${highlight ? 'text-white' : 'text-zinc-400'}`}>{val}</span>
+        </div>
+    )
 }
