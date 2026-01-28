@@ -1,183 +1,130 @@
 import { useState } from 'react';
-import { Swords, Layers, RefreshCw, FileImage, MousePointer2, ArrowRight, Trophy } from 'lucide-react';
-import { LogicWrapper } from '../layout/LogicWrapper';
+import { Layers, Swords, ArrowRight, FileImage, MousePointer2 } from 'lucide-react';
+import { ChapterLayout } from '../layout/ChapterLayout';
 
-const COMPARE_LOGIC_SNIPPET = `
-const leaderColumns = useMemo(() => {
-  return activeLeaderMetrics.map(metric => {
-    // Dynamic 'Apex' Node Discovery
-    const node = availableNodes.reduce((p, c) => 
-      (p[metric] > c[metric]) ? p : c
-    );
-    return { metric, node };
+const COMPARE_TEXT = [
+    {
+        title: "Comparative Intelligence",
+        content: "This suite moves beyond basic head-to-head metrics. Built on a Pivot & Spotlight philosophy, it allows operators to dynamically swap their 'Baseline'—comparing selected nodes against the real-time Network Average or specific high-performance leaders (Apex Nodes)."
+    },
+    {
+        title: "Ghost Canvas Export",
+        content: "Standard screenshots cut off scrollable data. Pulse renders a hidden, full-width copy of the dashboard off-screen (Ghost Canvas) to capture every node in the fleet, generating a pixel-perfect 5000px PNG report."
+    }
+];
+
+const COMPARE_CODE = `
+// Ghost Canvas Renderer
+const captureTopology = async () => {
+  setScanning(true);
+  
+  // 1. Mount Hidden DOM
+  const ghost = <HiddenTable data={fullFleet} />;
+  
+  // 2. Vectorize & Rasterize
+  const png = await htmlToImage(ghost, {
+    width: 5000,
+    quality: 1.0
   });
-}, [activeLeaderMetrics]);
-
-// Ghost Canvas: Off-screen DOM rendering
-const exportReport = async () => {
-  const ghost = renderToStaticMarkup(<GhostTable data={fleet} />);
-  return await htmlToImage(ghost, { width: 5000 });
+  
+  return download(png);
 };
 `;
 
 export function CompareChapter() {
-    return (
-        <LogicWrapper 
-            title="Comparative_Intelligence.ts" 
-            code={COMPARE_LOGIC_SNIPPET} 
-            githubPath="src/logic/compare-engine.ts"
-        >
-            <div className="flex flex-col gap-8 h-full">
-                <GhostCanvasSimulator />
-                <PivotLogicSimulator />
-            </div>
-        </LogicWrapper>
-    );
-}
-
-function GhostCanvasSimulator() {
     const [scanning, setScanning] = useState(false);
+    const [mode, setMode] = useState<'AVG' | 'APEX'>('AVG');
 
-    const handleScan = () => {
+    const triggerScan = () => {
         setScanning(true);
-        setTimeout(() => setScanning(false), 2500);
+        setTimeout(() => setScanning(false), 2000);
     };
 
     return (
-        <div className="bg-[#050505] border border-zinc-800 rounded-[2rem] p-8 relative overflow-hidden group shadow-2xl">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-8 relative z-10">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-purple-400">
-                        <Layers size={20}/>
+        <ChapterLayout
+            chapterNumber="05"
+            title="Analytics Suite"
+            subtitle="Pivoting baselines and high-fidelity reporting engines."
+            textData={COMPARE_TEXT}
+            codeSnippet={COMPARE_CODE}
+            githubPath="src/logic/compare-engine.ts"
+        >
+            <div className="flex flex-col h-full bg-[#080808] p-8 gap-8">
+                
+                {/* 1. GHOST CANVAS SIMULATOR */}
+                <div className="bg-zinc-900/20 border border-zinc-800 rounded-3xl p-6 relative overflow-hidden group">
+                    <div className="flex justify-between items-center mb-6 relative z-10">
+                        <div className="flex items-center gap-3">
+                            <Layers size={18} className="text-purple-400"/>
+                            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Ghost Canvas</span>
+                        </div>
+                        <button 
+                            onClick={triggerScan}
+                            disabled={scanning}
+                            className="bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold px-4 py-2 rounded-full transition-all disabled:opacity-50 flex items-center gap-2"
+                        >
+                            {scanning ? 'Rendering...' : 'Export Report'}
+                        </button>
                     </div>
-                    <div>
-                        <h3 className="font-bold text-white text-lg tracking-tight">Ghost Canvas</h3>
-                        <div className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Off-Screen Renderer</div>
+
+                    {/* Preview Area */}
+                    <div className="h-32 bg-black border border-zinc-800 rounded-xl relative overflow-hidden flex items-center justify-center">
+                        <FileImage size={32} className="text-zinc-700"/>
+                        
+                        {/* The Laser */}
+                        {scanning && (
+                            <div className="absolute top-0 left-0 w-1 h-full bg-purple-500 shadow-[0_0_30px_#a855f7] animate-[scan_2s_ease-in-out]"></div>
+                        )}
+                        {/* Progress */}
+                        {scanning && (
+                            <div className="absolute bottom-4 w-1/2 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-purple-500 animate-[progress_2s_linear]"></div>
+                            </div>
+                        )}
                     </div>
                 </div>
-                <button 
-                    onClick={handleScan} 
-                    disabled={scanning}
-                    className="flex items-center gap-2 text-[10px] bg-purple-500/10 border border-purple-500/50 hover:bg-purple-500 hover:text-white text-purple-400 px-4 py-2 rounded-full font-bold transition-all disabled:opacity-50"
-                >
-                    {scanning ? 'CAPTURING DOM...' : 'EXPORT REPORT'}
-                </button>
-            </div>
 
-            {/* The Canvas Simulation */}
-            <div className="relative border border-zinc-800 bg-[#0a0a0a] rounded-xl h-40 flex items-center justify-center overflow-hidden">
-                
-                {/* The "Laser" Scanner */}
-                {scanning && (
-                    <div className="absolute top-0 left-0 w-full h-1 bg-purple-500 shadow-[0_0_50px_rgba(168,85,247,1)] z-20 animate-[scanVertical_2.5s_ease-in-out]"></div>
-                )}
+                {/* 2. PIVOT TABLE SIMULATOR */}
+                <div className="flex-1 bg-zinc-900/20 border border-zinc-800 rounded-3xl p-6 flex flex-col">
+                    <div className="flex justify-between items-center mb-8">
+                        <div className="flex items-center gap-3">
+                            <Swords size={18} className="text-pink-400"/>
+                            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Pivot Logic</span>
+                        </div>
+                        {/* Toggle */}
+                        <div className="flex bg-black p-1 rounded-lg border border-zinc-800 relative">
+                             {/* Hint Dot */}
+                             {mode === 'AVG' && <span className="absolute -top-1 -right-1 w-2 h-2 bg-pink-500 rounded-full animate-ping"></span>}
+                             <button onClick={() => setMode('AVG')} className={`px-3 py-1 rounded text-[9px] font-bold transition-all ${mode==='AVG' ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}>VS AVG</button>
+                             <button onClick={() => setMode('APEX')} className={`px-3 py-1 rounded text-[9px] font-bold transition-all ${mode==='APEX' ? 'bg-pink-600 text-white shadow' : 'text-zinc-500'}`}>VS APEX</button>
+                        </div>
+                    </div>
 
-                {/* Content being scanned */}
-                <div className={`transition-all duration-300 ${scanning ? 'opacity-100' : 'opacity-40 grayscale'}`}>
-                    {scanning ? (
-                        <div className="text-center">
-                            <div className="text-xs font-mono text-purple-400 mb-2 uppercase tracking-widest animate-pulse">Rendering 5000px Topology...</div>
-                            <div className="w-48 h-1 bg-zinc-800 rounded-full mx-auto overflow-hidden">
-                                <div className="h-full bg-purple-500 animate-[progress_2.5s_linear]"></div>
+                    {/* Animated Bars */}
+                    <div className="space-y-6 flex-1 justify-center flex flex-col">
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-[10px] font-bold text-zinc-500 uppercase">
+                                <span>Your Node</span>
+                                <span className="text-white">1.2 PB</span>
+                            </div>
+                            <div className="h-2 w-full bg-zinc-900 rounded-full overflow-hidden">
+                                <div className="h-full w-[40%] bg-zinc-500 rounded-full"></div>
                             </div>
                         </div>
-                    ) : (
-                        <div className="flex flex-col items-center gap-3 text-zinc-600">
-                            <FileImage size={32} />
-                            <span className="text-[10px] font-bold uppercase tracking-widest">Canvas Idle</span>
+
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-[10px] font-bold text-zinc-500 uppercase">
+                                <span className={mode==='APEX'?'text-pink-500 transition-colors':'transition-colors'}>{mode==='AVG' ? 'Network Avg' : 'Shard Apex'}</span>
+                                <span className="text-white transition-all key={mode}">{mode==='AVG' ? '290 GB' : '4.5 PB'}</span>
+                            </div>
+                            <div className="h-2 w-full bg-zinc-900 rounded-full overflow-hidden relative">
+                                <div className={`absolute top-0 left-0 h-full rounded-full transition-all duration-700 ease-out ${mode==='AVG' ? 'w-[10%] bg-zinc-700' : 'w-[95%] bg-pink-600'}`}></div>
+                            </div>
                         </div>
-                    )}
+                    </div>
                 </div>
             </div>
-
-             <style>{`
-                @keyframes scanVertical {
-                    0% { top: 0%; opacity: 0; }
-                    10% { opacity: 1; }
-                    90% { opacity: 1; }
-                    100% { top: 100%; opacity: 0; }
-                }
-            `}</style>
-        </div>
-    );
-}
-
-function PivotLogicSimulator() {
-    const [mode, setMode] = useState<'AVG' | 'LEADER'>('AVG');
-
-    return (
-        <div className="bg-[#050505] border border-zinc-800 rounded-[2rem] p-8 h-full flex flex-col shadow-2xl relative overflow-hidden">
-             
-             {/* Header */}
-             <div className="flex justify-between items-center mb-8 relative z-10">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-pink-500">
-                        <Swords size={20}/>
-                    </div>
-                    <div>
-                        <h3 className="font-bold text-white text-lg tracking-tight">Pivot & Spotlight</h3>
-                        <div className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">Comparative Analytics</div>
-                    </div>
-                </div>
-                
-                {/* Tactile Switch */}
-                <div className="flex bg-black rounded-lg p-1 border border-zinc-800">
-                    <button onClick={() => setMode('AVG')} className={`px-4 py-1.5 text-[10px] font-bold rounded-md transition-all ${mode==='AVG' ? 'bg-zinc-800 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}>VS AVG</button>
-                    <button onClick={() => setMode('LEADER')} className={`px-4 py-1.5 text-[10px] font-bold rounded-md transition-all ${mode==='LEADER' ? 'bg-pink-600 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}>VS APEX</button>
-                </div>
-            </div>
-
-            {/* The Chart */}
-            <div className="space-y-6 flex-1 relative z-10">
-                
-                {/* Row 1: Your Node */}
-                <div className="space-y-2">
-                    <div className="flex justify-between text-[10px] font-bold uppercase text-zinc-500 tracking-wider">
-                        <span>Node 8x...2A (You)</span>
-                        <span className="text-white">1.2 PB</span>
-                    </div>
-                    <div className="h-3 w-full bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
-                        <div className="h-full bg-zinc-400 w-[40%] rounded-full"></div>
-                    </div>
-                </div>
-
-                {/* Row 2: Comparison Target (Animated) */}
-                <div className="space-y-2">
-                    <div className="flex justify-between text-[10px] font-bold uppercase text-zinc-500 tracking-wider">
-                        <span className={`transition-colors duration-500 ${mode === 'LEADER' ? 'text-pink-500' : 'text-zinc-500'}`}>
-                            {mode === 'AVG' ? 'Network Average' : 'Shard Leader (Apex)'}
-                        </span>
-                        <span className="text-white transition-all key={mode}">
-                            {mode === 'AVG' ? '290 GB' : '4.5 PB'}
-                        </span>
-                    </div>
-                    <div className="h-3 w-full bg-zinc-900 rounded-full overflow-hidden border border-zinc-800 relative">
-                        {/* The Bar Animates Width */}
-                        <div 
-                            className={`h-full rounded-full transition-all duration-700 ease-out ${mode === 'AVG' ? 'w-[10%] bg-zinc-600' : 'w-[95%] bg-pink-600'}`}
-                        ></div>
-                    </div>
-                </div>
-
-                {/* Result Pill */}
-                <div className={`
-                    mt-4 p-4 rounded-xl border flex items-center justify-between transition-all duration-500
-                    ${mode === 'AVG' ? 'bg-green-900/10 border-green-500/20' : 'bg-red-900/10 border-red-500/20'}
-                `}>
-                    <div className="flex items-center gap-3">
-                        <div className={`p-1.5 rounded-full ${mode === 'AVG' ? 'bg-green-500 text-black' : 'bg-red-500 text-white'}`}>
-                            {mode === 'AVG' ? <ArrowRight size={12} className="-rotate-45"/> : <ArrowRight size={12} className="rotate-45"/>}
-                        </div>
-                        <span className={`text-xs font-bold uppercase tracking-wider ${mode === 'AVG' ? 'text-green-500' : 'text-red-500'}`}>
-                            {mode === 'AVG' ? 'Hardware Advantage' : 'Hardware Deficit'}
-                        </span>
-                    </div>
-                    <span className={`font-mono font-bold text-lg ${mode === 'AVG' ? 'text-green-400' : 'text-red-400'}`}>
-                        {mode === 'AVG' ? '+310%' : '-73%'}
-                    </span>
-                </div>
-            </div>
-        </div>
+            <style>{`@keyframes scan { 0% { left: 0%; } 100% { left: 100%; } }`}</style>
+        </ChapterLayout>
     );
 }
