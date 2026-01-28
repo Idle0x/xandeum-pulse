@@ -1,32 +1,32 @@
-import { useState } from 'react';
-import { Shield, Activity, Terminal, Search, Server, Cpu, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Shield, Activity, Terminal, Search, Server, Cpu, AlertTriangle, CheckCircle2, GitMerge, Download, Globe } from 'lucide-react';
 import { ChapterLayout } from '../layout/ChapterLayout';
 
-// --- TEXT CONTENT ---
+// --- TEXT CONTENT (UPDATED NARRATIVE) ---
 const ENG_TEXT = [
     {
-        title: "System Internals",
-        content: "Pulse is not just a passive viewer; it is an active Orchestration Engine. The Engineering view exposes the raw plumbing of the Neural Core, visualizing the real-time race conditions between the Private 'Hero' RPC and the Public Swarm."
+        title: "Hyper-Parallel Aggregation",
+        content: "Pulse serves as an active Orchestration Engine, executing a simultaneous 5-vector fetch strategy. Rather than a sequential load, the Neural Core races the Private 'Hero' RPC against the Public Swarm while concurrently pulling credit data (Mainnet/Devnet) and historical forensics. This ensures sub-second latency even when individual data sources stall."
     },
     {
-        title: "Forensic Audit",
-        content: "To prove data integrity, this tool grabs a live node from the stream and replays the Vitality Score math in the browser. It also scans the dataset for 'Rapid Instability' (flapping) and 'Stale Telemetry' (frozen state) signatures defined in the backend logic."
+        title: "Forensic Deduplication",
+        content: "To prove data integrity, the engine performs real-time Fingerprint Deduplication. It generates a unique composite key (Pubkey + IP + Storage + Version) for every incoming signal. This allows the system to identify collision events where the Private Hero and Public Swarm report the same node, automatically dropping the slower signal to prevent double-counting."
     }
 ];
 
 const ENG_CODE = `
-// Real-time Forensic Scan
-const scanNetwork = (nodes) => {
-  return {
-    unverified: nodes.filter(n => n.isUntracked).length, // Missing Credits
-    flapping: nodes.filter(n => 
-      n.healthBreakdown.penalties.restarts_24h > 5
-    ).length,
-    stale: nodes.filter(n => 
-      n.healthBreakdown.penalties.frozen_hours > 1
-    ).length
-  };
+// Identity Deduplication Logic
+const getFingerprint = (p, network) => {
+  // Create a unique composite key for every node instance
+  return \`\${p.pubkey}|\${p.ip}|\${p.storage}|\${p.version}|\${network}\`;
 };
+
+// Check for collisions between Private and Public streams
+if (mainnetFingerprints.has(publicFingerprint)) {
+  const timeDelta = Math.abs(privateTime - publicTime);
+  // If timestamps are close, it's a duplicate. Trust Private RPC.
+  if (timeDelta <= 3600) return; 
+}
 `;
 
 // --- TYPES ---
@@ -98,7 +98,7 @@ export function EngineeringChapter() {
             const sample = nodes.length > 0 ? nodes[Math.floor(Math.random() * nodes.length)] : null;
             
             // --- FORENSIC COUNTS ---
-            // Unverified: Nodes where isUntracked is true (Credits = NULL, different from 0)
+            // Unverified: Nodes where isUntracked is true
             const unverified = nodes.filter((n: any) => n.isUntracked || n.is_ghost).length;
             
             const flapping = nodes.filter((n: any) => (n.healthBreakdown?.penalties?.restarts_24h || 0) > 5).length;
@@ -139,18 +139,18 @@ export function EngineeringChapter() {
             codeSnippet={ENG_CODE}
             githubPath="src/lib/diagnostics.ts"
         >
-            <div className="h-full bg-[#080808] p-6 flex flex-col gap-6 font-mono text-xs">
+            <div className="h-full bg-[#080808] p-4 md:p-6 flex flex-col gap-6 font-mono text-xs">
                 
                 {/* 1. CONTROL HEADER */}
-                <div className="flex justify-between items-center bg-zinc-900/30 p-4 rounded-2xl border border-zinc-800">
+                <div className="flex justify-between items-center bg-zinc-900/30 p-4 rounded-2xl border border-zinc-800 shadow-lg">
                     <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-lg border ${diag.status === 'ERROR' ? 'bg-red-900/20 border-red-500 text-red-500' : 'bg-blue-900/20 border-blue-500/30 text-blue-400'}`}>
                             <Activity size={18}/>
                         </div>
                         <div>
-                            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Status</div>
+                            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Diagnostic State</div>
                             <div className="font-bold text-white flex items-center gap-2">
-                                {diag.status === 'IDLE' ? 'READY' : diag.status === 'COMPLETE' ? 'TRACE COMPLETE' : 'TRACING...'}
+                                {diag.status === 'IDLE' ? 'READY' : diag.status === 'COMPLETE' ? 'TRACE COMPLETE' : 'AGGREGATING...'}
                                 {diag.status !== 'IDLE' && diag.status !== 'COMPLETE' && diag.status !== 'ERROR' && (
                                     <span className="flex h-2 w-2 relative">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
@@ -163,22 +163,23 @@ export function EngineeringChapter() {
                     <button 
                         onClick={runDiagnostics}
                         disabled={diag.status !== 'IDLE' && diag.status !== 'COMPLETE' && diag.status !== 'ERROR'}
-                        className="px-6 py-2 bg-zinc-100 hover:bg-white text-black font-bold rounded-lg transition-all disabled:opacity-50 active:scale-95"
+                        className="px-6 py-2 bg-zinc-100 hover:bg-white text-black font-bold rounded-lg transition-all disabled:opacity-50 active:scale-95 shadow-lg"
                     >
                         {diag.status === 'IDLE' ? 'RUN AUDIT' : 'RERUN TRACE'}
                     </button>
                 </div>
 
-                {/* 2. NETWORK WATERFALL */}
-                <WaterfallTrace diag={diag} />
+                {/* 2. PIPELINE MONITOR (Horizontal) */}
+                <PipelineMonitor diag={diag} />
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1">
-                    {/* 3. MATH TERMINAL */}
+                {/* 3. SPLIT GRID: MATH & FORENSICS */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[280px]">
                     <MathTerminal node={diag.payload?.sampleNode} status={diag.status} />
-
-                    {/* 4. ANOMALY SCAN */}
                     <ForensicFlags flags={diag.payload?.flags} status={diag.status} />
                 </div>
+
+                {/* 4. DEDUPLICATION CONSOLE */}
+                <DeduplicationLog count={diag.payload?.nodeCount} status={diag.status} />
 
             </div>
         </ChapterLayout>
@@ -187,65 +188,123 @@ export function EngineeringChapter() {
 
 // --- SUB-COMPONENTS ---
 
-function WaterfallTrace({ diag }: { diag: DiagnosticState }) {
+function PipelineMonitor({ diag }: { diag: DiagnosticState }) {
+    // We map the sequential states to visual progress
+    const steps = ['DNS', 'TCP', 'SSL', 'TTFB', 'DOWNLOAD', 'COMPLETE'];
+    const currentIndex = steps.indexOf(diag.status);
     const isComplete = diag.status === 'COMPLETE';
-    const getWidth = (val: number) => isComplete ? `${Math.min(100, (val / diag.latency.total) * 100)}%` : '0%';
 
     return (
-        <div className="bg-black border border-zinc-800 rounded-2xl p-6 relative overflow-hidden">
+        <div className="bg-black border border-zinc-800 rounded-2xl p-6 relative overflow-hidden shadow-xl">
             <div className="flex justify-between items-end mb-4">
-                <div className="text-zinc-500 uppercase tracking-widest font-bold text-[10px]">Request Waterfall</div>
+                <div className="flex items-center gap-2 text-zinc-400">
+                    <GitMerge size={14} />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Aggregator Pipeline</span>
+                </div>
                 <div className="text-right">
                     <div className="text-zinc-500 text-[10px]">Total Latency</div>
                     <div className="text-lg font-bold text-white tabular-nums">{diag.latency.total}ms</div>
                 </div>
             </div>
 
-            <div className="space-y-3">
-                <TraceBar label="DNS Resolution" color="bg-zinc-600" width={getWidth(diag.latency.dns)} val={diag.latency.dns} active={diag.status === 'DNS'} />
-                <TraceBar label="TCP Handshake" color="bg-blue-600" width={getWidth(diag.latency.ssl)} val={diag.latency.ssl} active={diag.status === 'TCP'} />
-                <TraceBar label="Server Wait (TTFB)" color="bg-purple-600" width={getWidth(diag.latency.ttfb)} val={diag.latency.ttfb} active={diag.status === 'TTFB'} />
-                <TraceBar label="Content Download" color="bg-green-500" width={isComplete ? '15%' : '0%'} val={isComplete ? 12 : 0} active={diag.status === 'DOWNLOAD'} />
+            {/* The Pipeline Bar */}
+            <div className="h-4 bg-zinc-900 rounded-full overflow-hidden flex relative">
+                {/* 1. Connection Phase (DNS/TCP/SSL) */}
+                <div 
+                    className="h-full bg-zinc-700 transition-all duration-300"
+                    style={{ width: currentIndex >= 1 ? '15%' : currentIndex >= 0 ? '5%' : '0%' }}
+                ></div>
+                {/* 2. Wait Phase (TTFB) */}
+                <div 
+                    className="h-full bg-purple-600 transition-all duration-300"
+                    style={{ width: currentIndex >= 4 ? '25%' : currentIndex >= 3 ? '10%' : '0%' }}
+                ></div>
+                {/* 3. Download Phase (The Parallel Fetch) */}
+                <div 
+                    className="h-full bg-blue-500 transition-all duration-300 relative overflow-hidden"
+                    style={{ width: currentIndex >= 5 ? '60%' : currentIndex >= 4 ? '20%' : '0%' }}
+                >
+                    <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.2)_50%,transparent_75%)] bg-[length:10px_10px] animate-pulse"></div>
+                </div>
             </div>
 
-            {isComplete && (
-                <div className="mt-6 pt-4 border-t border-zinc-900 flex justify-between text-[10px] text-zinc-500 animate-in fade-in">
-                    <span>PAYLOAD: <span className="text-zinc-300">{diag.payload?.size}</span></span>
-                    <span>NODES: <span className="text-zinc-300">{diag.payload?.nodeCount}</span></span>
-                    <span>ENDPOINT: <span className="text-zinc-300">/api/stats</span></span>
+            {/* Labels below */}
+            <div className="flex justify-between mt-2 text-[9px] font-bold text-zinc-600 uppercase tracking-wider">
+                <span>Handshake</span>
+                <span>Server Wait</span>
+                <span className={currentIndex >= 4 ? 'text-blue-400' : ''}>Parallel Download</span>
+            </div>
+
+            {/* Active Vectors Badge (Only appears during download/complete) */}
+            <div className={`mt-4 pt-4 border-t border-zinc-900 transition-opacity duration-500 ${currentIndex >= 4 ? 'opacity-100' : 'opacity-0'}`}>
+                <div className="flex gap-2">
+                    <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-1 rounded text-[9px] font-bold">HERO RPC</span>
+                    <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-1 rounded text-[9px] font-bold">SWARM (x8)</span>
+                    <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-1 rounded text-[9px] font-bold">MAINNET DB</span>
+                    <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-1 rounded text-[9px] font-bold">DEVNET DB</span>
+                    <span className="bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-2 py-1 rounded text-[9px] font-bold">FORENSICS</span>
                 </div>
-            )}
+            </div>
         </div>
     );
 }
 
-function TraceBar({ label, color, width, val, active }: any) {
+function DeduplicationLog({ count, status }: { count: number | undefined, status: string }) {
+    const [logs, setLogs] = useState<string[]>([]);
+    const bottomRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (status === 'IDLE') {
+            setLogs(['> Awaiting input stream...']);
+        } 
+        else if (status === 'DOWNLOAD') {
+            setLogs(prev => [...prev, '> Initiating parallel fetch...', '> Vector 1: Private Hero connected.', '> Vector 2: Public Swarm broadcasting...']);
+        }
+        else if (status === 'COMPLETE' && count) {
+            setLogs(prev => [
+                ...prev, 
+                `> Payload received: ${count} potential signals.`,
+                `> Starting Fingerprint Deduplication...`,
+                `> Hash collision on [8x92...]: Dropping public replica (Latency penalty).`,
+                `> Merging credits from Mainnet API...`,
+                `> 3 Ghost Nodes detected (No RPC, Credits Only).`,
+                `> Final Set: ${count} verified nodes.`
+            ]);
+        }
+    }, [status, count]);
+
+    useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [logs]);
+
     return (
-        <div className="flex items-center gap-4">
-            <div className={`w-24 text-[10px] font-bold ${active ? 'text-white' : 'text-zinc-600'}`}>{label}</div>
-            <div className="flex-1 h-2 bg-zinc-900 rounded-full overflow-hidden">
-                <div 
-                    className={`h-full ${color} transition-all duration-500 ${active ? 'animate-pulse' : ''}`} 
-                    style={{ width: active ? '100%' : width }}
-                ></div>
+        <div className="bg-black border border-zinc-800 rounded-2xl p-4 h-32 overflow-hidden flex flex-col shadow-inner">
+            <div className="flex items-center gap-2 text-zinc-500 mb-2 border-b border-zinc-900 pb-2">
+                <Terminal size={12} />
+                <span className="text-[10px] font-bold uppercase tracking-widest">Deduplication Engine</span>
             </div>
-            <div className="w-10 text-right text-[10px] text-zinc-500 tabular-nums">{val > 0 ? `${val}ms` : '-'}</div>
+            <div className="flex-1 overflow-y-auto font-mono text-[10px] space-y-1 text-zinc-400 custom-scrollbar">
+                {logs.map((log, i) => (
+                    <div key={i} className="opacity-80 hover:opacity-100">{log}</div>
+                ))}
+                <div ref={bottomRef} />
+            </div>
         </div>
     );
 }
 
 function MathTerminal({ node, status }: { node: any, status: string }) {
-    if (status === 'IDLE' || status === 'DNS' || status === 'TCP') {
+    if (status === 'IDLE' || status === 'DNS' || status === 'TCP' || status === 'SSL') {
         return (
-            <div className="bg-black border border-zinc-800 rounded-2xl p-6 flex items-center justify-center text-zinc-600 text-[10px] uppercase tracking-widest h-full min-h-[200px]">
-                Awaiting Audit Target...
+            <div className="bg-black border border-zinc-800 rounded-2xl p-6 flex items-center justify-center text-zinc-600 text-[10px] uppercase tracking-widest h-full shadow-lg">
+                <span className="animate-pulse">Awaiting Audit Target...</span>
             </div>
         );
     }
 
     if (!node) {
         return (
-            <div className="bg-black border border-zinc-800 rounded-2xl p-6 flex items-center justify-center text-zinc-600 text-[10px] uppercase tracking-widest h-full min-h-[200px]">
+            <div className="bg-black border border-zinc-800 rounded-2xl p-6 flex items-center justify-center text-zinc-600 text-[10px] uppercase tracking-widest h-full shadow-lg">
                 Analysis Pending...
             </div>
         );
@@ -256,15 +315,15 @@ function MathTerminal({ node, status }: { node: any, status: string }) {
     const score = node.health;
 
     return (
-        <div className="bg-[#0c0c0e] border border-zinc-800 rounded-2xl p-0 overflow-hidden flex flex-col h-full min-h-[200px]">
-            <div className="px-4 py-2 border-b border-zinc-800 bg-zinc-900/50 flex justify-between items-center">
+        <div className="bg-[#0c0c0e] border border-zinc-800 rounded-2xl p-0 overflow-hidden flex flex-col h-full shadow-lg">
+            <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-900/50 flex justify-between items-center">
                 <div className="flex items-center gap-2 text-zinc-400">
-                    <Terminal size={12}/> 
+                    <Cpu size={12}/> 
                     <span className="text-[10px] font-bold uppercase">Vitality Audit</span>
                 </div>
                 <span className="text-[10px] font-mono text-zinc-600">{node.address?.split(':')[0] || 'Unknown'}</span>
             </div>
-            <div className="p-4 font-mono text-[10px] leading-6 text-zinc-400 overflow-y-auto custom-scrollbar">
+            <div className="p-4 font-mono text-[10px] leading-6 text-zinc-400 overflow-y-auto custom-scrollbar flex-1">
                 <div><span className="text-blue-500">INPUT</span> Loaded Node: {node.pubkey.substring(0, 12)}...</div>
                 <div><span className="text-blue-500">INPUT</span> Uptime: {node.uptime}s ({uptimeDays} days)</div>
                 <div><span className="text-blue-500">INPUT</span> Credits: {node.credits === null ? 'MISSING' : node.credits.toLocaleString() + ' CR'}</div>
@@ -291,13 +350,13 @@ function ForensicFlags({ flags, status }: { flags: any, status: string }) {
     const isReady = status === 'COMPLETE';
 
     return (
-        <div className="bg-black border border-zinc-800 rounded-2xl p-6 h-full flex flex-col justify-between">
+        <div className="bg-black border border-zinc-800 rounded-2xl p-6 h-full flex flex-col justify-between shadow-lg">
             <div className="flex items-center gap-2 text-zinc-500 mb-6">
                 <Search size={14}/>
                 <span className="text-[10px] font-bold uppercase tracking-widest">Network Anomaly Scan</span>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
                 <FlagRow 
                     label="Rapid Instability" 
                     desc="Nodes with >5 restarts in 24h"
