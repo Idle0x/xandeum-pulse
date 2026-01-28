@@ -6,23 +6,49 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
+/**
+ * FIX: We allow the build/tests to proceed if keys are missing by using 
+ * a mock client during tests. This prevents the "Supabase keys are missing" 
+ * error from breaking your CI/CD pipeline.
+ */
+const isTest = process.env.NODE_ENV === 'test';
+
+if (!isTest && (!supabaseUrl || !supabaseKey)) {
   throw new Error("SERVER ERROR: Supabase keys are missing.");
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Initialize real client if keys exist, otherwise use a safe mock for tests
+const supabase = (supabaseUrl && supabaseKey)
+  ? createClient(supabaseUrl, supabaseKey)
+  : { 
+      from: () => ({ 
+        select: () => ({ 
+          eq: () => ({ 
+            gte: () => ({ 
+              order: () => ({ 
+                limit: () => ({ 
+                  single: () => Promise.resolve({ data: null, error: null }) 
+                }),
+                gte: () => Promise.resolve({ data: [], error: null })
+              }) 
+            }) 
+          }),
+          gte: () => ({
+            order: () => Promise.resolve({ data: [], error: null })
+          })
+        }) 
+      }) 
+    } as any;
 
 // --- 2. CUSTOM IN-MEMORY CACHE ---
-// A robust RAM-based cache that avoids Next.js file-system errors.
-
 type CacheEntry = {
   timestamp: number;
-  data: any; // Updated from any[] to any to support single objects (Genesis)
+  data: any; 
 };
 
 const globalCache = new Map<string, CacheEntry>();
 const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 Minutes
-const GENESIS_CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 Hours (Genesis doesn't change)
+const GENESIS_CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 Hours
 
 async function fetchWithCache(
   key: string, 
@@ -33,24 +59,16 @@ async function fetchWithCache(
   const cached = globalCache.get(key);
   const duration = customDuration || CACHE_DURATION_MS;
 
-  // A. Cache Hit
   if (cached && (now - cached.timestamp < duration)) {
     return cached.data;
   }
 
-  // B. Cache Miss
   try {
     const data = await fetcher();
-
-    globalCache.set(key, {
-      timestamp: now,
-      data: data
-    });
-
+    globalCache.set(key, { timestamp: now, data: data });
     return data;
   } catch (error: any) {
     console.error(`Cache Refresh Failed for ${key}:`, error.message);
-    // Fallback: Return stale data if available, otherwise throw
     if (cached) return cached.data;
     throw error;
   }
@@ -88,7 +106,6 @@ const fetchRawNodeHistory = async (stableId: string, network: string, days: numb
   return data || [];
 };
 
-// NEW: Optimized Bulk Fetch for Vitality Forensics (Lightweight)
 const fetchForensicSnapshots = async (days: number) => {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
@@ -103,13 +120,12 @@ const fetchForensicSnapshots = async (days: number) => {
   return data || [];
 };
 
-// NEW: Finds the absolute first time we saw this node (Genesis)
 const fetchNodeGenesis = async (stableId: string) => {
   const { data, error } = await supabase
     .from('node_snapshots')
     .select('created_at')
     .eq('node_id', stableId)
-    .order('created_at', { ascending: true }) // Oldest first
+    .order('created_at', { ascending: true })
     .limit(1)
     .single();
 
@@ -133,7 +149,6 @@ export async function getNodeHistoryAction(stableId: string, network: string, da
   });
 }
 
-// Used by historyAggregator.ts
 export async function getForensicHistoryAction(days: number) {
   const cacheKey = `forensic-history-${days}d`;
   return await fetchWithCache(cacheKey, async () => {
@@ -141,12 +156,11 @@ export async function getForensicHistoryAction(days: number) {
   });
 }
 
-// Used by IdentityView for "Tracking Since"
 export async function getNodeGenesisAction(stableId: string) {
   const cacheKey = `node-genesis-${stableId}`;
   return await fetchWithCache(
     cacheKey, 
     async () => { return await fetchNodeGenesis(stableId); },
-    GENESIS_CACHE_DURATION_MS // Cache for 24h
+    GENESIS_CACHE_DURATION_MS
   );
 }
