@@ -42,7 +42,6 @@ export interface EnrichedNode {
     version: number;
     reputation: number | null;
     storage: number;
-    // NEW: Penalty Object
     penalties?: {
       restarts: number;
       consistency: number;
@@ -58,6 +57,21 @@ export interface EnrichedNode {
   };
   rank?: number;
   health_rank?: number;
+}
+
+// --- HELPER: STABLE IDENTITY ---
+
+/**
+ * Generates a stable unique ID for a node instance.
+ * Logic: Pubkey + IP Address (Port stripped).
+ * This ensures that if a node runs on port 9001 in public and 6000 in private,
+ * it is still recognized as the SAME machine.
+ */
+function getStableId(pubkey: string, address: string): string {
+  if (!pubkey) return 'unknown';
+  // Strip port from address (e.g., "1.2.3.4:9001" -> "1.2.3.4")
+  const ip = address.includes(':') ? address.split(':')[0] : address;
+  return `${pubkey}-${ip}`;
 }
 
 // --- FETCHING (Hero A: Private) ---
@@ -82,7 +96,6 @@ async function fetchPrivateMainnetNodes() {
   } catch (e) {
     const errMsg = (e as any).message;
     console.warn("Private Mainnet RPC Failed:", errMsg);
-    // On failure, return stale cache if available
     if (privateMainnetCache.data.length > 0) return privateMainnetCache.data;
   }
   return [];
@@ -106,8 +119,8 @@ async function fetchOperatorNode() {
         address: `${operatorIp}:9001`,
         rpc_port: 6000,
         pubkey: operatorPubkey,
-        is_public: false,
-        version: "1.2.0", // Manual override
+        is_public: false, // Operator is usually hidden
+        version: "1.2.0", // Manual override or fetch if available
         uptime: stats.uptime,
         storage_committed: stats.file_size,
         storage_used: 0,
@@ -163,19 +176,16 @@ async function resolveLocations(ips: string[]) {
 
 export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<{ nodes: EnrichedNode[], stats: any }> {
 
-  // ---------------------------------------------------------
-  // PHASE 1: COLLECTION (Dual Hero + Orchestrator + History)
-  // ---------------------------------------------------------
-
+  // 1. COLLECTION
   const [rawPrivateNodes, operatorNode, rawPublicNodes, creditsData, historyReport] = await Promise.all([
-    fetchPrivateMainnetNodes(),      // Hero A (Private)
-    fetchOperatorNode(),             // Operator Injection
-    publicOrchestrator.fetchNodes(), // Hero B + Passive Discovery (Public)
+    fetchPrivateMainnetNodes(),
+    fetchOperatorNode(),
+    publicOrchestrator.fetchNodes(),
     fetchCredits(),
-    fetchNodeHistoryReport()         // Historical Forensics (7-Day Report Card)
+    fetchNodeHistoryReport()
   ]);
 
-  // Inject Operator
+  // Inject Operator into Private List
   if (operatorNode) {
     const exists = rawPrivateNodes.find((p: any) => p.pubkey === operatorNode.pubkey);
     if (!exists) rawPrivateNodes.unshift(operatorNode);
@@ -187,6 +197,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
 
   const isCreditsApiOnline = creditsData.mainnet.length > 0 || creditsData.devnet.length > 0;
 
+  // Process Credits Maps
   const mainnetCreditMap = new Map<string, number>();
   const devnetCreditMap = new Map<string, number>();
   const mainnetValues: number[] = [];
@@ -207,24 +218,22 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   const medianDevnet = devnetValues.sort((a, b) => a - b)[Math.floor(devnetValues.length / 2)] || 0;
 
   // ---------------------------------------------------------
-  // PHASE 2: FINGERPRINTING & DEDUPLICATION (The Critical Logic)
+  // PHASE 2: AUTHORITY-BASED DEDUPLICATION
   // ---------------------------------------------------------
 
   const processedNodes: EnrichedNode[] = [];
+  const knownMainnetIds = new Set<string>();
 
-  const getFingerprint = (p: any, assumedNetwork: 'MAINNET' | 'DEVNET') => {
-    const key = p.pubkey || p.public_key;
-    const rawCredVal = assumedNetwork === 'MAINNET' ? mainnetCreditMap.get(key) : devnetCreditMap.get(key);
-    const credits = rawCredVal !== undefined ? rawCredVal : 'NULL';
-    return `${key}|${p.address}|${p.storage_committed}|${p.storage_used}|${p.version}|${p.is_public}|${credits}`;
-  };
-
-  const mainnetFingerprints = new Map<string, number>();
-
-  // A. PROCESS PRIVATE RPC (ANCHOR) -> ALWAYS MAINNET
+  // A. PROCESS PRIVATE RPC (ANCHOR - THE AUTHORITY)
+  // We strictly assume EVERYTHING in Private RPC is Mainnet.
   rawPrivateNodes.forEach((pod: any) => {
     const pubkey = pod.pubkey || pod.public_key;
-    const ip = pod.address.split(':')[0];
+    const stableId = getStableId(pubkey, pod.address);
+    
+    // Log this ID as "Known on Mainnet"
+    knownMainnetIds.add(stableId);
+
+    const ip = pod.address.includes(':') ? pod.address.split(':')[0] : pod.address;
     const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
 
     const rawCreds = mainnetCreditMap.get(pubkey);
@@ -233,48 +242,44 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     if (rawCreds !== undefined) { credits = rawCreds; }
     else if (isCreditsApiOnline) { isUntracked = true; }
 
-    const uptimeVal = Number(pod.uptime) || 0;
     const node: EnrichedNode = {
       ...pod, pubkey: pubkey, network: 'MAINNET', credits: credits, isUntracked: isUntracked,
       is_operator: pod.is_operator || false,
       storage_committed: Number(pod.storage_committed) || 0,
       storage_used: Number(pod.storage_used) || 0,
-      uptime: uptimeVal,
+      uptime: Number(pod.uptime) || 0,
       health: 0, healthBreakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 },
       location: { lat: loc.lat, lon: loc.lon, countryName: (loc as any).country || (loc as any).countryName || 'Unknown', countryCode: loc.countryCode, city: loc.city }
     };
     processedNodes.push(node);
-    const fingerprint = getFingerprint(pod, 'MAINNET');
-    mainnetFingerprints.set(fingerprint, uptimeVal);
   });
 
-  // B. PROCESS PUBLIC SWARM (SUBTRACTION WITH TIME DELTA)
+  // B. PROCESS PUBLIC SWARM (FILTER)
   rawPublicNodes.forEach((pod: any) => {
-    // 1. Check if this node is a duplicate Mainnet node
-    const potentialMainnetFingerprint = getFingerprint(pod, 'MAINNET');
-    const publicUptime = Number(pod.uptime) || 0;
+    const pubkey = pod.pubkey || pod.public_key;
+    const stableId = getStableId(pubkey, pod.address);
 
-    if (mainnetFingerprints.has(potentialMainnetFingerprint)) {
-      const privateUptime = mainnetFingerprints.get(potentialMainnetFingerprint) || 0;
-      const diff = Math.abs(privateUptime - publicUptime);
-      if (diff <= 3600) {
-        return; // DUPLICATE DETECTED -> Skip. Trust Private RPC.
-      }
+    // --- THE FIX ---
+    // If this specific machine (Pubkey + IP) was already seen in Private RPC,
+    // we DROP IT entirely. We trust the Private RPC stats over Public stats.
+    if (knownMainnetIds.has(stableId)) {
+      return; 
     }
 
-    // 2. It is either Devnet OR a Mainnet node that Private RPC missed
-    const pubkey = pod.pubkey || pod.public_key;
-    const ip = pod.address.split(':')[0];
+    // If we are here, it's a NEW node (Cluster node or Devnet node).
+    const ip = pod.address.includes(':') ? pod.address.split(':')[0] : pod.address;
     const loc = geoCache.get(ip) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
 
     let network: 'MAINNET' | 'DEVNET' = 'DEVNET';
     let credits: number | null = null;
     let isUntracked = false;
 
+    // Determine Network for this "Wild" node
     const mainnetVal = mainnetCreditMap.get(pubkey);
     const devnetVal = devnetCreditMap.get(pubkey);
 
-    if (mainnetVal !== undefined && devnetVal === undefined) {
+    if (mainnetVal !== undefined) {
+      // It has Mainnet credits -> Likely a second node in a cluster on Mainnet
       network = 'MAINNET';
       credits = mainnetVal;
     } else if (devnetVal !== undefined) {
@@ -289,7 +294,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
       ...pod, pubkey: pubkey, network: network, credits: credits, isUntracked: isUntracked,
       storage_committed: Number(pod.storage_committed) || 0,
       storage_used: Number(pod.storage_used) || 0,
-      uptime: publicUptime,
+      uptime: Number(pod.uptime) || 0,
       health: 0, healthBreakdown: { uptime: 0, version: 0, reputation: 0, storage: 0 },
       location: { lat: loc.lat, lon: loc.lon, countryName: (loc as any).country || (loc as any).countryName || 'Unknown', countryCode: loc.countryCode, city: loc.city }
     };
@@ -297,7 +302,7 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   });
 
   // ---------------------------------------------------------
-  // PHASE 3: SCORING & STATS (UPGRADED with Temporal Vitality)
+  // PHASE 3: SCORING & STATS
   // ---------------------------------------------------------
 
   const rawVersionCounts: Record<string, number> = {};
@@ -315,100 +320,15 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
 
   const storageArray = processedNodes.map(p => p.storage_committed).sort((a, b) => a - b);
   const medianStorage = storageArray.length ? storageArray[Math.floor(storageArray.length / 2)] : 1;
-  
-  // NEW: Calculate P95 Storage for Elite Scoring
   const p95Index = Math.floor(storageArray.length * 0.95);
   const p95Storage = storageArray.length ? storageArray[p95Index] : 1;
 
-  await resolveLocations([...new Set(processedNodes.map(p => p.address.split(':')[0]))]);
+  await resolveLocations([...new Set(processedNodes.map(p => p.address.includes(':') ? p.address.split(':')[0] : p.address))]);
 
   const finalNodes = processedNodes.map(node => {
-    const ip = node.address.split(':')[0];
+    const ip = node.address.includes(':') ? node.address.split(':')[0] : node.address;
     const loc = geoCache.get(ip) || node.location;
     const medianCreditsForScore = node.network === 'MAINNET' ? medianMainnet : medianDevnet;
 
-    // LOOK UP HISTORICAL CONTEXT (Report Card)
-    // Updated default to match new ForensicContext
-    let nodeHistory: HistoryContext = { 
-        restarts_7d: 0, 
-        restarts_24h: 0, 
-        yield_velocity_24h: 0, 
-        consistency_score: 1,
-        frozen_duration_hours: 0
-    };
-
-    // Attempt standard Stable ID formats
-    const stableId = `${node.pubkey}-${ip}-${node.network}`;
-
-    if (historyReport.has(stableId)) {
-        nodeHistory = historyReport.get(stableId)!;
-    }
-
-    // CALCULATE VITALITY WITH FORENSICS
-    const vitality = calculateVitalityScore(
-      node.storage_committed, node.storage_used, node.uptime,
-      node.version, consensusVersion, sortedCleanVersions,
-      medianCreditsForScore, node.credits, medianStorage, 
-      p95Storage, // Passing P95
-      isCreditsApiOnline,
-      nodeHistory // Passing the Forensic Report Card
-    );
-
-    return {
-      ...node,
-      location: { lat: loc.lat, lon: loc.lon, countryName: (loc as any).country || (loc as any).countryName || 'Unknown', countryCode: loc.countryCode, city: loc.city },
-      health: vitality.total,
-      healthBreakdown: vitality.breakdown
-    };
-  });
-
-  const mainnetList = finalNodes.filter(n => n.network === 'MAINNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
-  const devnetList = finalNodes.filter(n => n.network === 'DEVNET').sort((a, b) => (b.credits || 0) - (a.credits || 0));
-
-  const assignRank = (list: EnrichedNode[]) => {
-    let r = 1;
-    list.forEach((n, i) => {
-      if (i > 0 && (n.credits || 0) < (list[i-1].credits || 0)) r = i + 1;
-      n.rank = r;
-    });
-  };
-  assignRank(mainnetList);
-  assignRank(devnetList);
-
-  const allSorted = [...mainnetList, ...devnetList];
-  allSorted.sort((a, b) => b.health - a.health);
-  let hr = 1;
-  allSorted.forEach((n, i) => {
-    if (i > 0 && n.health < allSorted[i-1].health) hr = i + 1;
-    n.health_rank = hr;
-  });
-
-  let totalUptime = 0, totalVersion = 0, totalReputation = 0, reputationCount = 0, totalStorage = 0;
-  allSorted.forEach(node => {
-    totalUptime += node.healthBreakdown.uptime;
-    totalVersion += node.healthBreakdown.version;
-    totalStorage += node.healthBreakdown.storage;
-    if (node.healthBreakdown.reputation !== null) { totalReputation += node.healthBreakdown.reputation; reputationCount++; }
-  });
-
-  const nodeCount = allSorted.length || 1;
-  const avgHealth = Math.round(allSorted.reduce((a, b) => a + b.health, 0) / nodeCount);
-
-  return {
-    nodes: allSorted,
-    stats: {
-      consensusVersion,
-      medianCredits: medianMainnet,
-      medianStorage,
-      totalNodes: allSorted.length,
-      systemStatus: { credits: isCreditsApiOnline, rpc: true },
-      avgBreakdown: {
-        total: avgHealth,
-        uptime: Math.round(totalUptime / nodeCount),
-        version: Math.round(totalVersion / nodeCount),
-        reputation: reputationCount > 0 ? Math.round(totalReputation / reputationCount) : null,
-        storage: Math.round(totalStorage / nodeCount)
-      }
-    }
-  };
-}
+    // Stable ID for History Lookup (Forensics)
+    const stableId = getStableId(node.pubkey
