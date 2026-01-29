@@ -62,7 +62,6 @@ export interface EnrichedNode {
 
 // --- HELPERS ---
 
-// robustly strip port to get raw IP for deduplication
 function getIp(addressStr: string): string {
   if (!addressStr) return '';
   return addressStr.split(':')[0];
@@ -74,7 +73,6 @@ async function fetchPrivateMainnetNodes() {
   const privateUrl = process.env.XANDEUM_PRIVATE_RPC_URL;
   if (!privateUrl) { console.warn("XANDEUM_PRIVATE_RPC_URL is not set."); return []; }
 
-  // Serve cache if within 15 seconds (Robustness for Private Blips)
   if (Date.now() - privateMainnetCache.timestamp < 15000 && privateMainnetCache.data.length > 0) {
       return privateMainnetCache.data;
   }
@@ -83,14 +81,12 @@ async function fetchPrivateMainnetNodes() {
   try {
     const res = await axios.post(privateUrl, payload, { timeout: TIMEOUT_RPC });
     if (res.data?.result?.pods && Array.isArray(res.data.result.pods)) {
-      // Update Cache
       privateMainnetCache = { data: res.data.result.pods, timestamp: Date.now() };
       return res.data.result.pods;
     }
   } catch (e) {
     const errMsg = (e as any).message;
     console.warn("Private Mainnet RPC Failed:", errMsg);
-    // On failure, return stale cache if available
     if (privateMainnetCache.data.length > 0) return privateMainnetCache.data;
   }
   return [];
@@ -176,14 +172,13 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   // ---------------------------------------------------------
 
   const [rawPrivateNodes, operatorNode, rawPublicNodes, creditsData, historyReport] = await Promise.all([
-    fetchPrivateMainnetNodes(),      // Hero A (Private)
-    fetchOperatorNode(),             // Operator Injection
-    publicOrchestrator.fetchNodes(), // Hero B + Passive Discovery (Public)
+    fetchPrivateMainnetNodes(),      
+    fetchOperatorNode(),             
+    publicOrchestrator.fetchNodes(), 
     fetchCredits(),
-    fetchNodeHistoryReport()         // Historical Forensics (7-Day Report Card)
+    fetchNodeHistoryReport()         
   ]);
 
-  // Inject Operator
   if (operatorNode) {
     const exists = rawPrivateNodes.find((p: any) => p.pubkey === operatorNode.pubkey);
     if (!exists) rawPrivateNodes.unshift(operatorNode);
@@ -215,17 +210,13 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   const medianDevnet = devnetValues.sort((a, b) => a - b)[Math.floor(devnetValues.length / 2)] || 0;
 
   // ---------------------------------------------------------
-  // PHASE 2: INSTANCE-BASED DEDUPLICATION (The Fix)
+  // PHASE 2: INSTANCE-BASED DEDUPLICATION (With Devnet Exception)
   // ---------------------------------------------------------
 
   const processedNodes: EnrichedNode[] = [];
-  
-  // This Set tracks "Instances" we have officially accepted.
-  // Format: "pubkey-ip" (Raw IP, no port)
   const knownInstances = new Set<string>();
 
   // A. PROCESS PRIVATE RPC (The Authority) -> ALWAYS MAINNET
-  // We trust these blindly. They are the Anchor.
   rawPrivateNodes.forEach((pod: any) => {
     const pubkey = pod.pubkey || pod.public_key;
     const rawIp = getIp(pod.address);
@@ -235,7 +226,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     let credits: number | null = null;
     let isUntracked = false;
     
-    // Mainnet nodes usually have mainnet credits, but if missing, they are still Mainnet (just untracked/new)
     if (rawCreds !== undefined) { credits = rawCreds; }
     else if (isCreditsApiOnline) { isUntracked = true; }
 
@@ -253,29 +243,33 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     
     processedNodes.push(node);
     
-    // Register this instance as "Known"
+    // Register this instance as "Known Mainnet"
     const instanceId = `${pubkey}-${rawIp}`;
     knownInstances.add(instanceId);
   });
 
   // B. PROCESS PUBLIC SWARM (The Filler)
-  // We only accept nodes here if they are NOT in the 'knownInstances' set.
   rawPublicNodes.forEach((pod: any) => {
     const pubkey = pod.pubkey || pod.public_key;
     const rawIp = getIp(pod.address);
     const instanceId = `${pubkey}-${rawIp}`;
 
-    // STRICT CHECK: If this exact Pubkey+IP combo exists in Private, DROP IT.
-    // It is a ghost/duplicate. We trust the Private RPC data, not this one.
-    if (knownInstances.has(instanceId)) {
+    // CHECK 1: Is this Pubkey/IP already in Mainnet?
+    const isGhostCandidate = knownInstances.has(instanceId);
+    
+    // CHECK 2: Does this node have explicit DEVNET credits?
+    const hasDevnetStake = devnetCreditMap.get(pubkey) !== undefined;
+
+    // THE CRITICAL FIX: 
+    // If it's a known ghost, we DROP it... 
+    // UNLESS it has confirmed Devnet stake, then we KEEP it (Dual-Stack Node).
+    if (isGhostCandidate && !hasDevnetStake) {
       return; 
     }
 
-    // If we are here, it is a NEW instance (either Devnet, or a Mainnet node missed by Private RPC).
     const loc = geoCache.get(rawIp) || { lat: 0, lon: 0, country: 'Unknown', countryCode: 'XX', city: 'Unknown' };
     const publicUptime = Number(pod.uptime) || 0;
 
-    // Determine Network based on Credits
     let network: 'MAINNET' | 'DEVNET' = 'DEVNET';
     let credits: number | null = null;
     let isUntracked = false;
@@ -284,15 +278,14 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     const devnetVal = devnetCreditMap.get(pubkey);
 
     if (mainnetVal !== undefined && devnetVal === undefined) {
-      // It has Mainnet credits only -> Likely a Mainnet node that Private RPC missed
       network = 'MAINNET';
       credits = mainnetVal;
+      // Safety: If logic brought us here but it was a Ghost Candidate, 
+      // it means it had NO devnet stake. It should have been dropped above.
     } else if (devnetVal !== undefined) {
-      // It has Devnet credits -> Definitely Devnet
       network = 'DEVNET';
       credits = devnetVal;
     } else {
-      // No credits found -> Default to Devnet (Safe assumption for wild nodes)
       network = 'DEVNET';
       if (isCreditsApiOnline) { isUntracked = true; }
     }
@@ -307,7 +300,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     };
     
     processedNodes.push(node);
-    // Add to set (to prevent duplicates within the public array itself, though rare)
     knownInstances.add(instanceId);
   });
 
@@ -333,7 +325,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
   const p95Index = Math.floor(storageArray.length * 0.95);
   const p95Storage = storageArray.length ? storageArray[p95Index] : 1;
 
-  // Batch Resolve IPs
   await resolveLocations([...new Set(processedNodes.map(p => getIp(p.address)))]);
 
   const finalNodes = processedNodes.map(node => {
@@ -341,9 +332,6 @@ export async function getNetworkPulse(mode: 'fast' | 'swarm' = 'fast'): Promise<
     const loc = geoCache.get(rawIp) || node.location;
     const medianCreditsForScore = node.network === 'MAINNET' ? medianMainnet : medianDevnet;
 
-    // LOOK UP HISTORICAL CONTEXT (Report Card)
-    // We use the same ID logic: Pubkey + IP + Network (optional, but good for uniqueness)
-    // Note: HistoryAggregator likely uses "pubkey-ip" as well.
     let nodeHistory: HistoryContext = { 
         restarts_7d: 0, 
         restarts_24h: 0, 
