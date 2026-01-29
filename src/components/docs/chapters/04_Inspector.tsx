@@ -16,7 +16,7 @@ export function InspectorChapter() {
                         Chapter 03
                     </span>
                 </div>
-                <h2 className="text-4xl md:text-5xl font-black text-white tracking-tighter mb-6">Inspector Engine</h2>
+                <h2 className="text-4xl md:text-5xl font-black text-white tracking-tighter mb-6">Deep Inspection</h2>
                 <p className="text-zinc-400 leading-relaxed text-base md:text-lg">
                     The Inspector is a forensic diagnostic engine. It utilizes a multi-variate scoring matrix to grade node health and classifies behavior into distinct operational archetypes.
                 </p>
