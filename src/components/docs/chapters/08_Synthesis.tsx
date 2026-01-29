@@ -1,16 +1,11 @@
 import { useState, useEffect } from 'react';
 import { 
-  Sparkles, 
-  GitMerge, 
-  BrainCircuit, 
-  ArrowRight, 
-  Activity, 
-  PieChart, 
-  Map as MapIcon,
+  Sparkles, GitMerge, BrainCircuit, ArrowRight, 
+  Activity, PieChart, Map as MapIcon, Terminal 
 } from 'lucide-react';
 import { ChapterLayout } from '../layout/ChapterLayout';
 
-// --- CODE SNIPPET FOR BOTTOM DRAWER ---
+// --- CODE SNIPPET ---
 const ENGINE_CODE = `
 // The Weaving Protocol: Stitching Math to Meaning
 const MATRIX = {
@@ -41,202 +36,240 @@ function weaveNarrative(stats, context) {
 `;
 
 export function SynthesisChapter() {
-    // --- SIMULATION 1 STATE: CONTEXT LENS ---
-    const [activeLens, setActiveLens] = useState<'OVERVIEW' | 'MARKET SHARE' | 'TOPOLOGY'>('OVERVIEW');
-
-    // --- SIMULATION 2 STATE: TERMINAL ---
-    const [termStep, setTermStep] = useState(0);
-    
-    // Terminal Animation Loop
-    useEffect(() => {
-        const sequence = [
-            { step: 0, duration: 1500 }, // Fetching
-            { step: 1, duration: 1500 }, // Analyzing
-            { step: 2, duration: 1500 }, // Selecting
-            { step: 3, duration: 4000 }, // Output (Long pause to read)
-        ];
-
-        let currentStepIndex = 0;
-
-        const runStep = () => {
-            setTermStep(sequence[currentStepIndex].step);
-            const duration = sequence[currentStepIndex].duration;
-            
-            currentStepIndex = (currentStepIndex + 1) % sequence.length;
-            setTimeout(runStep, duration);
-        };
-
-        const timer = setTimeout(runStep, 100);
-        return () => clearTimeout(timer);
-    }, []);
-
     return (
         <ChapterLayout
             chapterNumber="09"
             title="Synthesis & Narrative Engine"
             subtitle="Context-aware orchestration and deterministic natural language generation."
-            textData={[]} // Custom rendering below
+            textData={[]} 
             codeSnippet={ENGINE_CODE}
             githubPath="lib/narrative-engine.ts"
         >
-            <div className="flex flex-col gap-12 pb-12">
+            <div className="flex flex-col gap-24 pb-12">
 
-                {/* --- PARAGRAPH 1: THE SYNTHESIS ENGINE --- */}
-                <div className="prose prose-invert max-w-none">
-                    <h3 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
-                        <BrainCircuit size={20} className="text-blue-400" />
-                        Intelligence Orchestration
-                    </h3>
-                    <p className="text-zinc-400 leading-relaxed mt-4">
-                        The <strong>Synthesis Engine</strong> acts as the dashboard’s central cortex, functioning as both a state synchronizer and a context-aware filter. It orchestrates the connection between the map, charts, and data grids, ensuring that when a user focuses on a specific node, every component updates in unison. Crucially, it applies a <em>semantic lens</em> to the data based on the active tab; for example, analyzing "Credits" through an operational efficiency lens in the <em>Overview</em> tab, versus a wealth concentration lens in the <em>Market Share</em> tab. This ensures insights are always specific to the user's current goal.
-                    </p>
-                </div>
-
-                {/* --- SIMULATION 1: CONTEXT LENS --- */}
-                <div className="bg-[#050505] border border-zinc-800 rounded-2xl p-6 md:p-8 relative overflow-hidden shadow-2xl">
-                    <div className="absolute top-0 right-0 p-4 opacity-10">
-                        <GitMerge size={100} />
-                    </div>
+                {/* ===================================================
+                    SECTION 1: CONTEXT LENS (Sim Left, Text Right)
+                   =================================================== */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
                     
-                    <div className="flex flex-col md:flex-row gap-8 items-center justify-center relative z-10">
-                        
-                        {/* Input Node */}
-                        <div className="flex flex-col items-center gap-3 shrink-0">
-                            <span className="text-[10px] font-mono uppercase text-zinc-500 tracking-widest">Raw Telemetry</span>
-                            <div className="w-28 h-28 md:w-32 md:h-32 bg-zinc-900 border border-zinc-700 rounded-xl flex flex-col items-center justify-center shadow-lg relative">
-                                <span className="text-3xl md:text-4xl font-bold text-white mb-1">High</span>
-                                <span className="text-[10px] md:text-xs font-mono text-zinc-400">CREDITS</span>
-                                <div className="absolute -bottom-2 w-full flex justify-center">
-                                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                    {/* LEFT: Simulation */}
+                    <div className="order-2 lg:order-1">
+                        <ContextLensSimulator />
+                    </div>
+
+                    {/* RIGHT: Text */}
+                    <div className="space-y-8 order-1 lg:order-2">
+                        <div>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                                    <BrainCircuit size={24} className="text-blue-400" />
                                 </div>
+                                <h3 className="text-2xl font-bold text-white">Intelligence Orchestration</h3>
                             </div>
-                        </div>
-
-                        {/* Arrows */}
-                        <div className="flex flex-col items-center justify-center h-12 w-12 md:h-12 md:w-24">
-                            <ArrowRight className="text-zinc-600 hidden md:block" />
-                            <ArrowRight className="text-zinc-600 md:hidden rotate-90" />
-                        </div>
-
-                        {/* The Processor */}
-                        <div className="flex-1 w-full max-w-xl flex flex-col gap-4">
-                            {/* Controls */}
-                            <div className="flex flex-wrap md:flex-nowrap gap-1 bg-zinc-900/50 p-1 rounded-lg border border-zinc-800">
-                                <button 
-                                    onClick={() => setActiveLens('OVERVIEW')}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-[10px] md:text-xs font-bold uppercase transition-all whitespace-nowrap ${activeLens === 'OVERVIEW' ? 'bg-blue-600 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                >
-                                    <Activity size={12} className="hidden sm:block" /> Overview
-                                </button>
-                                <button 
-                                    onClick={() => setActiveLens('MARKET SHARE')}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-[10px] md:text-xs font-bold uppercase transition-all whitespace-nowrap ${activeLens === 'MARKET SHARE' ? 'bg-pink-600 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                >
-                                    <PieChart size={12} className="hidden sm:block" /> Market Share
-                                </button>
-                                <button 
-                                    onClick={() => setActiveLens('TOPOLOGY')}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-[10px] md:text-xs font-bold uppercase transition-all whitespace-nowrap ${activeLens === 'TOPOLOGY' ? 'bg-emerald-600 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                >
-                                    <MapIcon size={12} className="hidden sm:block" /> Topology
-                                </button>
-                            </div>
-
-                            {/* Output Box */}
-                            <div className="bg-black border border-zinc-800 rounded-xl p-6 min-h-[110px] flex items-center justify-center relative overflow-hidden transition-all duration-300">
-                                <div className={`absolute inset-0 opacity-10 transition-colors duration-500 ${activeLens === 'OVERVIEW' ? 'bg-blue-500' : activeLens === 'MARKET SHARE' ? 'bg-pink-500' : 'bg-emerald-500'}`}></div>
-                                
-                                {activeLens === 'OVERVIEW' && (
-                                    <p className="text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                        <span className="text-blue-400 font-mono text-[10px] md:text-xs block mb-2 tracking-widest">INTERPRETATION: EFFICIENCY</span>
-                                        <span className="text-zinc-200 font-medium text-sm md:text-base">"Hardware configuration is optimal. Throughput is at maximum capacity."</span>
-                                    </p>
-                                )}
-                                {activeLens === 'MARKET SHARE' && (
-                                    <p className="text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                        <span className="text-pink-400 font-mono text-[10px] md:text-xs block mb-2 tracking-widest">INTERPRETATION: CENTRALIZATION</span>
-                                        <span className="text-zinc-200 font-medium text-sm md:text-base">"Risk detected. Revenue concentration suggests an oligarchy structure."</span>
-                                    </p>
-                                )}
-                                {activeLens === 'TOPOLOGY' && (
-                                    <p className="text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                        <span className="text-emerald-400 font-mono text-[10px] md:text-xs block mb-2 tracking-widest">INTERPRETATION: GEOPOLITICAL</span>
-                                        <span className="text-zinc-200 font-medium text-sm md:text-base">"Strategic Asset. This node is a primary economic anchor for the regional cluster."</span>
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* --- PARAGRAPH 2: THE NARRATIVE ENGINE --- */}
-                <div className="prose prose-invert max-w-none mt-4">
-                    <h3 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
-                        <Sparkles size={20} className="text-pink-400" />
-                        Narrative Generation
-                    </h3>
-                    <p className="text-zinc-400 leading-relaxed mt-4">
-                        Working in tandem is the <strong>Narrative Engine</strong>, a deterministic linguist that converts raw statistical variance—such as Standard Deviation and Gini Coefficients—into human-readable situation reports. Rather than using static templates, it employs a <em>"Combinatorial Weave"</em> technique. This logic stitches precise technical telemetry (e.g., <em>"Positive delta of +14%"</em>) with simplified semantic bridges (e.g., <em>"indicating that..."</em>), allowing the system to autonomously toggle between distinct personalities—Executive, Analyst, or Strategist—without sounding robotic.
-                    </p>
-                </div>
-
-                {/* --- SIMULATION 2: THE TERMINAL --- */}
-                <div className="bg-black border border-zinc-800 rounded-xl p-6 md:p-8 font-mono text-sm relative overflow-hidden shadow-2xl min-h-[240px] flex flex-col">
-                    {/* Header */}
-                    <div className="flex items-center gap-2 border-b border-zinc-900 pb-4 mb-4">
-                        <div className="flex gap-1.5">
-                            <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50"></div>
-                            <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
-                            <div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50"></div>
-                        </div>
-                        <span className="text-zinc-600 text-xs ml-2">narrative-engine — v2.0.4</span>
-                    </div>
-
-                    {/* Terminal Body */}
-                    <div className="flex-1 flex flex-col gap-3">
-                        {/* STEP 0: FETCH */}
-                        <div className={`flex items-center gap-3 transition-opacity duration-300 ${termStep >= 0 ? 'opacity-100' : 'opacity-0'}`}>
-                            <span className="text-zinc-500">{'>'}</span>
-                            <span className="text-blue-400">FETCHING_TELEMETRY...</span>
-                        </div>
-
-                        {/* STEP 1: ANALYZE */}
-                        <div className={`flex items-center gap-3 transition-opacity duration-300 ${termStep >= 1 ? 'opacity-100' : 'opacity-0'}`}>
-                            <span className="text-zinc-500">{'>'}</span>
-                            <div className="flex gap-4 text-xs">
-                                <span className="text-zinc-300">GINI: <span className="text-yellow-400">0.65 (HIGH)</span></span>
-                                <span className="text-zinc-300">TOP_3_SHARE: <span className="text-yellow-400">55%</span></span>
-                            </div>
-                        </div>
-
-                        {/* STEP 2: SELECT */}
-                        <div className={`flex items-center gap-3 transition-opacity duration-300 ${termStep >= 2 ? 'opacity-100' : 'opacity-0'}`}>
-                            <span className="text-zinc-500">{'>'}</span>
-                            <span className="text-purple-400">SELECTING_MODE: <span className="text-white bg-purple-500/20 px-1 rounded">ANALYST_WARNING</span></span>
-                        </div>
-
-                        {/* STEP 3: OUTPUT */}
-                        <div className={`mt-4 border-l-2 border-pink-500 pl-4 py-1 transition-all duration-500 ${termStep >= 3 ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'}`}>
-                            <p className="text-zinc-100 leading-relaxed">
-                                <span className="text-pink-500 font-bold mr-2">root@pulse:~$</span>
-                                "Oligarchy detected. The top 3 nodes control 55% of network resources, which indicates a high centralization risk."
-                                <span className="inline-block w-2 h-4 bg-pink-500 ml-2 animate-pulse align-middle"></span>
+                            <p className="text-zinc-400 leading-relaxed text-sm">
+                                The Synthesis Engine acts as the dashboard’s central cortex. It applies a <em>semantic lens</em> to the data based on your active tab.
+                            </p>
+                            <p className="text-zinc-400 leading-relaxed text-sm mt-4">
+                                For example, it analyzes the same "Credit Score" through an <strong>Efficiency Lens</strong> in the Overview tab, but switches to an <strong>Inequality Lens</strong> in the Market Share tab. This ensures insights are always specific to the user's current goal.
                             </p>
                         </div>
                     </div>
 
-                    {/* Footer Progress */}
-                    <div className="mt-auto pt-4 flex items-center justify-between text-[10px] text-zinc-600 uppercase tracking-widest">
-                        <span>Status: {termStep === 3 ? 'IDLE' : 'PROCESSING'}</span>
-                        <div className="flex gap-1">
-                             {[0,1,2,3].map(s => (
-                                 <div key={s} className={`w-8 h-1 rounded-full transition-colors duration-300 ${termStep >= s ? 'bg-blue-500' : 'bg-zinc-800'}`}></div>
-                             ))}
+                </div>
+
+                {/* Divider */}
+                <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-800 to-transparent"></div>
+
+                {/* ===================================================
+                    SECTION 2: NARRATIVE ENGINE (Text Left, Sim Right)
+                   =================================================== */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+                    
+                    {/* LEFT: Text */}
+                    <div className="space-y-8">
+                        <div>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="p-2 rounded-lg bg-pink-500/10 border border-pink-500/20">
+                                    <Sparkles size={24} className="text-pink-400" />
+                                </div>
+                                <h3 className="text-2xl font-bold text-white">Narrative Generation</h3>
+                            </div>
+                            <p className="text-zinc-400 leading-relaxed text-sm">
+                                Working in tandem is the <strong>Narrative Engine</strong>, a deterministic linguist that converts raw statistical variance into human-readable reports.
+                            </p>
+                            <p className="text-zinc-400 leading-relaxed text-sm mt-4">
+                                It employs a <em>"Combinatorial Weave"</em> technique, stitching precise technical telemetry with semantic bridges. This allows the system to autonomously toggle between distinct personalities—Executive, Analyst, or Strategist—without sounding robotic.
+                            </p>
                         </div>
                     </div>
+
+                    {/* RIGHT: Simulation */}
+                    <TerminalSimulator />
+
                 </div>
 
             </div>
         </ChapterLayout>
+    );
+}
+
+
+// --- SIMULATOR 1: CONTEXT LENS ---
+function ContextLensSimulator() {
+    const [activeLens, setActiveLens] = useState<'OVERVIEW' | 'MARKET SHARE' | 'TOPOLOGY'>('OVERVIEW');
+
+    return (
+        <div className="bg-[#080808] border border-zinc-800 rounded-3xl p-6 relative overflow-hidden shadow-2xl flex flex-col gap-6 min-h-[220px] justify-center">
+             
+             {/* Background Icon */}
+             <div className="absolute top-0 right-0 p-4 opacity-[0.03] pointer-events-none">
+                <GitMerge size={120} />
+            </div>
+
+            {/* FLOW DIAGRAM */}
+            <div className="flex items-center justify-between gap-4 relative z-10">
+
+                {/* 1. INPUT */}
+                <div className="flex flex-col items-center gap-2 shrink-0">
+                    <div className="w-20 h-20 bg-zinc-900 border border-zinc-800 rounded-xl flex flex-col items-center justify-center shadow-lg relative">
+                        <span className="text-2xl font-bold text-white mb-1">High</span>
+                        <span className="text-[9px] font-mono text-zinc-500">CREDITS</span>
+                    </div>
+                </div>
+
+                {/* 2. ARROW */}
+                <ArrowRight className="text-zinc-700" size={20} />
+
+                {/* 3. PROCESSOR (The Buttons) */}
+                <div className="flex-1 flex flex-col gap-2 max-w-[180px]">
+                    <button 
+                        onClick={() => setActiveLens('OVERVIEW')}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${activeLens === 'OVERVIEW' ? 'bg-blue-600 text-white shadow-lg scale-105' : 'bg-zinc-900 text-zinc-500 border border-zinc-800'}`}
+                    >
+                        <Activity size={12} /> Overview
+                    </button>
+                    <button 
+                        onClick={() => setActiveLens('MARKET SHARE')}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${activeLens === 'MARKET SHARE' ? 'bg-pink-600 text-white shadow-lg scale-105' : 'bg-zinc-900 text-zinc-500 border border-zinc-800'}`}
+                    >
+                        <PieChart size={12} /> Market Share
+                    </button>
+                    <button 
+                        onClick={() => setActiveLens('TOPOLOGY')}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${activeLens === 'TOPOLOGY' ? 'bg-emerald-600 text-white shadow-lg scale-105' : 'bg-zinc-900 text-zinc-500 border border-zinc-800'}`}
+                    >
+                        <MapIcon size={12} /> Topology
+                    </button>
+                </div>
+
+                {/* 4. ARROW */}
+                <ArrowRight className="text-zinc-700" size={20} />
+
+                {/* 5. OUTPUT */}
+                <div className="flex-1 bg-black border border-zinc-800 rounded-xl p-3 h-24 flex items-center justify-center relative overflow-hidden">
+                     <div className={`absolute inset-0 opacity-10 transition-colors duration-500 ${activeLens === 'OVERVIEW' ? 'bg-blue-500' : activeLens === 'MARKET SHARE' ? 'bg-pink-500' : 'bg-emerald-500'}`}></div>
+                     
+                     {activeLens === 'OVERVIEW' && (
+                        <div className="text-center animate-in fade-in zoom-in duration-300">
+                            <span className="text-blue-500 font-bold text-[10px] block mb-1">EFFICIENCY</span>
+                            <span className="text-zinc-300 text-xs leading-tight">"Throughput is at max capacity."</span>
+                        </div>
+                    )}
+                    {activeLens === 'MARKET SHARE' && (
+                        <div className="text-center animate-in fade-in zoom-in duration-300">
+                            <span className="text-pink-500 font-bold text-[10px] block mb-1">RISK</span>
+                            <span className="text-zinc-300 text-xs leading-tight">"Oligarchy structure detected."</span>
+                        </div>
+                    )}
+                    {activeLens === 'TOPOLOGY' && (
+                        <div className="text-center animate-in fade-in zoom-in duration-300">
+                            <span className="text-emerald-500 font-bold text-[10px] block mb-1">GEOPOLITICAL</span>
+                            <span className="text-zinc-300 text-xs leading-tight">"Strategic regional anchor."</span>
+                        </div>
+                    )}
+                </div>
+
+            </div>
+        </div>
+    );
+}
+
+// --- SIMULATOR 2: TERMINAL ---
+function TerminalSimulator() {
+    const [termStep, setTermStep] = useState(0);
+
+    useEffect(() => {
+        const sequence = [
+            { step: 0, duration: 1500 }, // Fetching
+            { step: 1, duration: 1500 }, // Analyzing
+            { step: 2, duration: 1500 }, // Selecting
+            { step: 3, duration: 4000 }, // Output
+        ];
+
+        let currentStepIndex = 0;
+        const runStep = () => {
+            setTermStep(sequence[currentStepIndex].step);
+            const duration = sequence[currentStepIndex].duration;
+            currentStepIndex = (currentStepIndex + 1) % sequence.length;
+            setTimeout(runStep, duration);
+        };
+        const timer = setTimeout(runStep, 100);
+        return () => clearTimeout(timer);
+    }, []);
+
+    return (
+        <div className="bg-black border border-zinc-800 rounded-3xl p-6 font-mono text-sm relative overflow-hidden shadow-2xl h-[220px] flex flex-col justify-between">
+            
+            {/* Header */}
+            <div className="flex items-center gap-2 border-b border-zinc-900 pb-2">
+                <div className="flex gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-red-500/20 border border-red-500/50"></div>
+                    <div className="w-2 h-2 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
+                    <div className="w-2 h-2 rounded-full bg-green-500/20 border border-green-500/50"></div>
+                </div>
+                <span className="text-zinc-600 text-[10px] ml-2">narrative-engine — v2.0.4</span>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 flex flex-col gap-2 pt-3 text-[10px] sm:text-xs">
+                {/* STEP 0 */}
+                <div className={`flex items-center gap-2 transition-opacity duration-300 ${termStep >= 0 ? 'opacity-100' : 'opacity-0'}`}>
+                    <span className="text-zinc-500">{'>'}</span>
+                    <span className="text-blue-400">FETCHING_TELEMETRY...</span>
+                </div>
+
+                {/* STEP 1 */}
+                <div className={`flex items-center gap-2 transition-opacity duration-300 ${termStep >= 1 ? 'opacity-100' : 'opacity-0'}`}>
+                    <span className="text-zinc-500">{'>'}</span>
+                    <span className="text-zinc-300">GINI: <span className="text-yellow-400">0.65</span></span>
+                    <span className="text-zinc-300">SHARE: <span className="text-yellow-400">55%</span></span>
+                </div>
+
+                {/* STEP 2 */}
+                <div className={`flex items-center gap-2 transition-opacity duration-300 ${termStep >= 2 ? 'opacity-100' : 'opacity-0'}`}>
+                    <span className="text-zinc-500">{'>'}</span>
+                    <span className="text-purple-400">MODE: <span className="text-white bg-purple-500/20 px-1 rounded">ANALYST_WARNING</span></span>
+                </div>
+
+                {/* STEP 3 */}
+                <div className={`mt-2 border-l-2 border-pink-500 pl-3 py-1 transition-all duration-500 ${termStep >= 3 ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'}`}>
+                    <p className="text-zinc-100 leading-relaxed">
+                        <span className="text-pink-500 font-bold mr-2">root@pulse:~$</span>
+                        "Top 3 nodes control 55% of resources, indicating high centralization risk."
+                        <span className="inline-block w-1.5 h-3 bg-pink-500 ml-1 animate-pulse align-middle"></span>
+                    </p>
+                </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between text-[9px] text-zinc-600 uppercase tracking-widest pt-2 border-t border-zinc-900">
+                <span>Status: {termStep === 3 ? 'IDLE' : 'PROCESSING'}</span>
+                <div className="flex gap-1">
+                        {[0,1,2,3].map(s => (
+                            <div key={s} className={`w-4 h-1 rounded-full transition-colors duration-300 ${termStep >= s ? 'bg-blue-500' : 'bg-zinc-800'}`}></div>
+                        ))}
+                </div>
+            </div>
+        </div>
     );
 }
