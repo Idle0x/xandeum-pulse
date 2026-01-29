@@ -30,7 +30,9 @@ export function TelemetryChapter() {
             title="Telemetry & UX"
             subtitle="Adapting data density for macro-audits and hardware preservation."
             textData={TELEMETRY_TEXT}
-            // Code snippet props removed as requested
+            // FIX: Pass empty strings to satisfy TypeScript strict mode
+            codeSnippet=""
+            githubPath=""
         >
             <div className={`h-full min-h-[500px] rounded-3xl relative overflow-hidden transition-all duration-1000 border ${zenMode ? 'bg-black border-zinc-900' : 'bg-[#09090b] border-zinc-800'}`}>
                 
