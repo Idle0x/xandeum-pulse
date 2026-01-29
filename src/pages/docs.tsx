@@ -55,33 +55,50 @@ export default function DocsPage() {
   // --- CORE NAVIGATION HANDLER ---
   const changeChapter = (id: ChapterID) => {
     if (id === activeChapter) return;
-    
+
     const currentIndex = CHAPTERS.findIndex(c => c.id === activeChapter);
     const newIndex = CHAPTERS.findIndex(c => c.id === id);
-    
+
     // Set animation direction based on linear movement
     setDirection(newIndex > currentIndex ? 'NEXT' : 'PREV');
     setIsTransitioning(true);
-    
+
     // Smooth transition timeout to allow exit animations
     setTimeout(() => {
       setActiveChapter(id);
       setIsTransitioning(false);
-      
+
       // On desktop, the page handles internal scrolling. On transition, we reset.
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 400); 
   };
 
+  // --- BOOT LOADER HANDLER (Deep Linking) ---
+  const handleBootStart = (sectionId: string) => {
+      // Map the IDs from BootChapter to strict ChapterIDs
+      switch (sectionId) {
+          case 'manual':
+              changeChapter('MANUAL');
+              break;
+          case 'engineering':
+              changeChapter('ENGINEERING');
+              break;
+          case 'school':
+              changeChapter('FLIGHT'); // Maps "Flight School" to FLIGHT chapter
+              break;
+          case 'deck':
+              changeChapter('TERMINAL'); // Maps "Command Deck" to TERMINAL (or preferred chapter)
+              break;
+          default:
+              changeChapter('MANUAL');
+      }
+  };
+
   // --- LINEAR FLOW LOGIC ---
   const nextChapter = () => {
-    // SPECIAL SKIP LOGIC: 
-    // Jumping from 'BOOT' (Chapter 0) to 'MANUAL' (Chapter 2) 
-    // to keep Flight School optional as per operational requirements.
     if (activeChapter === 'BOOT') {
         return changeChapter('MANUAL');
     }
-
     const currentIndex = CHAPTERS.findIndex(c => c.id === activeChapter);
     if (currentIndex < CHAPTERS.length - 1) {
       changeChapter(CHAPTERS[currentIndex + 1].id);
@@ -91,7 +108,6 @@ export default function DocsPage() {
   const prevChapter = () => {
     const currentIndex = CHAPTERS.findIndex(c => c.id === activeChapter);
     if (currentIndex > 0) {
-      // If navigating back from Manual, go to Boot.
       if (activeChapter === 'MANUAL') {
           return changeChapter('BOOT');
       }
@@ -122,7 +138,11 @@ export default function DocsPage() {
         >
             {/* MODULE SWITCHER */}
             <div className="min-h-[calc(100vh-4rem)]">
-                {activeChapter === 'BOOT' && <BootChapter onStart={() => changeChapter('MANUAL')} />}
+                {/* UPDATED: Passed handleBootStart to onStart.
+                    This ensures clicking "Engineering" actually goes to Engineering.
+                */}
+                {activeChapter === 'BOOT' && <BootChapter onStart={handleBootStart} />}
+                
                 {activeChapter === 'FLIGHT' && <FlightChapter />}
                 {activeChapter === 'MANUAL' && <ManualChapter />}
                 {activeChapter === 'TELEMETRY' && <TelemetryChapter />}
@@ -160,7 +180,7 @@ export default function DocsPage() {
           onPrev={prevChapter}
         />
       </div>
-      
+
     </DocShell>
   );
 }
