@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Activity, Search, Wifi, WifiOff, Crown, Zap, 
   ThermometerSun, ShieldCheck, TrendingUp, CheckCircle, 
-  Calculator, Fingerprint, AlertOctagon, Power 
+  Calculator, Fingerprint, Power 
 } from 'lucide-react';
 
 export function InspectorChapter() {
@@ -22,10 +22,8 @@ export function InspectorChapter() {
                 </p>
             </div>
 
-            {/* --- SECTION 1: VITALITY MATRIX (Text Left, Sim Right) --- */}
+            {/* --- SECTION 1: VITALITY MATRIX --- */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-                
-                {/* 1A. Text Content */}
                 <div className="space-y-8">
                     <div>
                         <div className="flex items-center gap-3 mb-4">
@@ -37,12 +35,7 @@ export function InspectorChapter() {
                         <p className="text-zinc-400 leading-relaxed text-sm">
                             The Inspector utilizes a <strong>Dynamic Reweighting Protocol</strong>. Instead of linear averages, it employs an <strong>Elastic Scoring</strong> model that adapts to network conditions.
                         </p>
-                        <p className="text-zinc-400 leading-relaxed text-sm mt-4">
-                            Crucially, the engine is network-aware. If the API goes offline, it automatically voids the "Reputation" metric to prevent stale data corruption, shifting weight to hardware constants like Storage and Uptime.
-                        </p>
                     </div>
-
-                    {/* Formula Card */}
                     <div className="p-4 rounded-xl bg-zinc-900/30 border border-zinc-800/50 space-y-3">
                         <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
                             <Calculator size={12} /> Scoring Algorithm
@@ -52,21 +45,14 @@ export function InspectorChapter() {
                         </div>
                     </div>
                 </div>
-
-                {/* 1B. Vitality Simulator */}
                 <VitalitySimulator />
-
             </div>
 
-            {/* --- SECTION 2: FORENSICS (Sim Left, Text Right) --- */}
+            {/* --- SECTION 2: FORENSICS ENGINE --- */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-                
-                {/* 2A. Forensics Engine (Heatmap) */}
                 <div className="order-2 lg:order-1">
                     <ForensicsEngine />
                 </div>
-
-                {/* 2B. Text Content */}
                 <div className="space-y-8 order-1 lg:order-2">
                     <div>
                         <div className="flex items-center gap-3 mb-4">
@@ -76,14 +62,12 @@ export function InspectorChapter() {
                             <h3 className="text-2xl font-bold text-white">Forensic Timeline</h3>
                         </div>
                         <p className="text-zinc-400 leading-relaxed text-sm">
-                            The Inspector scans the node's history for behavioral patterns. It generates a <strong>State Heatmap</strong> to visualize stability over time.
+                            The Inspector generates a <strong>State Heatmap</strong> to visualize stability over time.
                         </p>
                         <p className="text-zinc-400 leading-relaxed text-sm mt-4">
-                            Complex behaviors trigger specific archetype flags. For example, a node cycling rapidly through "Restart" states (Purple) will eventually lock into "Critical" (Red). Recovering from a critical state requires a mandatory "Warmup" period (Blue) before the system re-certifies the node as "Elite" (Green).
+                            Complex behaviors trigger specific states. A node in "Trauma" (Purple) eventually locks into "Critical" (Red). Recovering from a critical failure isn't instant—it requires a manual reset and a mandatory <strong>Warmup Sequence</strong> (Blue) before the node is recertified as "Elite" (Green).
                         </p>
                     </div>
-
-                    {/* Tags */}
                     <div className="flex flex-wrap gap-2">
                         {['Zombie State', 'Trauma Loop', 'Incubation', 'Elite'].map(tag => (
                             <span key={tag} className="px-3 py-1 rounded-full border border-zinc-800 bg-zinc-900/50 text-[10px] font-bold uppercase text-zinc-500">
@@ -92,7 +76,6 @@ export function InspectorChapter() {
                         ))}
                     </div>
                 </div>
-
             </div>
 
         </section>
@@ -100,9 +83,8 @@ export function InspectorChapter() {
 }
 
 // ==========================================
-// 1. VITALITY SIMULATOR (Unchanged Logic)
+// 1. VITALITY SIMULATOR (Unchanged)
 // ==========================================
-
 function VitalitySimulator() {
     const [isOnline, setIsOnline] = useState(true);
     const [uptime, setUptime] = useState(14); 
@@ -175,10 +157,9 @@ function VitalitySimulator() {
 }
 
 // ==========================================
-// 2. FORENSICS ENGINE (Heatmap Game)
+// 2. FORENSICS ENGINE (New Logic)
 // ==========================================
 
-// Color Palette Constants
 const COLORS = {
     ELITE: 'bg-emerald-500',
     TRAUMA: 'bg-purple-500',
@@ -189,13 +170,15 @@ const COLORS = {
 };
 
 function ForensicsEngine() {
-    // Timeline State: Array of block types
     const [timeline, setTimeline] = useState<Array<{color: string, type: string}>>([]);
     
-    // Game State
-    const [status, setStatus] = useState<'NORMAL' | 'CRITICAL' | 'WARMUP'>('NORMAL');
-    const [traumaCount, setTraumaCount] = useState(0);
-    const [warmupProgress, setWarmupProgress] = useState(0);
+    // States: 'NORMAL' | 'CRITICAL' | 'WARMUP' | 'OFFLINE'
+    const [status, setStatus] = useState<'NORMAL' | 'CRITICAL' | 'WARMUP' | 'OFFLINE'>('NORMAL');
+    
+    // Counters
+    const [traumaCount, setTraumaCount] = useState(0);      // Tracks consecutive purple clicks
+    const [recoveryAttempts, setRecoveryAttempts] = useState(0); // Tracks clicks on Elite while in Critical
+    const [warmupProgress, setWarmupProgress] = useState(0);  // Tracks blue blocks (0 to 5)
 
     const logRef = useRef<HTMLDivElement>(null);
 
@@ -206,51 +189,86 @@ function ForensicsEngine() {
 
     // Initial fill
     useEffect(() => {
-        setTimeline(Array(20).fill({ color: 'bg-zinc-900', type: 'EMPTY' }));
+        setTimeline(Array(24).fill({ color: 'bg-zinc-900', type: 'EMPTY' }));
     }, []);
 
-    // --- GAME LOGIC ---
+    // --- GAME LOGIC ENGINE ---
     const handleAction = (action: 'ELITE' | 'TRAUMA' | 'ZOMBIE' | 'OFFLINE') => {
         let nextBlock = { color: '', type: '' };
 
-        // 1. CRITICAL LOCKDOWN (Red State)
-        if (status === 'CRITICAL') {
-            if (action === 'OFFLINE') {
-                // Escape Route found
+        // --- RULE 1: OFFLINE OVERRIDE ---
+        // Offline works immediately regardless of current state
+        if (action === 'OFFLINE') {
+            setStatus('OFFLINE');
+            setTraumaCount(0);
+            setRecoveryAttempts(0);
+            setWarmupProgress(0);
+            nextBlock = { color: COLORS.OFFLINE, type: 'SYSTEM OFFLINE' };
+            setTimeline(prev => [...prev, nextBlock]);
+            return;
+        }
+
+        // --- RULE 2: STATE MACHINE ---
+
+        // A. OFFLINE STATE
+        if (status === 'OFFLINE') {
+            if (action === 'ELITE') {
+                // Elite triggers restart (Warmup)
                 setStatus('WARMUP');
-                setWarmupProgress(0);
-                nextBlock = { color: COLORS.OFFLINE, type: 'MANUAL RESET' };
+                setWarmupProgress(1);
+                nextBlock = { color: COLORS.WARMUP, type: 'BOOT SEQUENCE 1/5' };
             } else {
-                // Access Denied - Keep logging Red
+                // Trauma/Zombie in offline just stays offline/gray
+                nextBlock = { color: COLORS.OFFLINE, type: 'OFFLINE' };
+            }
+        }
+
+        // B. CRITICAL STATE (Red Lock)
+        else if (status === 'CRITICAL') {
+            if (action === 'ELITE') {
+                // Elite Attempt 1: Fail (Stay Red)
+                if (recoveryAttempts === 0) {
+                    setRecoveryAttempts(1);
+                    nextBlock = { color: COLORS.CRITICAL, type: 'RECOVERY FAILED' };
+                } 
+                // Elite Attempt 2: Success (Switch to Warmup)
+                else {
+                    setStatus('WARMUP');
+                    setWarmupProgress(1);
+                    setRecoveryAttempts(0); // Reset for next time
+                    nextBlock = { color: COLORS.WARMUP, type: 'RECOVERY INIT 1/5' };
+                }
+            } else {
+                // Clicking Trauma/Zombie keeps it Critical
                 nextBlock = { color: COLORS.CRITICAL, type: 'CRITICAL FAILURE' };
             }
         }
         
-        // 2. WARMUP SEQUENCE (Blue State)
+        // C. WARMUP STATE (Blue Sequence)
         else if (status === 'WARMUP') {
-            if (action === 'OFFLINE') {
-                nextBlock = { color: COLORS.OFFLINE, type: 'OFFLINE' };
-            } else {
-                // Any other click forces Blue blocks
-                nextBlock = { color: COLORS.WARMUP, type: `WARMUP SEQ ${warmupProgress + 1}/5` };
-                
-                if (warmupProgress + 1 >= 5) {
-                    setStatus('NORMAL');
-                    setTraumaCount(0);
-                } else {
-                    setWarmupProgress(p => p + 1);
-                }
-            }
+             // Any click (except Offline, handled above) advances warmup
+             // but we paint Blue regardless of what button was clicked
+             if (warmupProgress < 5) {
+                 const current = warmupProgress + 1;
+                 setWarmupProgress(current);
+                 nextBlock = { color: COLORS.WARMUP, type: `WARMUP SEQ ${current}/5` };
+                 
+                 // If we just hit 5, next click will be Normal
+                 if (current >= 5) {
+                     setStatus('NORMAL');
+                     setTraumaCount(0);
+                 }
+             }
         }
 
-        // 3. NORMAL OPERATIONS
+        // D. NORMAL OPERATIONS
         else {
             if (action === 'ELITE') {
                 nextBlock = { color: COLORS.ELITE, type: 'ELITE STATUS' };
-                setTraumaCount(0); // Healthy resets trauma streak
+                setTraumaCount(0); 
             } 
             else if (action === 'TRAUMA') {
-                // Check Trauma Trap
+                // Check Trauma Threshold
                 if (traumaCount + 1 >= 3) {
                     setStatus('CRITICAL');
                     nextBlock = { color: COLORS.CRITICAL, type: 'CRITICAL LOCK' };
@@ -262,16 +280,12 @@ function ForensicsEngine() {
             else if (action === 'ZOMBIE') {
                 // Random chance for Missing Credits
                 if (Math.random() > 0.7) {
-                     // We add two blocks: Yellow then Blue
                     const temp = [...timeline, { color: COLORS.ZOMBIE, type: 'ZOMBIE STATE' }];
                     setTimeline([...temp, { color: COLORS.WARMUP, type: 'MISSING CREDITS' }]);
-                    return; // Return early since we set state directly
+                    return; 
                 } else {
                     nextBlock = { color: COLORS.ZOMBIE, type: 'ZOMBIE STATE' };
                 }
-            }
-            else if (action === 'OFFLINE') {
-                nextBlock = { color: COLORS.OFFLINE, type: 'OFFLINE' };
             }
         }
 
@@ -287,10 +301,10 @@ function ForensicsEngine() {
                     <Search size={12} /> Pattern Matcher
                 </div>
                 {/* Dynamic Status Pill */}
-                <div className={`px-3 py-1 rounded-full border flex items-center gap-2 transition-all duration-300 ${status === 'CRITICAL' ? 'bg-red-500/10 border-red-500/50 text-red-500 animate-pulse' : status === 'WARMUP' ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : 'bg-zinc-900 border-zinc-800 text-zinc-500'}`}>
-                    <div className={`w-1.5 h-1.5 rounded-full ${status === 'CRITICAL' ? 'bg-red-500' : status === 'WARMUP' ? 'bg-blue-500' : 'bg-emerald-500'}`}></div>
+                <div className={`px-3 py-1 rounded-full border flex items-center gap-2 transition-all duration-300 ${status === 'CRITICAL' ? 'bg-red-500/10 border-red-500/50 text-red-500 animate-pulse' : status === 'WARMUP' ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' : status === 'OFFLINE' ? 'bg-zinc-800 border-zinc-700 text-zinc-400' : 'bg-zinc-900 border-zinc-800 text-zinc-500'}`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${status === 'CRITICAL' ? 'bg-red-500' : status === 'WARMUP' ? 'bg-blue-500' : status === 'OFFLINE' ? 'bg-zinc-500' : 'bg-emerald-500'}`}></div>
                     <span className="text-[9px] font-bold uppercase">
-                        {status === 'CRITICAL' ? 'SYSTEM LOCK' : status === 'WARMUP' ? `WARMING UP ${warmupProgress}/5` : 'NOMINAL'}
+                        {status === 'CRITICAL' ? 'SYSTEM LOCK' : status === 'WARMUP' ? `WARMING UP ${warmupProgress}/5` : status === 'OFFLINE' ? 'SIGNAL LOST' : 'NOMINAL'}
                     </span>
                 </div>
             </div>
@@ -358,7 +372,6 @@ function ForensicsEngine() {
     );
 }
 
-// Helper Components
 function ForensicButton({ label, icon: Icon, color, borderColor, hoverBg, onClick }: any) {
     return (
         <button 
