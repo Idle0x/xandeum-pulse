@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Shield, Activity, Terminal, Search, Cpu, 
   GitMerge, Clock
