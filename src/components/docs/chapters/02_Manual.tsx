@@ -5,7 +5,7 @@ import {
     ScanLine, Loader2, TrendingUp, BookOpen, Cpu 
 } from 'lucide-react';
 
-// --- TEXT CONTENT (Right Column) ---
+// --- TEXT CONTENT (Now at the top) ---
 const MANUAL_FEATURES = [
     {
         id: "registry",
@@ -42,144 +42,141 @@ export function ManualChapter() {
     };
 
     return (
-        <section className="max-w-7xl mx-auto px-6 py-24">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+        <section className="max-w-5xl mx-auto px-6 py-24">
+            <div className="flex flex-col gap-16">
 
-                {/* --- LEFT COL: The Active Registry (Span 7) --- */}
-                <div className="lg:col-span-7">
-                    <div 
-                        ref={containerRef}
-                        className="p-6 rounded-3xl bg-[#080808] border border-zinc-800 shadow-2xl h-[480px] overflow-y-auto custom-scrollbar relative"
-                    >
-                         {/* Grid Layout */}
-                        <div className="grid grid-cols-2 gap-3 group/grid pb-12">
-                            
-                            {/* Row 1 */}
-                            <ActiveCard 
-                                id="cyclic"
-                                isActive={activeCardId === 'cyclic'}
-                                onClick={handleCardClick}
-                                icon={Activity} title="Cyclic Rotation" tag="UX/UI" color="blue" 
-                            />
-                            <ActiveCard 
-                                id="zen"
-                                isActive={activeCardId === 'zen'}
-                                onClick={handleCardClick}
-                                icon={Eye} title="Zen Mode" tag="OLED" color="zinc" 
-                            />
-
-                            {/* Large Card: Node Inspector */}
-                            <ActiveCard 
-                                id="inspector"
-                                isActive={activeCardId === 'inspector'}
-                                onClick={handleCardClick}
-                                icon={Search} title="Node Inspector" tag="DIAGNOSTICS" color="red" 
-                                className="col-span-2 bg-zinc-900/20" 
-                            />
-
-                            {/* Row 2 */}
-                            <ActiveCard 
-                                id="stable_id"
-                                isActive={activeCardId === 'stable_id'}
-                                onClick={handleCardClick}
-                                icon={Hash} title="Stable ID v2" tag="BACKEND" color="indigo" 
-                                className="col-span-2" 
-                            />
-                            
-                            <ActiveCard 
-                                id="pulse"
-                                isActive={activeCardId === 'pulse'}
-                                onClick={handleCardClick}
-                                icon={Camera} title="Proof of Pulse" tag="SOCIAL" color="green" 
-                            />
-                            
-                            <ActiveCard 
-                                id="ghost"
-                                isActive={activeCardId === 'ghost'}
-                                onClick={handleCardClick}
-                                icon={FileBarChart} title="Ghost Canvas" tag="REPORT" color="purple" 
-                            />
-
-                            {/* Row 3 */}
-                            <ActiveCard 
-                                id="stoinc"
-                                isActive={activeCardId === 'stoinc'}
-                                onClick={handleCardClick}
-                                icon={Zap} title="STOINC Sim" tag="ECONOMICS" color="yellow" 
-                            />
-                            
-                            <ActiveCard 
-                                id="crash"
-                                isActive={activeCardId === 'crash'}
-                                onClick={handleCardClick}
-                                icon={WifiOff} title="Crash Protocols" tag="RESILIENCE" color="red" 
-                            />
-                            
-                            <ActiveCard 
-                                id="compare"
-                                isActive={activeCardId === 'compare'}
-                                onClick={handleCardClick}
-                                icon={Scale} title="Comparative" tag="ANALYTICS" color="pink" 
-                            />
-                            
-                            <ActiveCard 
-                                id="time"
-                                isActive={activeCardId === 'time'}
-                                onClick={handleCardClick}
-                                icon={Clock} title="Time Machine" tag="TEMPORAL" color="orange" 
-                            />
-
-                            {/* Footer */}
-                            <ActiveCard 
-                                id="king"
-                                isActive={activeCardId === 'king'}
-                                onClick={handleCardClick}
-                                icon={Globe} title="King Node Logic" tag="SPATIAL" color="cyan" 
-                                className="col-span-2" 
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* --- RIGHT COL: System Architecture (Span 5) --- */}
-                {/* Replaces the code snippet area */}
-                <div className="lg:col-span-5 space-y-8 pt-4">
+                {/* --- 1. TOP SECTION: Header & Feature Specs --- */}
+                <div className="space-y-10">
                     
-                    <div>
-                        <div className="flex items-center gap-2 mb-4">
+                    {/* Header Text */}
+                    <div className="max-w-3xl">
+                        <div className="flex items-center gap-2 mb-6">
                             <span className="text-[10px] font-bold uppercase tracking-widest text-blue-500 bg-blue-500/10 px-2 py-1 rounded">
                                 Chapter 01
                             </span>
                         </div>
-                        <h2 className="text-3xl font-black text-white tracking-tighter mb-4">Field Manual</h2>
-                        <p className="text-zinc-400 leading-relaxed text-sm">
+                        <h2 className="text-4xl md:text-5xl font-black text-white tracking-tighter mb-6">Field Manual</h2>
+                        <p className="text-zinc-400 leading-relaxed text-base md:text-lg">
                             The definitive technical index of the protocols, logic modules, and operational standards that power the ecosystem.
                         </p>
                     </div>
 
-                    <div className="grid gap-4">
+                    {/* Feature Cards (Grid on Desktop, Stack on Mobile) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {MANUAL_FEATURES.map((feature) => (
-                            <div key={feature.id} className="group p-5 rounded-2xl bg-zinc-900/20 border border-zinc-800 hover:border-zinc-700 transition-colors">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 group-hover:border-zinc-700 transition-colors">
+                            <div key={feature.id} className="group p-6 rounded-2xl bg-zinc-900/20 border border-zinc-800 hover:border-zinc-700 transition-colors">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 group-hover:border-zinc-700 transition-colors">
                                         {feature.icon}
                                     </div>
-                                    <h3 className="font-bold text-white text-sm">{feature.title}</h3>
+                                    <h3 className="font-bold text-white text-base">{feature.title}</h3>
                                 </div>
-                                <p className="text-xs text-zinc-500 leading-relaxed pl-1">
+                                <p className="text-sm text-zinc-500 leading-relaxed pl-1">
                                     {feature.content}
                                 </p>
                             </div>
                         ))}
                     </div>
 
+                    {/* Status Badge */}
                     <div className="flex items-center gap-2 p-3 rounded-lg bg-zinc-900 border border-zinc-800 w-fit">
                         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                        <span className="text-[10px] text-zinc-400 font-mono">
+                        <span className="text-xs text-zinc-400 font-mono">
                             All Systems Operational
                         </span>
                     </div>
 
+                </div>
+
+                {/* --- 2. BOTTOM SECTION: The Active Registry Grid --- */}
+                <div ref={containerRef} className="w-full">
+                    {/* Grid Logic:
+                        - Mobile: 2 Columns
+                        - Desktop: 4 Columns
+                        - This allows the "Large Cards" (col-span-2) to take up half a row on desktop, 
+                          creating a perfect bento-box feel.
+                    */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 group/grid">
+                        
+                        {/* --- ROW 1 --- */}
+                        <ActiveCard 
+                            id="cyclic"
+                            isActive={activeCardId === 'cyclic'}
+                            onClick={handleCardClick}
+                            icon={Activity} title="Cyclic Rotation" tag="UX/UI" color="blue" 
+                        />
+                        <ActiveCard 
+                            id="zen"
+                            isActive={activeCardId === 'zen'}
+                            onClick={handleCardClick}
+                            icon={Eye} title="Zen Mode" tag="OLED" color="zinc" 
+                        />
+                        {/* Large Card: Node Inspector (Takes 2 slots) */}
+                        <ActiveCard 
+                            id="inspector"
+                            isActive={activeCardId === 'inspector'}
+                            onClick={handleCardClick}
+                            icon={Search} title="Node Inspector" tag="DIAGNOSTICS" color="red" 
+                            className="col-span-2 bg-zinc-900/20" 
+                        />
+
+                        {/* --- ROW 2 --- */}
+                        {/* Large Card: Stable ID (Takes 2 slots) */}
+                        <ActiveCard 
+                            id="stable_id"
+                            isActive={activeCardId === 'stable_id'}
+                            onClick={handleCardClick}
+                            icon={Hash} title="Stable ID v2" tag="BACKEND" color="indigo" 
+                            className="col-span-2" 
+                        />
+                        <ActiveCard 
+                            id="pulse"
+                            isActive={activeCardId === 'pulse'}
+                            onClick={handleCardClick}
+                            icon={Camera} title="Proof of Pulse" tag="SOCIAL" color="green" 
+                        />
+                        <ActiveCard 
+                            id="ghost"
+                            isActive={activeCardId === 'ghost'}
+                            onClick={handleCardClick}
+                            icon={FileBarChart} title="Ghost Canvas" tag="REPORT" color="purple" 
+                        />
+
+                        {/* --- ROW 3 --- */}
+                        <ActiveCard 
+                            id="stoinc"
+                            isActive={activeCardId === 'stoinc'}
+                            onClick={handleCardClick}
+                            icon={Zap} title="STOINC Sim" tag="ECONOMICS" color="yellow" 
+                        />
+                        <ActiveCard 
+                            id="crash"
+                            isActive={activeCardId === 'crash'}
+                            onClick={handleCardClick}
+                            icon={WifiOff} title="Crash Protocols" tag="RESILIENCE" color="red" 
+                        />
+                        <ActiveCard 
+                            id="compare"
+                            isActive={activeCardId === 'compare'}
+                            onClick={handleCardClick}
+                            icon={Scale} title="Comparative" tag="ANALYTICS" color="pink" 
+                        />
+                        <ActiveCard 
+                            id="time"
+                            isActive={activeCardId === 'time'}
+                            onClick={handleCardClick}
+                            icon={Clock} title="Time Machine" tag="TEMPORAL" color="orange" 
+                        />
+
+                        {/* --- FOOTER CARD --- */}
+                        <ActiveCard 
+                            id="king"
+                            isActive={activeCardId === 'king'}
+                            onClick={handleCardClick}
+                            icon={Globe} title="King Node Logic" tag="SPATIAL" color="cyan" 
+                            className="col-span-2 md:col-start-2" // Centered on desktop (starts at col 2, spans 2)
+                        />
+                    </div>
                 </div>
 
             </div>
@@ -187,7 +184,7 @@ export function ManualChapter() {
     );
 }
 
-// --- SUB-COMPONENTS ---
+// --- SUB-COMPONENTS (Unchanged Logic) ---
 
 function ActiveCard({ id, isActive, onClick, icon: Icon, title, color, tag, className = "" }: any) {
     const colors: any = {
@@ -207,7 +204,7 @@ function ActiveCard({ id, isActive, onClick, icon: Icon, title, color, tag, clas
         <div 
             onClick={(e) => onClick(id, e)}
             className={`
-                relative overflow-hidden p-5 rounded-2xl border bg-[#0c0c0e] transition-all duration-300 group cursor-pointer
+                relative overflow-hidden p-5 rounded-2xl border bg-[#080808] transition-all duration-300 group cursor-pointer
                 ${isActive ? 'z-20 scale-[1.02] !opacity-100 shadow-2xl !bg-black' : 'hover:z-10 hover:shadow-2xl hover:-translate-y-1 group-hover/grid:opacity-50 hover:!opacity-100'}
                 ${isActive ? 'border-white/20' : colors[color]}
                 ${className}
