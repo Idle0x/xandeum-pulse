@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Monitor, Eye, LayoutGrid, LayoutList, RefreshCw, Wifi, EyeOff, Zap, Server } from 'lucide-react';
-import { ChapterLayout } from '../layout/ChapterLayout';
+import { Eye, LayoutGrid, LayoutList, RefreshCw, Wifi, EyeOff, Cpu, Zap, Activity } from 'lucide-react';
 
-const TELEMETRY_TEXT = [
+// --- DATA: Feature Highlights (Replaces Code) ---
+const TELEMETRY_FEATURES = [
     {
+        id: "density",
+        icon: <Activity size={18} className="text-blue-400" />,
         title: "Hybrid-Density Topology",
-        content: "The Pulse interface is built on a Hybrid-Density Topology designed to adapt to different operator needs. Whether you are performing a macro-audit of 1,000+ nodes (List View) or deep-diving into a single validator's vitals (Grid View), the dashboard manages data density through intelligent metric rotation."
+        content: "The Pulse interface adapts to operator needs. It automatically switches between high-fidelity 'Card Views' for single-validator deep dives and compressed 'List Views' for macro-audits of 1,000+ nodes."
     },
     {
+        id: "oled",
+        icon: <Zap size={18} className="text-yellow-400" />,
         title: "OLED Preservation Protocol",
-        content: "Beyond visualization, the platform incorporates a Hardware Preservation Protocol (Zen Mode). 24/7 monitoring leads to screen burn-in. Engaging Zen Mode strips the UI of all blurs, gradients, and animations, rendering the entire dashboard in high-contrast OLED black to minimize light emission."
+        content: "24/7 monitoring causes screen burn-in. 'Zen Mode' is a hardware-safety feature that eliminates blurs, gradients, and static pixels, rendering the dashboard in pure #000000 to minimize organic light emission."
     }
 ];
 
@@ -18,147 +22,178 @@ export function TelemetryChapter() {
     const [layoutMode, setLayoutMode] = useState<'GRID' | 'LIST'>('GRID');
     const [metricIndex, setMetricIndex] = useState(0);
 
-    // Cyclic Metric Logic (Simulates data rotation in Grid View)
+    // Cyclic Metric Logic (Simulates live data)
     useEffect(() => {
-        const i = setInterval(() => setMetricIndex(p => (p + 1) % 3), 3000);
+        const i = setInterval(() => setMetricIndex(p => (p + 1) % 3), 4000);
         return () => clearInterval(i);
     }, []);
 
     return (
-        <ChapterLayout
-            chapterNumber="02"
-            title="Telemetry & UX"
-            subtitle="Adapting data density for macro-audits and hardware preservation."
-            textData={TELEMETRY_TEXT}
-            // FIX: Pass empty strings to satisfy TypeScript strict mode
-            codeSnippet=""
-            githubPath=""
-        >
-            <div className={`h-full min-h-[500px] rounded-3xl relative overflow-hidden transition-all duration-1000 border ${zenMode ? 'bg-black border-zinc-900' : 'bg-[#09090b] border-zinc-800'}`}>
-                
-                {/* --- 1. GLOBAL DIMMER OVERLAY --- 
-                    This sits on top of content to simulate full-screen dimming, 
-                    but below the controls (z-20 vs z-30) so you can turn it off. 
-                */}
-                <div 
-                    className={`absolute inset-0 bg-black transition-opacity duration-1000 pointer-events-none z-20 ${zenMode ? 'opacity-95' : 'opacity-0'}`}
-                ></div>
+        <section className="max-w-7xl mx-auto px-6 py-24 relative">
+            
+            {/* --- GLOBAL ZEN OVERLAY --- 
+                This covers the ENTIRE screen (fixed inset-0) when active.
+                z-index 40 ensures it covers the sidebar/header of the main site 
+                but sits below the simulation content (z-50).
+            */}
+            <div 
+                className={`fixed inset-0 bg-black transition-opacity duration-1000 pointer-events-none ${zenMode ? 'opacity-100 z-[40]' : 'opacity-0 z-[-1]'}`}
+            />
 
-                {/* --- 2. HEADER CONTROLS (Z-30 to stay clickable) --- */}
-                <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-30 border-b border-white/5 bg-gradient-to-b from-black/50 to-transparent">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+
+                {/* --- LEFT COL: The Simulation (Span 7) --- */}
+                {/* We add z-50 here so this specific container stays visible above the black overlay in Zen Mode */}
+                <div className={`lg:col-span-7 flex flex-col gap-6 relative transition-all duration-1000 ${zenMode ? 'z-[50]' : 'z-0'}`}>
                     
-                    {/* Layout Switcher */}
-                    <div className="flex bg-zinc-900/50 p-1 rounded-lg border border-zinc-800 backdrop-blur-md">
-                        <button 
-                            onClick={() => setLayoutMode('GRID')}
-                            className={`p-2 rounded-md transition-all ${layoutMode === 'GRID' ? 'bg-zinc-800 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
-                            title="Grid Topology (Micro)"
-                        >
-                            <LayoutGrid size={16}/>
-                        </button>
-                        <button 
-                            onClick={() => setLayoutMode('LIST')}
-                            className={`p-2 rounded-md transition-all ${layoutMode === 'LIST' ? 'bg-zinc-800 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
-                            title="List Topology (Macro)"
-                        >
-                            <LayoutList size={16}/>
-                        </button>
-                    </div>
+                    {/* SIMULATION CONTAINER */}
+                    <div className={`
+                        w-full rounded-3xl overflow-hidden border transition-all duration-1000 relative min-h-[500px] flex flex-col
+                        ${zenMode ? 'bg-black border-zinc-900 shadow-none' : 'bg-[#09090b] border-zinc-800 shadow-2xl'}
+                    `}>
+                        
+                        {/* 1. CONTROL DECK (Header) */}
+                        <div className={`
+                            flex items-center justify-between px-6 py-4 border-b transition-colors duration-1000
+                            ${zenMode ? 'border-zinc-900 bg-black' : 'border-zinc-800 bg-zinc-900/50'}
+                        `}>
+                            {/* Layout Switcher */}
+                            <div className="flex bg-zinc-900/80 p-1 rounded-lg border border-zinc-800">
+                                <button 
+                                    onClick={() => setLayoutMode('GRID')}
+                                    className={`p-1.5 rounded-md transition-all ${layoutMode === 'GRID' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                >
+                                    <LayoutGrid size={14}/>
+                                </button>
+                                <button 
+                                    onClick={() => setLayoutMode('LIST')}
+                                    className={`p-1.5 rounded-md transition-all ${layoutMode === 'LIST' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                >
+                                    <LayoutList size={14}/>
+                                </button>
+                            </div>
 
-                    {/* Zen Toggle */}
-                    <button 
-                        onClick={() => setZenMode(!zenMode)}
-                        className={`
-                            group relative px-4 py-2 rounded-full border text-[10px] font-bold uppercase tracking-widest transition-all duration-500 overflow-hidden
-                            ${zenMode 
-                                ? 'bg-zinc-900 border-zinc-800 text-emerald-500 hover:bg-zinc-800' 
-                                : 'bg-red-500/10 border-red-500/50 text-red-500 hover:bg-red-500/20'
-                            }
-                        `}
-                    >
-                        <div className="relative z-10 flex items-center gap-2">
-                            {zenMode ? <Eye size={14}/> : <EyeOff size={14}/>} 
-                            {zenMode ? 'ZEN ACTIVE' : 'ENGAGE ZEN'}
+                            {/* Zen Toggle (High Visibility) */}
+                            <button 
+                                onClick={() => setZenMode(!zenMode)}
+                                className={`
+                                    group relative pl-3 pr-4 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-widest transition-all duration-500 flex items-center gap-2
+                                    ${zenMode 
+                                        ? 'bg-zinc-900 border-zinc-800 text-green-500 hover:bg-zinc-800' 
+                                        : 'bg-red-500/10 border-red-500/50 text-red-500 hover:bg-red-500/20'
+                                    }
+                                `}
+                            >
+                                {zenMode ? <Eye size={12}/> : <EyeOff size={12}/>}
+                                {zenMode ? 'System Safe' : 'Zen Mode Off'}
+                            </button>
                         </div>
-                    </button>
+
+                        {/* 2. DATA VIEWPORT */}
+                        <div className="p-6 flex-1 overflow-y-auto">
+                            {layoutMode === 'GRID' ? (
+                                // GRID MODE
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {[1, 2, 3, 4].map((i) => (
+                                        <div key={i} className={`p-5 rounded-xl border transition-all duration-1000 ${zenMode ? 'bg-black border-zinc-800' : 'bg-zinc-900/30 border-zinc-700/50 hover:border-zinc-600'}`}>
+                                            <div className="flex justify-between mb-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`w-1.5 h-1.5 rounded-full ${zenMode ? 'bg-zinc-800' : 'bg-green-500 animate-pulse'}`}></div>
+                                                    <span className={`font-mono text-xs ${zenMode ? 'text-zinc-600' : 'text-zinc-300'}`}>0x82...9A</span>
+                                                </div>
+                                                <Wifi size={12} className="text-zinc-600"/>
+                                            </div>
+                                            
+                                            {/* Cycling Metrics Area */}
+                                            <div className="space-y-3">
+                                                <div className="flex justify-between items-center pb-2 border-b border-zinc-800/50">
+                                                    <span className="text-[10px] uppercase text-zinc-600 font-bold">Health</span>
+                                                    <span className={`text-xs font-mono ${zenMode ? 'text-zinc-500' : 'text-green-400'}`}>98.2%</span>
+                                                </div>
+                                                
+                                                <div className="relative h-5 overflow-hidden">
+                                                    <div className={`absolute w-full transition-all duration-500 flex justify-between items-center ${metricIndex === 0 ? 'top-0 opacity-100' : '-top-5 opacity-0'}`}>
+                                                        <span className="text-[10px] uppercase text-zinc-600 font-bold">Storage</span>
+                                                        <span className="text-xs font-mono text-zinc-400">1.2 PB</span>
+                                                    </div>
+                                                    <div className={`absolute w-full transition-all duration-500 flex justify-between items-center ${metricIndex === 1 ? 'top-0 opacity-100' : '-top-5 opacity-0'}`}>
+                                                        <span className="text-[10px] uppercase text-zinc-600 font-bold">Uptime</span>
+                                                        <span className="text-xs font-mono text-zinc-400">14d 2h</span>
+                                                    </div>
+                                                    <div className={`absolute w-full transition-all duration-500 flex justify-between items-center ${metricIndex === 2 ? 'top-0 opacity-100' : '-top-5 opacity-0'}`}>
+                                                        <span className="text-[10px] uppercase text-zinc-600 font-bold">Version</span>
+                                                        <span className="text-xs font-mono text-zinc-400">v1.0.4</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                // LIST MODE
+                                <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2">
+                                    {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                                        <div key={i} className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${zenMode ? 'border-zinc-900 text-zinc-600' : 'bg-zinc-900/20 border-zinc-800 hover:bg-zinc-900 text-zinc-400'}`}>
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-1 h-1 rounded-full ${zenMode ? 'bg-zinc-800' : 'bg-blue-500'}`}></div>
+                                                <span className="text-xs font-mono">0x82...9A</span>
+                                            </div>
+                                            <span className="text-[10px] uppercase font-bold text-zinc-600 hidden sm:block">Tokyo, JP</span>
+                                            <div className="flex gap-4">
+                                                <span className={`text-xs font-mono w-12 text-right ${zenMode ? 'text-zinc-700' : 'text-green-500'}`}>98%</span>
+                                                <span className="text-xs font-mono w-16 text-right">1.2PB</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {/* Caption for Simulation */}
+                    <div className={`flex items-center gap-2 justify-center transition-opacity duration-500 ${zenMode ? 'opacity-0' : 'opacity-100'}`}>
+                        <RefreshCw size={12} className="text-zinc-600 animate-spin-slow"/>
+                        <span className="text-[10px] uppercase tracking-widest text-zinc-600">Live Simulation Active</span>
+                    </div>
                 </div>
 
-                {/* --- 3. MAIN SIMULATION CONTENT --- */}
-                <div className="pt-24 px-6 pb-6 h-full overflow-y-auto custom-scrollbar relative z-10">
+                {/* --- RIGHT COL: Feature Specs (Span 5) --- */}
+                {/* Replaces the code block. This fades out in Zen Mode to focus on data. */}
+                <div className={`lg:col-span-5 space-y-8 pt-4 transition-opacity duration-1000 ${zenMode ? 'opacity-20 blur-sm pointer-events-none' : 'opacity-100'}`}>
                     
-                    {layoutMode === 'GRID' ? (
-                        // --- GRID MODE: CYCLIC METRICS ---
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {[1, 2, 3, 4].map((i) => (
-                                <div key={i} className={`p-5 rounded-2xl border transition-all duration-500 ${zenMode ? 'bg-zinc-950 border-zinc-900' : 'bg-zinc-900/20 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/40'}`}>
-                                    <div className="flex justify-between mb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${zenMode ? 'bg-zinc-900 text-zinc-700' : 'bg-blue-500/10 text-blue-400'}`}>
-                                                <Server size={14} />
-                                            </div>
-                                            <div>
-                                                <div className={`text-xs font-bold ${zenMode ? 'text-zinc-600' : 'text-zinc-200'}`}>Validator-0{i}</div>
-                                                <div className="text-[9px] font-mono text-zinc-600">192.168.0.{i}</div>
-                                            </div>
-                                        </div>
-                                        {/* Status Dot */}
-                                        <div className={`w-2 h-2 rounded-full ${zenMode ? 'bg-zinc-800' : 'bg-emerald-500 shadow-[0_0_10px_#10b981]'}`}></div>
-                                    </div>
+                    <div>
+                        <h2 className="text-3xl font-black text-white tracking-tighter mb-4">Telemetry & UX</h2>
+                        <p className="text-zinc-400 leading-relaxed text-sm">
+                            The Xandeum Pulse dashboard isn't just a data dump. It is an intelligent surface that manages cognitive load and hardware longevity through adaptive layouts.
+                        </p>
+                    </div>
 
-                                    {/* The Cyclic Metric Area */}
-                                    <div className="bg-black/40 rounded-lg p-3 border border-white/5 relative overflow-hidden h-14 flex items-center">
-                                        <div className={`absolute inset-0 flex items-center justify-between px-4 transition-all duration-500 ${metricIndex === 0 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-                                            <span className="text-[10px] font-bold text-zinc-500 uppercase">Health Score</span>
-                                            <span className={`font-mono text-lg font-bold ${zenMode ? 'text-zinc-500' : 'text-white'}`}>98.5%</span>
-                                        </div>
-                                        <div className={`absolute inset-0 flex items-center justify-between px-4 transition-all duration-500 ${metricIndex === 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-                                            <span className="text-[10px] font-bold text-zinc-500 uppercase">Storage Cap</span>
-                                            <span className={`font-mono text-lg font-bold ${zenMode ? 'text-zinc-500' : 'text-blue-400'}`}>1.2 PB</span>
-                                        </div>
-                                        <div className={`absolute inset-0 flex items-center justify-between px-4 transition-all duration-500 ${metricIndex === 2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-                                            <span className="text-[10px] font-bold text-zinc-500 uppercase">Uptime</span>
-                                            <span className={`font-mono text-lg font-bold ${zenMode ? 'text-zinc-500' : 'text-emerald-400'}`}>14d 2h</span>
-                                        </div>
+                    <div className="grid gap-6">
+                        {TELEMETRY_FEATURES.map((feature) => (
+                            <div key={feature.id} className="group p-6 rounded-2xl bg-zinc-900/20 border border-zinc-800 hover:border-zinc-700 transition-colors">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 group-hover:border-zinc-700 transition-colors">
+                                        {feature.icon}
                                     </div>
-                                    
-                                    <div className="mt-2 flex justify-end">
-                                        <span className="text-[9px] text-zinc-600 flex items-center gap-1">
-                                            <RefreshCw size={8} className={zenMode ? '' : 'animate-spin'} /> Cycling Telemetry
-                                        </span>
-                                    </div>
+                                    <h3 className="font-bold text-white text-sm">{feature.title}</h3>
                                 </div>
-                            ))}
-                        </div>
-                    ) : (
-                        // --- LIST MODE: HIGH DENSITY ---
-                        <div className="flex flex-col gap-2">
-                            {/* Table Header */}
-                            <div className="grid grid-cols-4 px-4 py-2 text-[9px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800/50">
-                                <span>Identity</span>
-                                <span>Location</span>
-                                <span>Health</span>
-                                <span className="text-right">Capacity</span>
+                                <p className="text-xs text-zinc-500 leading-relaxed pl-1">
+                                    {feature.content}
+                                </p>
                             </div>
-                            
-                            {/* Rows */}
-                            {[...Array(8)].map((_, i) => (
-                                <div key={i} className={`grid grid-cols-4 px-4 py-3 rounded-lg border items-center transition-colors ${zenMode ? 'border-zinc-900 text-zinc-700 bg-black' : 'border-zinc-800/50 hover:bg-zinc-800/30 text-zinc-400 hover:text-zinc-200'}`}>
-                                    <div className="flex items-center gap-2">
-                                        <div className={`w-1.5 h-1.5 rounded-full ${zenMode ? 'bg-zinc-800' : 'bg-emerald-500'}`}></div>
-                                        <span className="font-mono text-xs">0x82...{i}A</span>
-                                    </div>
-                                    <span className="text-xs">Tokyo, JP</span>
-                                    <div className="w-16 h-1 bg-zinc-800 rounded-full overflow-hidden">
-                                        <div className={`h-full ${zenMode ? 'bg-zinc-700' : 'bg-emerald-500'}`} style={{ width: `${80 + (i*2)}%` }}></div>
-                                    </div>
-                                    <span className="text-xs font-mono text-right">{1.2 + (i * 0.1)} PB</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                        ))}
+                    </div>
+
+                    <div className="flex items-center gap-2 p-4 rounded-lg bg-blue-500/5 border border-blue-500/10">
+                        <Cpu size={16} className="text-blue-500" />
+                        <span className="text-xs text-blue-300 font-mono">
+                            src/components/ui/telemetry-engine.tsx
+                        </span>
+                    </div>
+
                 </div>
 
             </div>
-        </ChapterLayout>
+        </section>
     );
 }
