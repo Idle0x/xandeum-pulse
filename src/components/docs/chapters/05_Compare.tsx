@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Layers, Swords, FileImage, ScanLine, BarChart3, ArrowRight } from 'lucide-react';
+import { Layers, Swords, FileImage, ScanLine, BarChart3 } from 'lucide-react';
 import { ChapterLayout } from '../layout/ChapterLayout';
 
 const COMPARE_CODE = `
@@ -24,7 +24,7 @@ const captureTopology = async () => {
 export function CompareChapter() {
     // --- SIMULATION 1: GHOST CANVAS ---
     const [scanning, setScanning] = useState(false);
-    
+
     // --- SIMULATION 2: PIVOT LOGIC ---
     const [mode, setMode] = useState<'AVG' | 'APEX'>('AVG');
 
@@ -39,7 +39,7 @@ export function CompareChapter() {
             chapterNumber="05"
             title="Analytics Suite"
             subtitle="Pivoting baselines and high-fidelity reporting engines."
-            textData={[]} // We render text manually in the grid below
+            textData={[]} // Rendering manual content below
             codeSnippet={COMPARE_CODE}
             githubPath="src/logic/compare-engine.ts"
         >
@@ -49,7 +49,7 @@ export function CompareChapter() {
                     FEATURE 1: COMPARATIVE INTELLIGENCE (PIVOT)
                    =================================================== */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-                    
+
                     {/* LEFT COLUMN: TEXT */}
                     <div className="prose prose-invert">
                         <h3 className="text-xl font-bold text-zinc-100 flex items-center gap-2 mb-4">
@@ -73,8 +73,18 @@ export function CompareChapter() {
                             </div>
                             {/* Toggle */}
                             <div className="flex bg-zinc-900 p-1 rounded-lg border border-zinc-800 relative">
-                                 <button onClick={() => setMode('AVG')} className={`px-3 py-1.5 rounded-md text-[9px] font-bold transition-all ${mode==='AVG' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}>VS AVG</button>
-                                 <button onClick={() => setMode('APEX')} className={`px-3 py-1.5 rounded-md text-[9px] font-bold transition-all ${mode==='APEX' ? 'bg-pink-600 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}>VS APEX</button>
+                                 <button 
+                                    onClick={() => setMode('AVG')} 
+                                    className={`px-3 py-1.5 rounded-md text-[9px] font-bold transition-all ${mode==='AVG' ? 'bg-zinc-700 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                 >
+                                    VS AVG
+                                 </button>
+                                 <button 
+                                    onClick={() => setMode('APEX')} 
+                                    className={`px-3 py-1.5 rounded-md text-[9px] font-bold transition-all ${mode==='APEX' ? 'bg-pink-600 text-white shadow' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                 >
+                                    VS APEX
+                                 </button>
                             </div>
                         </div>
 
@@ -129,7 +139,7 @@ export function CompareChapter() {
                     FEATURE 2: GHOST CANVAS EXPORT
                    =================================================== */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-                    
+
                     {/* LEFT COLUMN: TEXT */}
                     <div className="prose prose-invert">
                         <h3 className="text-xl font-bold text-zinc-100 flex items-center gap-2 mb-4">
@@ -169,7 +179,7 @@ export function CompareChapter() {
                             <div className={`transition-all duration-500 ${scanning ? 'scale-90 opacity-50 blur-[2px]' : 'scale-100 opacity-100'}`}>
                                  <FileImage size={48} className="text-zinc-700"/>
                             </div>
-                            
+
                             {/* Success Message */}
                             {scanning && (
                                 <div className="absolute inset-0 flex items-center justify-center z-20">
@@ -187,7 +197,7 @@ export function CompareChapter() {
                             {/* Grid Lines (Background) */}
                             <div className="absolute inset-0 z-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
                         </div>
-                        
+
                         {/* Status Footer */}
                         <div className="mt-6 flex items-center justify-between">
                              <div className="text-[9px] font-mono text-zinc-500">CANVAS_SIZE: 5000px × 3200px</div>
