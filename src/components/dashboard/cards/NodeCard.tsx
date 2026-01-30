@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'; // <--- Added Imports
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Shield, Star, Maximize2, CheckCircle, 
   AlertTriangle, Medal, Wallet, AlertOctagon 
@@ -23,32 +23,39 @@ export const NodeCard = ({
   zenMode, mostCommonVersion, sortBy 
 }: NodeCardProps) => {
 
-  // 1. HOVER STATE
+  // --- 1. HOVER & CYCLE LOGIC ---
   const [isHovered, setIsHovered] = useState(false);
+  
+  // Local state to "buffer" the parent's cycleStep
+  const [localStep, setLocalStep] = useState(cycleStep);
 
-  // 2. CALCULATE ACTIVE STEP (Context-Aware Hover)
+  // Sync parent cycleStep to localStep ONLY if NOT hovering.
+  // This prevents the card from jumping to the next metric while the user is looking at it.
+  useEffect(() => {
+    if (!isHovered) {
+      setLocalStep(cycleStep);
+    }
+  }, [cycleStep, isHovered]);
+
+  // Calculate the step to display. 
+  // If hovering, we force it to the metric the user is sorting by.
   const activeStep = useMemo(() => {
-    // Only override if hovered
     if (isHovered) {
-      // MAP SORT KEYS TO YOUR CYCLE INDICES
-      // IMPORTANT: Ensure these indices (0, 1, 2) match the order in your useCardCycle hook!
       switch (sortBy) {
-        case 'uptime': return 0;       
-        case 'storage': return 1;      
-        case 'storage_used': return 1; 
-        case 'health': return 2;       
-        // For 'version' or 'credits', we don't force a footer change
-        // since those are already visible in the card body.
-        default: return cycleStep;
+        case 'storage_used': return 0; // Hook Index 0
+        case 'storage':      return 1; // Hook Index 1
+        case 'health':       return 2; // Hook Index 2
+        case 'uptime':       return 3; // Hook Index 3
+        default:             return localStep; 
       }
     }
-    return cycleStep;
-  }, [isHovered, sortBy, cycleStep]);
+    return localStep;
+  }, [isHovered, sortBy, localStep]);
 
-  // 3. USE HOOK with the computed 'activeStep'
+  // Pass the calculated step to your cycle hook
   const cycleData = useCardCycle(node, activeStep, zenMode, sortBy);
 
-  // Helpers
+  // --- 2. HELPERS & STYLES ---
   const cleanVer = (node.version || '').replace(/[^0-9.]/g, '');
   const cleanConsensus = mostCommonVersion.replace(/[^0-9.]/g, '');
   const isLatest = cleanVer === cleanConsensus || compareVersions(cleanVer, cleanConsensus) > 0;
@@ -64,7 +71,6 @@ export const NodeCard = ({
   return (
     <div
       onClick={() => onClick(node)}
-      // 4. BIND HOVER EVENTS
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={`group relative border rounded-xl p-3 md:p-5 cursor-pointer ${containerStyle}`}
@@ -83,12 +89,12 @@ export const NodeCard = ({
              <div className="flex gap-1">
                 {node.network === 'MAINNET' && (
                   <span className={`text-[7px] md:text-[8px] px-1 rounded font-bold uppercase ${zenMode ? 'bg-zinc-200 text-black' : 'bg-green-500 text-black'}`}>
-                    {window.innerWidth < 768 ? 'MN' : 'MAINNET'}
+                    {typeof window !== 'undefined' && window.innerWidth < 768 ? 'MN' : 'MAINNET'}
                   </span>
                 )}
                 {node.network === 'DEVNET' && (
                   <span className={`text-[7px] md:text-[8px] px-1 rounded font-bold uppercase ${zenMode ? 'border border-zinc-600 text-zinc-400' : 'bg-blue-500 text-white'}`}>
-                    {window.innerWidth < 768 ? 'DN' : 'DEVNET'}
+                    {typeof window !== 'undefined' && window.innerWidth < 768 ? 'DN' : 'DEVNET'}
                   </span>
                 )}
                 {node.network === 'UNKNOWN' && (
@@ -109,7 +115,13 @@ export const NodeCard = ({
           </div>
         </div>
 
-        <button onClick={(e) => onToggleFavorite(e, node.address || '')} className={`p-1.5 md:p-3 rounded-full shrink-0 ${zenMode ? '' : 'transition-all duration-200 active:scale-90'} ${isFav ? (zenMode ? 'text-white' : 'text-yellow-500 bg-yellow-500/10') : 'text-zinc-600 hover:text-white'}`}>
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFavorite(e, node.address || '');
+          }} 
+          className={`p-1.5 md:p-3 rounded-full shrink-0 ${zenMode ? '' : 'transition-all duration-200 active:scale-90'} ${isFav ? (zenMode ? 'text-white' : 'text-yellow-500 bg-yellow-500/10') : 'text-zinc-600 hover:text-white'}`}
+        >
           <Star size={14} className="md:w-6 md:h-6" strokeWidth={isFav ? 2.5 : 2} fill={isFav ? "currentColor" : "none"} />
         </button>
       </div>
@@ -141,8 +153,14 @@ export const NodeCard = ({
               <div className="flex items-center gap-1 md:gap-2 text-zinc-500 w-full justify-center font-bold tracking-wide"><AlertTriangle size={8} className="md:w-[10px] md:h-[10px]"/> NO CREDITS</div>
             ) : node.credits !== null ? (
               <>
-                <div className="flex items-center gap-1 md:gap-1.5"><Medal size={8} className={`md:w-[10px] md:h-[10px] ${zenMode ? 'text-zinc-500' : (node.rank===1?'text-yellow-400':'text-zinc-500')}`} /><span className="text-zinc-400 font-bold">#{node.rank}</span></div>
-                <div className="flex items-center gap-1 md:gap-1.5"><span className="text-zinc-300 font-mono">{node.credits.toLocaleString()}</span><Wallet size={8} className={`md:w-[10px] md:h-[10px] ${zenMode ? 'text-zinc-600' : 'text-yellow-600'}`}/></div>
+                <div className="flex items-center gap-1 md:gap-1.5">
+                  <Medal size={8} className={`md:w-[10px] md:h-[10px] ${zenMode ? 'text-zinc-500' : (node.rank === 1 ? 'text-yellow-400' : 'text-zinc-500')}`} />
+                  <span className="text-zinc-400 font-bold">#{node.rank}</span>
+                </div>
+                <div className="flex items-center gap-1 md:gap-1.5">
+                  <span className="text-zinc-300 font-mono">{node.credits.toLocaleString()}</span>
+                  <Wallet size={8} className={`md:w-[10px] md:h-[10px] ${zenMode ? 'text-zinc-600' : 'text-yellow-600'}`}/>
+                </div>
               </>
             ) : (
               <div className={`flex items-center gap-1 md:gap-2 w-full justify-center font-bold italic ${zenMode ? 'text-zinc-400' : 'text-red-400'}`}><AlertOctagon size={8} className="md:w-[10px] md:h-[10px]"/> OFFLINE</div>
@@ -150,7 +168,7 @@ export const NodeCard = ({
           </div>
         </div>
 
-        {/* Footer: Cycling Metric (Now Responsive to Hover) */}
+        {/* Footer: Cycling Metric */}
         <div className="pt-1 md:pt-3 mt-1 md:mt-3 border-t border-zinc-800 flex justify-between items-end">
           <div>
             <span className="text-[8px] md:text-[10px] text-zinc-500 uppercase font-bold block mb-0.5 flex items-center gap-1">
