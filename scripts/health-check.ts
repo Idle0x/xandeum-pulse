@@ -24,12 +24,25 @@ interface RpcNode {
 
 interface CreditNode {
   pod_id?: string;
-  pubkey?: string; // Fallback
-  id?: string;     // Fallback
+  pubkey?: string; 
+  id?: string;     
   credits: number;
 }
 
 // --- HELPERS ---
+
+/**
+ * Filters rows to ensure one entry per pubkey for financial accuracy.
+ */
+function getUniqueFinancialRows(nodeRows: any[]) {
+  const seen = new Set<string>();
+  return nodeRows.filter(n => {
+    if (!n.pubkey || seen.has(n.pubkey)) return false;
+    seen.add(n.pubkey);
+    return true;
+  });
+}
+
 function getConsensusMetrics(nodeList: any[]) {
   if (!nodeList || nodeList.length === 0) return { version: '0.0.0', score: 0 };
   const activeNodes = nodeList.filter(n => (n.uptime || 0) > 0);
@@ -55,26 +68,32 @@ function getConsensusMetrics(nodeList: any[]) {
 }
 
 function getFinancialMetrics(nodeRows: any[]) {
-  if (!nodeRows || nodeRows.length === 0) return { total: 0, avg: 0, dominance: 0 };
+  // DEDUPLICATION: Ensure we only count credits once per unique pubkey
+  const uniqueRows = getUniqueFinancialRows(nodeRows);
+  
+  if (uniqueRows.length === 0) return { total: 0, avg: 0, dominance: 0, count: 0 };
 
-  const total = nodeRows.reduce((acc, n) => acc + (n.credits || 0), 0);
-  const avg = total / nodeRows.length;
+  const total = uniqueRows.reduce((acc, n) => acc + (n.credits || 0), 0);
+  const avg = total / uniqueRows.length;
 
-  const sorted = [...nodeRows].sort((a, b) => (b.credits || 0) - (a.credits || 0));
+  const sorted = [...uniqueRows].sort((a, b) => (b.credits || 0) - (a.credits || 0));
   const top10Sum = sorted.slice(0, 10).reduce((acc, n) => acc + (n.credits || 0), 0);
   const dominance = total > 0 ? (top10Sum / total) * 100 : 0;
 
-  return { total, avg, dominance: parseFloat(dominance.toFixed(2)) };
+  return { 
+    total, 
+    avg, 
+    dominance: parseFloat(dominance.toFixed(2)),
+    count: uniqueRows.length // This is the "Actual Leaderboard Nodes"
+  };
 }
 
-// Helper to safely extract ID regardless of API variations
 const getSafeKey = (c: CreditNode) => c.pod_id || c.pubkey || c.id || 'unknown';
 
 async function runMonitor() {
-  console.log("xx 🏥 Starting Pulse Monitor (Strict Network Separation Mode)...");
+  console.log("xx 🏥 Starting Pulse Monitor (Hybrid Physical/Financial Mode)...");
 
   try {
-    // 1. Parallel Fetching
     const [pulseRes, mainnetCreditsRes, devnetCreditsRes] = await Promise.allSettled([
       axios.get(PULSE_API_URL, { timeout: 30000 }),
       axios.get(CREDITS_API_MAINNET, { timeout: 10000 }),
@@ -95,7 +114,6 @@ async function runMonitor() {
     const rawMainnetCredits = parseCredits(mainnetCreditsRes);
     const rawDevnetCredits = parseCredits(devnetCreditsRes);
 
-    // 2. STRICTLY SEPARATE MAPS
     const mainnetCreditMap = new Map<string, number>();
     rawMainnetCredits.forEach(c => {
         const key = getSafeKey(c);
@@ -108,18 +126,13 @@ async function runMonitor() {
         if (key !== 'unknown') devnetCreditMap.set(key, c.credits);
     });
 
-    console.log(`xx Loaded Maps: Mainnet (${mainnetCreditMap.size}), Devnet (${devnetCreditMap.size})`);
-
     const supabase = getServiceSupabase();
     if (!supabase) {
       console.warn("⚠️ No DB Key. Exiting.");
       process.exit(0);
     }
 
-    // --- 3. THE MERGE ---
     const uniqueNodeRows: any[] = [];
-    const seenRpcPubkeys = new Set<string>(); 
-
     const finalAllNodes: any[] = [];
     const finalMainnet: any[] = [];
     const finalDevnet: any[] = [];
@@ -130,31 +143,21 @@ async function runMonitor() {
       const net = rpcNode.network || 'MAINNET';
 
       let creditVal = 0;
-
       if (net === 'MAINNET') {
         creditVal = mainnetCreditMap.get(pubkey) || 0;
-        mainnetCreditMap.delete(pubkey); 
+        // Don't delete yet, as multiple physical nodes share this key
       } else {
         creditVal = devnetCreditMap.get(pubkey) || 0;
-        devnetCreditMap.delete(pubkey); 
       }
 
       const finalCredits = creditVal > 0 ? creditVal : (rpcNode.credits || 0);
-
       const processedNode = { ...rpcNode, credits: finalCredits, is_ghost: false };
+      
       finalAllNodes.push(processedNode);
       if (net === 'MAINNET') finalMainnet.push(processedNode);
-      if (net === 'DEVNET') finalDevnet.push(processedNode);
+      else finalDevnet.push(processedNode);
 
-      let ipOnly = '0.0.0.0';
-      const rawAddr = rpcNode.address;
-
-      if (!rawAddr || rawAddr === '' || rawAddr.startsWith('0.0.0.0') || rawAddr === 'null') {
-         ipOnly = 'private'; 
-      } else {
-         ipOnly = rawAddr.split(':')[0];
-      }
-
+      let ipOnly = rpcNode.address && rpcNode.address !== 'null' ? rpcNode.address.split(':')[0] : 'private';
       const stableId = `${pubkey}-${ipOnly}-${net}`; 
 
       uniqueNodeRows.push({
@@ -167,71 +170,41 @@ async function runMonitor() {
         storage_used: Number(rpcNode.storage_used || 0),
         uptime: Number(rpcNode.uptime || 0),
         rank: 0,
-        version: rpcNode.version || '0.0.0', // <--- FIXED: Now Saving Version
+        version: rpcNode.version || '0.0.0',
         created_at: new Date().toISOString()
       });
-
-      seenRpcPubkeys.add(pubkey);
     }
 
-    // --- PHASE B: PROCESS GHOST NODES ---
+    // --- PHASE B: PROCESS GHOST NODES (Remaining in Maps) ---
+    // Filter out keys already seen in RPC nodes to get true ghosts
+    const rpcPubkeys = new Set(rpcNodes.map(n => n.pubkey));
 
-    // 1. Mainnet Ghosts
-    for (const [pubkey, credits] of mainnetCreditMap.entries()) {
-        const ghostNode = {
-          pubkey: pubkey,
-          network: 'MAINNET', 
-          address: 'private',
-          health: 0, uptime: 0, credits: credits, is_ghost: true
-        };
-
+    const processGhosts = (map: Map<string, number>, network: string) => {
+      for (const [pubkey, credits] of map.entries()) {
+        if (rpcPubkeys.has(pubkey)) continue; // Not a ghost, just a shared key
+        
+        const ghostNode = { pubkey, network, address: 'private', health: 0, uptime: 0, credits, is_ghost: true };
         finalAllNodes.push(ghostNode);
-        finalMainnet.push(ghostNode);
+        if (network === 'MAINNET') finalMainnet.push(ghostNode);
+        else finalDevnet.push(ghostNode);
 
         uniqueNodeRows.push({
-          node_id: `${pubkey}-private-MAINNET`,
-          pubkey: pubkey,
-          network: 'MAINNET',
-          health: 0, credits: credits, 
-          storage_committed: 0, storage_used: 0, uptime: 0, rank: 0,
-          version: '0.0.0', // <--- FIXED: Default version for ghosts
+          node_id: `${pubkey}-private-${network}`,
+          pubkey, network, health: 0, credits, storage_committed: 0, storage_used: 0, uptime: 0, rank: 0, version: '0.0.0',
           created_at: new Date().toISOString()
         });
-    }
+      }
+    };
 
-    // 2. Devnet Ghosts
-    for (const [pubkey, credits] of devnetCreditMap.entries()) {
-        const ghostNode = {
-          pubkey: pubkey,
-          network: 'DEVNET', 
-          address: 'private',
-          health: 0, uptime: 0, credits: credits, is_ghost: true
-        };
-
-        finalAllNodes.push(ghostNode);
-        finalDevnet.push(ghostNode);
-
-        uniqueNodeRows.push({
-          node_id: `${pubkey}-private-DEVNET`,
-          pubkey: pubkey,
-          network: 'DEVNET',
-          health: 0, credits: credits, 
-          storage_committed: 0, storage_used: 0, uptime: 0, rank: 0,
-          version: '0.0.0', // <--- FIXED: Default version for ghosts
-          created_at: new Date().toISOString()
-        });
-    }
-
-    console.log(`xx Metrics: ${rpcNodes.length} Public + ${uniqueNodeRows.length - rpcNodes.length} Ghosts processed.`);
+    processGhosts(mainnetCreditMap, 'MAINNET');
+    processGhosts(devnetCreditMap, 'DEVNET');
 
     // --- 4. AGGREGATES ---
     const calcStats = (nodes: any[]) => {
       let cap = 0, used = 0, healthSum = 0, healthCount = 0, stabSum = 0, stabCount = 0;
-
       for (const n of nodes) {
         cap += Number(n.storage_committed || 0);
         used += Number(n.storage_used || 0);
-
         if (!n.is_ghost && (n.health || 0) > 0) {
           healthSum += Number(n.health);
           healthCount++;
@@ -239,10 +212,8 @@ async function runMonitor() {
           stabCount++;
         }
       }
-
       return {
-        cap,
-        used,
+        cap, used,
         avgHealth: healthCount > 0 ? Math.round(healthSum / healthCount) : 0,
         avgStab: stabCount > 0 ? parseFloat((stabSum / stabCount).toFixed(2)) : 0
       };
@@ -256,12 +227,14 @@ async function runMonitor() {
     const mainnetConsensus = getConsensusMetrics(finalMainnet);
     const devnetConsensus = getConsensusMetrics(finalDevnet);
 
+    // FINANCIALS (Deduplicated)
     const globalFin = getFinancialMetrics(uniqueNodeRows);
     const mainnetFin = getFinancialMetrics(uniqueNodeRows.filter(n => n.network === 'MAINNET'));
     const devnetFin = getFinancialMetrics(uniqueNodeRows.filter(n => n.network === 'DEVNET'));
 
     // --- 5. INSERT ---
     const { error: netError } = await supabase.from('network_snapshots').insert({
+      // Dashboard (Physical)
       total_nodes: finalAllNodes.length,
       total_capacity: globalStats.cap,
       total_used: globalStats.used,
@@ -269,11 +242,16 @@ async function runMonitor() {
       avg_stability: globalStats.avgStab,
       consensus_score: globalConsensus.score,    
       consensus_version: globalConsensus.version,
+
+      // Leaderboard (Unique)
+      total_unique_providers: globalFin.count,
       total_credits: globalFin.total,
       avg_credits: globalFin.avg,
       top10_dominance: globalFin.dominance,
 
+      // Mainnet
       mainnet_nodes: finalMainnet.length,
+      mainnet_unique_providers: mainnetFin.count,
       mainnet_capacity: mainnetStats.cap,
       mainnet_used: mainnetStats.used,
       mainnet_avg_health: mainnetStats.avgHealth,
@@ -283,7 +261,9 @@ async function runMonitor() {
       mainnet_avg_credits: mainnetFin.avg,
       mainnet_dominance: mainnetFin.dominance,
 
+      // Devnet
       devnet_nodes: finalDevnet.length,
+      devnet_unique_providers: devnetFin.count,
       devnet_capacity: devnetStats.cap,
       devnet_used: devnetStats.used,
       devnet_avg_health: devnetStats.avgHealth,
@@ -295,12 +275,10 @@ async function runMonitor() {
     });
 
     if (netError) console.error('❌ Network Snapshot Failed:', netError.message);
-    else console.log(`✅ Saved Network Snapshot.`);
+    else console.log(`✅ Saved: Physical(${finalAllNodes.length}) vs Unique(${globalFin.count})`);
 
     const { error: nodeError } = await supabase.from('node_snapshots').insert(uniqueNodeRows);
-
     if (nodeError) console.error('❌ Node Snapshots Failed:', nodeError.message);
-    else console.log(`✅ Saved ${uniqueNodeRows.length} Node Snapshots.`);
 
     process.exit(0);
   } catch (error: any) {
