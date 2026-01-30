@@ -41,6 +41,9 @@ export const HealthView = ({
   const bd = node.healthBreakdown || { uptime: health, version: health, reputation: health, storage: health };
   const avgs = networkStats?.avgBreakdown || { uptime: 0, version: 0, reputation: 0, storage: 0 };
 
+  // NEW: Extract Penalty Data safely
+  const penalties = (node.healthBreakdown as any)?.penalties || { restarts: 0, consistency: 1, restarts_7d_count: 0 };
+
   const isUntracked = (node as any).isUntracked;
   const isApiOffline = node.credits === null;
   const isReputationInvalid = isUntracked || isApiOffline;
@@ -165,6 +168,9 @@ export const HealthView = ({
                     timeRange={timeRange} 
                     globalConsensusVersion={globalConsensusVersion} 
                     globalSortedVersions={globalSortedVersions} 
+                    
+                    // --- INJECTING LIVE PENALTIES ---
+                    currentPenalties={penalties} 
                 />
             </div>
         </div>
