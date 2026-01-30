@@ -13,9 +13,10 @@ export type VitalityArchetype =
 export interface PinConfig {
   show: boolean;
   color: string; 
-  label?: string; // Short label for the Pin itself (e.g. "Hung")
+  label?: string; // Short label for the Pin itself
 }
 
+// New: Human Readable Issue Structure
 export interface VitalityIssue {
   code: string;       // e.g. "V_FROZEN"
   title: string;      // e.g. "Process Hung"
@@ -29,17 +30,17 @@ export interface VitalityAnalysis {
   textColor: string;
   label: string;
   
-  // New Human-Readable Fields
-  issues: VitalityIssue[]; // List of problems for the Middle Section
+  // New: List of human-readable problems for the Middle Section
+  issues: VitalityIssue[]; 
   
   topPin: PinConfig;
   bottomPin: PinConfig;
   
-  // Debug (keep these hidden or small if needed)
+  // Debug (keep hidden or small)
   rawVectors: string[]; 
 }
 
-// --- HUMANIZER CONFIG ---
+// --- HUMANIZER CONFIG (The "English" Translation) ---
 
 const VECTOR_DEFINITIONS: Record<string, { title: string; desc: string; severity: VitalityIssue['severity'] }> = {
   // CRITICAL
@@ -59,21 +60,27 @@ const VECTOR_DEFINITIONS: Record<string, { title: string; desc: string; severity
   V_SYNCING:       { title: 'Syncing',        desc: 'Initializing network data.', severity: 'info' },
 };
 
-// --- LOGIC HELPERS (Consensus & Window) ---
+// --- LOGIC HELPERS ---
 
+// Determine version status based on Network Consensus (Rank 1)
 const getVersionStatus = (nodeVersion: string | undefined, allSortedVersions: string[], consensusVersion: string) => {
     if (!nodeVersion) return { V_LATEST: false, V_LAGGING: true, V_OBSOLETE: false };
+    
     const consensusIndex = allSortedVersions.indexOf(consensusVersion);
     const nodeIndex = allSortedVersions.indexOf(nodeVersion);
+    
+    // If unknown version, assume lagging
     if (nodeIndex === -1) return { V_LATEST: false, V_LAGGING: true, V_OBSOLETE: false };
     
-    // Logic: Leading (lower index) counts as Latest. 
-    // Lagging is 1-2 steps behind. Obsolete is >2 steps behind.
+    // Calculate distance from Consensus
     const distance = nodeIndex - consensusIndex;
     
     return {
+        // Leading (lower index) or Equal to Consensus = Latest
         V_LATEST: distance <= 0,
+        // 1 or 2 steps behind = Lagging
         V_LAGGING: distance > 0 && distance <= 2,
+        // > 2 steps behind = Obsolete
         V_OBSOLETE: distance > 2
     };
 };
@@ -82,8 +89,8 @@ const getVersionStatus = (nodeVersion: string | undefined, allSortedVersions: st
 
 export const analyzePointVitality = (
   point: NodeHistoryPoint, 
-  historyWindow: NodeHistoryPoint[],
-  refPoint24H: NodeHistoryPoint | undefined,
+  historyWindow: NodeHistoryPoint[], // Last ~5 points (for smoothing)
+  refPoint24H: NodeHistoryPoint | undefined, // Point from ~24 hours ago (for Frozen check)
   versionContext: { allSorted: string[], consensus: string }
 ): VitalityAnalysis => {
 
@@ -98,15 +105,18 @@ export const analyzePointVitality = (
   v.V_OFFLINE = uptime === 0;
   v.V_SYNCING = uptime > 0 && uptime < 900; 
   
-  // Frozen (24h Check)
+  // --- FROZEN CHECK (24 HOUR LOGIC) ---
   if (refPoint24H && !v.V_OFFLINE) {
       const timeDelta = new Date(point.date).getTime() - new Date(refPoint24H.date).getTime();
       const uptimeDelta = point.uptime - refPoint24H.uptime;
-      // > 20h passed AND < 10s uptime change
-      if (timeDelta > 72000000 && uptimeDelta < 10) v.V_FROZEN_UPTIME = true;
+      
+      // If time passed > 20h (72,000,000ms) AND Uptime moved < 10 seconds -> FROZEN
+      if (timeDelta > 72000000 && uptimeDelta < 10) {
+          v.V_FROZEN_UPTIME = true;
+      }
   }
 
-  // Version
+  // --- VERSION CHECK (CONSENSUS LOGIC) ---
   const vStats = getVersionStatus(bd.version, versionContext.allSorted, versionContext.consensus);
   Object.assign(v, vStats);
 
@@ -119,28 +129,32 @@ export const analyzePointVitality = (
   v.V_GHOST = consistency < 0.80;
   v.V_CONSISTENT = consistency > 0.95;
 
-  // Economic (Windowed)
+  // --- ECONOMIC CHECK (SMOOTHED WINDOW LOGIC) ---
   const credits = point.credits;
   v.V_UNTRACKED = credits == null;
   
   let windowVelocity = 0;
   if (historyWindow.length > 0) {
+      // Net change over the window
       windowVelocity = (credits || 0) - (historyWindow[0].credits || 0);
   }
+  
   v.V_PRODUCING = windowVelocity > 0;
+  // Stagnant: Tracked + Online + Zero Yield in Window + Not Frozen (Frozen takes priority)
   v.V_STAGNANT = !v.V_UNTRACKED && windowVelocity === 0 && !v.V_FROZEN_UPTIME && !v.V_OFFLINE && !v.V_SYNCING;
   
   v.V_PENALIZED = penalties.restarts > 0;
   v.V_YOUNG = uptime < 259200; // < 3 days
 
   // Event Detectors (For Pins)
-  const prevPoint = historyWindow[historyWindow.length - 1];
+  const prevPoint = historyWindow[historyWindow.length - 1]; // Immediate previous point
   const isRestart = prevPoint && point.uptime < (prevPoint.uptime - 100);
   const isUpdate = prevPoint && bd.version !== prevPoint.version;
+  
   if (isRestart) v.V_RESTART = true;
   if (isUpdate) v.V_UPDATE = true;
 
-  // 2. DETERMINE ARCHETYPE
+  // 2. DETERMINE ARCHETYPE (Priority Waterfall)
   let archetype: VitalityArchetype = 'ACTIVE';
   let baseColor = '#06b6d4'; 
   let textColor = 'text-cyan-400';
