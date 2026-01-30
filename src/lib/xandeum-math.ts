@@ -73,10 +73,9 @@ export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: str
 
   // The Strict Step-Down Scale
   if (distance <= 0) return 100; // Consensus or Leading
-  if (distance === 1) return 90; // N-1
+  if (distance === 1) return 80; // N-1 
   if (distance === 2) return 70; // N-2
-  if (distance === 3) return 35; // N-3
-  return 0;                      // N-4+ (Obsolete)
+  return 0;
 };
 
 /**
