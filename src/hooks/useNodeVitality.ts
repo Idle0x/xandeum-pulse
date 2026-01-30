@@ -27,29 +27,42 @@ export const useNodeVitality = (node: Node, history: NodeHistoryPoint[] = []) =>
     // --- 1. HISTORICAL FORENSICS ---
     // We sort history newest-first to analyze recent trends
     const sortedHistory = [...history].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    
-    // Pattern 1: Restart Frequency (Volatility)
-    // We scan the last 24h of snapshots. If uptime drops significantly, it's a restart.
+
+    // Pattern 1: Restart Frequency (CRASH DETECTION)
+    // We scan the last 24h. A restart is ONLY counted if uptime RESETS to near zero.
+    // Preventing false positives from minor RPC lag/jitter.
     let restartCount = 0;
     if (sortedHistory.length > 1) {
         for (let i = 0; i < sortedHistory.length - 1; i++) {
             const curr = sortedHistory[i].uptime;
             const prev = sortedHistory[i+1].uptime; // Older snapshot
-            // If current uptime is less than previous (by > 60s buffer), it reset
-            if (curr < prev - 60) {
+            
+            // LOGIC UPDATE:
+            // 1. Current uptime must be significantly lower than previous
+            // 2. AND Current uptime must be small (< 1 hour) indicating a fresh boot
+            // This ignores "1000s -> 950s" glitches, but catches "1000s -> 10s" crashes.
+            if (curr < prev && curr < 3600) {
                 restartCount++;
             }
         }
     }
 
-    // Pattern 2: Stagnation Check (Zombie Process)
-    // Compare current live data vs snapshot from ~1 hour ago
+    // Pattern 2: Stagnation Check (The 24-Hour "Frozen" Rule)
+    // Compare current live data vs snapshot from ~24 hours ago
     let isFrozen = false;
-    const oneHourAgo = sortedHistory.find(p => (now - new Date(p.date).getTime()) > 60 * 60 * 1000);
-    if (oneHourAgo) {
-        const deltaUptime = currentUptime - oneHourAgo.uptime;
-        // If 1 hour passed in real time, but uptime grew < 60 seconds -> Frozen
-        if (Math.abs(deltaUptime) < 60 && currentUptime > 1000) {
+    const twentyFourHoursAgo = sortedHistory.find(p => {
+        const diff = now - new Date(p.date).getTime();
+        // Look for a point roughly 24h ago (23h - 25h window)
+        return diff > 23 * 60 * 60 * 1000 && diff < 25 * 60 * 60 * 1000;
+    });
+
+    if (twentyFourHoursAgo && currentUptime > 3600) {
+        const deltaRealTime = now - new Date(twentyFourHoursAgo.date).getTime();
+        const deltaUptime = (currentUptime - twentyFourHoursAgo.uptime) * 1000; // to ms
+
+        // Tolerance: 10 Minutes (600,000 ms)
+        // If 24 hours passed, but uptime moved less than 10 minutes -> FROZEN
+        if (Math.abs(deltaUptime) < 600000) {
             isFrozen = true;
         }
     }
@@ -58,6 +71,7 @@ export const useNodeVitality = (node: Node, history: NodeHistoryPoint[] = []) =>
     // Missing from > 80% of snapshots in last 6 hours
     const sixHoursPoints = sortedHistory.filter(p => (now - new Date(p.date).getTime()) < 6 * 60 * 60 * 1000);
     const missingCount = sixHoursPoints.filter(p => p.health === 0).length;
+    // We need at least 5 points to make a judgement
     const isGhosting = sixHoursPoints.length > 5 && (missingCount / sixHoursPoints.length > 0.8);
 
 
@@ -80,7 +94,7 @@ export const useNodeVitality = (node: Node, history: NodeHistoryPoint[] = []) =>
     }
 
     // LEVEL 2: THE "ZOMBIE" CHECK (STAGNANT)
-    // Criteria: Seen recently (< 2h) BUT uptime counter is stuck
+    // Criteria: Seen recently (< 2h) BUT uptime counter is stuck (24h Check)
     if (isFrozen) {
         return {
             status: 'STAGNANT',
@@ -88,7 +102,7 @@ export const useNodeVitality = (node: Node, history: NodeHistoryPoint[] = []) =>
             color: 'text-yellow-500',
             bgColor: 'bg-yellow-500/10 border-yellow-500/20',
             icon: Activity,
-            reason: 'Process hung: Uptime counter frozen',
+            reason: 'Process hung: Uptime frozen for 24h',
             confidence: 95
         };
     }
@@ -105,7 +119,7 @@ export const useNodeVitality = (node: Node, history: NodeHistoryPoint[] = []) =>
             bgColor: 'bg-orange-500/10 border-orange-500/20',
             icon: AlertTriangle,
             reason: restartCount > 5 
-                ? `High volatility: ${restartCount} restarts detected` 
+                ? `High volatility: ${restartCount} restarts in 24h` 
                 : `High latency: Last seen ${Math.round(sinceSeenMins)}m ago`,
             confidence: 85
         };
@@ -113,8 +127,6 @@ export const useNodeVitality = (node: Node, history: NodeHistoryPoint[] = []) =>
 
     // LEVEL 4: THE "BOOT" CHECK (WARMUP)
     // Criteria: Uptime < 30 mins.
-    // Note: If it passed Level 1 (Offline) and Level 3 (Unstable - Late Reporting), 
-    // it means it's reporting on time but just started. This is a healthy boot.
     if (currentUptime < 30 * 60) {
         return {
             status: 'WARMUP',
