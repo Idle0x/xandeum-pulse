@@ -4,10 +4,9 @@ import { RankedNode } from '../../types/leaderboard';
 import { useNetworkHistory } from '../../hooks/useNetworkHistory';
 
 interface StatsOverviewProps {
-  nodes: RankedNode[]; // Kept for fallback count
+  nodes: RankedNode[]; 
   networkFilter: string;
   onOpenAnalytics: () => void;
-  // Removed networkStats prop as we now use history directly for consistency
 }
 
 export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }: StatsOverviewProps) {
@@ -36,7 +35,8 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
       // Extract based on Filter
       if (networkFilter === 'MAINNET') {
           return {
-              count: latest.mainnet_nodes,
+              // UPDATED: Use Unique Providers, fallback to raw nodes if missing
+              count: latest.mainnet_unique_providers || latest.mainnet_nodes,
               totalCredits: latest.mainnet_credits,
               avgCredits: latest.mainnet_avg_credits,
               dominance: latest.mainnet_dominance,
@@ -46,7 +46,8 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
           };
       } else if (networkFilter === 'DEVNET') {
            return {
-              count: latest.devnet_nodes,
+              // UPDATED: Use Unique Providers, fallback to raw nodes if missing
+              count: latest.devnet_unique_providers || latest.devnet_nodes,
               totalCredits: latest.devnet_credits,
               avgCredits: latest.devnet_avg_credits,
               dominance: latest.devnet_dominance,
@@ -57,7 +58,8 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
       } else {
           // COMBINED / ALL
           return {
-              count: latest.total_nodes,
+              // UPDATED: Use Unique Providers, fallback to raw nodes if missing
+              count: latest.total_unique_providers || latest.total_nodes,
               totalCredits: latest.total_credits,
               avgCredits: latest.avg_credits,
               dominance: latest.top10_dominance,
@@ -68,6 +70,8 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
       }
   }, [history, networkFilter, nodes.length]);
 
+  // ... (Rest of TickerCard and return statement remains exactly the same)
+  
   // --- SUB-COMPONENT: COMPACT TICKER CARD ---
   const TickerCard = ({ icon: Icon, label, value, subValue, deltaType, rawValue, valueColor = "text-white", hideTrend = false }: any) => {
       let delta = 0;
@@ -92,7 +96,7 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
       const isPos = delta > 0;
       const isNeg = delta < 0;
       const isNeutral = Math.abs(delta) < 0.01;
-      
+
       const trendColor = isPos ? 'text-green-500' : isNeg ? 'text-red-500' : 'text-zinc-500';
       const Arrow = isPos ? TrendingUp : isNeg ? TrendingDown : Minus;
 
@@ -101,20 +105,16 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
             onClick={onOpenAnalytics}
             className="bg-zinc-900/40 border border-zinc-800/60 p-3 rounded-lg backdrop-blur-md cursor-pointer group hover:bg-zinc-900 hover:border-zinc-700 transition-all flex flex-col justify-center min-h-[60px]"
         >
-            {/* LABEL */}
             <div className="flex items-center gap-1.5 mb-0.5">
                 <Icon size={10} className="text-zinc-500 group-hover:text-zinc-300 transition-colors" />
                 <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 group-hover:text-zinc-400 transition-colors">
                     {label}
                 </span>
             </div>
-
-            {/* VALUE & TICKER */}
             <div className="flex items-baseline gap-2">
                 <div className={`text-lg font-black tracking-tight font-mono ${valueColor}`}>
                     {loading ? <div className="h-5 w-16 bg-zinc-800 rounded animate-pulse"/> : value}
                 </div>
-
                 {!hideTrend && !loading && (
                     <div className={`flex items-center gap-1 text-[9px] font-mono font-bold ${isNeutral ? 'text-zinc-500' : trendColor}`}>
                         {isNeutral ? <Minus size={8} /> : <Arrow size={8} strokeWidth={3} />}
@@ -136,7 +136,7 @@ export default function StatsOverview({ nodes, networkFilter, onOpenAnalytics }:
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <TickerCard 
                 icon={Users} 
-                label={`Nodes (${networkLabel})`} 
+                label={`Unique Nodes (${networkLabel})`} 
                 value={stats.count.toLocaleString()} 
                 rawValue={stats.count}
                 deltaType="COUNT"
