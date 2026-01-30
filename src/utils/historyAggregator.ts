@@ -114,13 +114,27 @@ export async function fetchNodeHistoryReport(): Promise<NetworkHistoryReport> {
   Object.entries(grouped).forEach(([nodeId, history]) => {
     let restarts7d = 0;
     let restarts24h = 0;
-    
+
     // Forensics for Frozen State
     let currentFrozenStreakMs = 0;
 
     // Forensics for 24h Velocity
     let minCredits24h = -1;
     let maxCredits24h = 0;
+
+    // --- FIX: DYNAMIC EXPECTATION CALCULATION ---
+    // We calculate how long we have actually known about this node ID
+    // instead of hardcoding a 7-day expectation.
+    const firstPointTime = new Date(history[0].created_at).getTime();
+    const lastPointTime = new Date(history[history.length - 1].created_at).getTime();
+    
+    // Calculate hours between first and last seen point
+    const lifespanHours = Math.max(1, (lastPointTime - firstPointTime) / (1000 * 60 * 60));
+    
+    // If the node is young (< 7 days), expect fewer snapshots.
+    // If the node is old (> 7 days), expect the full 168.
+    const expected = Math.min(168, lifespanHours);
+    // --- END FIX ---
 
     for (let i = 1; i < history.length; i++) {
       const prev = history[i-1];
@@ -157,7 +171,7 @@ export async function fetchNodeHistoryReport(): Promise<NetworkHistoryReport> {
     }
 
     // 4. Consistency Score
-    const expected = 168; // 7 days * 24 hours
+    // Using the dynamic 'expected' value calculated above
     const consistency = Math.min(1, history.length / (expected * 0.8));
 
     // Calculate final velocity
