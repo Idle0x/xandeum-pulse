@@ -3,10 +3,10 @@
 // --- HELPER INTERFACES ---
 export interface ForensicContext {
   restarts_7d: number;      
-  restarts_24h: number;          // NEW: Trauma context
-  yield_velocity_24h: number;    // NEW: Zombie context
+  restarts_24h: number;          
+  yield_velocity_24h: number;    
   consistency_score: number;
-  frozen_duration_hours: number; // NEW: Ice Age context
+  frozen_duration_hours: number; 
 }
 
 export const cleanSemver = (v: string) => {
@@ -39,42 +39,36 @@ export const calculateElasticStorageScore = (
 ) => {
   if (medianBytes === 0) return 0;
 
-  // Guard: Ensure P95 is at least Median to prevent division errors
   const safeP95 = Math.max(p95Bytes, medianBytes * 1.01);
 
-  // ZONE 1: The Standard Zone (C <= Median)
   if (committedBytes <= medianBytes) {
       return 50 * Math.log2((committedBytes / medianBytes) + 1);
   }
 
-  // ZONE 2: The Growth Zone (Median < C <= P95)
   if (committedBytes <= safeP95) {
       const position = Math.log10(committedBytes / medianBytes) / Math.log10(safeP95 / medianBytes);
       return 50 + (40 * position);
   }
 
-  // ZONE 3: The Whale Zone (C > P95)
   return Math.min(100, 90 + 10 * Math.log2((committedBytes / safeP95) + 1));
 };
 
-// --- UPDATED: STRICT VERSION SCORING ---
+// --- VERSION SCORING ---
 export const getVersionScoreByRank = (nodeVersion: string, consensusVersion: string, sortedCleanVersions: string[]) => {
   const cleanNode = cleanSemver(nodeVersion);
   const cleanConsensus = cleanSemver(consensusVersion);
 
-  // If node is newer or equal to consensus
   if (compareVersions(cleanNode, cleanConsensus) >= 0) return 100; 
 
   const consensusIndex = sortedCleanVersions.indexOf(cleanConsensus);
   const nodeIndex = sortedCleanVersions.indexOf(cleanNode);
 
-  if (nodeIndex === -1) return 0; // Unknown version
+  if (nodeIndex === -1) return 0; 
   const distance = nodeIndex - consensusIndex;
 
-  // The Strict Step-Down Scale
-  if (distance <= 0) return 100; // Consensus or Leading
-  if (distance === 1) return 80; // N-1 
-  if (distance === 2) return 70; // N-2
+  if (distance <= 0) return 100; 
+  if (distance === 1) return 80; 
+  if (distance === 2) return 70; 
   return 0;
 };
 
@@ -96,26 +90,24 @@ export const calculateVitalityScore = (
   isCreditsApiOnline: boolean,
   context: ForensicContext 
 ) => {
-  // 1. HARD GATE: No storage = No Score.
   if (storageCommitted <= 0) return { total: 0, breakdown: { uptime: 0, version: 0, reputation: 0, storage: 0, penalties: { restarts: 0, consistency: 1, restarts_7d_count: 0 } } };
 
-  // --- PILLAR 1: UPTIME (The Veteran Curve) ---
+  // --- PILLAR 1: UPTIME ---
   const uptimeDays = uptimeSeconds / 86400;
   const uptimeScore = calculateSigmoidScore(uptimeDays, 30, 0.15); 
 
-  // --- PILLAR 2: STORAGE (Elastic Model + Utility) ---
+  // --- PILLAR 2: STORAGE ---
   const baseStorageScore = calculateElasticStorageScore(storageCommitted, medianStorage, p95Storage);
   const utilizationBonus = storageUsed > 0 ? Math.min(15, 5 * Math.log2((storageUsed / (1024 ** 3)) + 2)) : 0;
   const totalStorageScore = Math.min(100, baseStorageScore + utilizationBonus);
 
-  // --- PILLAR 3: VERSION (The Sunset Gate) ---
+  // --- PILLAR 3: VERSION ---
   const versionScore = getVersionScoreByRank(version, consensusVersion, sortedCleanVersions);
 
-  // --- PILLAR 4: REPUTATION (Wealth + Velocity) ---
+  // --- PILLAR 4: REPUTATION ---
   let reputationScore: number | null = null;
   if (credits !== null && medianCredits > 0) {
     let rawRepScore = Math.min(100, (credits / (medianCredits * 2)) * 100);
-    // ZOMBIE CHECK: If earning nothing today, max rep is capped at 50%
     if (context.yield_velocity_24h === 0) {
        rawRepScore = Math.min(50, rawRepScore); 
     }
@@ -134,24 +126,25 @@ export const calculateVitalityScore = (
       rawTotal = (uptimeScore * 0.45) + (totalStorageScore * 0.35) + (versionScore * 0.20);
   }
 
-  // --- THE PENALTIES (The Teeth) ---
+  // --- THE PENALTIES ---
 
-  // A. Quadratic Restart Penalty (Base)
+  // A. Quadratic Restart Penalty
   const rawRestartPenalty = Math.pow(context.restarts_7d, 2);
   let restartPenalty = Math.min(36, rawRestartPenalty);
 
-  // B. Trauma Multiplier (Rapid Restarts)
+  // B. Trauma Multiplier
   if (context.restarts_24h > 5) {
       restartPenalty = Math.min(50, restartPenalty * 1.5);
   }
 
-  // C. Consistency Damper (Multiplier)
-  // This penalizes flickering nodes. E.g. 0.8 Consistency = Score * 0.64
-  const consistencyMult = Math.pow(context.consistency_score, 2);
+  // C. Consistency Damper
+  // DEBUG BYPASS: Hardcoded to 1 to ignore data gaps while debugging history aggregator.
+  // Original: const consistencyMult = Math.pow(context.consistency_score, 2);
+  const consistencyMult = 1;
 
-  // D. FROZEN PENALTY (The Ice Age Protocol)
+  // D. Frozen Penalty
   let frozenPenalty = 0;
-  let frozenCap = 100; // Default no cap
+  let frozenCap = 100; 
 
   if (context.frozen_duration_hours > 0) {
       if (context.frozen_duration_hours < 1) {
@@ -161,16 +154,14 @@ export const calculateVitalityScore = (
       } else {
           frozenPenalty = 50; 
       }
-      // THE CAP (> 3 Days / 72 Hours)
       if (context.frozen_duration_hours >= 72) {
-          frozenCap = 10; // Cap score at 10
+          frozenCap = 10; 
       }
   }
 
   // --- FINAL FORMULA ---
   let netScore = (rawTotal - restartPenalty - frozenPenalty) * consistencyMult;
 
-  // Apply Hard Caps
   netScore = Math.min(netScore, frozenCap);
   netScore = Math.max(0, Math.min(100, netScore));
 
