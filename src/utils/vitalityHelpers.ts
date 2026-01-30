@@ -17,18 +17,18 @@ export interface PinConfig {
 }
 
 export interface VitalityIssue {
-  code: string;       // e.g. "V_FROZEN"
-  title: string;      // e.g. "Process Hung"
-  description: string;// e.g. "Snapshot identical to 24h ago."
+  code: string;       
+  title: string;      
+  description: string;
   severity: 'critical' | 'warning' | 'info';
 }
 
 export interface VitalityAnalysis {
   archetype: VitalityArchetype;
-  baseColor: string; // HEX CODE
-  textColor: string; // Tailwind text class
+  baseColor: string; 
+  textColor: string; 
   label: string;
-  vectors: string[]; // Debug list
+  vectors: string[]; 
   issues: VitalityIssue[]; 
   topPin: PinConfig;
   bottomPin: PinConfig;
@@ -48,7 +48,7 @@ const VECTOR_DEFINITIONS: Record<string, { title: string; description: string; s
   V_VOLATILE:      { title: 'Instability',    description: 'Frequent restarts detected.', severity: 'warning' },
   V_GHOST:         { title: 'Data Gaps',      description: 'Irregular reporting patterns.', severity: 'warning' },
   
-  // INFO / EVENTS (For Pins)
+  // INFO / EVENTS
   V_RESTART:       { title: 'System Restart', description: 'Uptime reset detected.', severity: 'info' },
   V_UPDATE:        { title: 'Software Update',description: 'Version changed recently.', severity: 'info' },
   V_SYNCING:       { title: 'Syncing',        description: 'Initializing network data.', severity: 'info' },
@@ -56,7 +56,7 @@ const VECTOR_DEFINITIONS: Record<string, { title: string; description: string; s
 
 // --- LOGIC HELPERS ---
 
-// NEW: Robust Semver Comparison (Sort Independent)
+// Helper: Semantic Version Comparison (Sort Independent)
 // Returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal
 const compareSemver = (v1: string, v2: string) => {
   const clean = (v: string) => v.replace(/[^0-9.]/g, ''); 
@@ -75,20 +75,19 @@ const compareSemver = (v1: string, v2: string) => {
 const getVersionStatus = (nodeVersion: string | undefined, allSortedVersions: string[], consensusVersion: string) => {
     if (!nodeVersion) return { V_LATEST: false, V_LAGGING: true, V_OBSOLETE: false };
     
-    // 1. MATH CHECK (The Fix): 
-    // If Node >= Consensus, it is LATEST. This works regardless of list sorting.
+    // 1. MATH CHECK: If Node >= Consensus, it is LATEST.
     if (compareSemver(nodeVersion, consensusVersion) >= 0) {
         return { V_LATEST: true, V_LAGGING: false, V_OBSOLETE: false };
     }
 
-    // 2. DISTANCE CHECK (Only for older nodes)
+    // 2. DISTANCE CHECK (For older nodes only)
     const consensusIndex = allSortedVersions.indexOf(consensusVersion);
     const nodeIndex = allSortedVersions.indexOf(nodeVersion);
     
+    // If unknown version, assume lagging
     if (nodeIndex === -1) return { V_LATEST: false, V_LAGGING: true, V_OBSOLETE: false };
 
-    // Calculate absolute distance. 
-    // Since we already handled "Newer" nodes above, any distance here means "Older"
+    // Calculate distance steps (1 version behind, 2 versions behind, etc.)
     const distance = Math.abs(consensusIndex - nodeIndex);
     
     return {
@@ -105,7 +104,7 @@ const calculateVectors = (
   historyWindow: NodeHistoryPoint[], 
   refPoint24H: NodeHistoryPoint | undefined, 
   versionContext: { allSorted: string[], consensus: string },
-  nodeCreatedAt: string // <--- NEW PARAM: Required for V_YOUNG
+  firstSeenDate: string // <--- MATCHES IDENTITYVIEW LOGIC (sorted[0].date)
 ) => {
   const uptime = point.uptime || 0;
   const bd = (point as any).healthBreakdown || {};
@@ -121,13 +120,13 @@ const calculateVectors = (
       const timeDelta = new Date(point.date).getTime() - new Date(refPoint24H.date).getTime();
       const uptimeDelta = point.uptime - refPoint24H.uptime;
 
-      // UPDATED: Relaxed tolerance to 60s (was 10s) to prevent false positives from heartbeat jitter
+      // Relaxed tolerance (60s) to handle network jitter/RPC lag
       if (timeDelta > 72000000 && uptimeDelta < 60) { 
           V_FROZEN_UPTIME = true;
       }
   }
 
-  // --- 2. VERSION VECTORS (Consensus Based) ---
+  // --- 2. VERSION VECTORS ---
   const vStats = getVersionStatus(bd.version, versionContext.allSorted, versionContext.consensus);
   const { V_LATEST, V_LAGGING, V_OBSOLETE } = vStats;
 
@@ -140,7 +139,7 @@ const calculateVectors = (
   const V_CONSISTENT = consistency > 0.95;
   const V_GHOST = consistency < 0.80;
 
-  // --- 4. ECONOMIC VECTORS (Windowed) ---
+  // --- 4. ECONOMIC VECTORS ---
   const credits = point.credits; 
   const V_UNTRACKED = credits === null || credits === undefined;
 
@@ -159,9 +158,9 @@ const calculateVectors = (
   // --- 5. TIME/PENALTY VECTORS ---
   const V_PENALIZED = penalties.restarts > 0;
   
-  // FIX: V_YOUNG is now based on DB Creation Date, not Uptime.
+  // CONSISTENCY FIX: V_YOUNG is now based on 'First Seen' date.
   // 3 Days = 259,200,000 ms
-  const ageMs = Date.now() - new Date(nodeCreatedAt).getTime();
+  const ageMs = new Date(point.date).getTime() - new Date(firstSeenDate).getTime();
   const V_YOUNG = ageMs < 259200000; 
 
   // Event Detectors
@@ -189,10 +188,10 @@ export const analyzePointVitality = (
   historyWindow: NodeHistoryPoint[],
   refPoint24H: NodeHistoryPoint | undefined,
   versionContext: { allSorted: string[], consensus: string },
-  nodeCreatedAt: string // <--- PASSED DOWN FROM COMPONENT
+  firstSeenDate: string // <--- Pass the derived 'firstSeen' from IdentityView here
 ): VitalityAnalysis => {
 
-  const v = calculateVectors(point, historyWindow, refPoint24H, versionContext, nodeCreatedAt);
+  const v = calculateVectors(point, historyWindow, refPoint24H, versionContext, firstSeenDate);
   const activeVectors = Object.entries(v).filter(([_, val]) => val).map(([key]) => key);
 
   let archetype: VitalityArchetype = 'ACTIVE';
