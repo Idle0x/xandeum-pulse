@@ -40,14 +40,14 @@ const VECTOR_DEFINITIONS: Record<string, { title: string; description: string; s
   // CRITICAL
   V_OFFLINE:       { title: 'System Offline', description: 'Node is unreachable.', severity: 'critical' },
   V_OBSOLETE:      { title: 'Update Required', description: 'Consensus lost. Update ASAP.', severity: 'critical' },
-  
+
   // WARNINGS
   V_FROZEN_UPTIME: { title: 'Process Hung',   description: 'Uptime stuck for >24h. Restart needed.', severity: 'warning' },
   V_STAGNANT:      { title: 'Zero Yield',     description: 'Online but earning nothing.', severity: 'warning' },
   V_LAGGING:       { title: 'Version Lag',    description: 'Newer version available.', severity: 'warning' },
   V_VOLATILE:      { title: 'Instability',    description: 'Frequent restarts detected.', severity: 'warning' },
   V_GHOST:         { title: 'Data Gaps',      description: 'Irregular reporting patterns.', severity: 'warning' },
-  
+
   // INFO / EVENTS
   V_RESTART:       { title: 'System Restart', description: 'Uptime reset detected.', severity: 'info' },
   V_UPDATE:        { title: 'Software Update',description: 'Version changed recently.', severity: 'info' },
@@ -62,7 +62,7 @@ const compareSemver = (v1: string, v2: string) => {
   const clean = (v: string) => v.replace(/[^0-9.]/g, ''); 
   const p1 = clean(v1).split('.').map(Number);
   const p2 = clean(v2).split('.').map(Number);
-  
+
   for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
     const n1 = p1[i] || 0;
     const n2 = p2[i] || 0;
@@ -74,7 +74,7 @@ const compareSemver = (v1: string, v2: string) => {
 
 const getVersionStatus = (nodeVersion: string | undefined, allSortedVersions: string[], consensusVersion: string) => {
     if (!nodeVersion) return { V_LATEST: false, V_LAGGING: true, V_OBSOLETE: false };
-    
+
     // 1. MATH CHECK: If Node >= Consensus, it is LATEST.
     if (compareSemver(nodeVersion, consensusVersion) >= 0) {
         return { V_LATEST: true, V_LAGGING: false, V_OBSOLETE: false };
@@ -83,13 +83,13 @@ const getVersionStatus = (nodeVersion: string | undefined, allSortedVersions: st
     // 2. DISTANCE CHECK (For older nodes only)
     const consensusIndex = allSortedVersions.indexOf(consensusVersion);
     const nodeIndex = allSortedVersions.indexOf(nodeVersion);
-    
+
     // If unknown version, assume lagging
     if (nodeIndex === -1) return { V_LATEST: false, V_LAGGING: true, V_OBSOLETE: false };
 
     // Calculate distance steps (1 version behind, 2 versions behind, etc.)
     const distance = Math.abs(consensusIndex - nodeIndex);
-    
+
     return {
         V_LATEST: false,
         V_LAGGING: distance <= 2,
@@ -104,7 +104,7 @@ const calculateVectors = (
   historyWindow: NodeHistoryPoint[], 
   refPoint24H: NodeHistoryPoint | undefined, 
   versionContext: { allSorted: string[], consensus: string },
-  firstSeenDate: string // <--- MATCHES IDENTITYVIEW LOGIC (sorted[0].date)
+  firstSeenDate: string 
 ) => {
   const uptime = point.uptime || 0;
   const bd = (point as any).healthBreakdown || {};
@@ -126,8 +126,10 @@ const calculateVectors = (
       }
   }
 
-  // --- 2. VERSION VECTORS ---
-  const vStats = getVersionStatus(bd.version, versionContext.allSorted, versionContext.consensus);
+  // --- 2. VERSION VECTORS (FIXED) ---
+  // FIX: Access point.version (string) instead of bd.version (score)
+  const versionString = (point as any).version; 
+  const vStats = getVersionStatus(versionString, versionContext.allSorted, versionContext.consensus);
   const { V_LATEST, V_LAGGING, V_OBSOLETE } = vStats;
 
   // --- 3. STABILITY VECTORS ---
@@ -152,21 +154,21 @@ const calculateVectors = (
   }
 
   const V_PRODUCING = windowVelocity > 0;
-  
+
   const V_STAGNANT = !V_UNTRACKED && windowVelocity === 0 && !V_FROZEN_UPTIME && !V_OFFLINE && !V_SYNCING; 
 
   // --- 5. TIME/PENALTY VECTORS ---
   const V_PENALIZED = penalties.restarts > 0;
-  
+
   // CONSISTENCY FIX: V_YOUNG is now based on 'First Seen' date.
-  // 3 Days = 259,200,000 ms
   const ageMs = new Date(point.date).getTime() - new Date(firstSeenDate).getTime();
   const V_YOUNG = ageMs < 259200000; 
 
   // Event Detectors
   const prevPoint = historyWindow[historyWindow.length - 1]; 
   const isRestart = prevPoint && point.uptime < (prevPoint.uptime - 100);
-  const isUpdate = prevPoint && bd.version !== prevPoint.version;
+  // FIX: Also check string version here
+  const isUpdate = prevPoint && (point as any).version !== (prevPoint as any).version;
 
   const V_RESTART = !!isRestart;
   const V_UPDATE = !!isUpdate;
@@ -188,7 +190,7 @@ export const analyzePointVitality = (
   historyWindow: NodeHistoryPoint[],
   refPoint24H: NodeHistoryPoint | undefined,
   versionContext: { allSorted: string[], consensus: string },
-  firstSeenDate: string // <--- Pass the derived 'firstSeen' from IdentityView here
+  firstSeenDate: string 
 ): VitalityAnalysis => {
 
   const v = calculateVectors(point, historyWindow, refPoint24H, versionContext, firstSeenDate);
