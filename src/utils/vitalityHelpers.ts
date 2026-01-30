@@ -77,7 +77,7 @@ const compareVersions = (v1: string, v2: string) => {
 // --- UPDATED: THE COLLAPSED LADDER LOGIC ---
 const getVersionStatus = (nodeVersion: string | undefined, globalSortedVersions: string[], consensusVersion: string) => {
     const result = { V_LATEST: false, V_LAGGING: false, V_OBSOLETE: false };
-    
+
     if (!nodeVersion) {
         result.V_LAGGING = true; 
         return result;
@@ -185,6 +185,7 @@ const calculateVectors = (
   const V_STAGNANT = !V_UNTRACKED && windowVelocity === 0 && !V_FROZEN_UPTIME && !V_OFFLINE && !V_SYNCING; 
 
   // --- 5. TIME/PENALTY VECTORS ---
+  // A point is penalized if it has restart penalties OR low consistency
   const V_PENALIZED = penalties.restarts > 0;
 
   // First Seen Logic
@@ -289,11 +290,18 @@ export const analyzePointVitality = (
 
   const bottomPin: PinConfig = { show: false, color: 'bg-transparent' };
 
-  if (v.V_RESTART) {
+  // --- PIN LOGIC UPGRADE ---
+  // The Red Pin now handles Restart Events OR Active Penalties (Trauma/Consistency)
+  // This ensures the "Penalty" state is visible as a pin on the ribbon.
+  if (v.V_RESTART || v.V_PENALIZED || !v.V_CONSISTENT) {
       bottomPin.show = true;
       bottomPin.color = 'bg-rose-400'; 
-      bottomPin.label = 'Restart';
-  } else if (v.V_UPDATE) {
+      
+      if (v.V_RESTART) bottomPin.label = 'Restart';
+      else if (v.V_PENALIZED) bottomPin.label = 'Trauma';
+      else bottomPin.label = 'Penalty';
+  } 
+  else if (v.V_UPDATE) {
       bottomPin.show = true;
       bottomPin.color = 'bg-blue-400';
       bottomPin.label = 'Update';
