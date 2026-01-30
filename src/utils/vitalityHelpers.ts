@@ -3,12 +3,12 @@ import { NodeHistoryPoint } from '../hooks/useNodeHistory';
 // --- TYPES ---
 
 export type VitalityArchetype = 
-  | 'CRITICAL'    // Dead / Obsolete+Stagnant (Rose)
-  | 'TRAUMA'      // Instability (Violet)
-  | 'DRIFT'       // Hung / Stagnant / Lagging / Obsolete(Active) (Amber)
-  | 'INCUBATION'  // New / Untracked+Good (Blue)
-  | 'ELITE'       // Perfect (Emerald)
-  | 'ACTIVE';     // Solid / Reliable (Cyan)
+  | 'CRITICAL'    
+  | 'TRAUMA'      
+  | 'DRIFT'       
+  | 'INCUBATION'  
+  | 'ELITE'       
+  | 'ACTIVE';     
 
 export interface PinConfig {
   show: boolean;
@@ -54,15 +54,17 @@ const VECTOR_DEFINITIONS: Record<string, { title: string; description: string; s
   V_SYNCING:       { title: 'Syncing',        description: 'Initializing network data.', severity: 'info' },
 };
 
-// --- LOGIC HELPERS ---
+// --- LOGIC HELPERS (REPLACED AS REQUESTED) ---
 
-// Helper: Semantic Version Comparison (Sort Independent)
-// Returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal
-const compareSemver = (v1: string, v2: string) => {
-  const clean = (v: string) => v.replace(/[^0-9.]/g, ''); 
-  const p1 = clean(v1).split('.').map(Number);
-  const p2 = clean(v2).split('.').map(Number);
+export const cleanSemver = (v: string) => {
+  if (!v) return '0.0.0';
+  const mainVer = v.split('-')[0];
+  return mainVer.replace(/[^0-9.]/g, '');
+};
 
+const compareVersions = (v1: string, v2: string) => {
+  const p1 = cleanSemver(v1).split('.').map(Number);
+  const p2 = cleanSemver(v2).split('.').map(Number);
   for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
     const n1 = p1[i] || 0;
     const n2 = p2[i] || 0;
@@ -74,39 +76,54 @@ const compareSemver = (v1: string, v2: string) => {
 
 // --- UPDATED: STRICT GLOBAL CONSENSUS CHECK ---
 const getVersionStatus = (nodeVersion: string | undefined, globalSortedVersions: string[], consensusVersion: string) => {
-    if (!nodeVersion) return { V_LATEST: false, V_LAGGING: true, V_OBSOLETE: false };
-
-    // 1. SAFETY CHECK: If Leading or Matching Consensus -> LATEST
-    // "Any version above or on consensus is fine."
-    if (compareSemver(nodeVersion, consensusVersion) >= 0) {
-        return { V_LATEST: true, V_LAGGING: false, V_OBSOLETE: false };
+    // Default safe state
+    const result = { V_LATEST: false, V_LAGGING: false, V_OBSOLETE: false };
+    
+    if (!nodeVersion) {
+        result.V_LAGGING = true; // Fallback
+        return result;
     }
 
-    // 2. DISTANCE CHECK (Using Global List)
-    // We only look at versions that are OLDER than consensus in the global list
-    // to calculate how "far behind" this node is.
+    const cleanNode = cleanSemver(nodeVersion);
+    const cleanConsensus = cleanSemver(consensusVersion);
+
+    // 1. CHECK: Higher or Equal to Consensus -> LATEST
+    // This correctly handles "Leading" nodes.
+    if (compareVersions(cleanNode, cleanConsensus) >= 0) {
+        result.V_LATEST = true;
+        return result;
+    }
+
+    // 2. CHECK: Distance in Global List
+    // We clean the global list for accurate matching
+    const cleanList = globalSortedVersions.map(cleanSemver);
     
-    // Clean and Normalize logic
-    const cleanVer = (v: string) => v.replace(/[^0-9.]/g, '');
-    const cleanNode = cleanVer(nodeVersion);
-    const cleanList = globalSortedVersions.map(cleanVer);
-    
-    // Find where the node sits in the global stack
     const nodeIndex = cleanList.indexOf(cleanNode);
-    const consensusIndex = cleanList.indexOf(cleanVer(consensusVersion));
+    const consensusIndex = cleanList.indexOf(cleanConsensus);
 
-    // If version is unknown to the network, assume Lagging
-    if (nodeIndex === -1) return { V_LATEST: false, V_LAGGING: true, V_OBSOLETE: false };
+    // If version is unknown to the network list and we already know it's not newer (step 1),
+    // we treat it as Obsolete.
+    if (nodeIndex === -1) {
+        result.V_OBSOLETE = true;
+        return result;
+    }
 
-    // Calculate strict steps behind
-    // Example: [v1.5, v1.4, v1.3]. Consensus v1.5 (idx 0). Node v1.3 (idx 2). Distance = 2.
     const distance = nodeIndex - consensusIndex;
 
-    return {
-        V_LATEST: false,
-        V_LAGGING: distance > 0 && distance <= 2, // 1 or 2 steps behind
-        V_OBSOLETE: distance > 2                  // 3+ steps behind
-    };
+    // 1 or 2 versions behind -> LAGGING
+    if (distance > 0 && distance <= 2) {
+        result.V_LAGGING = true;
+    } 
+    // 3+ versions behind -> OBSOLETE
+    else if (distance >= 3) {
+        result.V_OBSOLETE = true;
+    }
+    // Fallback safety (should be covered by step 1)
+    else {
+        result.V_LATEST = true; 
+    }
+
+    return result;
 };
 
 // --- VECTOR ENGINE ---
@@ -115,8 +132,8 @@ const calculateVectors = (
   point: NodeHistoryPoint, 
   historyWindow: NodeHistoryPoint[], 
   refPoint24H: NodeHistoryPoint | undefined, 
-  globalSortedVersions: string[], // <--- GLOBAL CONTEXT
-  globalConsensus: string,        // <--- GLOBAL CONTEXT
+  globalSortedVersions: string[], 
+  globalConsensus: string,        
   firstSeenDate: string 
 ) => {
   const uptime = point.uptime || 0;
@@ -139,7 +156,7 @@ const calculateVectors = (
       }
   }
 
-  // --- 2. VERSION VECTORS (Using Global Context) ---
+  // --- 2. VERSION VECTORS (UPDATED LOGIC) ---
   const versionString = (point as any).version || '0.0.0'; 
   const vStats = getVersionStatus(versionString, globalSortedVersions, globalConsensus);
   const { V_LATEST, V_LAGGING, V_OBSOLETE } = vStats;
@@ -166,7 +183,6 @@ const calculateVectors = (
   }
 
   const V_PRODUCING = windowVelocity > 0;
-
   const V_STAGNANT = !V_UNTRACKED && windowVelocity === 0 && !V_FROZEN_UPTIME && !V_OFFLINE && !V_SYNCING; 
 
   // --- 5. TIME/PENALTY VECTORS ---
@@ -200,9 +216,9 @@ export const analyzePointVitality = (
   point: NodeHistoryPoint, 
   historyWindow: NodeHistoryPoint[],
   refPoint24H: NodeHistoryPoint | undefined,
-  globalSortedVersions: string[], // <--- ARG 4
-  globalConsensus: string,        // <--- ARG 5
-  firstSeenDate: string           // <--- ARG 6
+  globalSortedVersions: string[], 
+  globalConsensus: string,        
+  firstSeenDate: string           
 ): VitalityAnalysis => {
 
   const v = calculateVectors(point, historyWindow, refPoint24H, globalSortedVersions, globalConsensus, firstSeenDate);
