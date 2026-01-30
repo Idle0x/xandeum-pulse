@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useMemo } from 'react';
 import { Zap } from 'lucide-react';
 import { Node } from '../../types';
 import { ControlRail } from './ControlRail';
@@ -17,7 +17,7 @@ const LEADER_THEME_MAP: Record<string, any> = {
 // NEW: Dynamic Watermark Component
 const StaticWatermark = () => {
   const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  
+
   return (
     <div className="flex items-center justify-center gap-3 py-8 w-full border-t border-zinc-800 bg-[#020202] mt-auto">
        <div className="w-6 h-6 bg-cyan-500 rounded-full shadow-[0_0_15px_#06b6d4] flex items-center justify-center">
@@ -48,6 +48,27 @@ export const PulseExportCanvas = forwardRef<HTMLDivElement, PulseExportCanvasPro
 
   const totalItems = leaders.length + nodes.length;
   const formatScope = (scope: string) => scope.charAt(0).toUpperCase() + scope.slice(1).toLowerCase();
+
+  // --- NEW: CALCULATE GLOBAL VERSIONS LOCALLY FOR EXPORT ---
+  // We combine leaders + nodes to get a representative set for the snapshot
+  const { globalConsensus, globalSortedVersions } = useMemo(() => {
+      const allExportNodes = [...leaders.map(l => l.node), ...nodes];
+      if (!allExportNodes.length) return { globalConsensus: '0.0.0', globalSortedVersions: [] };
+      
+      const counts: Record<string, number> = {};
+      const uniqueSet = new Set<string>();
+
+      allExportNodes.forEach(n => {
+          const v = n.version || '0.0.0';
+          counts[v] = (counts[v] || 0) + 1;
+          uniqueSet.add(v);
+      });
+
+      const consensus = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+      const sorted = Array.from(uniqueSet).sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
+      
+      return { globalConsensus: consensus, globalSortedVersions: sorted };
+  }, [nodes, leaders]);
 
   return (
     <div ref={ref} className="bg-[#020202] flex flex-col items-start text-zinc-100 font-sans" style={{ width: 'fit-content', minWidth: '100%', minHeight: '100vh' }}>
@@ -89,6 +110,9 @@ export const PulseExportCanvas = forwardRef<HTMLDivElement, PulseExportCanvasPro
                         isLeader={true}      
                         leaderType={leader.metric}
                         hoveredNodeKey={null}
+                        // NEW PROPS PASSED
+                        globalConsensusVersion={globalConsensus}
+                        globalSortedVersions={globalSortedVersions}
                     />
                 );
             })}
@@ -112,6 +136,9 @@ export const PulseExportCanvas = forwardRef<HTMLDivElement, PulseExportCanvasPro
                         benchmarks={benchmarks}
                         showNetwork={showNetwork}
                         hoveredNodeKey={null}
+                        // NEW PROPS PASSED
+                        globalConsensusVersion={globalConsensus}
+                        globalSortedVersions={globalSortedVersions}
                     />
                 );
             })}
