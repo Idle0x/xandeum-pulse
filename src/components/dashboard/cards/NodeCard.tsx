@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react'; // <--- Added Imports
 import { 
   Shield, Star, Maximize2, CheckCircle, 
   AlertTriangle, Medal, Wallet, AlertOctagon 
@@ -22,8 +23,30 @@ export const NodeCard = ({
   zenMode, mostCommonVersion, sortBy 
 }: NodeCardProps) => {
 
-  // USE THE HOOK YOU PROVIDED (Overrides logic handled internally)
-  const cycleData = useCardCycle(node, cycleStep, zenMode, sortBy);
+  // 1. HOVER STATE
+  const [isHovered, setIsHovered] = useState(false);
+
+  // 2. CALCULATE ACTIVE STEP (Context-Aware Hover)
+  const activeStep = useMemo(() => {
+    // Only override if hovered
+    if (isHovered) {
+      // MAP SORT KEYS TO YOUR CYCLE INDICES
+      // IMPORTANT: Ensure these indices (0, 1, 2) match the order in your useCardCycle hook!
+      switch (sortBy) {
+        case 'uptime': return 0;       
+        case 'storage': return 1;      
+        case 'storage_used': return 1; 
+        case 'health': return 2;       
+        // For 'version' or 'credits', we don't force a footer change
+        // since those are already visible in the card body.
+        default: return cycleStep;
+      }
+    }
+    return cycleStep;
+  }, [isHovered, sortBy, cycleStep]);
+
+  // 3. USE HOOK with the computed 'activeStep'
+  const cycleData = useCardCycle(node, activeStep, zenMode, sortBy);
 
   // Helpers
   const cleanVer = (node.version || '').replace(/[^0-9.]/g, '');
@@ -41,6 +64,9 @@ export const NodeCard = ({
   return (
     <div
       onClick={() => onClick(node)}
+      // 4. BIND HOVER EVENTS
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       className={`group relative border rounded-xl p-3 md:p-5 cursor-pointer ${containerStyle}`}
     >
       {!zenMode && (
@@ -124,7 +150,7 @@ export const NodeCard = ({
           </div>
         </div>
 
-        {/* Footer: Cycling Metric */}
+        {/* Footer: Cycling Metric (Now Responsive to Hover) */}
         <div className="pt-1 md:pt-3 mt-1 md:mt-3 border-t border-zinc-800 flex justify-between items-end">
           <div>
             <span className="text-[8px] md:text-[10px] text-zinc-500 uppercase font-bold block mb-0.5 flex items-center gap-1">
