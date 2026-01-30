@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NodeHistoryPoint, HistoryTimeRange } from '../../../hooks/useNodeHistory';
 import { 
   X, Clock, Coins, Zap, Activity, AlertTriangle, 
@@ -12,15 +12,19 @@ interface StabilityRibbonProps {
   loading: boolean;
   days?: number; 
   timeRange?: HistoryTimeRange;
-  color?: string; 
+  color?: string;
+  // NEW: Global Network Context
+  globalConsensusVersion: string;
+  globalSortedVersions: string[]; 
 }
 
-// --- SUB-COMPONENT: VITALITY SNAPSHOT CARD (Restored Mobile Dimensions) ---
+// --- SUB-COMPONENT: VITALITY SNAPSHOT CARD ---
 const VitalitySnapshotCard = ({ 
   point, 
   historyWindow,
   refPoint24H,
-  versionContext,
+  globalConsensusVersion, // <--- NEW PROP
+  globalSortedVersions,   // <--- NEW PROP
   firstSeenDate, 
   onClose,
   positionClass 
@@ -28,12 +32,21 @@ const VitalitySnapshotCard = ({
   point: NodeHistoryPoint, 
   historyWindow: NodeHistoryPoint[],
   refPoint24H: NodeHistoryPoint | undefined,
-  versionContext: { allSorted: string[], consensus: string },
+  globalConsensusVersion: string, 
+  globalSortedVersions: string[], 
   firstSeenDate: string, 
   onClose: () => void,
   positionClass: string
 }) => {
-    const analysis = analyzePointVitality(point, historyWindow, refPoint24H, versionContext, firstSeenDate);
+    // PASS GLOBAL CONTEXT to Analyzer
+    const analysis = analyzePointVitality(
+        point, 
+        historyWindow, 
+        refPoint24H, 
+        globalSortedVersions, 
+        globalConsensusVersion, 
+        firstSeenDate
+    );
     const health = point.health || 0;
 
     // Icon Selection based on Archetype
@@ -46,19 +59,18 @@ const VitalitySnapshotCard = ({
         ACTIVE: CheckCircle
     }[analysis.archetype] || Activity;
 
-    // Filter issues for display (Max 3 lines to keep it short)
     const displayIssues = analysis.issues.slice(0, 3);
     const hasIssues = displayIssues.length > 0;
 
     return (
         <div className={`absolute bottom-full mb-2 md:mb-3 ${positionClass} z-50 animate-in fade-in zoom-in-95 duration-200`}>
-            {/* CONTAINER: w-52 on Mobile, w-64 on Desktop (Restored) */}
+            {/* CONTAINER: w-52 on Mobile, w-64 on Desktop */}
             <div className="bg-[#09090b] border border-zinc-800 rounded-xl shadow-2xl w-52 md:w-64 relative overflow-hidden flex flex-col backdrop-blur-xl">
 
                  {/* Pointer Arrow */}
                  <div className={`absolute -bottom-1.5 w-3 h-3 bg-[#09090b] border-b border-r border-zinc-800 transform rotate-45 ${positionClass.includes('left-4') ? 'left-4' : positionClass.includes('right-4') ? 'right-4' : 'left-1/2 -translate-x-1/2'}`}></div>
 
-                 {/* --- ZONE A: HEADER (Compact) --- */}
+                 {/* --- ZONE A: HEADER --- */}
                  <div className="p-2 md:p-3 border-b border-zinc-800/50 bg-zinc-900/30">
                      <div className="flex justify-between items-start mb-1.5 md:mb-2">
                         <div className="flex flex-col">
@@ -88,9 +100,8 @@ const VitalitySnapshotCard = ({
                      </div>
                  </div>
 
-                 {/* --- ZONE B: METRICS & ISSUES (Dense) --- */}
+                 {/* --- ZONE B: METRICS & ISSUES --- */}
                  <div className="p-2 md:p-3 bg-[#09090b]">
-                     {/* Basic Metrics Grid */}
                      <div className="grid grid-cols-2 gap-1.5 md:gap-2 mb-2 md:mb-3">
                         <div className="p-1.5 md:p-2 rounded bg-zinc-900/50 border border-zinc-800 flex flex-col justify-center">
                             <div className="flex items-center gap-1 md:gap-1.5 text-zinc-500 mb-0.5 md:mb-1">
@@ -108,7 +119,6 @@ const VitalitySnapshotCard = ({
                         </div>
                      </div>
 
-                     {/* The "Middle" Section: Badges */}
                      {hasIssues ? (
                         <div className="flex flex-wrap gap-1 md:gap-1.5">
                             {displayIssues.map((issue) => (
@@ -124,7 +134,6 @@ const VitalitySnapshotCard = ({
                             ))}
                         </div>
                      ) : (
-                        // If no issues, show "All Systems Normal"
                         <div className="flex items-center gap-1.5 px-1.5 py-1 rounded bg-emerald-950/20 border border-emerald-900/50 text-emerald-500 text-[8px] md:text-[9px] font-medium leading-tight">
                             <CheckCircle className="w-2.5 h-2.5" />
                             All Systems Operational
@@ -132,7 +141,7 @@ const VitalitySnapshotCard = ({
                      )}
                  </div>
 
-                 {/* --- ZONE C: CONTEXT FOOTER (Tiny Text) --- */}
+                 {/* --- ZONE C: CONTEXT FOOTER --- */}
                  <div className="px-2 py-1.5 md:px-3 md:py-2 bg-zinc-900/80 border-t border-zinc-800">
                     {hasIssues ? (
                         <div className="flex flex-col gap-1">
@@ -160,7 +169,15 @@ const VitalitySnapshotCard = ({
 };
 
 // --- MAIN COMPONENT ---
-export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D', color: customColor }: StabilityRibbonProps) => {
+export const StabilityRibbon = ({ 
+  history, 
+  loading, 
+  days = 30, 
+  timeRange = '30D', 
+  color: customColor,
+  globalConsensusVersion, // <--- ACCEPT PROP
+  globalSortedVersions    // <--- ACCEPT PROP
+}: StabilityRibbonProps) => {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -174,22 +191,13 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [selectedIdx]);
 
-  // --- 1. PRE-CALCULATE VERSION CONTEXT ---
-  const versionContext = useMemo(() => {
-    if (!history.length) return { allSorted: [], consensus: '' };
-    // FIX: Map h.version (string) not score
-    const uniqueVersions = Array.from(new Set(history.map((h: any) => h.version).filter(Boolean)));
-    const sorted = uniqueVersions.sort((a: any, b: any) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
-    return { allSorted: sorted, consensus: sorted[0] || '' };
-  }, [history]);
-
   const slots = Array.from({ length: days });
 
   if (loading) return <div className="flex gap-[2px] w-full animate-pulse h-2 md:h-3">{slots.map((_, i) => <div key={i} className="flex-1 bg-zinc-800 rounded-[1px] opacity-20" />)}</div>;
 
   const sortedHistory = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   
-  // --- CALCULATE FIRST SEEN DATE ---
+  // First Seen Date
   const firstSeenDate = sortedHistory.length > 0 ? sortedHistory[0].date : new Date().toISOString();
 
   const startIndex = Math.max(0, sortedHistory.length - days);
@@ -201,10 +209,8 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
       if (!point) return null;
 
       const absoluteIndex = startIndex + selectedIdx;
-      
       const startWindow = Math.max(0, absoluteIndex - 5);
       const historyWindow = sortedHistory.slice(startWindow, absoluteIndex);
-      
       const targetTime = new Date(point.date).getTime() - 86400000;
       const refPoint24H = sortedHistory.find(p => {
            const t = new Date(p.date).getTime();
@@ -220,7 +226,8 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
             point={point} 
             historyWindow={historyWindow} 
             refPoint24H={refPoint24H}
-            versionContext={versionContext}
+            globalConsensusVersion={globalConsensusVersion} // <--- PASS DOWN
+            globalSortedVersions={globalSortedVersions}     // <--- PASS DOWN
             firstSeenDate={firstSeenDate} 
             onClose={() => setSelectedIdx(null)} 
             positionClass={positionClass} 
@@ -243,17 +250,23 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
 
           if (point) {
              const absoluteIndex = startIndex + dataIndex;
-             
              const startWindow = Math.max(0, absoluteIndex - 5);
              const historyWindow = sortedHistory.slice(startWindow, absoluteIndex);
-             
              const targetTime = new Date(point.date).getTime() - 86400000;
              const refPoint24H = sortedHistory.find(p => {
                  const t = new Date(p.date).getTime();
                  return t >= targetTime - 3600000 && t <= targetTime + 3600000;
              });
 
-             const analysis = analyzePointVitality(point, historyWindow, refPoint24H, versionContext, firstSeenDate);
+             // PASS GLOBAL CONTEXT
+             const analysis = analyzePointVitality(
+                 point, 
+                 historyWindow, 
+                 refPoint24H, 
+                 globalSortedVersions, 
+                 globalConsensusVersion, 
+                 firstSeenDate
+             );
 
              baseColor = analysis.baseColor;
              topPin = analysis.topPin;
@@ -273,15 +286,8 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
               `} 
               style={point ? { backgroundColor: baseColor } : {}}
             >
-                {/* TOP PIN */}
-                {topPin.show && (
-                    <div className={`absolute -top-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${topPin.color} ring-1 ring-black/10`}></div>
-                )}
-
-                {/* BOTTOM PIN */}
-                {bottomPin.show && (
-                    <div className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${bottomPin.color} ring-1 ring-black/20`}></div>
-                )}
+                {topPin.show && <div className={`absolute -top-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${topPin.color} ring-1 ring-black/10`}></div>}
+                {bottomPin.show && <div className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${bottomPin.color} ring-1 ring-black/20`}></div>}
             </div>
           );
         })}
