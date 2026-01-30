@@ -12,16 +12,18 @@ interface StabilityRibbonProps {
   loading: boolean;
   days?: number; 
   timeRange?: HistoryTimeRange;
-  color?: string; 
+  color?: string;
+  // CRITICAL UPDATE: Pass the global network consensus here
+  networkConsensusVersion?: string; 
 }
 
-// --- SUB-COMPONENT: VITALITY SNAPSHOT CARD (Redesigned) ---
+// --- SUB-COMPONENT: VITALITY SNAPSHOT CARD ---
 const VitalitySnapshotCard = ({ 
   point, 
   historyWindow,
   refPoint24H,
   versionContext,
-  firstSeenDate, // <--- NEW PROP
+  firstSeenDate,
   onClose,
   positionClass 
 }: { 
@@ -29,15 +31,14 @@ const VitalitySnapshotCard = ({
   historyWindow: NodeHistoryPoint[],
   refPoint24H: NodeHistoryPoint | undefined,
   versionContext: { allSorted: string[], consensus: string },
-  firstSeenDate: string, // <--- NEW TYPE
+  firstSeenDate: string,
   onClose: () => void,
   positionClass: string
 }) => {
-    // PASS THE 5TH ARGUMENT HERE
+    // 1. Pass firstSeenDate to the analysis engine
     const analysis = analyzePointVitality(point, historyWindow, refPoint24H, versionContext, firstSeenDate);
     const health = point.health || 0;
 
-    // Icon Selection based on Archetype
     const Icon = {
         CRITICAL: AlertTriangle,
         TRAUMA: Zap,
@@ -47,19 +48,15 @@ const VitalitySnapshotCard = ({
         ACTIVE: CheckCircle
     }[analysis.archetype] || Activity;
 
-    // Filter issues for display (Max 3 lines to keep it short)
     const displayIssues = analysis.issues.slice(0, 3);
     const hasIssues = displayIssues.length > 0;
 
     return (
         <div className={`absolute bottom-full mb-3 ${positionClass} z-50 animate-in fade-in zoom-in-95 duration-200`}>
-            {/* CONTAINER: Slightly wider for better text fit (w-64 mobile, w-72 desktop) */}
             <div className="bg-[#09090b] border border-zinc-800 rounded-xl shadow-2xl w-64 md:w-72 relative overflow-hidden flex flex-col">
-
-                 {/* Pointer Arrow */}
                  <div className={`absolute -bottom-1.5 w-3 h-3 bg-[#09090b] border-b border-r border-zinc-800 transform rotate-45 ${positionClass.includes('left-4') ? 'left-4' : positionClass.includes('right-4') ? 'right-4' : 'left-1/2 -translate-x-1/2'}`}></div>
 
-                 {/* --- ZONE A: HEADER --- */}
+                 {/* ZONE A: HEADER */}
                  <div className="p-3 border-b border-zinc-800/50 bg-zinc-900/30">
                      <div className="flex justify-between items-start mb-2">
                         <div className="flex flex-col">
@@ -89,9 +86,8 @@ const VitalitySnapshotCard = ({
                      </div>
                  </div>
 
-                 {/* --- ZONE B: METRICS & DETECTED ISSUES --- */}
+                 {/* ZONE B: METRICS */}
                  <div className="p-3 bg-[#09090b]">
-                     {/* Basic Metrics Grid */}
                      <div className="grid grid-cols-2 gap-2 mb-3">
                         <div className="p-2 rounded bg-zinc-900/50 border border-zinc-800 flex flex-col justify-center">
                             <div className="flex items-center gap-1.5 text-zinc-500 mb-1">
@@ -109,7 +105,6 @@ const VitalitySnapshotCard = ({
                         </div>
                      </div>
 
-                     {/* The "Middle" Section: List of Technical Titles */}
                      {hasIssues ? (
                         <div className="flex flex-wrap gap-1.5">
                             {displayIssues.map((issue) => (
@@ -125,7 +120,6 @@ const VitalitySnapshotCard = ({
                             ))}
                         </div>
                      ) : (
-                        // If no issues, show "All Systems Normal"
                         <div className="flex items-center gap-2 px-2 py-1 rounded bg-emerald-950/20 border border-emerald-900/50 text-emerald-500 text-[10px] font-medium">
                             <CheckCircle size={10} />
                             All Systems Operational
@@ -133,7 +127,7 @@ const VitalitySnapshotCard = ({
                      )}
                  </div>
 
-                 {/* --- ZONE C: CONTEXT FOOTER --- */}
+                 {/* ZONE C: FOOTER */}
                  <div className="px-3 py-2 bg-zinc-900/80 border-t border-zinc-800">
                     {hasIssues ? (
                         <div className="flex flex-col gap-1">
@@ -161,7 +155,14 @@ const VitalitySnapshotCard = ({
 };
 
 // --- MAIN COMPONENT ---
-export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D', color: customColor }: StabilityRibbonProps) => {
+export const StabilityRibbon = ({ 
+    history, 
+    loading, 
+    days = 30, 
+    timeRange = '30D', 
+    color: customColor,
+    networkConsensusVersion // <--- RECEIVE IT
+}: StabilityRibbonProps) => {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -175,22 +176,30 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [selectedIdx]);
 
-  // --- 1. PRE-CALCULATE VERSION CONTEXT ---
+  // --- 1. CALCULATE VERSION CONTEXT (ROBUST) ---
   const versionContext = useMemo(() => {
-    if (!history.length) return { allSorted: [], consensus: '' };
+    if (!history.length) return { allSorted: [], consensus: networkConsensusVersion || '' };
+
+    // Get unique versions from THIS node's history
     const uniqueVersions = Array.from(new Set(history.map((h: any) => h.healthBreakdown?.version).filter(Boolean)));
+    
+    // Semantic Sort (Newest First) to create a clean list
     const sorted = uniqueVersions.sort((a: any, b: any) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
-    return { allSorted: sorted, consensus: sorted[0] || '' };
-  }, [history]);
+
+    // THE FIX: Prefer the Network Consensus if provided. 
+    // Fallback to local history "best guess" (sorted[0]) only if network data is missing.
+    const consensus = networkConsensusVersion || sorted[0] || '';
+
+    return { allSorted: sorted, consensus };
+  }, [history, networkConsensusVersion]);
 
   const slots = Array.from({ length: days });
 
   if (loading) return <div className="flex gap-[2px] w-full animate-pulse h-2 md:h-3">{slots.map((_, i) => <div key={i} className="flex-1 bg-zinc-800 rounded-[1px] opacity-20" />)}</div>;
 
   const sortedHistory = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  
-  // --- CALCULATE FIRST SEEN DATE ---
-  // The oldest point in the sorted history array
+
+  // --- 2. CALCULATE FIRST SEEN DATE (CONSISTENT WITH IDENTITY VIEW) ---
   const firstSeenDate = sortedHistory.length > 0 ? sortedHistory[0].date : new Date().toISOString();
 
   const startIndex = Math.max(0, sortedHistory.length - days);
@@ -202,16 +211,13 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
       if (!point) return null;
 
       const absoluteIndex = startIndex + selectedIdx;
-      
-      // Calculate Window (Last 5 points)
       const startWindow = Math.max(0, absoluteIndex - 5);
       const historyWindow = sortedHistory.slice(startWindow, absoluteIndex);
-      
-      // Calculate 24H Reference Point
-      const targetTime = new Date(point.date).getTime() - 86400000; // 24 hours ago
+
+      const targetTime = new Date(point.date).getTime() - 86400000;
       const refPoint24H = sortedHistory.find(p => {
            const t = new Date(p.date).getTime();
-           return t >= targetTime - 3600000 && t <= targetTime + 3600000; // +/- 1 hour tolerance
+           return t >= targetTime - 3600000 && t <= targetTime + 3600000;
       });
 
       let positionClass = "-translate-x-1/2 left-1/2"; 
@@ -224,7 +230,7 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
             historyWindow={historyWindow} 
             refPoint24H={refPoint24H}
             versionContext={versionContext}
-            firstSeenDate={firstSeenDate} // <--- PASS PROP
+            firstSeenDate={firstSeenDate} // <--- PASSED
             onClose={() => setSelectedIdx(null)} 
             positionClass={positionClass} 
         />
@@ -246,18 +252,16 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
 
           if (point) {
              const absoluteIndex = startIndex + dataIndex;
-             
-             // --- LOGIC PREPARATION ---
              const startWindow = Math.max(0, absoluteIndex - 5);
              const historyWindow = sortedHistory.slice(startWindow, absoluteIndex);
-             
+
              const targetTime = new Date(point.date).getTime() - 86400000;
              const refPoint24H = sortedHistory.find(p => {
                  const t = new Date(p.date).getTime();
                  return t >= targetTime - 3600000 && t <= targetTime + 3600000;
              });
 
-             // PASS 5th ARGUMENT: firstSeenDate
+             // 3. EXECUTE ENGINE WITH NEW PARAMS
              const analysis = analyzePointVitality(point, historyWindow, refPoint24H, versionContext, firstSeenDate);
 
              baseColor = analysis.baseColor;
@@ -278,12 +282,9 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
               `} 
               style={point ? { backgroundColor: baseColor } : {}}
             >
-                {/* TOP PIN */}
                 {topPin.show && (
                     <div className={`absolute -top-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${topPin.color} ring-1 ring-black/10`}></div>
                 )}
-
-                {/* BOTTOM PIN */}
                 {bottomPin.show && (
                     <div className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${bottomPin.color} ring-1 ring-black/20`}></div>
                 )}
