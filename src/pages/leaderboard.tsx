@@ -68,25 +68,24 @@ export default function Leaderboard() {
       );
   }, [allNodes, networkFilter, searchQuery]);
 
-  // --- HELPER: Get Current Stats for Modal ---
-  const getCurrentStats = () => {
-     // We calculate stats based on the currently filtered view (e.g. Mainnet only vs Combined)
-     // so the modal matches the cards the user just clicked.
+  // --- MEMO: Current Stats for Modal ---
+  // Optimized: Only recalculate when the filtered list changes
+  const currentStats = useMemo(() => {
      const nodes = filteredAndRanked; 
      const total = nodes.reduce((sum, n) => sum + n.credits, 0);
      const avg = nodes.length ? Math.round(total / nodes.length) : 0;
      const top10 = nodes.slice(0, 10).reduce((sum, n) => sum + n.credits, 0);
-
-     // FIX: Return a number, not a string. The Modal handles the .toFixed formatting.
+     
      const dom = total > 0 ? (top10 / total) * 100 : 0;
 
      return { 
          totalCredits: total, 
          avgCredits: avg, 
          dominance: dom, 
+         // Since we fixed the hook mapping, .length now equals Unique Providers
          nodeCount: nodes.length 
      };
-  };
+  }, [filteredAndRanked]);
 
   // --- EFFECT: Deep Link Handler ---
   // Handles URLs like /leaderboard?highlight=PUBKEY
@@ -155,7 +154,7 @@ export default function Leaderboard() {
       {/* WIZARD COMPONENT */}
       <StoincSimulator controller={simController} />
 
-      {/* STATS OVERVIEW COMPONENT (Updated with onClick handler) */}
+      {/* STATS OVERVIEW COMPONENT */}
       {!loading && !creditsOffline && (
         <StatsOverview 
             nodes={filteredAndRanked} 
@@ -205,11 +204,11 @@ export default function Leaderboard() {
         </footer>
       )}
 
-      {/* NEW: ANALYTICS MODAL */}
+      {/* ANALYTICS MODAL */}
       {isAnalyticsOpen && (
           <LeaderboardAnalyticsModal 
               onClose={() => setIsAnalyticsOpen(false)} 
-              currentStats={getCurrentStats()} 
+              currentStats={currentStats} 
           />
       )}
     </div>
