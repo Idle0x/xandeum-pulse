@@ -1,14 +1,21 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { NodeHistoryPoint } from '../../../hooks/useNodeHistory';
+import { NodeHistoryPoint, HistoryTimeRange } from '../../../hooks/useNodeHistory';
 import { 
-  X, Clock, Coins, Activity, AlertTriangle, 
-  CheckCircle, ThermometerSun, Crown, Zap, Info
+  X, Clock, Coins, Zap, Activity, AlertTriangle, 
+  CheckCircle, ThermometerSun, Crown, Info 
 } from 'lucide-react';
-import { analyzePointVitality, VitalityIssue } from './vitalityHelpers'; // Import from file above
+import { analyzePointVitality } from '../../../utils/vitalityHelpers';
 import { formatUptime } from '../../../utils/formatters';
 
-// --- SUB-COMPONENT: NEW CARD DESIGN ---
+interface StabilityRibbonProps {
+  history: NodeHistoryPoint[];
+  loading: boolean;
+  days?: number; 
+  timeRange?: HistoryTimeRange;
+  color?: string; 
+}
 
+// --- SUB-COMPONENT: VITALITY SNAPSHOT CARD (Redesigned) ---
 const VitalitySnapshotCard = ({ 
   point, 
   historyWindow,
@@ -27,7 +34,7 @@ const VitalitySnapshotCard = ({
     const analysis = analyzePointVitality(point, historyWindow, refPoint24H, versionContext);
     const health = point.health || 0;
 
-    // Icon Mapping
+    // Icon Selection based on Archetype
     const Icon = {
         CRITICAL: AlertTriangle,
         TRAUMA: Zap,
@@ -45,7 +52,7 @@ const VitalitySnapshotCard = ({
         <div className={`absolute bottom-full mb-3 ${positionClass} z-50 animate-in fade-in zoom-in-95 duration-200`}>
             {/* CONTAINER: Slightly wider for better text fit (w-64 mobile, w-72 desktop) */}
             <div className="bg-[#09090b] border border-zinc-800 rounded-xl shadow-2xl w-64 md:w-72 relative overflow-hidden flex flex-col">
-                 
+
                  {/* Pointer Arrow */}
                  <div className={`absolute -bottom-1.5 w-3 h-3 bg-[#09090b] border-b border-r border-zinc-800 transform rotate-45 ${positionClass.includes('left-4') ? 'left-4' : positionClass.includes('right-4') ? 'right-4' : 'left-1/2 -translate-x-1/2'}`}></div>
 
@@ -151,16 +158,8 @@ const VitalitySnapshotCard = ({
     );
 };
 
-// --- MAIN RIBBON COMPONENT ---
-
-interface StabilityRibbonProps {
-  history: NodeHistoryPoint[];
-  loading: boolean;
-  days?: number; 
-  color?: string; 
-}
-
-export const StabilityRibbon = ({ history, loading, days = 30, color: customColor }: StabilityRibbonProps) => {
+// --- MAIN COMPONENT ---
+export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D', color: customColor }: StabilityRibbonProps) => {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -174,13 +173,12 @@ export const StabilityRibbon = ({ history, loading, days = 30, color: customColo
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [selectedIdx]);
 
-  // Pre-calculate versions context
+  // --- 1. PRE-CALCULATE VERSION CONTEXT ---
   const versionContext = useMemo(() => {
     if (!history.length) return { allSorted: [], consensus: '' };
-    // In a real app, 'allSorted' should come from a global store of ALL nodes. 
-    // Here we use the history to derive what we can.
+    // Extract unique versions from history
     const uniqueVersions = Array.from(new Set(history.map((h: any) => h.healthBreakdown?.version).filter(Boolean)));
-    // Simple sort provided for context
+    // Sort descending (assuming simple string sort works for your version scheme, otherwise use semver)
     const sorted = uniqueVersions.sort((a: any, b: any) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
     return { allSorted: sorted, consensus: sorted[0] || '' };
   }, [history]);
@@ -200,17 +198,17 @@ export const StabilityRibbon = ({ history, loading, days = 30, color: customColo
 
       const absoluteIndex = startIndex + selectedIdx;
       
-      // Calculate Window & Reference
+      // Calculate Window (Last 5 points)
       const startWindow = Math.max(0, absoluteIndex - 5);
       const historyWindow = sortedHistory.slice(startWindow, absoluteIndex);
       
-      const targetTime = new Date(point.date).getTime() - 86400000;
+      // Calculate 24H Reference Point
+      const targetTime = new Date(point.date).getTime() - 86400000; // 24 hours ago
       const refPoint24H = sortedHistory.find(p => {
            const t = new Date(p.date).getTime();
-           return t >= targetTime - 3600000 && t <= targetTime + 3600000;
+           return t >= targetTime - 3600000 && t <= targetTime + 3600000; // +/- 1 hour tolerance
       });
 
-      // Layout Logic
       let positionClass = "-translate-x-1/2 left-1/2"; 
       if (selectedIdx < 4) positionClass = "left-0 translate-x-0 left-4"; 
       if (selectedIdx > displayData.length - 5) positionClass = "right-0 translate-x-0 right-4"; 
@@ -218,7 +216,7 @@ export const StabilityRibbon = ({ history, loading, days = 30, color: customColo
       return (
         <VitalitySnapshotCard 
             point={point} 
-            historyWindow={historyWindow}
+            historyWindow={historyWindow} 
             refPoint24H={refPoint24H}
             versionContext={versionContext}
             onClose={() => setSelectedIdx(null)} 
@@ -242,6 +240,8 @@ export const StabilityRibbon = ({ history, loading, days = 30, color: customColo
 
           if (point) {
              const absoluteIndex = startIndex + dataIndex;
+             
+             // --- LOGIC PREPARATION ---
              const startWindow = Math.max(0, absoluteIndex - 5);
              const historyWindow = sortedHistory.slice(startWindow, absoluteIndex);
              
@@ -256,6 +256,7 @@ export const StabilityRibbon = ({ history, loading, days = 30, color: customColo
              baseColor = analysis.baseColor;
              topPin = analysis.topPin;
              bottomPin = analysis.bottomPin;
+
              if (customColor) baseColor = customColor; 
           }
 
@@ -270,8 +271,15 @@ export const StabilityRibbon = ({ history, loading, days = 30, color: customColo
               `} 
               style={point ? { backgroundColor: baseColor } : {}}
             >
-                {topPin.show && <div className={`absolute -top-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${topPin.color}`}></div>}
-                {bottomPin.show && <div className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${bottomPin.color}`}></div>}
+                {/* TOP PIN */}
+                {topPin.show && (
+                    <div className={`absolute -top-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${topPin.color} ring-1 ring-black/10`}></div>
+                )}
+
+                {/* BOTTOM PIN */}
+                {bottomPin.show && (
+                    <div className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${bottomPin.color} ring-1 ring-black/20`}></div>
+                )}
             </div>
           );
         })}
