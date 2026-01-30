@@ -21,6 +21,7 @@ const VitalitySnapshotCard = ({
   historyWindow,
   refPoint24H,
   versionContext,
+  firstSeenDate, // <--- NEW PROP
   onClose,
   positionClass 
 }: { 
@@ -28,10 +29,12 @@ const VitalitySnapshotCard = ({
   historyWindow: NodeHistoryPoint[],
   refPoint24H: NodeHistoryPoint | undefined,
   versionContext: { allSorted: string[], consensus: string },
+  firstSeenDate: string, // <--- NEW TYPE
   onClose: () => void,
   positionClass: string
 }) => {
-    const analysis = analyzePointVitality(point, historyWindow, refPoint24H, versionContext);
+    // PASS THE 5TH ARGUMENT HERE
+    const analysis = analyzePointVitality(point, historyWindow, refPoint24H, versionContext, firstSeenDate);
     const health = point.health || 0;
 
     // Icon Selection based on Archetype
@@ -130,8 +133,7 @@ const VitalitySnapshotCard = ({
                      )}
                  </div>
 
-                 {/* --- ZONE C: CONTEXT FOOTER (New Requirement) --- */}
-                 {/* This explains "What it means" in plain English */}
+                 {/* --- ZONE C: CONTEXT FOOTER --- */}
                  <div className="px-3 py-2 bg-zinc-900/80 border-t border-zinc-800">
                     {hasIssues ? (
                         <div className="flex flex-col gap-1">
@@ -176,9 +178,7 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
   // --- 1. PRE-CALCULATE VERSION CONTEXT ---
   const versionContext = useMemo(() => {
     if (!history.length) return { allSorted: [], consensus: '' };
-    // Extract unique versions from history
     const uniqueVersions = Array.from(new Set(history.map((h: any) => h.healthBreakdown?.version).filter(Boolean)));
-    // Sort descending (assuming simple string sort works for your version scheme, otherwise use semver)
     const sorted = uniqueVersions.sort((a: any, b: any) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
     return { allSorted: sorted, consensus: sorted[0] || '' };
   }, [history]);
@@ -188,6 +188,11 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
   if (loading) return <div className="flex gap-[2px] w-full animate-pulse h-2 md:h-3">{slots.map((_, i) => <div key={i} className="flex-1 bg-zinc-800 rounded-[1px] opacity-20" />)}</div>;
 
   const sortedHistory = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  
+  // --- CALCULATE FIRST SEEN DATE ---
+  // The oldest point in the sorted history array
+  const firstSeenDate = sortedHistory.length > 0 ? sortedHistory[0].date : new Date().toISOString();
+
   const startIndex = Math.max(0, sortedHistory.length - days);
   const displayData = sortedHistory.slice(startIndex);
 
@@ -219,6 +224,7 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
             historyWindow={historyWindow} 
             refPoint24H={refPoint24H}
             versionContext={versionContext}
+            firstSeenDate={firstSeenDate} // <--- PASS PROP
             onClose={() => setSelectedIdx(null)} 
             positionClass={positionClass} 
         />
@@ -251,7 +257,8 @@ export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D'
                  return t >= targetTime - 3600000 && t <= targetTime + 3600000;
              });
 
-             const analysis = analyzePointVitality(point, historyWindow, refPoint24H, versionContext);
+             // PASS 5th ARGUMENT: firstSeenDate
+             const analysis = analyzePointVitality(point, historyWindow, refPoint24H, versionContext, firstSeenDate);
 
              baseColor = analysis.baseColor;
              topPin = analysis.topPin;
