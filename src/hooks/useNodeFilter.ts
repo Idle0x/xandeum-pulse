@@ -27,7 +27,8 @@ export const useNodeFilter = (
       case 'version':
         return node.version || '0.0.0';
       case 'credits':
-        return node.credits ?? -1;
+        // CHANGE: Use Negative Infinity to ensure NA is always lower than 0
+        return node.credits ?? Number.NEGATIVE_INFINITY;
       default:
         return 0;
     }
