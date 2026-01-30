@@ -112,7 +112,7 @@ const fetchForensicSnapshots = async (days: number) => {
 
   const { data, error } = await supabase
     .from('node_snapshots')
-    .select('node_id, uptime, credits, created_at') 
+    .select('node_id, uptime, credits, created_at, version') 
     .gte('created_at', startDate.toISOString())
     .order('created_at', { ascending: true });
 
