@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { NodeHistoryPoint, HistoryTimeRange } from '../../../hooks/useNodeHistory';
 import { 
   X, Clock, Coins, Zap, Activity, AlertTriangle, 
-  CheckCircle, ThermometerSun, Crown, Info 
+  CheckCircle, ThermometerSun, Crown, Info, Flame 
 } from 'lucide-react';
 import { analyzePointVitality } from '../../../utils/vitalityHelpers';
 import { formatUptime } from '../../../utils/formatters';
@@ -13,7 +13,6 @@ interface StabilityRibbonProps {
   days?: number; 
   timeRange?: HistoryTimeRange;
   color?: string;
-  // NEW: Global Network Context
   globalConsensusVersion: string;
   globalSortedVersions: string[]; 
 }
@@ -23,8 +22,8 @@ const VitalitySnapshotCard = ({
   point, 
   historyWindow,
   refPoint24H,
-  globalConsensusVersion, // <--- NEW PROP
-  globalSortedVersions,   // <--- NEW PROP
+  globalConsensusVersion,
+  globalSortedVersions,
   firstSeenDate, 
   onClose,
   positionClass 
@@ -38,7 +37,6 @@ const VitalitySnapshotCard = ({
   onClose: () => void,
   positionClass: string
 }) => {
-    // PASS GLOBAL CONTEXT to Analyzer
     const analysis = analyzePointVitality(
         point, 
         historyWindow, 
@@ -48,8 +46,15 @@ const VitalitySnapshotCard = ({
         firstSeenDate
     );
     const health = point.health || 0;
+    
+    // SAFE EXTRACTION OF PENALTIES
+    // We default to 0/1 so the UI doesn't crash on old data
+    const penalties = (point as any).healthBreakdown?.penalties || { restarts: 0, consistency: 1 };
+    const restartPenalty = penalties.restarts || 0;
+    const consistencyScore = penalties.consistency !== undefined ? penalties.consistency : 1;
+    const hasPenalty = restartPenalty > 0 || consistencyScore < 0.95;
 
-    // Icon Selection based on Archetype
+    // Icon Selection
     const Icon = {
         CRITICAL: AlertTriangle,
         TRAUMA: Zap,
@@ -64,7 +69,7 @@ const VitalitySnapshotCard = ({
 
     return (
         <div className={`absolute bottom-full mb-2 md:mb-3 ${positionClass} z-50 animate-in fade-in zoom-in-95 duration-200`}>
-            {/* CONTAINER: w-52 on Mobile, w-64 on Desktop */}
+            {/* CONTAINER */}
             <div className="bg-[#09090b] border border-zinc-800 rounded-xl shadow-2xl w-52 md:w-64 relative overflow-hidden flex flex-col backdrop-blur-xl">
 
                  {/* Pointer Arrow */}
@@ -100,7 +105,7 @@ const VitalitySnapshotCard = ({
                      </div>
                  </div>
 
-                 {/* --- ZONE B: METRICS & ISSUES --- */}
+                 {/* --- ZONE B: METRICS --- */}
                  <div className="p-2 md:p-3 bg-[#09090b]">
                      <div className="grid grid-cols-2 gap-1.5 md:gap-2 mb-2 md:mb-3">
                         <div className="p-1.5 md:p-2 rounded bg-zinc-900/50 border border-zinc-800 flex flex-col justify-center">
@@ -119,6 +124,33 @@ const VitalitySnapshotCard = ({
                         </div>
                      </div>
 
+                     {/* --- ZONE B2: PENALTY LOG (NEW) --- */}
+                     {hasPenalty && (
+                        <div className="mb-2 md:mb-3 p-1.5 md:p-2 rounded bg-rose-950/20 border border-rose-900/50 flex flex-col gap-1">
+                            <div className="flex items-center gap-1 text-rose-400 mb-0.5">
+                                <Flame className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                                <span className="text-[7px] md:text-[8px] font-bold uppercase tracking-wider">Penalty Log</span>
+                            </div>
+                            
+                            {restartPenalty > 0 && (
+                                <div className="flex justify-between items-center text-[8px] md:text-[9px] pl-1 border-l border-rose-800/50">
+                                    <span className="text-zinc-400">Trauma Impact</span>
+                                    <span className="font-mono font-bold text-rose-400">-{restartPenalty} pts</span>
+                                </div>
+                            )}
+                            
+                            {consistencyScore < 0.95 && (
+                                <div className="flex justify-between items-center text-[8px] md:text-[9px] pl-1 border-l border-rose-800/50">
+                                    <span className="text-zinc-400">Consistency</span>
+                                    <span className="font-mono font-bold text-amber-500">
+                                        {(consistencyScore * 100).toFixed(0)}%
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                     )}
+
+                     {/* --- ZONE B3: ISSUES OR OK --- */}
                      {hasIssues ? (
                         <div className="flex flex-wrap gap-1 md:gap-1.5">
                             {displayIssues.map((issue) => (
@@ -175,8 +207,8 @@ export const StabilityRibbon = ({
   days = 30, 
   timeRange = '30D', 
   color: customColor,
-  globalConsensusVersion, // <--- ACCEPT PROP
-  globalSortedVersions    // <--- ACCEPT PROP
+  globalConsensusVersion, 
+  globalSortedVersions
 }: StabilityRibbonProps) => {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -196,7 +228,7 @@ export const StabilityRibbon = ({
   if (loading) return <div className="flex gap-[2px] w-full animate-pulse h-2 md:h-3">{slots.map((_, i) => <div key={i} className="flex-1 bg-zinc-800 rounded-[1px] opacity-20" />)}</div>;
 
   const sortedHistory = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  
+
   // First Seen Date
   const firstSeenDate = sortedHistory.length > 0 ? sortedHistory[0].date : new Date().toISOString();
 
@@ -226,8 +258,8 @@ export const StabilityRibbon = ({
             point={point} 
             historyWindow={historyWindow} 
             refPoint24H={refPoint24H}
-            globalConsensusVersion={globalConsensusVersion} // <--- PASS DOWN
-            globalSortedVersions={globalSortedVersions}     // <--- PASS DOWN
+            globalConsensusVersion={globalConsensusVersion}
+            globalSortedVersions={globalSortedVersions}
             firstSeenDate={firstSeenDate} 
             onClose={() => setSelectedIdx(null)} 
             positionClass={positionClass} 
@@ -258,7 +290,6 @@ export const StabilityRibbon = ({
                  return t >= targetTime - 3600000 && t <= targetTime + 3600000;
              });
 
-             // PASS GLOBAL CONTEXT
              const analysis = analyzePointVitality(
                  point, 
                  historyWindow, 
