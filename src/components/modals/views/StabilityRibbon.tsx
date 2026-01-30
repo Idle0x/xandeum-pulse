@@ -12,18 +12,16 @@ interface StabilityRibbonProps {
   loading: boolean;
   days?: number; 
   timeRange?: HistoryTimeRange;
-  color?: string;
-  // CRITICAL UPDATE: Pass the global network consensus here
-  networkConsensusVersion?: string; 
+  color?: string; 
 }
 
-// --- SUB-COMPONENT: VITALITY SNAPSHOT CARD ---
+// --- SUB-COMPONENT: VITALITY SNAPSHOT CARD (Restored Mobile Dimensions) ---
 const VitalitySnapshotCard = ({ 
   point, 
   historyWindow,
   refPoint24H,
   versionContext,
-  firstSeenDate,
+  firstSeenDate, 
   onClose,
   positionClass 
 }: { 
@@ -31,14 +29,14 @@ const VitalitySnapshotCard = ({
   historyWindow: NodeHistoryPoint[],
   refPoint24H: NodeHistoryPoint | undefined,
   versionContext: { allSorted: string[], consensus: string },
-  firstSeenDate: string,
+  firstSeenDate: string, 
   onClose: () => void,
   positionClass: string
 }) => {
-    // 1. Pass firstSeenDate to the analysis engine
     const analysis = analyzePointVitality(point, historyWindow, refPoint24H, versionContext, firstSeenDate);
     const health = point.health || 0;
 
+    // Icon Selection based on Archetype
     const Icon = {
         CRITICAL: AlertTriangle,
         TRAUMA: Zap,
@@ -48,102 +46,109 @@ const VitalitySnapshotCard = ({
         ACTIVE: CheckCircle
     }[analysis.archetype] || Activity;
 
+    // Filter issues for display (Max 3 lines to keep it short)
     const displayIssues = analysis.issues.slice(0, 3);
     const hasIssues = displayIssues.length > 0;
 
     return (
-        <div className={`absolute bottom-full mb-3 ${positionClass} z-50 animate-in fade-in zoom-in-95 duration-200`}>
-            <div className="bg-[#09090b] border border-zinc-800 rounded-xl shadow-2xl w-64 md:w-72 relative overflow-hidden flex flex-col">
+        <div className={`absolute bottom-full mb-2 md:mb-3 ${positionClass} z-50 animate-in fade-in zoom-in-95 duration-200`}>
+            {/* CONTAINER: w-52 on Mobile, w-64 on Desktop (Restored) */}
+            <div className="bg-[#09090b] border border-zinc-800 rounded-xl shadow-2xl w-52 md:w-64 relative overflow-hidden flex flex-col backdrop-blur-xl">
+
+                 {/* Pointer Arrow */}
                  <div className={`absolute -bottom-1.5 w-3 h-3 bg-[#09090b] border-b border-r border-zinc-800 transform rotate-45 ${positionClass.includes('left-4') ? 'left-4' : positionClass.includes('right-4') ? 'right-4' : 'left-1/2 -translate-x-1/2'}`}></div>
 
-                 {/* ZONE A: HEADER */}
-                 <div className="p-3 border-b border-zinc-800/50 bg-zinc-900/30">
-                     <div className="flex justify-between items-start mb-2">
+                 {/* --- ZONE A: HEADER (Compact) --- */}
+                 <div className="p-2 md:p-3 border-b border-zinc-800/50 bg-zinc-900/30">
+                     <div className="flex justify-between items-start mb-1.5 md:mb-2">
                         <div className="flex flex-col">
-                            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">SNAPSHOT</span>
-                            <span className="text-xs font-mono text-zinc-300 font-medium">
-                                {new Date(point.date).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            <span className="text-[8px] md:text-[10px] font-bold text-zinc-500 uppercase tracking-wider leading-none mb-0.5">SNAPSHOT</span>
+                            <span className="text-[10px] md:text-xs font-mono text-zinc-300 font-medium leading-none">
+                                {new Date(point.date).toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </span>
                         </div>
                         <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="text-zinc-600 hover:text-zinc-300 -mt-1 -mr-1 p-1">
-                            <X size={14} />
+                            <X size={12} className="md:w-3.5 md:h-3.5" />
                         </button>
                      </div>
 
                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <div className={`p-1.5 rounded-md bg-black/40 border border-white/5`}>
-                                <Icon className={`${analysis.textColor} w-4 h-4`} />
+                        <div className="flex items-center gap-1.5 md:gap-2">
+                            <div className={`p-1 md:p-1.5 rounded-md bg-black/40 border border-white/5`}>
+                                <Icon className={`${analysis.textColor} w-3 h-3 md:w-3.5 md:h-3.5`} />
                             </div>
                             <div className="flex flex-col">
-                                <span className={`text-xs font-black uppercase ${analysis.textColor} leading-tight`}>{analysis.label}</span>
-                                <span className="text-[9px] text-zinc-500">System State</span>
+                                <span className={`text-[9px] md:text-[10px] font-black uppercase ${analysis.textColor} leading-tight`}>{analysis.label}</span>
+                                <span className="text-[7px] md:text-[8px] text-zinc-500 leading-tight">System State</span>
                             </div>
                         </div>
-                        <span className={`text-xl font-black ${health >= 80 ? 'text-emerald-400' : health >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>
+                        <span className={`text-lg md:text-xl font-black leading-none ${health >= 80 ? 'text-emerald-400' : health >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>
                             {health}
                         </span>
                      </div>
                  </div>
 
-                 {/* ZONE B: METRICS */}
-                 <div className="p-3 bg-[#09090b]">
-                     <div className="grid grid-cols-2 gap-2 mb-3">
-                        <div className="p-2 rounded bg-zinc-900/50 border border-zinc-800 flex flex-col justify-center">
-                            <div className="flex items-center gap-1.5 text-zinc-500 mb-1">
-                                <Clock size={10} />
-                                <span className="text-[9px] font-bold uppercase">Uptime</span>
+                 {/* --- ZONE B: METRICS & ISSUES (Dense) --- */}
+                 <div className="p-2 md:p-3 bg-[#09090b]">
+                     {/* Basic Metrics Grid */}
+                     <div className="grid grid-cols-2 gap-1.5 md:gap-2 mb-2 md:mb-3">
+                        <div className="p-1.5 md:p-2 rounded bg-zinc-900/50 border border-zinc-800 flex flex-col justify-center">
+                            <div className="flex items-center gap-1 md:gap-1.5 text-zinc-500 mb-0.5 md:mb-1">
+                                <Clock className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                                <span className="text-[7px] md:text-[8px] font-bold uppercase">Uptime</span>
                             </div>
-                            <div className="text-[10px] font-mono font-bold text-zinc-300">{formatUptime(point.uptime)}</div>
+                            <div className="text-[9px] md:text-[11px] font-mono font-bold text-zinc-300 leading-none">{formatUptime(point.uptime)}</div>
                         </div>
-                        <div className="p-2 rounded bg-zinc-900/50 border border-zinc-800 flex flex-col justify-center">
-                            <div className="flex items-center gap-1.5 text-zinc-500 mb-1">
-                                <Coins size={10} />
-                                <span className="text-[9px] font-bold uppercase">Credits</span>
+                        <div className="p-1.5 md:p-2 rounded bg-zinc-900/50 border border-zinc-800 flex flex-col justify-center">
+                            <div className="flex items-center gap-1 md:gap-1.5 text-zinc-500 mb-0.5 md:mb-1">
+                                <Coins className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                                <span className="text-[7px] md:text-[8px] font-bold uppercase">Credits</span>
                             </div>
-                            <div className="text-[10px] font-mono font-bold text-zinc-300">{(point.credits || 0).toLocaleString()}</div>
+                            <div className="text-[9px] md:text-[11px] font-mono font-bold text-zinc-300 leading-none">{(point.credits || 0).toLocaleString()}</div>
                         </div>
                      </div>
 
+                     {/* The "Middle" Section: Badges */}
                      {hasIssues ? (
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-1 md:gap-1.5">
                             {displayIssues.map((issue) => (
                                 <div key={issue.code} className={`
-                                    flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium border
+                                    flex items-center gap-1 px-1.5 py-0.5 md:py-1 rounded text-[8px] md:text-[9px] font-medium border leading-tight
                                     ${issue.severity === 'critical' ? 'bg-rose-950/30 border-rose-900 text-rose-400' : 
                                       issue.severity === 'warning' ? 'bg-amber-950/30 border-amber-900 text-amber-400' : 
                                       'bg-blue-950/30 border-blue-900 text-blue-400'}
                                 `}>
-                                    {issue.severity === 'critical' ? <AlertTriangle size={10} /> : <Info size={10} />}
+                                    {issue.severity === 'critical' ? <AlertTriangle className="w-2.5 h-2.5" /> : <Info className="w-2.5 h-2.5" />}
                                     {issue.title}
                                 </div>
                             ))}
                         </div>
                      ) : (
-                        <div className="flex items-center gap-2 px-2 py-1 rounded bg-emerald-950/20 border border-emerald-900/50 text-emerald-500 text-[10px] font-medium">
-                            <CheckCircle size={10} />
+                        // If no issues, show "All Systems Normal"
+                        <div className="flex items-center gap-1.5 px-1.5 py-1 rounded bg-emerald-950/20 border border-emerald-900/50 text-emerald-500 text-[8px] md:text-[9px] font-medium leading-tight">
+                            <CheckCircle className="w-2.5 h-2.5" />
                             All Systems Operational
                         </div>
                      )}
                  </div>
 
-                 {/* ZONE C: FOOTER */}
-                 <div className="px-3 py-2 bg-zinc-900/80 border-t border-zinc-800">
+                 {/* --- ZONE C: CONTEXT FOOTER (Tiny Text) --- */}
+                 <div className="px-2 py-1.5 md:px-3 md:py-2 bg-zinc-900/80 border-t border-zinc-800">
                     {hasIssues ? (
                         <div className="flex flex-col gap-1">
                             {displayIssues.map(issue => (
-                                <div key={issue.code} className="flex gap-2 items-start">
+                                <div key={issue.code} className="flex gap-1.5 items-start">
                                     <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${issue.severity === 'critical' ? 'bg-rose-500' : 'bg-zinc-500'}`} />
-                                    <span className="text-[10px] text-zinc-400 leading-tight">
+                                    <span className="text-[8px] md:text-[9px] text-zinc-400 leading-tight">
                                         <span className="text-zinc-300 font-semibold">{issue.title}:</span> {issue.description}
                                     </span>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className="flex gap-2 items-start">
+                        <div className="flex gap-1.5 items-start">
                              <span className="mt-1 w-1 h-1 rounded-full bg-emerald-500 flex-shrink-0" />
-                             <span className="text-[10px] text-zinc-400 leading-tight">
+                             <span className="text-[8px] md:text-[9px] text-zinc-400 leading-tight">
                                 Node is following consensus and earning rewards optimally.
                              </span>
                         </div>
@@ -155,14 +160,7 @@ const VitalitySnapshotCard = ({
 };
 
 // --- MAIN COMPONENT ---
-export const StabilityRibbon = ({ 
-    history, 
-    loading, 
-    days = 30, 
-    timeRange = '30D', 
-    color: customColor,
-    networkConsensusVersion // <--- RECEIVE IT
-}: StabilityRibbonProps) => {
+export const StabilityRibbon = ({ history, loading, days = 30, timeRange = '30D', color: customColor }: StabilityRibbonProps) => {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -176,30 +174,22 @@ export const StabilityRibbon = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [selectedIdx]);
 
-  // --- 1. CALCULATE VERSION CONTEXT (ROBUST) ---
+  // --- 1. PRE-CALCULATE VERSION CONTEXT ---
   const versionContext = useMemo(() => {
-    if (!history.length) return { allSorted: [], consensus: networkConsensusVersion || '' };
-
-    // Get unique versions from THIS node's history
-    const uniqueVersions = Array.from(new Set(history.map((h: any) => h.healthBreakdown?.version).filter(Boolean)));
-    
-    // Semantic Sort (Newest First) to create a clean list
+    if (!history.length) return { allSorted: [], consensus: '' };
+    // FIX: Map h.version (string) not score
+    const uniqueVersions = Array.from(new Set(history.map((h: any) => h.version).filter(Boolean)));
     const sorted = uniqueVersions.sort((a: any, b: any) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
-
-    // THE FIX: Prefer the Network Consensus if provided. 
-    // Fallback to local history "best guess" (sorted[0]) only if network data is missing.
-    const consensus = networkConsensusVersion || sorted[0] || '';
-
-    return { allSorted: sorted, consensus };
-  }, [history, networkConsensusVersion]);
+    return { allSorted: sorted, consensus: sorted[0] || '' };
+  }, [history]);
 
   const slots = Array.from({ length: days });
 
   if (loading) return <div className="flex gap-[2px] w-full animate-pulse h-2 md:h-3">{slots.map((_, i) => <div key={i} className="flex-1 bg-zinc-800 rounded-[1px] opacity-20" />)}</div>;
 
   const sortedHistory = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-  // --- 2. CALCULATE FIRST SEEN DATE (CONSISTENT WITH IDENTITY VIEW) ---
+  
+  // --- CALCULATE FIRST SEEN DATE ---
   const firstSeenDate = sortedHistory.length > 0 ? sortedHistory[0].date : new Date().toISOString();
 
   const startIndex = Math.max(0, sortedHistory.length - days);
@@ -211,13 +201,14 @@ export const StabilityRibbon = ({
       if (!point) return null;
 
       const absoluteIndex = startIndex + selectedIdx;
+      
       const startWindow = Math.max(0, absoluteIndex - 5);
       const historyWindow = sortedHistory.slice(startWindow, absoluteIndex);
-
+      
       const targetTime = new Date(point.date).getTime() - 86400000;
       const refPoint24H = sortedHistory.find(p => {
            const t = new Date(p.date).getTime();
-           return t >= targetTime - 3600000 && t <= targetTime + 3600000;
+           return t >= targetTime - 3600000 && t <= targetTime + 3600000; 
       });
 
       let positionClass = "-translate-x-1/2 left-1/2"; 
@@ -230,7 +221,7 @@ export const StabilityRibbon = ({
             historyWindow={historyWindow} 
             refPoint24H={refPoint24H}
             versionContext={versionContext}
-            firstSeenDate={firstSeenDate} // <--- PASSED
+            firstSeenDate={firstSeenDate} 
             onClose={() => setSelectedIdx(null)} 
             positionClass={positionClass} 
         />
@@ -252,16 +243,16 @@ export const StabilityRibbon = ({
 
           if (point) {
              const absoluteIndex = startIndex + dataIndex;
+             
              const startWindow = Math.max(0, absoluteIndex - 5);
              const historyWindow = sortedHistory.slice(startWindow, absoluteIndex);
-
+             
              const targetTime = new Date(point.date).getTime() - 86400000;
              const refPoint24H = sortedHistory.find(p => {
                  const t = new Date(p.date).getTime();
                  return t >= targetTime - 3600000 && t <= targetTime + 3600000;
              });
 
-             // 3. EXECUTE ENGINE WITH NEW PARAMS
              const analysis = analyzePointVitality(point, historyWindow, refPoint24H, versionContext, firstSeenDate);
 
              baseColor = analysis.baseColor;
@@ -282,9 +273,12 @@ export const StabilityRibbon = ({
               `} 
               style={point ? { backgroundColor: baseColor } : {}}
             >
+                {/* TOP PIN */}
                 {topPin.show && (
                     <div className={`absolute -top-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${topPin.color} ring-1 ring-black/10`}></div>
                 )}
+
+                {/* BOTTOM PIN */}
                 {bottomPin.show && (
                     <div className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-[2px] h-[2px] rounded-full shadow-sm ${bottomPin.color} ring-1 ring-black/20`}></div>
                 )}
