@@ -54,7 +54,7 @@ const VECTOR_DEFINITIONS: Record<string, { title: string; description: string; s
   V_SYNCING:       { title: 'Syncing',        description: 'Initializing network data.', severity: 'info' },
 };
 
-// --- LOGIC HELPERS (REPLACED AS REQUESTED) ---
+// --- PURE MATH HELPERS (AS REQUESTED) ---
 
 export const cleanSemver = (v: string) => {
   if (!v) return '0.0.0';
