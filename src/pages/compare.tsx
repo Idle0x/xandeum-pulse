@@ -83,6 +83,27 @@ export default function ComparePage() {
       return selectedKeys.map(key => availableNodes.find(n => n.pubkey === key)).filter((n): n is Node => !!n);
   }, [selectedKeys, availableNodes]);
 
+  // --- NEW: CALCULATE GLOBAL VERSIONS ---
+  const { globalConsensus, globalSortedVersions } = useMemo(() => {
+      if (!availableNodes.length) return { globalConsensus: '0.0.0', globalSortedVersions: [] };
+      
+      const counts: Record<string, number> = {};
+      const uniqueSet = new Set<string>();
+
+      availableNodes.forEach(n => {
+          const v = n.version || '0.0.0';
+          counts[v] = (counts[v] || 0) + 1;
+          uniqueSet.add(v);
+      });
+
+      const consensus = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+      // Basic semver-ish sort (Desc)
+      const sorted = Array.from(uniqueSet).sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
+      
+      return { globalConsensus: consensus, globalSortedVersions: sorted };
+  }, [availableNodes]);
+
+
   const leaderColumns = useMemo(() => {
       if (availableNodes.length === 0) return [];
       return activeLeaderMetrics.map(metric => {
@@ -150,44 +171,22 @@ export default function ComparePage() {
   };
   const removeFavorite = (pubkey: string) => { const newFavs = favorites.filter(f => f !== pubkey); setFavorites(newFavs); localStorage.setItem('xandeum_favorites', JSON.stringify(newFavs)); };
 
-  // --- UPDATED: HANDLE NODE FOCUS + SCROLL TO CENTER ---
   const handleNodeFocusToggle = (key: string | null, isSelection = false) => {
-      // Logic: If it's a selection event (from legend), FORCE select. Do not toggle off.
-      // If it's a click on the column itself (isSelection=false or implicit), we might want to toggle, 
-      // but for stability, we will prioritize "Focus" behavior.
-      
       setHoveredNodeKey(prev => {
-          if (isSelection) return key; // Always set if selecting
-          return prev === key ? null : key; // Toggle if clicking the same column directly
+          if (isSelection) return key; 
+          return prev === key ? null : key; 
       });
 
-      // SCROLL LOGIC
       if (key && printRef.current) {
-          // Delay to allow any potential layout shifts (though unlikely in this stable layout)
           setTimeout(() => {
               const element = document.getElementById(`node-col-${key}`);
               if (element && printRef.current) {
                   const container = printRef.current;
-                  
-                  // CONSTANTS
-                  // We assume the Sticky Control Rail is ~200px (md breakpoint).
-                  // If on mobile, it's smaller, but this approximation is safe for centering.
                   const RAIL_WIDTH = window.innerWidth >= 768 ? 200 : 140; 
                   const CONTAINER_WIDTH = container.clientWidth;
                   const VISIBLE_WIDTH = CONTAINER_WIDTH - RAIL_WIDTH;
-                  
-                  // MATH: Use offsetLeft (relative to container start) for stability
-                  // Target: We want the element's center to align with the visual center of the available space.
-                  // Visual Center (relative to container left) = RAIL_WIDTH + (VISIBLE_WIDTH / 2)
-                  // Element Center (relative to container content start) = element.offsetLeft + (element.offsetWidth / 2)
-                  
-                  // Scroll Position = ElementCenter - VisualCenter
                   const targetScroll = (element.offsetLeft + (element.offsetWidth / 2)) - (RAIL_WIDTH + (VISIBLE_WIDTH / 2));
-
-                  container.scrollTo({
-                      left: targetScroll,
-                      behavior: 'smooth'
-                  });
+                  container.scrollTo({ left: targetScroll, behavior: 'smooth' });
               }
           }, 10);
       }
@@ -239,14 +238,12 @@ export default function ComparePage() {
           <div style={{ display: 'block' }}><PulseExportCanvas ref={exportFullRef} mode="FULL" nodes={selectedNodes} leaders={leaderColumns} benchmarks={benchmarks} showNetwork={showNetwork} networkScope={networkScope} currentWinners={currentWinners} overallWinnerKey={overallWinnerKey} /></div>
       </div>
 
-      {/* BACK BUTTON */}
       <div className="absolute top-4 left-4 z-[60]">
         <Link href="/" className="flex items-center justify-center p-3 rounded-full bg-zinc-900/40 backdrop-blur-md border border-white/5 hover:bg-white/10 hover:border-white/20 transition group">
             <ArrowLeft size={18} className="text-red-500/80 group-hover:text-red-400" />
         </Link>
       </div>
 
-       {/* NETWORK SWITCHER */}
        <div className="absolute top-4 right-4 z-[60]" ref={networkRef}>
           <button onClick={() => setIsNetworkOpen(!isNetworkOpen)} className="flex items-center gap-2 px-4 py-3 rounded-full bg-zinc-900/40 backdrop-blur-md text-white text-[10px] font-bold uppercase transition border border-white/5 hover:bg-white/10">
               <div className={`w-2 h-2 rounded-full ${networkScope === 'MAINNET' ? 'bg-green-500' : networkScope === 'DEVNET' ? 'bg-blue-500' : 'bg-white'}`}></div>
@@ -280,12 +277,10 @@ export default function ComparePage() {
         </div>
       </header>
 
-      {/* TOOLBAR */}
       <div className="px-4 md:px-8 pb-6 relative z-50 flex justify-center">
         <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3 max-w-5xl">
             <button onClick={() => setShowNetwork(!showNetwork)} className={`flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border w-auto ${showNetwork ? 'bg-white text-black border-white' : 'bg-black/40 text-zinc-400 border-white/5 hover:border-white/20'}`}>{showNetwork ? <CheckCircle size={12} /> : <div className="w-3 h-3 rounded-full border border-zinc-500"></div>} VS NETWORK</button>
 
-            {/* LEADER DROPDOWN */}
             <div className="relative" ref={leaderRef}>
                 <button onClick={() => setIsLeaderDropdownOpen(!isLeaderDropdownOpen)} className={`flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border w-auto ${activeLeaderMetrics.length > 0 ? 'bg-white text-black border-white' : 'bg-black/40 text-zinc-400 border-white/5 hover:border-white/20'}`}>
                     {activeLeaderMetrics.length > 0 ? `VS LEADERS (${activeLeaderMetrics.length})` : 'VS LEADER'} <ChevronDown size={12} />
@@ -329,7 +324,6 @@ export default function ComparePage() {
 
             <button onClick={handleShare} className="flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-[8px] md:text-[10px] font-bold uppercase transition whitespace-nowrap border border-zinc-700 w-auto"><Share2 size={12}/> SHARE</button>
 
-            {/* EXPORT DROPDOWN */}
             <div className="relative" ref={exportRef}>
                 <button onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)} className="flex items-center gap-2 px-2 md:px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[8px] md:text-[10px] font-bold uppercase transition shadow-[0_0_15px_rgba(37,99,235,0.3)] whitespace-nowrap w-auto">
                     <Download size={12}/> REPORT CARD <ChevronDown size={12} />
@@ -344,7 +338,6 @@ export default function ComparePage() {
         </div>
       </div>
 
-      {/* INTERACTIVE TABLE */}
       <div className="flex-1 overflow-hidden relative z-10 px-4 pb-4 md:px-8 md:pb-8 flex flex-col max-w-[1600px] mx-auto w-full bg-[#020202]"> 
          <div className="flex-initial min-h-[400px] flex flex-col bg-[#09090b]/60 backdrop-blur-2xl rounded-xl border border-white/5 shadow-2xl overflow-hidden relative mb-6">
              {selectedNodes.length === 0 && activeLeaderMetrics.length === 0 ? (
@@ -358,7 +351,6 @@ export default function ComparePage() {
                     </div>
                  </div>
              ) : (
-                 // TABLE SCROLL CONTAINER
                  <main ref={printRef} onClick={() => setHoveredNodeKey(null)} className="flex-1 overflow-x-auto overflow-y-auto bg-transparent relative flex custom-scrollbar snap-x items-start content-start">
                     <ControlRail showNetwork={showNetwork} benchmarks={benchmarks} />
 
@@ -379,6 +371,9 @@ export default function ComparePage() {
                                 onFocus={(k) => handleNodeFocusToggle(k, false)} 
                                 isLeader={true}      
                                 leaderType={leader.metric}
+                                // NEW PROPS
+                                globalConsensusVersion={globalConsensus}
+                                globalSortedVersions={globalSortedVersions}
                             />
                         );
                     })}
@@ -398,6 +393,9 @@ export default function ComparePage() {
                                 showNetwork={showNetwork}
                                 hoveredNodeKey={hoveredNodeKey} 
                                 onFocus={(k) => handleNodeFocusToggle(k, false)} 
+                                // NEW PROPS
+                                globalConsensusVersion={globalConsensus}
+                                globalSortedVersions={globalSortedVersions}
                             />
                         );
                     })}
@@ -407,7 +405,6 @@ export default function ComparePage() {
              )}
          </div>
 
-         {/* ANALYTICS DECK (INTERACTIVE) */}
          <div className="w-full max-w-[1600px] mx-auto">
             <SynthesisEngine 
                 nodes={[...leaderColumns.map(l => l.node), ...selectedNodes]} 
@@ -416,7 +413,6 @@ export default function ComparePage() {
                 benchmarks={benchmarks} 
                 hoveredNodeKey={hoveredNodeKey} 
                 onHover={setHoveredNodeKey}
-                // --- CONNECTED THE CHART CLICK TO TABLE SCROLL (Mode: Selection) ---
                 onNodeSelect={(k) => handleNodeFocusToggle(k, true)}
             />
          </div>
