@@ -20,7 +20,8 @@ export interface VitalityIssue {
   code: string;       
   title: string;      
   description: string;
-  severity: 'critical' | 'warning' | 'info';
+  // ADDED 'success'
+  severity: 'critical' | 'warning' | 'info' | 'success';
 }
 
 export interface VitalityAnalysis {
@@ -48,6 +49,10 @@ const VECTOR_DEFINITIONS: Record<string, { title: string; description: string; s
   V_VOLATILE:      { title: 'Instability',    description: 'Frequent restarts detected.', severity: 'warning' },
   V_GHOST:         { title: 'Data Gaps',      description: 'Irregular reporting patterns.', severity: 'warning' },
 
+  // POSITIVE (NEW)
+  V_REVIVED:       { title: 'System Revived', description: 'Node is back online after outage.', severity: 'success' },
+  V_PAYDAY:        { title: 'Yield Restored', description: 'Credits are flowing again.', severity: 'success' },
+
   // INFO / EVENTS
   V_RESTART:       { title: 'System Restart', description: 'Uptime reset detected.', severity: 'info' },
   V_UPDATE:        { title: 'Software Update',description: 'Version changed recently.', severity: 'info' },
@@ -58,7 +63,7 @@ const VECTOR_DEFINITIONS: Record<string, { title: string; description: string; s
 
 export const cleanSemver = (v: string) => {
   if (!v) return '0.0.0';
-  const mainVer = v.split('-')[0]; // Collapses 1.2.0-trynet to 1.2.0
+  const mainVer = v.split('-')[0]; 
   return mainVer.replace(/[^0-9.]/g, '');
 };
 
@@ -74,7 +79,7 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
-// --- UPDATED: THE COLLAPSED LADDER LOGIC ---
+// --- COLLAPSED LADDER LOGIC ---
 const getVersionStatus = (nodeVersion: string | undefined, globalSortedVersions: string[], consensusVersion: string) => {
     const result = { V_LATEST: false, V_LAGGING: false, V_OBSOLETE: false };
 
@@ -86,36 +91,28 @@ const getVersionStatus = (nodeVersion: string | undefined, globalSortedVersions:
     const cleanNode = cleanSemver(nodeVersion);
     const cleanConsensus = cleanSemver(consensusVersion);
 
-    // 1. CHECK: Higher or Equal to Consensus -> LATEST
-    // This is the absolute "Leading" check. Early adopters or Consensus = Green.
     if (compareVersions(cleanNode, cleanConsensus) >= 0) {
         result.V_LATEST = true;
         return result;
     }
 
-    // 2. BUILD THE UNIQUE LADDER (DEDUPLICATION FIX)
-    // We create a Set to remove duplicate clean versions (e.g. 1.2.0-trynet and 1.2.0 become one entry)
     const uniqueCleanList = Array.from(new Set(
         globalSortedVersions.map(cleanSemver)
-    )).sort((a, b) => compareVersions(b, a)); // Sort Descending
+    )).sort((a, b) => compareVersions(b, a)); 
 
     const nodeIndex = uniqueCleanList.indexOf(cleanNode);
     const consensusIndex = uniqueCleanList.indexOf(cleanConsensus);
 
-    // If version is so old/weird it's not even in the known list
     if (nodeIndex === -1) {
         result.V_OBSOLETE = true;
         return result;
     }
 
-    // 3. MEASURE DISTANCE ON THE COLLAPSED LADDER
     const distance = nodeIndex - consensusIndex;
 
-    // Distance 1 (e.g. 1.0.0) or Distance 2 (e.g. 0.8.0) -> LAGGING
     if (distance > 0 && distance <= 2) {
         result.V_LAGGING = true;
     } 
-    // Distance 3+ -> OBSOLETE
     else if (distance >= 3) {
         result.V_OBSOLETE = true;
     }
@@ -144,18 +141,17 @@ const calculateVectors = (
   const V_OFFLINE = uptime === 0;
   const V_SYNCING = uptime > 0 && uptime < 900; 
 
-  // --- FROZEN UPTIME CHECK (24 HOUR LOGIC) ---
+  // --- FROZEN UPTIME CHECK ---
   let V_FROZEN_UPTIME = false;
   if (refPoint24H && !V_OFFLINE) {
       const timeDelta = new Date(point.date).getTime() - new Date(refPoint24H.date).getTime();
       const uptimeDelta = point.uptime - refPoint24H.uptime;
-
       if (timeDelta > 72000000 && Math.abs(uptimeDelta) < 60) { 
           V_FROZEN_UPTIME = true;
       }
   }
 
-  // --- 2. VERSION VECTORS (COLLAPSED LADDER) ---
+  // --- 2. VERSION VECTORS ---
   const versionString = (point as any).version || '0.0.0'; 
   const vStats = getVersionStatus(versionString, globalSortedVersions, globalConsensus);
   const { V_LATEST, V_LAGGING, V_OBSOLETE } = vStats;
@@ -174,21 +170,19 @@ const calculateVectors = (
   const V_UNTRACKED = credits === null || credits === undefined;
 
   let windowVelocity = 0;
+  let prevCredits = 0;
+  
   if (historyWindow.length > 0) {
       const oldestInWindow = historyWindow[0];
       const currentCredits = credits || 0;
-      const oldCredits = oldestInWindow.credits || 0;
-      windowVelocity = currentCredits - oldCredits;
+      prevCredits = oldestInWindow.credits || 0;
+      windowVelocity = currentCredits - prevCredits;
   }
 
   const V_PRODUCING = windowVelocity > 0;
   const V_STAGNANT = !V_UNTRACKED && windowVelocity === 0 && !V_FROZEN_UPTIME && !V_OFFLINE && !V_SYNCING; 
 
-  // --- 5. TIME/PENALTY VECTORS ---
-  // A point is penalized if it has restart penalties OR low consistency
   const V_PENALIZED = penalties.restarts > 0;
-
-  // First Seen Logic
   const ageMs = new Date(point.date).getTime() - new Date(firstSeenDate).getTime();
   const V_YOUNG = ageMs < 259200000; 
 
@@ -200,13 +194,23 @@ const calculateVectors = (
   const V_RESTART = !!isRestart;
   const V_UPDATE = !!isUpdate;
 
+  // --- NEW POSITIVE DETECTORS ---
+  
+  // 1. Revival: Was offline (uptime 0), now online (>0)
+  const V_REVIVED = !!prevPoint && prevPoint.uptime === 0 && point.uptime > 0;
+  
+  // 2. Payday: Was stagnant (0 yield), now producing (>0 yield)
+  // We check strictly if velocity changed from 0 to positive
+  const V_PAYDAY = !!prevPoint && (prevPoint.credits || 0) === (historyWindow[historyWindow.length-2]?.credits || 0) && V_PRODUCING && !V_REVIVED;
+
   return {
     V_OFFLINE, V_SYNCING, V_FROZEN_UPTIME,
     V_LATEST, V_LAGGING, V_OBSOLETE,
     V_STABLE, V_JITTERY, V_VOLATILE, V_CONSISTENT, V_GHOST,
     V_PRODUCING, V_STAGNANT, V_UNTRACKED,
     V_PENALIZED, V_YOUNG,
-    V_RESTART, V_UPDATE 
+    V_RESTART, V_UPDATE,
+    V_REVIVED, V_PAYDAY // Export new vectors
   };
 };
 
@@ -225,28 +229,28 @@ export const analyzePointVitality = (
   const activeVectors = Object.entries(v).filter(([_, val]) => val).map(([key]) => key);
 
   let archetype: VitalityArchetype = 'ACTIVE';
-  let baseColor = '#06b6d4'; // Cyan-500
+  let baseColor = '#06b6d4'; 
   let textColor = 'text-cyan-400';
   let label = 'ACTIVE';
 
   // PRIORITY 1: CRITICAL
   if (v.V_OFFLINE || (v.V_OBSOLETE && v.V_STAGNANT) || (v.V_OBSOLETE && v.V_UNTRACKED)) {
     archetype = 'CRITICAL';
-    baseColor = '#be123c'; // Rose-700
+    baseColor = '#be123c'; 
     textColor = 'text-rose-500';
     label = v.V_OFFLINE ? 'OFFLINE' : 'OBSOLETE';
   }
   // PRIORITY 2: TRAUMA
   else if (v.V_VOLATILE || (v.V_PENALIZED && v.V_JITTERY) || (v.V_PENALIZED && v.V_STAGNANT)) {
     archetype = 'TRAUMA';
-    baseColor = '#7c3aed'; // Violet-600
+    baseColor = '#7c3aed'; 
     textColor = 'text-violet-400';
     label = 'TRAUMA STATE';
   }
   // PRIORITY 3: DRIFT
   else if (v.V_FROZEN_UPTIME || (v.V_STAGNANT && !v.V_SYNCING) || v.V_LAGGING || v.V_GHOST || v.V_OBSOLETE) {
     archetype = 'DRIFT';
-    baseColor = '#d97706'; // Amber-600
+    baseColor = '#d97706'; 
     textColor = 'text-amber-500';
 
     if (v.V_FROZEN_UPTIME) label = 'FROZEN (24H)';
@@ -258,21 +262,20 @@ export const analyzePointVitality = (
   // PRIORITY 4: INCUBATION
   else if (v.V_SYNCING || (v.V_YOUNG && v.V_PRODUCING) || (v.V_UNTRACKED && v.V_LATEST && v.V_STABLE)) {
     archetype = 'INCUBATION';
-    baseColor = '#2563eb'; // Blue-600
+    baseColor = '#2563eb'; 
     textColor = 'text-blue-400';
     label = v.V_SYNCING ? 'WARMING UP' : 'INCUBATION';
   }
   // PRIORITY 5: ELITE
   else if (v.V_LATEST && v.V_PRODUCING && v.V_STABLE && v.V_CONSISTENT) {
     archetype = 'ELITE';
-    baseColor = '#059669'; // Emerald-600
+    baseColor = '#059669'; 
     textColor = 'text-emerald-400';
     label = 'ELITE STATUS';
   }
-  // PRIORITY 6: ACTIVE
   else {
     archetype = 'ACTIVE';
-    baseColor = '#06b6d4'; // Cyan-500
+    baseColor = '#06b6d4'; 
     textColor = 'text-cyan-400';
     label = 'ACTIVE';
   }
@@ -291,9 +294,19 @@ export const analyzePointVitality = (
   const bottomPin: PinConfig = { show: false, color: 'bg-transparent' };
 
   // --- PIN LOGIC UPGRADE ---
-  // The Red Pin now handles Restart Events OR Active Penalties (Trauma/Consistency)
-  // This ensures the "Penalty" state is visible as a pin on the ribbon.
-  if (v.V_RESTART || v.V_PENALIZED || !v.V_CONSISTENT) {
+  // PRIORITY: REVIVED > PAYDAY > RESTART/PENALTY > UPDATE > BAD NEWS
+
+  if (v.V_REVIVED) {
+      bottomPin.show = true;
+      bottomPin.color = 'bg-emerald-400'; 
+      bottomPin.label = 'Revived';
+  } 
+  else if (v.V_PAYDAY) {
+      bottomPin.show = true;
+      bottomPin.color = 'bg-lime-400';
+      bottomPin.label = 'Payday';
+  }
+  else if (v.V_RESTART || v.V_PENALIZED || !v.V_CONSISTENT) {
       bottomPin.show = true;
       bottomPin.color = 'bg-rose-400'; 
       
