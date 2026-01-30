@@ -1,4 +1,11 @@
-import { getForensicHistoryAction } from '../app/actions/getHistory';
+// REMOVED: import { getForensicHistoryAction } from '../app/actions/getHistory';
+// ADDED: Direct DB Access to bypass potential caching issues during this fix
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 // ==========================================
 // PART 1: CHART AGGREGATION UTILITIES
@@ -88,17 +95,23 @@ export type NetworkHistoryReport = Map<string, HistoryContext>;
 export async function fetchNodeHistoryReport(): Promise<NetworkHistoryReport> {
   const report = new Map<string, HistoryContext>();
 
-  // CACHE UPGRADE: Use the Action instead of direct DB call
-  // Fetch 7 Days of data (Forensic Mode)
-  let snapshots = [];
-  try {
-      snapshots = await getForensicHistoryAction(7);
-  } catch (e) {
-      console.warn("History Aggregation Failed:", e);
+  // --- NUCLEAR OPTION: DIRECT DB FETCH (Bypassing getHistory Cache) ---
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - 7);
+
+  const { data: snapshots, error } = await supabase
+    .from('node_snapshots')
+    .select('node_id, uptime, credits, created_at')
+    .gte('created_at', startDate.toISOString())
+    .order('created_at', { ascending: true });
+
+  if (error) {
+      console.error("🔥 FATAL: DB Fetch Error in Aggregator:", error.message);
       return report;
   }
 
   if (!snapshots || snapshots.length === 0) {
+      console.warn("⚠️ No history snapshots found.");
       return report; 
   }
 
@@ -111,30 +124,32 @@ export async function fetchNodeHistoryReport(): Promise<NetworkHistoryReport> {
   const oneDayMs = 24 * 60 * 60 * 1000;
   const now = new Date().getTime();
 
+  let debugLogCount = 0; // Only log first 3 nodes to avoid spam
+
   Object.entries(grouped).forEach(([nodeId, history]) => {
     let restarts7d = 0;
     let restarts24h = 0;
-
-    // Forensics for Frozen State
     let currentFrozenStreakMs = 0;
-
-    // Forensics for 24h Velocity
     let minCredits24h = -1;
     let maxCredits24h = 0;
 
-    // --- FIX: DYNAMIC EXPECTATION CALCULATION ---
-    // We calculate how long we have actually known about this node ID
-    // instead of hardcoding a 7-day expectation.
+    // --- FIX 2: ROBUST LIFESPAN CALCULATION ---
     const firstPointTime = new Date(history[0].created_at).getTime();
     const lastPointTime = new Date(history[history.length - 1].created_at).getTime();
     
-    // Calculate hours between first and last seen point
-    const lifespanHours = Math.max(1, (lastPointTime - firstPointTime) / (1000 * 60 * 60));
+    // Ensure we don't get NaN if dates are weird
+    if (isNaN(firstPointTime) || isNaN(lastPointTime)) {
+        // Fallback for bad data
+        report.set(nodeId, { restarts_7d: 0, restarts_24h: 0, yield_velocity_24h: 0, consistency_score: 1, frozen_duration_hours: 0 });
+        return;
+    }
+
+    const lifespanHours = Math.max(0.1, (lastPointTime - firstPointTime) / (1000 * 60 * 60));
     
-    // If the node is young (< 7 days), expect fewer snapshots.
-    // If the node is old (> 7 days), expect the full 168.
-    const expected = Math.min(168, lifespanHours);
-    // --- END FIX ---
+    // --- FIX 3: THE "NEW NODE" SAFETY GUARD ---
+    // If a node is younger than 24 hours, FORCE 100% consistency.
+    // This stops "0.00" on new deployments instantly.
+    const isNewNode = lifespanHours < 24;
 
     for (let i = 1; i < history.length; i++) {
       const prev = history[i-1];
@@ -143,13 +158,13 @@ export async function fetchNodeHistoryReport(): Promise<NetworkHistoryReport> {
       const currTime = new Date(curr.created_at).getTime();
       const timeDiff = currTime - prevTime;
 
-      // 1. Count Restarts (Logic: Uptime dropped significantly)
+      // 1. Count Restarts
       if (curr.uptime < prev.uptime - 60) {
         restarts7d++;
         if ((now - currTime) <= oneDayMs) {
             restarts24h++;
         }
-        currentFrozenStreakMs = 0; // Reset on restart
+        currentFrozenStreakMs = 0; 
       }
       // 2. Frozen Detection
       else if (timeDiff > 1000 * 60 * 30) {
@@ -170,15 +185,30 @@ export async function fetchNodeHistoryReport(): Promise<NetworkHistoryReport> {
       }
     }
 
-    // 4. Consistency Score
-    // Using the dynamic 'expected' value calculated above
-    const consistency = Math.min(1, history.length / (expected * 0.8));
+    // --- FIX 4: CONSISTENCY CALCULATION ---
+    let consistency = 1;
 
-    // Calculate final velocity
+    if (isNewNode) {
+        consistency = 1; // Free pass for new nodes
+    } else {
+        // Standard logic for older nodes
+        const expected = Math.min(168, lifespanHours); 
+        // Prevent division by zero if expected is somehow 0
+        const safeExpected = Math.max(1, expected);
+        consistency = Math.min(1, history.length / (safeExpected * 0.8));
+    }
+    
+    // Final NaN Guard
+    if (isNaN(consistency)) consistency = 1;
+
     const velocity = minCredits24h === -1 ? 0 : Math.max(0, maxCredits24h - minCredits24h);
-
-    // Calculate frozen hours
     const frozenHours = currentFrozenStreakMs / (1000 * 60 * 60);
+
+    // --- SERVER LOGGING (Check your terminal) ---
+    if (debugLogCount < 3) {
+       console.log(`[Aggregator] Node: ${nodeId.substring(0, 15)}... | Lifespan: ${lifespanHours.toFixed(2)}h | IsNew: ${isNewNode} | Snapshots: ${history.length} | Score: ${consistency}`);
+       debugLogCount++;
+    }
 
     report.set(nodeId, {
       restarts_7d: restarts7d,
