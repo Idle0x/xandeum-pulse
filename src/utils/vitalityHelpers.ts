@@ -54,11 +54,11 @@ const VECTOR_DEFINITIONS: Record<string, { title: string; description: string; s
   V_SYNCING:       { title: 'Syncing',        description: 'Initializing network data.', severity: 'info' },
 };
 
-// --- PURE MATH HELPERS (AS REQUESTED) ---
+// --- PURE MATH HELPERS ---
 
 export const cleanSemver = (v: string) => {
   if (!v) return '0.0.0';
-  const mainVer = v.split('-')[0];
+  const mainVer = v.split('-')[0]; // Collapses 1.2.0-trynet to 1.2.0
   return mainVer.replace(/[^0-9.]/g, '');
 };
 
@@ -74,13 +74,12 @@ const compareVersions = (v1: string, v2: string) => {
   return 0;
 };
 
-// --- UPDATED: STRICT GLOBAL CONSENSUS CHECK ---
+// --- UPDATED: THE COLLAPSED LADDER LOGIC ---
 const getVersionStatus = (nodeVersion: string | undefined, globalSortedVersions: string[], consensusVersion: string) => {
-    // Default safe state
     const result = { V_LATEST: false, V_LAGGING: false, V_OBSOLETE: false };
     
     if (!nodeVersion) {
-        result.V_LAGGING = true; // Fallback
+        result.V_LAGGING = true; 
         return result;
     }
 
@@ -88,37 +87,38 @@ const getVersionStatus = (nodeVersion: string | undefined, globalSortedVersions:
     const cleanConsensus = cleanSemver(consensusVersion);
 
     // 1. CHECK: Higher or Equal to Consensus -> LATEST
-    // This correctly handles "Leading" nodes.
+    // This is the absolute "Leading" check. Early adopters or Consensus = Green.
     if (compareVersions(cleanNode, cleanConsensus) >= 0) {
         result.V_LATEST = true;
         return result;
     }
 
-    // 2. CHECK: Distance in Global List
-    // We clean the global list for accurate matching
-    const cleanList = globalSortedVersions.map(cleanSemver);
-    
-    const nodeIndex = cleanList.indexOf(cleanNode);
-    const consensusIndex = cleanList.indexOf(cleanConsensus);
+    // 2. BUILD THE UNIQUE LADDER (DEDUPLICATION FIX)
+    // We create a Set to remove duplicate clean versions (e.g. 1.2.0-trynet and 1.2.0 become one entry)
+    const uniqueCleanList = Array.from(new Set(
+        globalSortedVersions.map(cleanSemver)
+    )).sort((a, b) => compareVersions(b, a)); // Sort Descending
 
-    // If version is unknown to the network list and we already know it's not newer (step 1),
-    // we treat it as Obsolete.
+    const nodeIndex = uniqueCleanList.indexOf(cleanNode);
+    const consensusIndex = uniqueCleanList.indexOf(cleanConsensus);
+
+    // If version is so old/weird it's not even in the known list
     if (nodeIndex === -1) {
         result.V_OBSOLETE = true;
         return result;
     }
 
+    // 3. MEASURE DISTANCE ON THE COLLAPSED LADDER
     const distance = nodeIndex - consensusIndex;
 
-    // 1 or 2 versions behind -> LAGGING
+    // Distance 1 (e.g. 1.0.0) or Distance 2 (e.g. 0.8.0) -> LAGGING
     if (distance > 0 && distance <= 2) {
         result.V_LAGGING = true;
     } 
-    // 3+ versions behind -> OBSOLETE
+    // Distance 3+ -> OBSOLETE
     else if (distance >= 3) {
         result.V_OBSOLETE = true;
     }
-    // Fallback safety (should be covered by step 1)
     else {
         result.V_LATEST = true; 
     }
@@ -150,13 +150,12 @@ const calculateVectors = (
       const timeDelta = new Date(point.date).getTime() - new Date(refPoint24H.date).getTime();
       const uptimeDelta = point.uptime - refPoint24H.uptime;
 
-      // Relaxed tolerance (60s) to handle network jitter/RPC lag
       if (timeDelta > 72000000 && Math.abs(uptimeDelta) < 60) { 
           V_FROZEN_UPTIME = true;
       }
   }
 
-  // --- 2. VERSION VECTORS (UPDATED LOGIC) ---
+  // --- 2. VERSION VECTORS (COLLAPSED LADDER) ---
   const versionString = (point as any).version || '0.0.0'; 
   const vStats = getVersionStatus(versionString, globalSortedVersions, globalConsensus);
   const { V_LATEST, V_LAGGING, V_OBSOLETE } = vStats;
@@ -277,12 +276,9 @@ export const analyzePointVitality = (
     label = 'ACTIVE';
   }
 
-  // --- BUILD HUMAN ISSUES LIST ---
   const issues: VitalityIssue[] = activeVectors
     .filter(key => VECTOR_DEFINITIONS[key])
     .map(key => ({ code: key, ...VECTOR_DEFINITIONS[key] }));
-
-  // --- PIN SYSTEM ---
 
   const topPin: PinConfig = { show: false, color: 'bg-white' };
   if (v.V_GHOST) {
