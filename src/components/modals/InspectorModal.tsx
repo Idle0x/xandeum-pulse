@@ -82,11 +82,21 @@ export const InspectorModal = ({
     setTimeRange('24H'); // Reset time range to 24H when opening a new node
   }, [selectedNode.pubkey]);
 
+  // UPDATED: Computed Network Stats with Version Consensus Logic
   const computedNetworkStats = useMemo(() => {
     if (!nodes || nodes.length === 0) return null;
 
+    const counts: Record<string, number> = {};
+    const uniqueSet = new Set<string>();
+
     const totals = nodes.reduce((acc, node) => {
         const bd = node.healthBreakdown || { uptime: 0, version: 0, reputation: 0, storage: 0 };
+        
+        // Track versions for consensus
+        const v = node.version || '0.0.0';
+        counts[v] = (counts[v] || 0) + 1;
+        uniqueSet.add(v);
+
         return {
             health: acc.health + (node.health || 0),
             uptime: acc.uptime + (bd.uptime || 0),
@@ -97,9 +107,13 @@ export const InspectorModal = ({
     }, { health: 0, uptime: 0, version: 0, reputation: 0, storage: 0 });
 
     const count = nodes.length;
+    const sortedVers = Array.from(uniqueSet).sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
+    const consensus = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || '0.0.0';
 
     return {
         totalNodes: count,
+        globalConsensus: consensus,
+        globalSortedVersions: sortedVers,
         avgBreakdown: {
             total: totals.health / count,
             uptime: totals.uptime / count,
@@ -435,6 +449,9 @@ export const InspectorModal = ({
                                historyLoading={historyLoading}
                                timeRange={timeRange}
                                onTimeRangeChange={setTimeRange}
+                               // NEW: Passed consensus data for Health View
+                               globalConsensusVersion={computedNetworkStats?.globalConsensus || '0.0.0'}
+                               globalSortedVersions={computedNetworkStats?.globalSortedVersions || []}
                             />
                         )}
                        {modalView === 'storage' && (
