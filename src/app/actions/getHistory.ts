@@ -6,39 +6,15 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-/**
- * FIX: We allow the build/tests to proceed if keys are missing by using 
- * a mock client during tests. This prevents the "Supabase keys are missing" 
- * error from breaking your CI/CD pipeline.
- */
 const isTest = process.env.NODE_ENV === 'test';
 
 if (!isTest && (!supabaseUrl || !supabaseKey)) {
   throw new Error("SERVER ERROR: Supabase keys are missing.");
 }
 
-// Initialize real client if keys exist, otherwise use a safe mock for tests
 const supabase = (supabaseUrl && supabaseKey)
   ? createClient(supabaseUrl, supabaseKey)
-  : { 
-      from: () => ({ 
-        select: () => ({ 
-          eq: () => ({ 
-            gte: () => ({ 
-              order: () => ({ 
-                limit: () => ({ 
-                  single: () => Promise.resolve({ data: null, error: null }) 
-                }),
-                gte: () => Promise.resolve({ data: [], error: null })
-              }) 
-            }) 
-          }),
-          gte: () => ({
-            order: () => Promise.resolve({ data: [], error: null })
-          })
-        }) 
-      }) 
-    } as any;
+  : { from: () => ({ select: () => ({ eq: () => ({ gte: () => ({ order: () => ({ limit: () => ({ single: () => Promise.resolve({ data: null, error: null }) }), gte: () => Promise.resolve({ data: [], error: null }) }) }) }) }) }) } as any;
 
 // --- 2. CUSTOM IN-MEMORY CACHE ---
 type CacheEntry = {
@@ -47,8 +23,11 @@ type CacheEntry = {
 };
 
 const globalCache = new Map<string, CacheEntry>();
-const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 Minutes
-const GENESIS_CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 Hours
+
+// UPDATE: Lowered from 30 mins to 5 mins
+// This prevents "Stale Data" when you are actively monitoring the network.
+const CACHE_DURATION_MS = 5 * 60 * 1000; 
+const GENESIS_CACHE_DURATION_MS = 24 * 60 * 60 * 1000; 
 
 async function fetchWithCache(
   key: string, 
@@ -110,9 +89,10 @@ const fetchForensicSnapshots = async (days: number) => {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
 
+  // We explicitly select the fields we need to keep the payload light
   const { data, error } = await supabase
     .from('node_snapshots')
-    .select('node_id, uptime, credits, created_at, version') 
+    .select('node_id, uptime, credits, created_at') 
     .gte('created_at', startDate.toISOString())
     .order('created_at', { ascending: true });
 
