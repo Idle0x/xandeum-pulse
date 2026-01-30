@@ -20,7 +20,10 @@ interface NodeColumnProps {
   onFocus?: (key: string | null) => void;
   isLeader?: boolean;
   leaderType?: string;
-  shouldBounce?: boolean; 
+  shouldBounce?: boolean;
+  // NEW PROPS FOR GLOBAL CONTEXT
+  globalConsensusVersion: string;
+  globalSortedVersions: string[];
 }
 
 export const NodeColumn = ({ 
@@ -36,7 +39,9 @@ export const NodeColumn = ({
     onFocus, 
     isLeader,
     leaderType,
-    shouldBounce = false 
+    shouldBounce = false,
+    globalConsensusVersion, // <--- ACCEPT PROP
+    globalSortedVersions    // <--- ACCEPT PROP
 }: NodeColumnProps) => {
 
   const { history, loading } = useNodeHistory(node, '30D');
@@ -145,11 +150,16 @@ export const NodeColumn = ({
         </Row>
         <Row><span className="text-[9px] md:text-base font-mono text-zinc-300">{formatUptimePrecise(node.uptime || 0)}</span></Row>
 
-        {/* 👇 MOVED & FIXED: Stability Ribbon (Matches Height & Colors) */}
         <div className="h-[36px] md:h-[72px] flex items-center justify-center px-3 md:px-4 mt-0 relative">
            <div className="w-full opacity-90 group-hover/col:opacity-100 transition-opacity">
-              {/* Passed theme.hex to force color matching */}
-              <StabilityRibbon history={history} loading={loading} color={theme.hex} />
+              {/* Passed theme.hex to force color matching, AND GLOBAL CONTEXT */}
+              <StabilityRibbon 
+                  history={history} 
+                  loading={loading} 
+                  color={theme.hex} 
+                  globalConsensusVersion={globalConsensusVersion}
+                  globalSortedVersions={globalSortedVersions}
+              />
            </div>
         </div>
 
