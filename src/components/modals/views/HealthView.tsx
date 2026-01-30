@@ -16,6 +16,9 @@ interface HealthViewProps {
   // State Lifted Props
   timeRange: HistoryTimeRange;
   onTimeRangeChange: (range: HistoryTimeRange) => void;
+  // NEW PROPS
+  globalConsensusVersion: string;
+  globalSortedVersions: string[];
 }
 
 export const HealthView = ({ 
@@ -28,7 +31,9 @@ export const HealthView = ({
   history = [], 
   historyLoading = false,
   timeRange,
-  onTimeRangeChange
+  onTimeRangeChange,
+  globalConsensusVersion,
+  globalSortedVersions
 }: HealthViewProps) => {
   const health = node.health || 0;
 
@@ -162,6 +167,8 @@ export const HealthView = ({
                     loading={historyLoading} 
                     days={getRibbonSlots()}
                     timeRange={timeRange} 
+                    globalConsensusVersion={globalConsensusVersion} // PASSED
+                    globalSortedVersions={globalSortedVersions}     // PASSED
                 />
             </div>
         </div>
