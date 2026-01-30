@@ -72,28 +72,40 @@ const compareSemver = (v1: string, v2: string) => {
   return 0;
 };
 
-const getVersionStatus = (nodeVersion: string | undefined, allSortedVersions: string[], consensusVersion: string) => {
+// --- UPDATED: STRICT GLOBAL CONSENSUS CHECK ---
+const getVersionStatus = (nodeVersion: string | undefined, globalSortedVersions: string[], consensusVersion: string) => {
     if (!nodeVersion) return { V_LATEST: false, V_LAGGING: true, V_OBSOLETE: false };
 
-    // 1. MATH CHECK: If Node >= Consensus, it is LATEST.
+    // 1. SAFETY CHECK: If Leading or Matching Consensus -> LATEST
+    // "Any version above or on consensus is fine."
     if (compareSemver(nodeVersion, consensusVersion) >= 0) {
         return { V_LATEST: true, V_LAGGING: false, V_OBSOLETE: false };
     }
 
-    // 2. DISTANCE CHECK (For older nodes only)
-    const consensusIndex = allSortedVersions.indexOf(consensusVersion);
-    const nodeIndex = allSortedVersions.indexOf(nodeVersion);
+    // 2. DISTANCE CHECK (Using Global List)
+    // We only look at versions that are OLDER than consensus in the global list
+    // to calculate how "far behind" this node is.
+    
+    // Clean and Normalize logic
+    const cleanVer = (v: string) => v.replace(/[^0-9.]/g, '');
+    const cleanNode = cleanVer(nodeVersion);
+    const cleanList = globalSortedVersions.map(cleanVer);
+    
+    // Find where the node sits in the global stack
+    const nodeIndex = cleanList.indexOf(cleanNode);
+    const consensusIndex = cleanList.indexOf(cleanVer(consensusVersion));
 
-    // If unknown version, assume lagging
+    // If version is unknown to the network, assume Lagging
     if (nodeIndex === -1) return { V_LATEST: false, V_LAGGING: true, V_OBSOLETE: false };
 
-    // Calculate distance steps (1 version behind, 2 versions behind, etc.)
-    const distance = Math.abs(consensusIndex - nodeIndex);
+    // Calculate strict steps behind
+    // Example: [v1.5, v1.4, v1.3]. Consensus v1.5 (idx 0). Node v1.3 (idx 2). Distance = 2.
+    const distance = nodeIndex - consensusIndex;
 
     return {
         V_LATEST: false,
-        V_LAGGING: distance <= 2,
-        V_OBSOLETE: distance > 2
+        V_LAGGING: distance > 0 && distance <= 2, // 1 or 2 steps behind
+        V_OBSOLETE: distance > 2                  // 3+ steps behind
     };
 };
 
@@ -103,7 +115,8 @@ const calculateVectors = (
   point: NodeHistoryPoint, 
   historyWindow: NodeHistoryPoint[], 
   refPoint24H: NodeHistoryPoint | undefined, 
-  versionContext: { allSorted: string[], consensus: string },
+  globalSortedVersions: string[], // <--- GLOBAL CONTEXT
+  globalConsensus: string,        // <--- GLOBAL CONTEXT
   firstSeenDate: string 
 ) => {
   const uptime = point.uptime || 0;
@@ -121,15 +134,14 @@ const calculateVectors = (
       const uptimeDelta = point.uptime - refPoint24H.uptime;
 
       // Relaxed tolerance (60s) to handle network jitter/RPC lag
-      if (timeDelta > 72000000 && uptimeDelta < 60) { 
+      if (timeDelta > 72000000 && Math.abs(uptimeDelta) < 60) { 
           V_FROZEN_UPTIME = true;
       }
   }
 
-  // --- 2. VERSION VECTORS (FIXED) ---
-  // FIX: Access point.version (string) instead of bd.version (score)
-  const versionString = (point as any).version; 
-  const vStats = getVersionStatus(versionString, versionContext.allSorted, versionContext.consensus);
+  // --- 2. VERSION VECTORS (Using Global Context) ---
+  const versionString = (point as any).version || '0.0.0'; 
+  const vStats = getVersionStatus(versionString, globalSortedVersions, globalConsensus);
   const { V_LATEST, V_LAGGING, V_OBSOLETE } = vStats;
 
   // --- 3. STABILITY VECTORS ---
@@ -160,14 +172,13 @@ const calculateVectors = (
   // --- 5. TIME/PENALTY VECTORS ---
   const V_PENALIZED = penalties.restarts > 0;
 
-  // CONSISTENCY FIX: V_YOUNG is now based on 'First Seen' date.
+  // First Seen Logic
   const ageMs = new Date(point.date).getTime() - new Date(firstSeenDate).getTime();
   const V_YOUNG = ageMs < 259200000; 
 
   // Event Detectors
   const prevPoint = historyWindow[historyWindow.length - 1]; 
   const isRestart = prevPoint && point.uptime < (prevPoint.uptime - 100);
-  // FIX: Also check string version here
   const isUpdate = prevPoint && (point as any).version !== (prevPoint as any).version;
 
   const V_RESTART = !!isRestart;
@@ -189,11 +200,12 @@ export const analyzePointVitality = (
   point: NodeHistoryPoint, 
   historyWindow: NodeHistoryPoint[],
   refPoint24H: NodeHistoryPoint | undefined,
-  versionContext: { allSorted: string[], consensus: string },
-  firstSeenDate: string 
+  globalSortedVersions: string[], // <--- ARG 4
+  globalConsensus: string,        // <--- ARG 5
+  firstSeenDate: string           // <--- ARG 6
 ): VitalityAnalysis => {
 
-  const v = calculateVectors(point, historyWindow, refPoint24H, versionContext, firstSeenDate);
+  const v = calculateVectors(point, historyWindow, refPoint24H, globalSortedVersions, globalConsensus, firstSeenDate);
   const activeVectors = Object.entries(v).filter(([_, val]) => val).map(([key]) => key);
 
   let archetype: VitalityArchetype = 'ACTIVE';
