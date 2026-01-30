@@ -14,7 +14,9 @@ interface StabilityRibbonProps {
   timeRange?: HistoryTimeRange;
   color?: string;
   globalConsensusVersion: string;
-  globalSortedVersions: string[]; 
+  globalSortedVersions: string[];
+  // NEW: Accept Live Penalties from Parent
+  currentPenalties?: { restarts: number; consistency: number };
 }
 
 // --- SUB-COMPONENT: VITALITY SNAPSHOT CARD ---
@@ -48,7 +50,6 @@ const VitalitySnapshotCard = ({
     const health = point.health || 0;
     
     // SAFE EXTRACTION OF PENALTIES
-    // We default to 0/1 so the UI doesn't crash on old data
     const penalties = (point as any).healthBreakdown?.penalties || { restarts: 0, consistency: 1 };
     const restartPenalty = penalties.restarts || 0;
     const consistencyScore = penalties.consistency !== undefined ? penalties.consistency : 1;
@@ -124,7 +125,7 @@ const VitalitySnapshotCard = ({
                         </div>
                      </div>
 
-                     {/* --- ZONE B2: PENALTY LOG (NEW) --- */}
+                     {/* --- ZONE B2: PENALTY LOG (RED ZONE) --- */}
                      {hasPenalty && (
                         <div className="mb-2 md:mb-3 p-1.5 md:p-2 rounded bg-rose-950/20 border border-rose-900/50 flex flex-col gap-1">
                             <div className="flex items-center gap-1 text-rose-400 mb-0.5">
@@ -158,9 +159,12 @@ const VitalitySnapshotCard = ({
                                     flex items-center gap-1 px-1.5 py-0.5 md:py-1 rounded text-[8px] md:text-[9px] font-medium border leading-tight
                                     ${issue.severity === 'critical' ? 'bg-rose-950/30 border-rose-900 text-rose-400' : 
                                       issue.severity === 'warning' ? 'bg-amber-950/30 border-amber-900 text-amber-400' : 
+                                      issue.severity === 'success' ? 'bg-emerald-950/30 border-emerald-900 text-emerald-400' : 
                                       'bg-blue-950/30 border-blue-900 text-blue-400'}
                                 `}>
-                                    {issue.severity === 'critical' ? <AlertTriangle className="w-2.5 h-2.5" /> : <Info className="w-2.5 h-2.5" />}
+                                    {issue.severity === 'critical' ? <AlertTriangle className="w-2.5 h-2.5" /> : 
+                                     issue.severity === 'success' ? <CheckCircle className="w-2.5 h-2.5" /> : 
+                                     <Info className="w-2.5 h-2.5" />}
                                     {issue.title}
                                 </div>
                             ))}
@@ -179,7 +183,11 @@ const VitalitySnapshotCard = ({
                         <div className="flex flex-col gap-1">
                             {displayIssues.map(issue => (
                                 <div key={issue.code} className="flex gap-1.5 items-start">
-                                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${issue.severity === 'critical' ? 'bg-rose-500' : 'bg-zinc-500'}`} />
+                                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${
+                                        issue.severity === 'critical' ? 'bg-rose-500' : 
+                                        issue.severity === 'success' ? 'bg-emerald-500' : 
+                                        'bg-zinc-500'
+                                    }`} />
                                     <span className="text-[8px] md:text-[9px] text-zinc-400 leading-tight">
                                         <span className="text-zinc-300 font-semibold">{issue.title}:</span> {issue.description}
                                     </span>
@@ -208,7 +216,8 @@ export const StabilityRibbon = ({
   timeRange = '30D', 
   color: customColor,
   globalConsensusVersion, 
-  globalSortedVersions
+  globalSortedVersions,
+  currentPenalties 
 }: StabilityRibbonProps) => {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -235,10 +244,31 @@ export const StabilityRibbon = ({
   const startIndex = Math.max(0, sortedHistory.length - days);
   const displayData = sortedHistory.slice(startIndex);
 
+  // --- HELPER: ENRICH POINT WITH LIVE DATA ---
+  const enrichPoint = (point: NodeHistoryPoint, index: number, total: number) => {
+      if (!point) return point;
+      
+      // If this is the very last point in the history array...
+      // AND we have current penalties passed down from parent...
+      if (index === total - 1 && currentPenalties) {
+          return {
+              ...point,
+              healthBreakdown: {
+                  ...(point as any).healthBreakdown,
+                  penalties: currentPenalties // <--- INJECTION
+              }
+          };
+      }
+      return point;
+  };
+
   const renderTooltip = () => {
       if (selectedIdx === null) return null;
-      const point = displayData[selectedIdx];
+      let point = displayData[selectedIdx];
       if (!point) return null;
+
+      // ENRICH THE POINT BEFORE RENDERING TOOLTIP
+      point = enrichPoint(point, selectedIdx, displayData.length);
 
       const absoluteIndex = startIndex + selectedIdx;
       const startWindow = Math.max(0, absoluteIndex - 5);
@@ -273,7 +303,7 @@ export const StabilityRibbon = ({
       <div className="flex gap-[2px] w-full h-full items-end">
         {slots.map((_, i) => {
           const dataIndex = displayData.length - (days - i);
-          const point = displayData[dataIndex];
+          let point = displayData[dataIndex];
           const isSelected = selectedIdx === dataIndex;
 
           let baseColor = '#06b6d4'; 
@@ -281,6 +311,9 @@ export const StabilityRibbon = ({
           let bottomPin = { show: false, color: '' };
 
           if (point) {
+             // ENRICH POINT FOR PIN LOGIC
+             point = enrichPoint(point, dataIndex, displayData.length);
+
              const absoluteIndex = startIndex + dataIndex;
              const startWindow = Math.max(0, absoluteIndex - 5);
              const historyWindow = sortedHistory.slice(startWindow, absoluteIndex);
