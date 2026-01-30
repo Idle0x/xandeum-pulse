@@ -1,11 +1,4 @@
-// REMOVED: import { getForensicHistoryAction } from '../app/actions/getHistory';
-// ADDED: Direct DB Access to bypass potential caching issues during this fix
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { getForensicHistoryAction } from '../app/actions/getHistory';
 
 // ==========================================
 // PART 1: CHART AGGREGATION UTILITIES
@@ -95,23 +88,16 @@ export type NetworkHistoryReport = Map<string, HistoryContext>;
 export async function fetchNodeHistoryReport(): Promise<NetworkHistoryReport> {
   const report = new Map<string, HistoryContext>();
 
-  // --- NUCLEAR OPTION: DIRECT DB FETCH (Bypassing getHistory Cache) ---
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - 7);
-
-  const { data: snapshots, error } = await supabase
-    .from('node_snapshots')
-    .select('node_id, uptime, credits, created_at')
-    .gte('created_at', startDate.toISOString())
-    .order('created_at', { ascending: true });
-
-  if (error) {
-      console.error("🔥 FATAL: DB Fetch Error in Aggregator:", error.message);
+  // Fetch 7 Days of data (Forensic Mode) via CACHED ACTION
+  let snapshots = [];
+  try {
+      snapshots = await getForensicHistoryAction(7);
+  } catch (e) {
+      console.warn("History Aggregation Failed:", e);
       return report;
   }
 
   if (!snapshots || snapshots.length === 0) {
-      console.warn("⚠️ No history snapshots found.");
       return report; 
   }
 
@@ -124,8 +110,6 @@ export async function fetchNodeHistoryReport(): Promise<NetworkHistoryReport> {
   const oneDayMs = 24 * 60 * 60 * 1000;
   const now = new Date().getTime();
 
-  let debugLogCount = 0; // Only log first 3 nodes to avoid spam
-
   Object.entries(grouped).forEach(([nodeId, history]) => {
     let restarts7d = 0;
     let restarts24h = 0;
@@ -133,13 +117,12 @@ export async function fetchNodeHistoryReport(): Promise<NetworkHistoryReport> {
     let minCredits24h = -1;
     let maxCredits24h = 0;
 
-    // --- FIX 2: ROBUST LIFESPAN CALCULATION ---
+    // --- FIX 2: ROBUST LIFESPAN CALCULATION (Age Aware) ---
     const firstPointTime = new Date(history[0].created_at).getTime();
     const lastPointTime = new Date(history[history.length - 1].created_at).getTime();
     
     // Ensure we don't get NaN if dates are weird
     if (isNaN(firstPointTime) || isNaN(lastPointTime)) {
-        // Fallback for bad data
         report.set(nodeId, { restarts_7d: 0, restarts_24h: 0, yield_velocity_24h: 0, consistency_score: 1, frozen_duration_hours: 0 });
         return;
     }
@@ -148,7 +131,6 @@ export async function fetchNodeHistoryReport(): Promise<NetworkHistoryReport> {
     
     // --- FIX 3: THE "NEW NODE" SAFETY GUARD ---
     // If a node is younger than 24 hours, FORCE 100% consistency.
-    // This stops "0.00" on new deployments instantly.
     const isNewNode = lifespanHours < 24;
 
     for (let i = 1; i < history.length; i++) {
@@ -193,7 +175,7 @@ export async function fetchNodeHistoryReport(): Promise<NetworkHistoryReport> {
     } else {
         // Standard logic for older nodes
         const expected = Math.min(168, lifespanHours); 
-        // Prevent division by zero if expected is somehow 0
+        // Prevent division by zero
         const safeExpected = Math.max(1, expected);
         consistency = Math.min(1, history.length / (safeExpected * 0.8));
     }
@@ -203,12 +185,6 @@ export async function fetchNodeHistoryReport(): Promise<NetworkHistoryReport> {
 
     const velocity = minCredits24h === -1 ? 0 : Math.max(0, maxCredits24h - minCredits24h);
     const frozenHours = currentFrozenStreakMs / (1000 * 60 * 60);
-
-    // --- SERVER LOGGING (Check your terminal) ---
-    if (debugLogCount < 3) {
-       console.log(`[Aggregator] Node: ${nodeId.substring(0, 15)}... | Lifespan: ${lifespanHours.toFixed(2)}h | IsNew: ${isNewNode} | Snapshots: ${history.length} | Score: ${consistency}`);
-       debugLogCount++;
-    }
 
     report.set(nodeId, {
       restarts_7d: restarts7d,
