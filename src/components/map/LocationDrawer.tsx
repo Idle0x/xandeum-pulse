@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react'; // <--- 1. Import useEffect
 import Link from 'next/link';
 import { 
   Activity, X, MapPin, Check, Share2, HelpCircle, ArrowRight, 
@@ -46,6 +46,22 @@ export const LocationDrawer: React.FC<LocationDrawerProps> = ({
   handleCopyCoords, copiedCoords, handleShareLink, copiedLink, setToast,
   getTierIndex, stats, isGlobalCreditsOffline, getLegendLabels, getLegendContext
 }) => {
+
+  // --- NEW: AUTO-SCROLL FIX ---
+  // When viewMode changes (re-sorting the list), find the active item and scroll to it.
+  useEffect(() => {
+    if (activeLocation && isSplitView) {
+        // Short timeout allows React to render the new DOM order first
+        const timer = setTimeout(() => {
+            const element = document.getElementById(`list-item-${activeLocation}`);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
+        return () => clearTimeout(timer);
+    }
+  }, [viewMode, sortedLocations, activeLocation, isSplitView]); 
+  // ----------------------------
 
   const getMetricText = (loc: LocationData) => {
     switch (viewMode) {
@@ -102,31 +118,25 @@ export const LocationDrawer: React.FC<LocationDrawerProps> = ({
 
                         return (
                             <div id={`list-item-${loc.name}`} key={loc.name} onClick={(e) => { e.stopPropagation(); toggleExpansion(loc.name, loc.lat, loc.lon); }} className={`group rounded-xl md:rounded-2xl border transition-all cursor-pointer overflow-hidden ${activeLocation === loc.name ? 'bg-zinc-800 border-green-500/50' : 'bg-zinc-900/50 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800'}`}>
-                                {/* Compact Row: Padding reduced from p-3 to p-1.5 on mobile */}
+                                {/* Compact Row */}
                                 <div className="p-1.5 md:p-3 flex items-center justify-between">
                                     <div className="flex items-center gap-2 md:gap-3">
-                                        {/* Rank Circle: w-5 h-5 (mobile) vs w-8 h-8 (desktop) */}
                                         <div className={`flex items-center justify-center w-5 h-5 md:w-8 md:h-8 rounded-full font-mono text-[9px] md:text-xs font-bold ${activeLocation === loc.name ? 'bg-green-500 text-white' : 'bg-zinc-800 text-zinc-500'}`}>{i + 1}</div>
                                         <div className="flex flex-col">
-                                            {/* Name: text-xs (mobile) vs text-sm (desktop) */}
                                             <span className="text-xs md:text-sm font-bold text-zinc-200 group-hover:text-white flex items-center gap-1.5 md:gap-2">{loc.countryCode && <img src={`https://flagcdn.com/w20/${loc.countryCode.toLowerCase()}.png`} className="w-3 md:w-4 h-auto rounded-sm" />}{loc.name}, {loc.country}</span>
-                                            {/* Coords: text-[9px] (mobile) vs text-[10px] (desktop) */}
                                             <span onClick={(e) => { e.stopPropagation(); handleCopyCoords(loc.lat, loc.lon, loc.name); }} className="text-[9px] md:text-[10px] text-zinc-500 flex items-center gap-1 hover:text-blue-400 cursor-copy transition-colors"><MapPin size={8} className="md:w-[10px] md:h-[10px]" /> {copiedCoords === loc.name ? <span className="text-green-500 font-bold">Copied!</span> : `${loc.lat.toFixed(2)}, ${loc.lon.toFixed(2)}`}</span>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        {/* Metric: text-xs (mobile) vs text-sm (desktop) */}
                                         <div className={`text-xs md:text-sm font-mono font-bold ${isMissingData ? (isGlobalCreditsOffline ? 'text-red-400' : 'text-zinc-500 italic') : ''}`} style={isMissingData ? {} : { color: tierColor }}>{getMetricText(loc)}</div>
                                         <div className="text-[9px] md:text-[10px] text-zinc-500">{loc.count} Nodes</div>
                                     </div>
                                 </div>
 
                                 {isExpanded && (
-                                    /* Expanded View: Padding reduced to p-2 on mobile */
+                                    /* Expanded View */
                                     <div className="bg-black/30 border-t border-white/5 p-2 md:p-4 animate-in slide-in-from-top-2 duration-300">
-                                        {/* Header Row: mb-2 (mobile) vs mb-4 (desktop) */}
                                         <div className="flex justify-between items-center mb-2 md:mb-4">
-                                            {/* Tier Badge: Smaller text and padding on mobile */}
                                             <div className="text-[9px] md:text-sm font-bold uppercase tracking-widest px-2 py-0.5 md:px-3 md:py-1 rounded border bg-black/50" style={{ color: tierColor, borderColor: `${tierColor}40` }}>{isMissingData ? (isGlobalCreditsOffline ? 'API ERROR' : 'UNTRACKED') : TIER_LABELS[viewMode][tier]} TIER</div>
                                             <div className="flex gap-2">
                                                 {sampleIp && (
@@ -138,7 +148,6 @@ export const LocationDrawer: React.FC<LocationDrawerProps> = ({
                                             </div>
                                         </div>
 
-                                        {/* X-Ray Grid: mb-2 (mobile) vs mb-4 (desktop) */}
                                         <div className="grid grid-cols-3 gap-1 md:gap-2 text-xs md:text-sm text-center mb-2 md:mb-4">
                                             <div className="flex flex-col items-center group/stat">
                                                 <div className="text-zinc-500 text-[8px] md:text-[10px] uppercase mb-0.5 md:mb-1 flex items-center gap-1">
@@ -146,10 +155,9 @@ export const LocationDrawer: React.FC<LocationDrawerProps> = ({
                                                     <HelpCircle size={8} className="cursor-help opacity-50"/>
                                                     <div className="absolute bottom-1/2 mb-2 hidden group-hover/stat:block bg-black border border-zinc-700 p-2 rounded text-[10px] text-zinc-300 z-50 w-32">{xray.descA}</div>
                                                 </div>
-                                                {/* Value: text-xs (mobile) vs text-base (implied/desktop) */}
                                                 <div className="font-mono font-bold text-xs md:text-base">{xray.valA}</div>
                                             </div>
-                                            
+
                                             <div className="flex flex-col items-center border-l border-zinc-800/50 group/stat">
                                                 <div className="text-zinc-500 text-[8px] md:text-[10px] uppercase mb-0.5 md:mb-1 flex items-center gap-1">
                                                     {xray.labelB}
@@ -169,7 +177,6 @@ export const LocationDrawer: React.FC<LocationDrawerProps> = ({
                                             </div>
                                         </div>
 
-                                        {/* Top Performer Card */}
                                         {topData && (() => {
                                             const isUntrackedKing = viewMode === 'CREDITS' && topData.isUntracked;
                                             const getCardStyle = () => {
@@ -179,10 +186,8 @@ export const LocationDrawer: React.FC<LocationDrawerProps> = ({
                                             };
 
                                             const CardContent = (
-                                                // Card: p-1.5 (mobile) vs p-3 (desktop)
                                                 <div className={`w-full border border-zinc-700/50 rounded-xl p-1.5 md:p-3 flex items-center justify-between transition-all group/card ${getCardStyle()} ${isGlobalCreditsOffline ? '' : 'bg-zinc-800/50'}`}>
                                                     <div className="flex items-center gap-2 md:gap-3">
-                                                        {/* Icon Box: p-1 (mobile) vs p-2 (desktop) */}
                                                         <div className={`p-1 md:p-2 rounded-lg ${MODE_COLORS[viewMode].bg} text-white`}>
                                                             {viewMode === 'STORAGE' ? <Database size={10} className="md:w-3.5 md:h-3.5" /> : viewMode === 'CREDITS' ? <Zap size={10} className="md:w-3.5 md:h-3.5" /> : <Activity size={10} className="md:w-3.5 md:h-3.5" />}
                                                         </div>
@@ -233,7 +238,6 @@ export const LocationDrawer: React.FC<LocationDrawerProps> = ({
                                             )
                                         })()}
 
-                                        {/* Progress Bar: mt-2 (mobile) vs mt-4 (desktop) | h-0.5 (mobile) vs h-1 (desktop) */}
                                         <div className="w-full h-0.5 md:h-1 bg-zinc-800 rounded-full mt-2 md:mt-4 overflow-hidden"><div className="h-full bg-white/20" style={{ width: `${(loc.count / stats.totalNodes) * 100}%` }}></div></div>
                                     </div>
                                 )}
