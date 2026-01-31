@@ -31,7 +31,8 @@ class PulseEngine {
 }
 `;
 
-export function ArchitectureChapter() {
+// *** RENAMED TO BrainChapter TO MATCH YOUR IMPORT ***
+export function BrainChapter() {
     return (
         <section className="max-w-6xl mx-auto px-6 py-24 space-y-24">
 
@@ -39,7 +40,7 @@ export function ArchitectureChapter() {
             <div className="max-w-3xl">
                 <div className="flex items-center gap-2 mb-6">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-500 bg-cyan-500/10 px-2 py-1 rounded">
-                        Chapter 02
+                        Chapter 06
                     </span>
                 </div>
                 <h2 className="text-4xl md:text-5xl font-black text-white tracking-tighter mb-6">Hybrid Architecture</h2>
