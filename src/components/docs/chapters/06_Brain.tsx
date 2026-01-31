@@ -234,8 +234,8 @@ function RpcRaceway() {
                     return prev + 0.6; // Constant slow speed
                 });
 
-                // --- WIN CONDITION ---
-                if (heroPos >= 100 && phase !== 'FINISHED' && phase !== 'GAP_FILLING') {
+                // --- WIN CONDITION (FIXED TYPE ERROR HERE) ---
+                if (heroPos >= 100 && phase !== 'GAP_FILLING') {
                     if (scenario === 'HERO_RECOVER_PATCH') {
                         setPhase('GAP_FILLING');
                         addLog(`[HERO] Payload secured. Waiting for integrity check...`, 'success');
@@ -243,7 +243,7 @@ function RpcRaceway() {
                         setPhase('FINISHED');
                         addLog(`[HERO] Payload secured. Integrity 100%.`, 'success');
                     }
-                } else if (swarmPos >= 100 && phase !== 'FINISHED') {
+                } else if (swarmPos >= 100 && phase !== 'GAP_FILLING') {
                     setPhase('FINISHED');
                     addLog(`[SWARM] Backup payload secured. Hero bypassed.`, 'warn');
                 }
