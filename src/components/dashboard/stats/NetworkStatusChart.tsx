@@ -28,7 +28,6 @@ export const NetworkStatusChart = ({
   const [activeMetric, setActiveMetric] = useState<'HEALTH' | 'STABILITY'>('HEALTH');
   const [showNodeCount, setShowNodeCount] = useState(false);
 
-  // --- CONFIG ---
   const config = useMemo(() => {
     return activeMetric === 'HEALTH' 
       ? {
@@ -45,7 +44,6 @@ export const NetworkStatusChart = ({
         };
   }, [activeMetric, healthKey, stabilityKey]);
 
-  // --- FLUID DATA MAPPING ---
   const fluidData = useMemo(() => {
     return history.map(point => ({
       date: point.date,
@@ -54,24 +52,17 @@ export const NetworkStatusChart = ({
     }));
   }, [history, config.sourceKey, countKey]);
 
-  // --- ELASTIC DOMAIN LOGIC (Dynamic Zoom) ---
-  const getElasticDomain = useCallback(([dataMin, dataMax]: [number, number]) => {
-     // Safety check
+  // --- FIX: Use 'any' to avoid Readonly vs Mutable type conflict ---
+  const getElasticDomain = useCallback(([dataMin, dataMax]: any) => {
      if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 100];
 
-     // We use a fixed 5-point buffer. 
-     // Since these are percentages (0-100), adding 5 points (e.g. 30 -> 35) 
-     // is cleaner than using a multiplier (e.g. 30 * 1.05 = 31.5).
      const buffer = 5;
-
      let min = dataMin - buffer;
      let max = dataMax + buffer;
 
-     // Strict clamps for percentage data
      if (min < 0) min = 0;
      if (max > 100) max = 100;
 
-     // If the chart is flat (e.g., constant 100%), ensure we don't have a zero range
      if (min === max) {
          if (min === 0) max = 10;
          else if (max === 100) min = 90;
@@ -100,7 +91,6 @@ export const NetworkStatusChart = ({
              {showNodeCount && payload[1] && (
                <div className="font-bold font-mono text-blue-400 flex items-center justify-between">
                  <span className="flex items-center gap-1.5">
-                    {/* Dashed line legend icon */}
                     <div className="w-3 h-0.5 border-t border-dashed border-blue-500"></div>
                     Node Count
                  </span>
@@ -116,8 +106,6 @@ export const NetworkStatusChart = ({
 
   return (
     <div className="w-full h-full flex flex-col rounded-xl border border-zinc-800 bg-black/40 p-3 relative group">
-
-      {/* HEADER */}
       <div className="flex flex-col mb-2 relative z-20 shrink-0 gap-1">
          <div className="flex justify-between items-start">
             <div>
@@ -135,7 +123,6 @@ export const NetworkStatusChart = ({
             </div>
 
             <div className="flex items-center gap-2">
-                {/* METRIC SELECTOR */}
                 <div className="relative">
                     <button onClick={() => setIsMetricOpen(!isMetricOpen)} className="flex items-center gap-1.5 px-2 py-1 rounded border border-zinc-800 bg-zinc-900/50 text-[9px] font-bold text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all min-w-[90px] justify-between">
                         <span className="flex items-center gap-1.5">
@@ -156,7 +143,6 @@ export const NetworkStatusChart = ({
                     )}
                 </div>
 
-                {/* TIME SELECTOR */}
                 <div className="relative">
                     <button onClick={() => setIsTimeOpen(!isTimeOpen)} className="flex items-center gap-1 px-2 py-1 rounded border border-zinc-800 bg-zinc-900/50 text-[9px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all">
                         {timeRange === 'ALL' ? 'MAX' : timeRange}
@@ -206,7 +192,6 @@ export const NetworkStatusChart = ({
                   dy={5} 
                />
 
-               {/* LEFT Y-AXIS (HEALTH/STABILITY) - Now Uses Dynamic Elastic Domain */}
                <YAxis 
                   yAxisId="left" 
                   domain={getElasticDomain} 
@@ -230,7 +215,6 @@ export const NetworkStatusChart = ({
 
                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3f3f46', strokeWidth: 1 }} />
 
-               {/* PRIMARY METRIC: Area Chart */}
                <Area 
                   yAxisId="left" 
                   type="monotone" 
@@ -244,7 +228,6 @@ export const NetworkStatusChart = ({
                   style={{ transition: 'stroke 1s ease' }}
                />
 
-               {/* SECONDARY METRIC: Broken Line for Node Count */}
                {showNodeCount && (
                    <Line 
                         yAxisId="right" 
@@ -252,7 +235,7 @@ export const NetworkStatusChart = ({
                         dataKey="secondary" 
                         stroke="#3b82f6" 
                         strokeWidth={2}
-                        strokeDasharray="4 4" // BROKEN LINE EFFECT
+                        strokeDasharray="4 4" 
                         dot={false} 
                         isAnimationActive={true} 
                         animationDuration={1000}
