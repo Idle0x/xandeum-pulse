@@ -29,8 +29,8 @@ export const ConsensusConvergenceChart = ({
     }));
   }, [history, dataKey]);
 
-  // --- FIX: Use 'any' to avoid Readonly vs Mutable type conflict ---
-  const getElasticDomain = useCallback(([dataMin, dataMax]: any) => {
+  // --- FIX: Added ': [number, number]' return type to satisfy Recharts strict typing ---
+  const getElasticDomain = useCallback(([dataMin, dataMax]: any): [number, number] => {
      if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 100];
 
      const buffer = 5; 
