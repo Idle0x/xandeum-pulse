@@ -16,7 +16,8 @@ interface NetworkStatusChartProps {
 export const NetworkStatusChart = ({ 
   history, 
   loading, 
-  timeRange, 
+  // CHANGED: Default to '30D'
+  timeRange = '30D', 
   onTimeRangeChange, 
   healthKey, 
   stabilityKey = 'avg_stability', 
@@ -52,7 +53,6 @@ export const NetworkStatusChart = ({
     }));
   }, [history, config.sourceKey, countKey]);
 
-  // --- FIX: Added ': [number, number]' return type ---
   const getElasticDomain = useCallback(([dataMin, dataMax]: any): [number, number] => {
      if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 100];
 
