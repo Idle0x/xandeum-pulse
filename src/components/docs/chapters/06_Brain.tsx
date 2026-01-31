@@ -234,7 +234,8 @@ function RpcRaceway() {
                     return prev + 0.6; // Constant slow speed
                 });
 
-                // --- WIN CONDITION (FIXED TYPE ERROR HERE) ---
+                // --- WIN CONDITION ---
+                // TypeScript fix: Removed check for 'FINISHED' because outer if condition already excludes it
                 if (heroPos >= 100 && phase !== 'GAP_FILLING') {
                     if (scenario === 'HERO_RECOVER_PATCH') {
                         setPhase('GAP_FILLING');
