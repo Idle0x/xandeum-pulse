@@ -28,7 +28,6 @@ export const NetworkStatusChart = ({
   const [activeMetric, setActiveMetric] = useState<'HEALTH' | 'STABILITY'>('HEALTH');
   const [showNodeCount, setShowNodeCount] = useState(false);
 
-  // Configuration for the metrics
   const config = useMemo(() => {
     return activeMetric === 'HEALTH' 
       ? {
@@ -36,18 +35,15 @@ export const NetworkStatusChart = ({
           label: 'Avg Health',
           subtitle: 'Global node performance & responsiveness',
           color: '#22c55e', 
-          threshold: 66 // Green above this, Red below this
         }
       : {
           sourceKey: stabilityKey,
           label: 'Avg Stability',
           subtitle: 'Network uptime & connection consistency',
-          color: '#eab308',
-          threshold: 0 // Stability uses standard single color
+          color: '#eab308', 
         };
   }, [activeMetric, healthKey, stabilityKey]);
 
-  // Transform data
   const fluidData = useMemo(() => {
     return history.map(point => ({
       date: point.date,
@@ -56,22 +52,7 @@ export const NetworkStatusChart = ({
     }));
   }, [history, config.sourceKey, countKey]);
 
-  // --- Calculate Gradient Split ---
-  const gradientOffset = useMemo(() => {
-    if (activeMetric !== 'HEALTH') return 0; 
-
-    const dataMax = Math.max(...fluidData.map((d) => d.primary));
-    const dataMin = Math.min(...fluidData.map((d) => d.primary));
-    const threshold = config.threshold;
-
-    if (dataMax <= threshold) return 0; // Everything below 66 -> All Red
-    if (dataMin >= threshold) return 1; // Everything above 66 -> All Green
-
-    return (dataMax - threshold) / (dataMax - dataMin);
-  }, [fluidData, activeMetric, config.threshold]);
-
-  // Elastic domain logic
-  // FIX: Changed input type to 'any' to solve the "readonly" vs "mutable" TypeScript conflict
+  // --- FIX: Added ': [number, number]' return type ---
   const getElasticDomain = useCallback(([dataMin, dataMax]: any): [number, number] => {
      if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 100];
 
@@ -93,22 +74,18 @@ export const NetworkStatusChart = ({
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      const value = Number(payload[0].value);
-      const isHealthy = activeMetric === 'HEALTH' ? value > config.threshold : true; 
-      const tooltipColor = isHealthy ? config.color : '#ef4444'; 
-
       return (
         <div className="px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 shadow-2xl text-[10px] backdrop-blur-md min-w-[140px] animate-in fade-in zoom-in-95 duration-200">
           <div className="text-zinc-500 mb-2 font-mono border-b border-zinc-800 pb-1">
             {new Date(label).toLocaleDateString(undefined, {month:'short', day:'numeric', hour:'numeric', minute: '2-digit'})}
           </div>
           <div className="flex flex-col gap-1.5">
-             <div className="font-bold font-mono flex items-center justify-between transition-colors duration-500" style={{ color: tooltipColor }}>
+             <div className="font-bold font-mono flex items-center justify-between transition-colors duration-500" style={{ color: config.color }}>
                <span className="flex items-center gap-1.5">
-                 <div className="w-1.5 h-1.5 rounded-full transition-colors duration-500" style={{ backgroundColor: tooltipColor }}></div>
+                 <div className="w-1.5 h-1.5 rounded-full transition-colors duration-500" style={{ backgroundColor: config.color }}></div>
                  {config.label}
                </span>
-               <span>{value.toFixed(1)}%</span>
+               <span>{Number(payload[0].value).toFixed(1)}%</span>
              </div>
 
              {showNodeCount && payload[1] && (
@@ -191,16 +168,9 @@ export const NetworkStatusChart = ({
          <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={fluidData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                <defs>
-                  {/* Background Fill: Always Green-ish transparent */}
                   <linearGradient id="fluidGradient" x1="0" y1="0" x2="0" y2="1">
-                     <stop offset="5%" stopColor={config.color} stopOpacity={0.2} />
-                     <stop offset="95%" stopColor={config.color} stopOpacity={0} />
-                  </linearGradient>
-
-                  {/* Stroke Split: Green > 66%, Red < 66% */}
-                  <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset={gradientOffset} stopColor="#22c55e" />
-                    <stop offset={gradientOffset} stopColor="#ef4444" />
+                     <stop offset="5%" stopColor={config.color} stopOpacity={0.2} style={{ transition: 'stop-color 1s ease' }} />
+                     <stop offset="95%" stopColor={config.color} stopOpacity={0} style={{ transition: 'stop-color 1s ease' }} />
                   </linearGradient>
                </defs>
 
@@ -228,7 +198,7 @@ export const NetworkStatusChart = ({
                   axisLine={false} 
                   tickLine={false} 
                   tick={{fontSize: 9, fill: '#71717a'}} 
-                  width={36} 
+                  width={28}
                />
 
                {showNodeCount && (
@@ -239,7 +209,7 @@ export const NetworkStatusChart = ({
                     axisLine={false} 
                     tickLine={false} 
                     tick={{fontSize: 9, fill: '#3b82f6'}} 
-                    width={36} 
+                    width={28} 
                   />
                )}
 
@@ -249,12 +219,13 @@ export const NetworkStatusChart = ({
                   yAxisId="left" 
                   type="monotone" 
                   dataKey="primary" 
-                  stroke={activeMetric === 'HEALTH' ? "url(#splitColor)" : config.color} 
+                  stroke={config.color} 
                   strokeWidth={1.5} 
                   fill="url(#fluidGradient)" 
                   isAnimationActive={true} 
                   animationDuration={1000}
                   animationEasing="ease-in-out"
+                  style={{ transition: 'stroke 1s ease' }}
                />
 
                {showNodeCount && (
