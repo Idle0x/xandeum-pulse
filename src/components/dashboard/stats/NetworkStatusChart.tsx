@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line } from 'recharts';
 import { HistoryTimeRange, NetworkHistoryPoint } from '../../../hooks/useNetworkHistory';
 import { ChevronDown, Loader2, Eye, EyeOff, Activity, Zap } from 'lucide-react';
@@ -53,6 +53,33 @@ export const NetworkStatusChart = ({
       secondary: point[countKey]
     }));
   }, [history, config.sourceKey, countKey]);
+
+  // --- ELASTIC DOMAIN LOGIC (Dynamic Zoom) ---
+  const getElasticDomain = useCallback(([dataMin, dataMax]: [number, number]) => {
+     // Safety check
+     if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 100];
+
+     // We use a fixed 5-point buffer. 
+     // Since these are percentages (0-100), adding 5 points (e.g. 30 -> 35) 
+     // is cleaner than using a multiplier (e.g. 30 * 1.05 = 31.5).
+     const buffer = 5;
+
+     let min = dataMin - buffer;
+     let max = dataMax + buffer;
+
+     // Strict clamps for percentage data
+     if (min < 0) min = 0;
+     if (max > 100) max = 100;
+
+     // If the chart is flat (e.g., constant 100%), ensure we don't have a zero range
+     if (min === max) {
+         if (min === 0) max = 10;
+         else if (max === 100) min = 90;
+         else { min -= 5; max += 5; }
+     }
+
+     return [min, max];
+  }, []);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -179,9 +206,10 @@ export const NetworkStatusChart = ({
                   dy={5} 
                />
 
+               {/* LEFT Y-AXIS (HEALTH/STABILITY) - Now Uses Dynamic Elastic Domain */}
                <YAxis 
                   yAxisId="left" 
-                  domain={[0, 100]} 
+                  domain={getElasticDomain} 
                   axisLine={false} 
                   tickLine={false} 
                   tick={{fontSize: 9, fill: '#71717a'}} 
