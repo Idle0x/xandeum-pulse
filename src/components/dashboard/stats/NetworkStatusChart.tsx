@@ -36,18 +36,18 @@ export const NetworkStatusChart = ({
           label: 'Avg Health',
           subtitle: 'Global node performance & responsiveness',
           color: '#22c55e', 
-          threshold: 66 // The magic number for the split
+          threshold: 66 // Green above this, Red below this
         }
       : {
           sourceKey: stabilityKey,
           label: 'Avg Stability',
           subtitle: 'Network uptime & connection consistency',
           color: '#eab308',
-          threshold: 0 // Stability usually doesn't use the red/green split in the same way, but adjustable here
+          threshold: 0 // Stability uses standard single color
         };
   }, [activeMetric, healthKey, stabilityKey]);
 
-  // Transform data for the chart
+  // Transform data
   const fluidData = useMemo(() => {
     return history.map(point => ({
       date: point.date,
@@ -56,23 +56,23 @@ export const NetworkStatusChart = ({
     }));
   }, [history, config.sourceKey, countKey]);
 
-  // --- NEW: Calculate the exact gradient offset for the 66% threshold ---
+  // --- Calculate Gradient Split ---
   const gradientOffset = useMemo(() => {
-    if (activeMetric !== 'HEALTH') return 0; // Only apply split logic to Health
+    if (activeMetric !== 'HEALTH') return 0; 
 
     const dataMax = Math.max(...fluidData.map((d) => d.primary));
     const dataMin = Math.min(...fluidData.map((d) => d.primary));
     const threshold = config.threshold;
 
-    if (dataMax <= threshold) return 0; // Everything is below 66 -> All Red
-    if (dataMin >= threshold) return 1; // Everything is above 66 -> All Green
+    if (dataMax <= threshold) return 0; // Everything below 66 -> All Red
+    if (dataMin >= threshold) return 1; // Everything above 66 -> All Green
 
-    // Calculate the percentage point where 66 sits within the current view
     return (dataMax - threshold) / (dataMax - dataMin);
   }, [fluidData, activeMetric, config.threshold]);
 
-  // Elastic domain to keep the chart looking good (zoomed in correctly)
-  const getElasticDomain = useCallback(([dataMin, dataMax]: [number, number]): [number, number] => {
+  // Elastic domain logic
+  // FIX: Changed input type to 'any' to solve the "readonly" vs "mutable" TypeScript conflict
+  const getElasticDomain = useCallback(([dataMin, dataMax]: any): [number, number] => {
      if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 100];
 
      const buffer = 5;
@@ -82,7 +82,6 @@ export const NetworkStatusChart = ({
      if (min < 0) min = 0;
      if (max > 100) max = 100;
 
-     // Ensure we don't have a flat line
      if (min === max) {
          if (min === 0) max = 10;
          else if (max === 100) min = 90;
@@ -95,9 +94,8 @@ export const NetworkStatusChart = ({
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const value = Number(payload[0].value);
-      // Dynamic color for the tooltip dot only
       const isHealthy = activeMetric === 'HEALTH' ? value > config.threshold : true; 
-      const tooltipColor = isHealthy ? config.color : '#ef4444'; // Green or Red
+      const tooltipColor = isHealthy ? config.color : '#ef4444'; 
 
       return (
         <div className="px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 shadow-2xl text-[10px] backdrop-blur-md min-w-[140px] animate-in fade-in zoom-in-95 duration-200">
@@ -148,7 +146,6 @@ export const NetworkStatusChart = ({
             </div>
 
             <div className="flex items-center gap-2">
-                {/* Metric Selector */}
                 <div className="relative">
                     <button onClick={() => setIsMetricOpen(!isMetricOpen)} className="flex items-center gap-1.5 px-2 py-1 rounded border border-zinc-800 bg-zinc-900/50 text-[9px] font-bold text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all min-w-[90px] justify-between">
                         <span className="flex items-center gap-1.5">
@@ -169,7 +166,6 @@ export const NetworkStatusChart = ({
                     )}
                 </div>
 
-                {/* Time Range Selector */}
                 <div className="relative">
                     <button onClick={() => setIsTimeOpen(!isTimeOpen)} className="flex items-center gap-1 px-2 py-1 rounded border border-zinc-800 bg-zinc-900/50 text-[9px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all">
                         {timeRange === 'ALL' ? 'MAX' : timeRange}
@@ -195,13 +191,13 @@ export const NetworkStatusChart = ({
          <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={fluidData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                <defs>
-                  {/* The Background Fill: Always Green, no weird Red underneath */}
+                  {/* Background Fill: Always Green-ish transparent */}
                   <linearGradient id="fluidGradient" x1="0" y1="0" x2="0" y2="1">
                      <stop offset="5%" stopColor={config.color} stopOpacity={0.2} />
                      <stop offset="95%" stopColor={config.color} stopOpacity={0} />
                   </linearGradient>
 
-                  {/* The Stroke Line: Splits Green/Red at exactly 66% */}
+                  {/* Stroke Split: Green > 66%, Red < 66% */}
                   <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
                     <stop offset={gradientOffset} stopColor="#22c55e" />
                     <stop offset={gradientOffset} stopColor="#ef4444" />
@@ -232,7 +228,7 @@ export const NetworkStatusChart = ({
                   axisLine={false} 
                   tickLine={false} 
                   tick={{fontSize: 9, fill: '#71717a'}} 
-                  width={28}
+                  width={36} 
                />
 
                {showNodeCount && (
@@ -243,7 +239,7 @@ export const NetworkStatusChart = ({
                     axisLine={false} 
                     tickLine={false} 
                     tick={{fontSize: 9, fill: '#3b82f6'}} 
-                    width={28} 
+                    width={36} 
                   />
                )}
 
@@ -253,11 +249,8 @@ export const NetworkStatusChart = ({
                   yAxisId="left" 
                   type="monotone" 
                   dataKey="primary" 
-                  // If we are in Health mode, use the split gradient for the LINE only. 
-                  // If Stability, just use the normal solid color.
                   stroke={activeMetric === 'HEALTH' ? "url(#splitColor)" : config.color} 
                   strokeWidth={1.5} 
-                  // Fill is always the standard fluidGradient (Green to transparent)
                   fill="url(#fluidGradient)" 
                   isAnimationActive={true} 
                   animationDuration={1000}
