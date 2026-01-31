@@ -9,7 +9,7 @@ interface ConsensusConvergenceChartProps {
   timeRange: HistoryTimeRange;
   onTimeRangeChange: (r: HistoryTimeRange) => void;
   dataKey: keyof NetworkHistoryPoint;
-  color?: string; // Added back to satisfy parent component, even if unused
+  color?: string; 
 }
 
 export const ConsensusConvergenceChart = ({ 
@@ -18,10 +18,9 @@ export const ConsensusConvergenceChart = ({
   timeRange, 
   onTimeRangeChange, 
   dataKey,
-  color // Accepted but ignored in favor of Split Gradient logic
 }: ConsensusConvergenceChartProps) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  
+
   const THRESHOLD = 66; 
 
   const fluidData = useMemo(() => {
@@ -51,12 +50,13 @@ export const ConsensusConvergenceChart = ({
      return [min, max];
   }, []);
 
+  // --- STROKE COLOR LOGIC ONLY ---
   const gradientOffset = useMemo(() => {
     if (fluidData.length === 0) return 0;
 
     const dataMax = Math.max(...fluidData.map((i) => i.value));
     const dataMin = Math.min(...fluidData.map((i) => i.value));
-    
+
     const [domainMin, domainMax] = getElasticDomain([dataMin, dataMax]);
 
     if (domainMax <= THRESHOLD) return 0; 
@@ -69,7 +69,7 @@ export const ConsensusConvergenceChart = ({
     if (active && payload && payload.length) {
       const score = payload[0].value;
       const isCritical = score <= THRESHOLD;
-      
+
       return (
         <div className={`px-3 py-2 rounded-lg border shadow-xl text-[10px] backdrop-blur-md animate-in fade-in zoom-in-95 duration-200 ${isCritical ? 'bg-red-950/90 border-red-500/50' : 'bg-zinc-950 border-zinc-800'}`}>
           <div className="text-zinc-500 mb-1.5 font-mono border-b border-zinc-800/50 pb-1 flex justify-between">
@@ -117,13 +117,13 @@ export const ConsensusConvergenceChart = ({
          <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={fluidData} margin={{ top: 5, right: 0, left: -2, bottom: 0 }}>
                <defs>
-                  <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
-                     <stop offset={gradientOffset} stopColor="#22c55e" stopOpacity={0.3} />
-                     <stop offset={gradientOffset} stopColor="#22c55e" stopOpacity={0} />
-                     <stop offset={gradientOffset} stopColor="#ef4444" stopOpacity={0.5} />
-                     <stop offset="95%" stopColor="#ef4444" stopOpacity={0.1} />
+                  {/* SIMPLE FILL: Pure Green Gradient only. */}
+                  <linearGradient id="fillGradient" x1="0" y1="0" x2="0" y2="1">
+                     <stop offset="0%" stopColor="#22c55e" stopOpacity={0.3} />
+                     <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
                   </linearGradient>
-                  
+
+                  {/* STROKE ONLY: Splits color at 66% */}
                   <linearGradient id="splitStroke" x1="0" y1="0" x2="0" y2="1">
                      <stop offset={gradientOffset} stopColor="#22c55e" stopOpacity={1} />
                      <stop offset={gradientOffset} stopColor="#ef4444" stopOpacity={1} />
@@ -149,24 +149,23 @@ export const ConsensusConvergenceChart = ({
 
                <YAxis 
                   domain={getElasticDomain} 
-                  width={24} 
+                  width={34} 
                   tick={{ fontSize: 9, fill: '#52525b' }} 
                   axisLine={false}
                   tickLine={false}
                />
 
                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3f3f46', strokeWidth: 1 }} />
-               <ReferenceLine y={THRESHOLD} stroke="#ef4444" strokeDasharray="3 3" strokeOpacity={0.5} />
+               <ReferenceLine y={THRESHOLD} stroke="#ef4444" strokeDasharray="3 3" strokeOpacity={0.4} />
 
                <Area 
                   type="monotone" 
                   dataKey="value" 
                   stroke="url(#splitStroke)" 
                   strokeWidth={2} 
-                  fill="url(#splitColor)" 
+                  fill="url(#fillGradient)" 
                   isAnimationActive={true}
                   animationDuration={1000}
-                  animationEasing="ease-in-out"
                />
             </AreaChart>
          </ResponsiveContainer>
