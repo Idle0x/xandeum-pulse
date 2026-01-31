@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
   Shield, Activity, Terminal, Search, Cpu, 
-  GitMerge, Clock
+  GitMerge, Clock, RotateCcw, Hash
 } from 'lucide-react';
 
 // --- TEXT CONTENT ---
@@ -42,22 +42,13 @@ if (mainnetFingerprints.has(publicFingerprint)) {
 // --- TYPES ---
 interface DiagnosticState {
     status: 'IDLE' | 'DNS' | 'TCP' | 'SSL' | 'TTFB' | 'DOWNLOAD' | 'COMPLETE' | 'ERROR';
-    latency: {
-        total: number;
-        dns: number;
-        ssl: number;
-        ttfb: number;
-    };
+    latency: { total: number; dns: number; ssl: number; ttfb: number; };
     payload: {
         size: string;
         nodeCount: number;
         heroStatus: boolean;
         sampleNode: any | null;
-        flags: {
-            unverified: number;
-            flapping: number;
-            stale: number;
-        }
+        flags: { unverified: number; flapping: number; stale: number; }
     } | null;
 }
 
@@ -68,8 +59,41 @@ export function EngineeringChapter() {
         payload: null
     });
 
-    // --- DIAGNOSTIC LOGIC ---
+    // --- NEW: SESSION STATE ---
+    const [lastRun, setLastRun] = useState<Date | null>(null);
+    const [traceId, setTraceId] = useState<string | null>(null);
+    const [timeAgo, setTimeAgo] = useState<string>('');
+
+    // --- TIMER EFFECT ---
+    useEffect(() => {
+        if (!lastRun) {
+            setTimeAgo('');
+            return;
+        }
+        const interval = setInterval(() => {
+            const diff = Math.floor((new Date().getTime() - lastRun.getTime()) / 1000);
+            const mins = Math.floor(diff / 60);
+            const secs = diff % 60;
+            setTimeAgo(`${mins}m ${secs}s ago`);
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [lastRun]);
+
+    // --- ACTIONS ---
+    const handleReset = () => {
+        setDiag({ status: 'IDLE', latency: { total: 0, dns: 0, ssl: 0, ttfb: 0 }, payload: null });
+        setLastRun(null);
+        setTraceId(null);
+        setTimeAgo('');
+    };
+
     const runDiagnostics = async () => {
+        // 1. Setup Session
+        const newTraceId = '#' + Math.random().toString(16).substr(2, 4).toUpperCase();
+        setTraceId(newTraceId);
+        setLastRun(new Date());
+        setTimeAgo('0m 0s ago');
+        
         setDiag({ 
             status: 'DNS', 
             latency: { total: 0, dns: 0, ssl: 0, ttfb: 0 }, 
@@ -79,7 +103,7 @@ export function EngineeringChapter() {
         const startTotal = performance.now();
 
         try {
-            // 1. SIMULATE NETWORK PHASES
+            // 2. Simulate Network Phases
             await new Promise(r => setTimeout(r, Math.random() * 20 + 10)); // DNS
             setDiag(prev => ({ ...prev, status: 'TCP' }));
 
@@ -89,7 +113,7 @@ export function EngineeringChapter() {
             await new Promise(r => setTimeout(r, Math.random() * 40 + 30)); // SSL
             setDiag(prev => ({ ...prev, status: 'TTFB' }));
 
-            // 2. REAL FETCH
+            // 3. Real Fetch
             const startFetch = performance.now();
             const res = await fetch('/api/stats?mode=fast');
             const ttfb = performance.now() - startFetch;
@@ -103,11 +127,10 @@ export function EngineeringChapter() {
             const data = await res.json();
             const totalTime = performance.now() - startTotal;
 
-            // 3. PROCESS REAL PAYLOAD
+            // 4. Process Payload
             const nodes = data.result?.pods || [];
             const sample = nodes.length > 0 ? nodes[Math.floor(Math.random() * nodes.length)] : null;
 
-            // --- FORENSIC COUNTS ---
             const unverified = nodes.filter((n: any) => n.isUntracked || n.is_ghost).length;
             const flapping = nodes.filter((n: any) => (n.healthBreakdown?.penalties?.restarts_24h || 0) > 5).length;
             const stale = nodes.filter((n: any) => (n.healthBreakdown?.penalties?.frozen_duration_hours || 0) > 1).length;
@@ -139,7 +162,7 @@ export function EngineeringChapter() {
     };
 
     return (
-        <section className="max-w-6xl mx-auto px-6 py-24 space-y-32">
+        <section className="max-w-6xl mx-auto px-6 py-24 space-y-16">
             
             {/* --- GLOBAL HEADER --- */}
             <div className="max-w-3xl">
@@ -154,14 +177,24 @@ export function EngineeringChapter() {
                 </p>
 
                 {/* --- MASTER CONTROL --- */}
-                <div className="mt-12 flex justify-between items-center bg-zinc-900/30 p-4 md:p-6 rounded-3xl border border-zinc-800 shadow-2xl">
+                <div className="mt-12 bg-zinc-900/30 p-4 md:p-6 rounded-3xl border border-zinc-800 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    
+                    {/* Left: Status & Time */}
                     <div className="flex items-center gap-4">
-                        <div className={`hidden md:block p-3 rounded-xl border ${diag.status === 'ERROR' ? 'bg-red-900/20 border-red-500 text-red-500' : 'bg-blue-900/20 border-blue-500/30 text-blue-400'}`}>
+                        <div className={`p-3 rounded-xl border shrink-0 transition-colors ${diag.status === 'ERROR' ? 'bg-red-900/20 border-red-500 text-red-500' : diag.status === 'COMPLETE' ? 'bg-emerald-900/20 border-emerald-500/30 text-emerald-400' : 'bg-blue-900/20 border-blue-500/30 text-blue-400'}`}>
                             <Activity size={20}/>
                         </div>
-                        <div>
-                            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Diagnostic State</div>
-                            <div className="text-lg md:text-xl font-bold text-white flex items-center gap-3">
+                        <div className="flex flex-col">
+                            <div className="flex items-center gap-3">
+                                <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Diagnostic State</div>
+                                {traceId && (
+                                    <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-[9px] font-mono text-zinc-400 border border-zinc-700">
+                                        ID: {traceId}
+                                    </span>
+                                )}
+                            </div>
+                            
+                            <div className="text-lg md:text-xl font-bold text-white flex items-center gap-3 mt-0.5">
                                 {diag.status === 'IDLE' ? 'READY' : diag.status === 'COMPLETE' ? 'TRACE COMPLETE' : 'AGGREGATING...'}
                                 {diag.status !== 'IDLE' && diag.status !== 'COMPLETE' && diag.status !== 'ERROR' && (
                                     <span className="flex h-2.5 w-2.5 relative">
@@ -170,21 +203,43 @@ export function EngineeringChapter() {
                                     </span>
                                 )}
                             </div>
+
+                            {/* Timestamp Row */}
+                            {lastRun && (
+                                <div className="flex items-center gap-2 mt-1 text-[10px] md:text-xs font-mono text-zinc-400 animate-in fade-in slide-in-from-left-2">
+                                    <span>{lastRun.toLocaleTimeString()}</span>
+                                    <span className="text-zinc-600">•</span>
+                                    <span className="text-blue-400 font-bold">{timeAgo}</span>
+                                </div>
+                            )}
                         </div>
                     </div>
-                    <button 
-                        onClick={runDiagnostics}
-                        disabled={diag.status !== 'IDLE' && diag.status !== 'COMPLETE' && diag.status !== 'ERROR'}
-                        className="px-6 py-2 md:px-8 md:py-3 bg-zinc-100 hover:bg-white text-black font-bold rounded-xl transition-all disabled:opacity-50 active:scale-95 shadow-lg text-[10px] md:text-xs tracking-wider"
-                    >
-                        {diag.status === 'IDLE' ? 'RUN AUDIT' : 'RERUN TRACE'}
-                    </button>
+
+                    {/* Right: Controls */}
+                    <div className="flex items-center gap-2">
+                         {diag.status !== 'IDLE' && (
+                             <button 
+                                onClick={handleReset}
+                                className="p-3 md:px-4 md:py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white border border-zinc-700 rounded-xl transition-all"
+                                title="Reset Dashboard"
+                             >
+                                 <RotateCcw size={16} />
+                             </button>
+                         )}
+                        <button 
+                            onClick={runDiagnostics}
+                            disabled={diag.status !== 'IDLE' && diag.status !== 'COMPLETE' && diag.status !== 'ERROR'}
+                            className="flex-1 md:flex-none px-6 py-3 bg-zinc-100 hover:bg-white text-black font-bold rounded-xl transition-all disabled:opacity-50 active:scale-95 shadow-lg text-xs tracking-wider uppercase"
+                        >
+                            {diag.status === 'IDLE' ? 'Run Audit' : 'Rerun Trace'}
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {/* --- SECTION 1: PIPELINE --- */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-                <div className="space-y-8">
+                <div className="space-y-6">
                     <div>
                         <div className="flex items-center gap-3 mb-4">
                             <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
@@ -195,15 +250,15 @@ export function EngineeringChapter() {
                         <p className="text-zinc-400 leading-relaxed text-sm">{ENG_TEXT[0].content}</p>
                     </div>
                 </div>
-                <PipelineMonitor diag={diag} />
+                <PipelineMonitor diag={diag} traceId={traceId} />
             </div>
 
             {/* --- SECTION 2: WATERFALL --- */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
                 <div className="order-2 lg:order-1">
-                    <WaterfallTrace diag={diag} />
+                    <WaterfallTrace diag={diag} traceId={traceId} />
                 </div>
-                <div className="space-y-8 order-1 lg:order-2">
+                <div className="space-y-6 order-1 lg:order-2">
                     <div>
                         <div className="flex items-center gap-3 mb-4">
                             <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
@@ -218,7 +273,7 @@ export function EngineeringChapter() {
 
             {/* --- SECTION 3: FORENSICS --- */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-start">
-                <div className="space-y-8">
+                <div className="space-y-6">
                     <div>
                         <div className="flex items-center gap-3 mb-4">
                             <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
@@ -230,17 +285,17 @@ export function EngineeringChapter() {
                     </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
-                    <MathTerminal node={diag.payload?.sampleNode} status={diag.status} />
-                    <ForensicFlags flags={diag.payload?.flags} status={diag.status} />
+                    <MathTerminal node={diag.payload?.sampleNode} status={diag.status} traceId={traceId} />
+                    <ForensicFlags flags={diag.payload?.flags} status={diag.status} traceId={traceId} />
                 </div>
             </div>
 
             {/* --- SECTION 4: DEDUPLICATION --- */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
                 <div className="order-2 lg:order-1">
-                    <DeduplicationLog count={diag.payload?.nodeCount} status={diag.status} />
+                    <DeduplicationLog count={diag.payload?.nodeCount} status={diag.status} traceId={traceId} />
                 </div>
-                <div className="space-y-8 order-1 lg:order-2">
+                <div className="space-y-6 order-1 lg:order-2">
                     <div>
                         <div className="flex items-center gap-3 mb-4">
                             <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
@@ -253,8 +308,8 @@ export function EngineeringChapter() {
                 </div>
             </div>
 
-            {/* --- SECTION 5: SOURCE CODE (BOTTOM) --- */}
-            <div className="border-t border-zinc-900 pt-24">
+            {/* --- SECTION 5: SOURCE CODE --- */}
+            <div className="border-t border-zinc-900 pt-16">
                 <div className="flex items-center gap-3 mb-8">
                     <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800">
                         <Terminal size={20} className="text-zinc-400" />
@@ -262,12 +317,12 @@ export function EngineeringChapter() {
                     <h3 className="text-xl font-bold text-white">Underlying Logic</h3>
                 </div>
                 
-                <div className="bg-[#050505] border border-zinc-800 rounded-2xl p-6 overflow-x-auto custom-scrollbar shadow-2xl relative group">
-                     <div className="absolute top-4 right-4 text-[9px] font-bold text-zinc-600 uppercase tracking-widest border border-zinc-800 px-2 py-1 rounded bg-black">
+                <div className="bg-[#0D1117] border border-zinc-800 rounded-2xl p-6 overflow-x-auto custom-scrollbar shadow-2xl relative group">
+                     <div className="absolute top-4 right-4 text-[9px] font-bold text-zinc-500 uppercase tracking-widest border border-zinc-800 px-2 py-1 rounded bg-[#0D1117]">
                            src/lib/diagnostics.ts
                      </div>
-                    <pre className="font-mono text-xs md:text-sm text-zinc-400 leading-relaxed">
-                        {ENG_CODE.trim()}
+                    <pre className="font-mono text-xs md:text-sm leading-relaxed">
+                        <code className="text-blue-300/90">{ENG_CODE.trim()}</code>
                     </pre>
                 </div>
             </div>
@@ -277,10 +332,10 @@ export function EngineeringChapter() {
 }
 
 // ==========================================
-// SUB-COMPONENTS (Unchanged from previous)
+// SUB-COMPONENTS (With Trace ID Support)
 // ==========================================
 
-function PipelineMonitor({ diag }: { diag: DiagnosticState }) {
+function PipelineMonitor({ diag, traceId }: { diag: DiagnosticState, traceId: string | null }) {
     const steps = ['DNS', 'TCP', 'SSL', 'TTFB', 'DOWNLOAD', 'COMPLETE'];
     const currentIndex = steps.indexOf(diag.status);
 
@@ -290,6 +345,7 @@ function PipelineMonitor({ diag }: { diag: DiagnosticState }) {
                 <div className="flex items-center gap-2 text-zinc-400">
                     <span className="text-[10px] font-bold uppercase tracking-widest">Aggregator Status</span>
                 </div>
+                {traceId && <div className="text-[9px] font-mono text-zinc-600 bg-zinc-900/50 px-1.5 py-0.5 rounded">SRC: {traceId}</div>}
             </div>
 
             <div className="h-6 bg-zinc-900 rounded-full overflow-hidden flex relative border border-zinc-800">
@@ -317,7 +373,7 @@ function PipelineMonitor({ diag }: { diag: DiagnosticState }) {
     );
 }
 
-function WaterfallTrace({ diag }: { diag: DiagnosticState }) {
+function WaterfallTrace({ diag, traceId }: { diag: DiagnosticState, traceId: string | null }) {
     const isComplete = diag.status === 'COMPLETE';
     const getWidth = (val: number) => isComplete ? `${Math.min(100, (val / diag.latency.total) * 100)}%` : '0%';
 
@@ -327,8 +383,8 @@ function WaterfallTrace({ diag }: { diag: DiagnosticState }) {
                 <div className="text-zinc-500 uppercase tracking-widest font-bold text-[10px] flex items-center gap-2">
                     <Clock size={14} /> Request Latency
                 </div>
-                <div className="text-right">
-                    <div className="text-zinc-500 text-[10px]">Total Time</div>
+                <div className="flex flex-col items-end">
+                    {traceId && <div className="text-[9px] font-mono text-zinc-600 bg-zinc-900/50 px-1.5 py-0.5 rounded mb-1">SRC: {traceId}</div>}
                     <div className="text-xl font-bold text-white tabular-nums">{diag.latency.total}ms</div>
                 </div>
             </div>
@@ -366,7 +422,7 @@ function TraceBar({ label, color, width, val, active }: any) {
     );
 }
 
-function DeduplicationLog({ count, status }: { count: number | undefined, status: string }) {
+function DeduplicationLog({ count, status, traceId }: { count: number | undefined, status: string, traceId: string | null }) {
     const [logs, setLogs] = useState<string[]>([]);
     const listRef = useRef<HTMLDivElement>(null); 
 
@@ -398,9 +454,12 @@ function DeduplicationLog({ count, status }: { count: number | undefined, status
 
     return (
         <div className="bg-[#080808] border border-zinc-800 rounded-3xl p-6 h-[220px] flex flex-col shadow-2xl">
-            <div className="flex items-center gap-2 text-zinc-500 mb-4 border-b border-zinc-900 pb-2">
-                <Terminal size={14} />
-                <span className="text-[10px] font-bold uppercase tracking-widest">Deduplication Engine</span>
+            <div className="flex items-center justify-between text-zinc-500 mb-4 border-b border-zinc-900 pb-2">
+                <div className="flex items-center gap-2">
+                    <Terminal size={14} />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Deduplication Engine</span>
+                </div>
+                {traceId && <div className="text-[9px] font-mono text-zinc-600 bg-zinc-900/50 px-1.5 py-0.5 rounded">SRC: {traceId}</div>}
             </div>
             <div ref={listRef} className="flex-1 overflow-y-auto font-mono text-[11px] space-y-2 text-zinc-400 custom-scrollbar scroll-smooth">
                 {logs.map((log, i) => (
@@ -411,7 +470,7 @@ function DeduplicationLog({ count, status }: { count: number | undefined, status
     );
 }
 
-function MathTerminal({ node, status }: { node: any, status: string }) {
+function MathTerminal({ node, status, traceId }: { node: any, status: string, traceId: string | null }) {
     if (status === 'IDLE' || status === 'DNS' || status === 'TCP' || status === 'SSL') {
         return (
             <div className="bg-[#080808] border border-zinc-800 rounded-3xl p-6 flex items-center justify-center text-zinc-600 text-[10px] uppercase tracking-widest h-full min-h-[220px] shadow-lg">
@@ -439,7 +498,7 @@ function MathTerminal({ node, status }: { node: any, status: string }) {
                     <Cpu size={14}/> 
                     <span className="text-[10px] font-bold uppercase">Vitality Audit</span>
                 </div>
-                <span className="text-[10px] font-mono text-zinc-600">{node.address?.split(':')[0] || 'Unknown'}</span>
+                {traceId && <div className="text-[9px] font-mono text-zinc-600 bg-zinc-900/50 px-1.5 py-0.5 rounded">SRC: {traceId}</div>}
             </div>
             <div className="p-5 font-mono text-[10px] leading-6 text-zinc-400 overflow-y-auto custom-scrollbar flex-1">
                 <div><span className="text-blue-500">INPUT</span> Loaded Node: {node.pubkey.substring(0, 12)}...</div>
@@ -461,14 +520,17 @@ function MathTerminal({ node, status }: { node: any, status: string }) {
     );
 }
 
-function ForensicFlags({ flags, status }: { flags: any, status: string }) {
+function ForensicFlags({ flags, status, traceId }: { flags: any, status: string, traceId: string | null }) {
     const isReady = status === 'COMPLETE';
 
     return (
         <div className="bg-[#080808] border border-zinc-800 rounded-3xl p-6 h-full flex flex-col justify-between shadow-lg min-h-[220px]">
-            <div className="flex items-center gap-2 text-zinc-500 mb-4">
-                <Search size={14}/>
-                <span className="text-[10px] font-bold uppercase tracking-widest">Anomaly Scan</span>
+            <div className="flex justify-between items-center text-zinc-500 mb-4">
+                <div className="flex items-center gap-2">
+                    <Search size={14}/>
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Anomaly Scan</span>
+                </div>
+                {traceId && <div className="text-[9px] font-mono text-zinc-600 bg-zinc-900/50 px-1.5 py-0.5 rounded">SRC: {traceId}</div>}
             </div>
 
             <div className="space-y-3">
