@@ -16,7 +16,8 @@ interface VitalsModalProps {
 export const VitalsModal = ({ onClose, nodes }: VitalsModalProps) => {
   const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
 
-  const [timeRange, setTimeRange] = useState<HistoryTimeRange>('24H');
+  // CHANGED: Initial state is now '30D'
+  const [timeRange, setTimeRange] = useState<HistoryTimeRange>('30D');
   const { history: pulseHistory, loading: pulseLoading } = useNetworkHistory(timeRange);
   const { history: shadowHistory, loading: shadowLoading } = useNetworkHistory('30D');
 
