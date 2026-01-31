@@ -3,7 +3,6 @@ import {
   Shield, Activity, Terminal, Search, Cpu, 
   GitMerge, Clock
 } from 'lucide-react';
-import { ChapterLayout } from '../layout/ChapterLayout';
 
 // --- TEXT CONTENT ---
 const ENG_TEXT = [
@@ -69,7 +68,7 @@ export function EngineeringChapter() {
         payload: null
     });
 
-    // --- PRESERVED LOGIC: DO NOT MODIFY ---
+    // --- DIAGNOSTIC LOGIC ---
     const runDiagnostics = async () => {
         setDiag({ 
             status: 'DNS', 
@@ -140,25 +139,29 @@ export function EngineeringChapter() {
     };
 
     return (
-        <ChapterLayout
-            chapterNumber="10"
-            title="System Internals"
-            subtitle="Live forensic audit of the RPC orchestration layer."
-            textData={[]} 
-            codeSnippet={ENG_CODE}
-            githubPath="src/lib/diagnostics.ts"
-        >
-            <div className="flex flex-col gap-32 pb-12">
+        <section className="max-w-6xl mx-auto px-6 py-24 space-y-32">
+            
+            {/* --- GLOBAL HEADER --- */}
+            <div className="max-w-3xl">
+                <div className="flex items-center gap-2 mb-6">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-blue-500 bg-blue-500/10 px-2 py-1 rounded">
+                        Chapter 10
+                    </span>
+                </div>
+                <h2 className="text-4xl md:text-5xl font-black text-white tracking-tighter mb-6">System Internals</h2>
+                <p className="text-zinc-400 leading-relaxed text-base md:text-lg">
+                    Live forensic audit of the RPC orchestration layer. This dashboard taps directly into the Node Vitality Stream to visualize deduplication, latency tracing, and health verification in real-time.
+                </p>
 
                 {/* --- MASTER CONTROL --- */}
-                <div className="flex justify-between items-center bg-zinc-900/30 p-6 rounded-3xl border border-zinc-800 shadow-2xl">
+                <div className="mt-12 flex justify-between items-center bg-zinc-900/30 p-4 md:p-6 rounded-3xl border border-zinc-800 shadow-2xl">
                     <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-xl border ${diag.status === 'ERROR' ? 'bg-red-900/20 border-red-500 text-red-500' : 'bg-blue-900/20 border-blue-500/30 text-blue-400'}`}>
+                        <div className={`hidden md:block p-3 rounded-xl border ${diag.status === 'ERROR' ? 'bg-red-900/20 border-red-500 text-red-500' : 'bg-blue-900/20 border-blue-500/30 text-blue-400'}`}>
                             <Activity size={20}/>
                         </div>
                         <div>
                             <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Diagnostic State</div>
-                            <div className="text-xl font-bold text-white flex items-center gap-3">
+                            <div className="text-lg md:text-xl font-bold text-white flex items-center gap-3">
                                 {diag.status === 'IDLE' ? 'READY' : diag.status === 'COMPLETE' ? 'TRACE COMPLETE' : 'AGGREGATING...'}
                                 {diag.status !== 'IDLE' && diag.status !== 'COMPLETE' && diag.status !== 'ERROR' && (
                                     <span className="flex h-2.5 w-2.5 relative">
@@ -172,99 +175,109 @@ export function EngineeringChapter() {
                     <button 
                         onClick={runDiagnostics}
                         disabled={diag.status !== 'IDLE' && diag.status !== 'COMPLETE' && diag.status !== 'ERROR'}
-                        className="px-8 py-3 bg-zinc-100 hover:bg-white text-black font-bold rounded-xl transition-all disabled:opacity-50 active:scale-95 shadow-lg text-xs tracking-wider"
+                        className="px-6 py-2 md:px-8 md:py-3 bg-zinc-100 hover:bg-white text-black font-bold rounded-xl transition-all disabled:opacity-50 active:scale-95 shadow-lg text-[10px] md:text-xs tracking-wider"
                     >
                         {diag.status === 'IDLE' ? 'RUN AUDIT' : 'RERUN TRACE'}
                     </button>
                 </div>
-
-                {/* --- SECTION 1: PIPELINE (Text Left, Sim Right) --- */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-                    <div className="space-y-8">
-                        <div>
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                                    <GitMerge size={24} className="text-blue-400" />
-                                </div>
-                                <h3 className="text-2xl font-bold text-white">{ENG_TEXT[0].title}</h3>
-                            </div>
-                            <p className="text-zinc-400 leading-relaxed text-sm">{ENG_TEXT[0].content}</p>
-                        </div>
-                    </div>
-                    <PipelineMonitor diag={diag} />
-                </div>
-
-                {/* Divider */}
-                <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-800 to-transparent"></div>
-
-                {/* --- SECTION 2: WATERFALL (Sim Left, Text Right) --- */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-                    <div className="order-2 lg:order-1">
-                        <WaterfallTrace diag={diag} />
-                    </div>
-                    <div className="space-y-8 order-1 lg:order-2">
-                        <div>
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                                    <Clock size={24} className="text-purple-400" />
-                                </div>
-                                <h3 className="text-2xl font-bold text-white">{ENG_TEXT[1].title}</h3>
-                            </div>
-                            <p className="text-zinc-400 leading-relaxed text-sm">{ENG_TEXT[1].content}</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Divider */}
-                <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-800 to-transparent"></div>
-
-                {/* --- SECTION 3: FORENSICS (Text Left, Split Sim Right) --- */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-start">
-                    <div className="space-y-8">
-                        <div>
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                                    <Search size={24} className="text-amber-400" />
-                                </div>
-                                <h3 className="text-2xl font-bold text-white">{ENG_TEXT[2].title}</h3>
-                            </div>
-                            <p className="text-zinc-400 leading-relaxed text-sm">{ENG_TEXT[2].content}</p>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
-                        <MathTerminal node={diag.payload?.sampleNode} status={diag.status} />
-                        <ForensicFlags flags={diag.payload?.flags} status={diag.status} />
-                    </div>
-                </div>
-
-                {/* Divider */}
-                <div className="w-full h-px bg-gradient-to-r from-transparent via-zinc-800 to-transparent"></div>
-
-                {/* --- SECTION 4: DEDUPLICATION (Sim Left, Text Right) --- */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-                    <div className="order-2 lg:order-1">
-                        <DeduplicationLog count={diag.payload?.nodeCount} status={diag.status} />
-                    </div>
-                    <div className="space-y-8 order-1 lg:order-2">
-                        <div>
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                                    <Shield size={24} className="text-emerald-400" />
-                                </div>
-                                <h3 className="text-2xl font-bold text-white">{ENG_TEXT[3].title}</h3>
-                            </div>
-                            <p className="text-zinc-400 leading-relaxed text-sm">{ENG_TEXT[3].content}</p>
-                        </div>
-                    </div>
-                </div>
-
             </div>
-        </ChapterLayout>
+
+            {/* --- SECTION 1: PIPELINE --- */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+                <div className="space-y-8">
+                    <div>
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                                <GitMerge size={24} className="text-blue-400" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-white">{ENG_TEXT[0].title}</h3>
+                        </div>
+                        <p className="text-zinc-400 leading-relaxed text-sm">{ENG_TEXT[0].content}</p>
+                    </div>
+                </div>
+                <PipelineMonitor diag={diag} />
+            </div>
+
+            {/* --- SECTION 2: WATERFALL --- */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+                <div className="order-2 lg:order-1">
+                    <WaterfallTrace diag={diag} />
+                </div>
+                <div className="space-y-8 order-1 lg:order-2">
+                    <div>
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                                <Clock size={24} className="text-purple-400" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-white">{ENG_TEXT[1].title}</h3>
+                        </div>
+                        <p className="text-zinc-400 leading-relaxed text-sm">{ENG_TEXT[1].content}</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* --- SECTION 3: FORENSICS --- */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-start">
+                <div className="space-y-8">
+                    <div>
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                                <Search size={24} className="text-amber-400" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-white">{ENG_TEXT[2].title}</h3>
+                        </div>
+                        <p className="text-zinc-400 leading-relaxed text-sm">{ENG_TEXT[2].content}</p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                    <MathTerminal node={diag.payload?.sampleNode} status={diag.status} />
+                    <ForensicFlags flags={diag.payload?.flags} status={diag.status} />
+                </div>
+            </div>
+
+            {/* --- SECTION 4: DEDUPLICATION --- */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+                <div className="order-2 lg:order-1">
+                    <DeduplicationLog count={diag.payload?.nodeCount} status={diag.status} />
+                </div>
+                <div className="space-y-8 order-1 lg:order-2">
+                    <div>
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                                <Shield size={24} className="text-emerald-400" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-white">{ENG_TEXT[3].title}</h3>
+                        </div>
+                        <p className="text-zinc-400 leading-relaxed text-sm">{ENG_TEXT[3].content}</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* --- SECTION 5: SOURCE CODE (BOTTOM) --- */}
+            <div className="border-t border-zinc-900 pt-24">
+                <div className="flex items-center gap-3 mb-8">
+                    <div className="p-2 rounded-lg bg-zinc-900 border border-zinc-800">
+                        <Terminal size={20} className="text-zinc-400" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white">Underlying Logic</h3>
+                </div>
+                
+                <div className="bg-[#050505] border border-zinc-800 rounded-2xl p-6 overflow-x-auto custom-scrollbar shadow-2xl relative group">
+                     <div className="absolute top-4 right-4 text-[9px] font-bold text-zinc-600 uppercase tracking-widest border border-zinc-800 px-2 py-1 rounded bg-black">
+                           src/lib/diagnostics.ts
+                     </div>
+                    <pre className="font-mono text-xs md:text-sm text-zinc-400 leading-relaxed">
+                        {ENG_CODE.trim()}
+                    </pre>
+                </div>
+            </div>
+
+        </section>
     );
 }
 
 // ==========================================
-// SUB-COMPONENTS
+// SUB-COMPONENTS (Unchanged from previous)
 // ==========================================
 
 function PipelineMonitor({ diag }: { diag: DiagnosticState }) {
@@ -279,7 +292,6 @@ function PipelineMonitor({ diag }: { diag: DiagnosticState }) {
                 </div>
             </div>
 
-            {/* Pipeline Bar */}
             <div className="h-6 bg-zinc-900 rounded-full overflow-hidden flex relative border border-zinc-800">
                 <div className="h-full bg-zinc-700 transition-all duration-300" style={{ width: currentIndex >= 1 ? '15%' : currentIndex >= 0 ? '5%' : '0%' }}></div>
                 <div className="h-full bg-purple-600 transition-all duration-300" style={{ width: currentIndex >= 4 ? '25%' : currentIndex >= 3 ? '10%' : '0%' }}></div>
@@ -294,7 +306,6 @@ function PipelineMonitor({ diag }: { diag: DiagnosticState }) {
                 <span className={currentIndex >= 4 ? 'text-blue-400' : ''}>Parallel Download</span>
             </div>
 
-            {/* Active Vectors */}
             <div className={`mt-6 pt-6 border-t border-zinc-900 transition-opacity duration-500 ${currentIndex >= 4 ? 'opacity-100' : 'opacity-0'}`}>
                 <div className="flex flex-wrap gap-2">
                     <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-1 rounded text-[9px] font-bold">HERO RPC</span>
@@ -443,7 +454,7 @@ function MathTerminal({ node, status }: { node: any, status: string }) {
                 <div className="my-3 border-t border-zinc-800/50"></div>
 
                 <div><span className="text-red-500">CHK</span> Restarts (7d): {penalties}</div>
-                
+
                 <div className="mt-2"><span className="text-green-500 font-bold">FINAL SCORE: {score}/100</span></div>
             </div>
         </div>
