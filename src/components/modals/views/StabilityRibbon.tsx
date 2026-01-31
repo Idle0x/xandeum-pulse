@@ -48,7 +48,7 @@ const VitalitySnapshotCard = ({
         firstSeenDate
     );
     const health = point.health || 0;
-    
+
     // SAFE EXTRACTION OF PENALTIES
     const penalties = (point as any).healthBreakdown?.penalties || { restarts: 0, consistency: 1 };
     const restartPenalty = penalties.restarts || 0;
@@ -70,14 +70,18 @@ const VitalitySnapshotCard = ({
 
     return (
         <div className={`absolute bottom-full mb-2 md:mb-3 ${positionClass} z-50 animate-in fade-in zoom-in-95 duration-200`}>
-            {/* CONTAINER */}
-            <div className="bg-[#09090b] border border-zinc-800 rounded-xl shadow-2xl w-52 md:w-64 relative overflow-hidden flex flex-col backdrop-blur-xl">
+            {/* CONTAINER 
+                Mobile: w-52, max-h-[320px], overflow-y-auto (scrolls if too tall)
+                Desktop: w-64, max-h-none, overflow-hidden (expands naturally)
+            */}
+            <div className="bg-[#09090b] border border-zinc-800 rounded-xl shadow-2xl w-52 md:w-64 relative flex flex-col backdrop-blur-xl max-h-[320px] overflow-y-auto md:max-h-none md:overflow-hidden">
 
                  {/* Pointer Arrow */}
                  <div className={`absolute -bottom-1.5 w-3 h-3 bg-[#09090b] border-b border-r border-zinc-800 transform rotate-45 ${positionClass.includes('left-4') ? 'left-4' : positionClass.includes('right-4') ? 'right-4' : 'left-1/2 -translate-x-1/2'}`}></div>
 
                  {/* --- ZONE A: HEADER --- */}
-                 <div className="p-2 md:p-3 border-b border-zinc-800/50 bg-zinc-900/30">
+                 {/* Added shrink-0 so header never collapses when scrolling body */}
+                 <div className="p-2 md:p-3 border-b border-zinc-800/50 bg-zinc-900/30 shrink-0">
                      <div className="flex justify-between items-start mb-1.5 md:mb-2">
                         <div className="flex flex-col">
                             <span className="text-[8px] md:text-[10px] font-bold text-zinc-500 uppercase tracking-wider leading-none mb-0.5">SNAPSHOT</span>
@@ -132,14 +136,14 @@ const VitalitySnapshotCard = ({
                                 <Flame className="w-2.5 h-2.5 md:w-3 md:h-3" />
                                 <span className="text-[7px] md:text-[8px] font-bold uppercase tracking-wider">Penalty Log</span>
                             </div>
-                            
+
                             {restartPenalty > 0 && (
                                 <div className="flex justify-between items-center text-[8px] md:text-[9px] pl-1 border-l border-rose-800/50">
                                     <span className="text-zinc-400">Trauma Impact</span>
                                     <span className="font-mono font-bold text-rose-400">-{restartPenalty} pts</span>
                                 </div>
                             )}
-                            
+
                             {consistencyScore < 0.95 && (
                                 <div className="flex justify-between items-center text-[8px] md:text-[9px] pl-1 border-l border-rose-800/50">
                                     <span className="text-zinc-400">Consistency</span>
@@ -178,7 +182,8 @@ const VitalitySnapshotCard = ({
                  </div>
 
                  {/* --- ZONE C: CONTEXT FOOTER --- */}
-                 <div className="px-2 py-1.5 md:px-3 md:py-2 bg-zinc-900/80 border-t border-zinc-800">
+                 {/* Added shrink-0 here too */}
+                 <div className="px-2 py-1.5 md:px-3 md:py-2 bg-zinc-900/80 border-t border-zinc-800 shrink-0">
                     {hasIssues ? (
                         <div className="flex flex-col gap-1">
                             {displayIssues.map(issue => (
@@ -247,7 +252,7 @@ export const StabilityRibbon = ({
   // --- HELPER: ENRICH POINT WITH LIVE DATA ---
   const enrichPoint = (point: NodeHistoryPoint, index: number, total: number) => {
       if (!point) return point;
-      
+
       // If this is the very last point in the history array...
       // AND we have current penalties passed down from parent...
       if (index === total - 1 && currentPenalties) {
