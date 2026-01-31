@@ -59,7 +59,7 @@ export function EngineeringChapter() {
         payload: null
     });
 
-    // --- NEW: SESSION STATE ---
+    // --- SESSION STATE ---
     const [lastRun, setLastRun] = useState<Date | null>(null);
     const [traceId, setTraceId] = useState<string | null>(null);
     const [timeAgo, setTimeAgo] = useState<string>('');
@@ -76,6 +76,11 @@ export function EngineeringChapter() {
             const secs = diff % 60;
             setTimeAgo(`${mins}m ${secs}s ago`);
         }, 1000);
+        
+        // Initial set
+        const diff = Math.floor((new Date().getTime() - lastRun.getTime()) / 1000);
+        setTimeAgo(`${Math.floor(diff / 60)}m ${diff % 60}s ago`);
+
         return () => clearInterval(interval);
     }, [lastRun]);
 
@@ -92,7 +97,6 @@ export function EngineeringChapter() {
         const newTraceId = '#' + Math.random().toString(16).substr(2, 4).toUpperCase();
         setTraceId(newTraceId);
         setLastRun(new Date());
-        setTimeAgo('0m 0s ago');
         
         setDiag({ 
             status: 'DNS', 
@@ -250,13 +254,13 @@ export function EngineeringChapter() {
                         <p className="text-zinc-400 leading-relaxed text-sm">{ENG_TEXT[0].content}</p>
                     </div>
                 </div>
-                <PipelineMonitor diag={diag} traceId={traceId} />
+                <PipelineMonitor diag={diag} traceId={traceId} timeAgo={timeAgo} />
             </div>
 
             {/* --- SECTION 2: WATERFALL --- */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
                 <div className="order-2 lg:order-1">
-                    <WaterfallTrace diag={diag} traceId={traceId} />
+                    <WaterfallTrace diag={diag} traceId={traceId} timeAgo={timeAgo} />
                 </div>
                 <div className="space-y-6 order-1 lg:order-2">
                     <div>
@@ -285,15 +289,15 @@ export function EngineeringChapter() {
                     </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
-                    <MathTerminal node={diag.payload?.sampleNode} status={diag.status} traceId={traceId} />
-                    <ForensicFlags flags={diag.payload?.flags} status={diag.status} traceId={traceId} />
+                    <MathTerminal node={diag.payload?.sampleNode} status={diag.status} traceId={traceId} timeAgo={timeAgo} />
+                    <ForensicFlags flags={diag.payload?.flags} status={diag.status} traceId={traceId} timeAgo={timeAgo} />
                 </div>
             </div>
 
             {/* --- SECTION 4: DEDUPLICATION --- */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
                 <div className="order-2 lg:order-1">
-                    <DeduplicationLog count={diag.payload?.nodeCount} status={diag.status} traceId={traceId} />
+                    <DeduplicationLog count={diag.payload?.nodeCount} status={diag.status} traceId={traceId} timeAgo={timeAgo} />
                 </div>
                 <div className="space-y-6 order-1 lg:order-2">
                     <div>
@@ -332,10 +336,10 @@ export function EngineeringChapter() {
 }
 
 // ==========================================
-// SUB-COMPONENTS (With Trace ID Support)
+// SUB-COMPONENTS (With Live TimeAgo)
 // ==========================================
 
-function PipelineMonitor({ diag, traceId }: { diag: DiagnosticState, traceId: string | null }) {
+function PipelineMonitor({ diag, traceId, timeAgo }: { diag: DiagnosticState, traceId: string | null, timeAgo: string }) {
     const steps = ['DNS', 'TCP', 'SSL', 'TTFB', 'DOWNLOAD', 'COMPLETE'];
     const currentIndex = steps.indexOf(diag.status);
 
@@ -345,7 +349,13 @@ function PipelineMonitor({ diag, traceId }: { diag: DiagnosticState, traceId: st
                 <div className="flex items-center gap-2 text-zinc-400">
                     <span className="text-[10px] font-bold uppercase tracking-widest">Aggregator Status</span>
                 </div>
-                {traceId && <div className="text-[9px] font-mono text-zinc-600 bg-zinc-900/50 px-1.5 py-0.5 rounded">SRC: {traceId}</div>}
+                {traceId && (
+                    <div className="flex items-center gap-2 text-[9px] font-mono text-zinc-500 bg-zinc-900/50 px-2 py-1 rounded border border-zinc-800">
+                        <span>SRC: {traceId}</span>
+                        <span className="text-zinc-700">|</span>
+                        <span className="text-blue-400">{timeAgo}</span>
+                    </div>
+                )}
             </div>
 
             <div className="h-6 bg-zinc-900 rounded-full overflow-hidden flex relative border border-zinc-800">
@@ -373,7 +383,7 @@ function PipelineMonitor({ diag, traceId }: { diag: DiagnosticState, traceId: st
     );
 }
 
-function WaterfallTrace({ diag, traceId }: { diag: DiagnosticState, traceId: string | null }) {
+function WaterfallTrace({ diag, traceId, timeAgo }: { diag: DiagnosticState, traceId: string | null, timeAgo: string }) {
     const isComplete = diag.status === 'COMPLETE';
     const getWidth = (val: number) => isComplete ? `${Math.min(100, (val / diag.latency.total) * 100)}%` : '0%';
 
@@ -384,7 +394,13 @@ function WaterfallTrace({ diag, traceId }: { diag: DiagnosticState, traceId: str
                     <Clock size={14} /> Request Latency
                 </div>
                 <div className="flex flex-col items-end">
-                    {traceId && <div className="text-[9px] font-mono text-zinc-600 bg-zinc-900/50 px-1.5 py-0.5 rounded mb-1">SRC: {traceId}</div>}
+                    {traceId && (
+                         <div className="flex items-center gap-2 text-[9px] font-mono text-zinc-500 bg-zinc-900/50 px-2 py-1 rounded border border-zinc-800 mb-1">
+                            <span>SRC: {traceId}</span>
+                            <span className="text-zinc-700">|</span>
+                            <span className="text-blue-400">{timeAgo}</span>
+                        </div>
+                    )}
                     <div className="text-xl font-bold text-white tabular-nums">{diag.latency.total}ms</div>
                 </div>
             </div>
@@ -422,7 +438,7 @@ function TraceBar({ label, color, width, val, active }: any) {
     );
 }
 
-function DeduplicationLog({ count, status, traceId }: { count: number | undefined, status: string, traceId: string | null }) {
+function DeduplicationLog({ count, status, traceId, timeAgo }: { count: number | undefined, status: string, traceId: string | null, timeAgo: string }) {
     const [logs, setLogs] = useState<string[]>([]);
     const listRef = useRef<HTMLDivElement>(null); 
 
@@ -459,7 +475,13 @@ function DeduplicationLog({ count, status, traceId }: { count: number | undefine
                     <Terminal size={14} />
                     <span className="text-[10px] font-bold uppercase tracking-widest">Deduplication Engine</span>
                 </div>
-                {traceId && <div className="text-[9px] font-mono text-zinc-600 bg-zinc-900/50 px-1.5 py-0.5 rounded">SRC: {traceId}</div>}
+                {traceId && (
+                     <div className="flex items-center gap-2 text-[9px] font-mono text-zinc-500 bg-zinc-900/50 px-2 py-1 rounded border border-zinc-800">
+                        <span>SRC: {traceId}</span>
+                        <span className="text-zinc-700">|</span>
+                        <span className="text-blue-400">{timeAgo}</span>
+                    </div>
+                )}
             </div>
             <div ref={listRef} className="flex-1 overflow-y-auto font-mono text-[11px] space-y-2 text-zinc-400 custom-scrollbar scroll-smooth">
                 {logs.map((log, i) => (
@@ -470,7 +492,7 @@ function DeduplicationLog({ count, status, traceId }: { count: number | undefine
     );
 }
 
-function MathTerminal({ node, status, traceId }: { node: any, status: string, traceId: string | null }) {
+function MathTerminal({ node, status, traceId, timeAgo }: { node: any, status: string, traceId: string | null, timeAgo: string }) {
     if (status === 'IDLE' || status === 'DNS' || status === 'TCP' || status === 'SSL') {
         return (
             <div className="bg-[#080808] border border-zinc-800 rounded-3xl p-6 flex items-center justify-center text-zinc-600 text-[10px] uppercase tracking-widest h-full min-h-[220px] shadow-lg">
@@ -498,7 +520,13 @@ function MathTerminal({ node, status, traceId }: { node: any, status: string, tr
                     <Cpu size={14}/> 
                     <span className="text-[10px] font-bold uppercase">Vitality Audit</span>
                 </div>
-                {traceId && <div className="text-[9px] font-mono text-zinc-600 bg-zinc-900/50 px-1.5 py-0.5 rounded">SRC: {traceId}</div>}
+                {traceId && (
+                     <div className="flex items-center gap-2 text-[9px] font-mono text-zinc-500 bg-zinc-900/50 px-2 py-1 rounded border border-zinc-800">
+                        <span>SRC: {traceId}</span>
+                        <span className="text-zinc-700">|</span>
+                        <span className="text-blue-400">{timeAgo}</span>
+                    </div>
+                )}
             </div>
             <div className="p-5 font-mono text-[10px] leading-6 text-zinc-400 overflow-y-auto custom-scrollbar flex-1">
                 <div><span className="text-blue-500">INPUT</span> Loaded Node: {node.pubkey.substring(0, 12)}...</div>
@@ -520,7 +548,7 @@ function MathTerminal({ node, status, traceId }: { node: any, status: string, tr
     );
 }
 
-function ForensicFlags({ flags, status, traceId }: { flags: any, status: string, traceId: string | null }) {
+function ForensicFlags({ flags, status, traceId, timeAgo }: { flags: any, status: string, traceId: string | null, timeAgo: string }) {
     const isReady = status === 'COMPLETE';
 
     return (
@@ -530,7 +558,13 @@ function ForensicFlags({ flags, status, traceId }: { flags: any, status: string,
                     <Search size={14}/>
                     <span className="text-[10px] font-bold uppercase tracking-widest">Anomaly Scan</span>
                 </div>
-                {traceId && <div className="text-[9px] font-mono text-zinc-600 bg-zinc-900/50 px-1.5 py-0.5 rounded">SRC: {traceId}</div>}
+                {traceId && (
+                     <div className="flex items-center gap-2 text-[9px] font-mono text-zinc-500 bg-zinc-900/50 px-2 py-1 rounded border border-zinc-800">
+                        <span>SRC: {traceId}</span>
+                        <span className="text-zinc-700">|</span>
+                        <span className="text-blue-400">{timeAgo}</span>
+                    </div>
+                )}
             </div>
 
             <div className="space-y-3">
