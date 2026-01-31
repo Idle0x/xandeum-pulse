@@ -40,7 +40,8 @@ const AXIS_STYLE = {
 };
 
 export const LeaderboardAnalyticsModal = ({ onClose, currentStats, initialNetwork = 'MAINNET' }: LeaderboardAnalyticsModalProps) => {
-  const [timeRange, setTimeRange] = useState<HistoryTimeRange>('24H');
+  // CHANGED: Default to '30D'
+  const [timeRange, setTimeRange] = useState<HistoryTimeRange>('30D');
   const [networkScope, setNetworkScope] = useState<NetworkScope>(initialNetwork);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
