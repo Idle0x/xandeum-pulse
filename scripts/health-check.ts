@@ -32,13 +32,21 @@ interface CreditNode {
 // --- HELPERS ---
 
 /**
- * Filters rows to ensure one entry per pubkey for financial accuracy.
+ * Filters rows to ensure one entry per pubkey PER NETWORK.
+ * Fix: Uses a composite key so a user on Mainnet AND Devnet counts for both.
  */
 function getUniqueFinancialRows(nodeRows: any[]) {
   const seen = new Set<string>();
   return nodeRows.filter(n => {
-    if (!n.pubkey || seen.has(n.pubkey)) return false;
-    seen.add(n.pubkey);
+    if (!n.pubkey) return false;
+    
+    // FIX 2: Composite Key (Pubkey + Network)
+    // This allows the same pubkey to exist once on Mainnet and once on Devnet,
+    // but prevents multiple physical nodes on the same network from inflating credits.
+    const uniqueKey = `${n.pubkey}-${n.network || 'MAINNET'}`;
+    
+    if (seen.has(uniqueKey)) return false;
+    seen.add(uniqueKey);
     return true;
   });
 }
@@ -68,9 +76,9 @@ function getConsensusMetrics(nodeList: any[]) {
 }
 
 function getFinancialMetrics(nodeRows: any[]) {
-  // DEDUPLICATION: Ensure we only count credits once per unique pubkey
+  // DEDUPLICATION: Ensure we only count credits once per unique pubkey/network combo
   const uniqueRows = getUniqueFinancialRows(nodeRows);
-  
+
   if (uniqueRows.length === 0) return { total: 0, avg: 0, dominance: 0, count: 0 };
 
   const total = uniqueRows.reduce((acc, n) => acc + (n.credits || 0), 0);
@@ -117,13 +125,21 @@ async function runMonitor() {
     const mainnetCreditMap = new Map<string, number>();
     rawMainnetCredits.forEach(c => {
         const key = getSafeKey(c);
-        if (key !== 'unknown') mainnetCreditMap.set(key, c.credits);
+        if (key !== 'unknown') {
+            // Optional Safety: Sum duplicates if API returns same key twice
+            const current = mainnetCreditMap.get(key) || 0;
+            mainnetCreditMap.set(key, current + c.credits);
+        }
     });
 
     const devnetCreditMap = new Map<string, number>();
     rawDevnetCredits.forEach(c => {
         const key = getSafeKey(c);
-        if (key !== 'unknown') devnetCreditMap.set(key, c.credits);
+        if (key !== 'unknown') {
+             // Optional Safety: Sum duplicates
+             const current = devnetCreditMap.get(key) || 0;
+             devnetCreditMap.set(key, current + c.credits);
+        }
     });
 
     const supabase = getServiceSupabase();
@@ -145,14 +161,13 @@ async function runMonitor() {
       let creditVal = 0;
       if (net === 'MAINNET') {
         creditVal = mainnetCreditMap.get(pubkey) || 0;
-        // Don't delete yet, as multiple physical nodes share this key
       } else {
         creditVal = devnetCreditMap.get(pubkey) || 0;
       }
 
       const finalCredits = creditVal > 0 ? creditVal : (rpcNode.credits || 0);
       const processedNode = { ...rpcNode, credits: finalCredits, is_ghost: false };
-      
+
       finalAllNodes.push(processedNode);
       if (net === 'MAINNET') finalMainnet.push(processedNode);
       else finalDevnet.push(processedNode);
@@ -176,21 +191,42 @@ async function runMonitor() {
     }
 
     // --- PHASE B: PROCESS GHOST NODES (Remaining in Maps) ---
-    // Filter out keys already seen in RPC nodes to get true ghosts
-    const rpcPubkeys = new Set(rpcNodes.map(n => n.pubkey));
+    // FIX 1: Filter out keys strictly by NETWORK to avoid cross-network contamination
+    
+    // Create sets of active keys SPECIFIC to each network
+    const activeMainnetKeys = new Set(
+        rpcNodes.filter(n => (n.network || 'MAINNET') === 'MAINNET').map(n => n.pubkey)
+    );
+
+    const activeDevnetKeys = new Set(
+        rpcNodes.filter(n => n.network === 'DEVNET').map(n => n.pubkey)
+    );
 
     const processGhosts = (map: Map<string, number>, network: string) => {
+      // Select the correct set to check against
+      const activeSetToCheck = network === 'MAINNET' ? activeMainnetKeys : activeDevnetKeys;
+
       for (const [pubkey, credits] of map.entries()) {
-        if (rpcPubkeys.has(pubkey)) continue; // Not a ghost, just a shared key
-        
+        // Only skip if this specific pubkey is active ON THIS SPECIFIC NETWORK
+        if (activeSetToCheck.has(pubkey)) continue; 
+
         const ghostNode = { pubkey, network, address: 'private', health: 0, uptime: 0, credits, is_ghost: true };
+        
         finalAllNodes.push(ghostNode);
         if (network === 'MAINNET') finalMainnet.push(ghostNode);
         else finalDevnet.push(ghostNode);
 
         uniqueNodeRows.push({
           node_id: `${pubkey}-private-${network}`,
-          pubkey, network, health: 0, credits, storage_committed: 0, storage_used: 0, uptime: 0, rank: 0, version: '0.0.0',
+          pubkey, 
+          network, 
+          health: 0, 
+          credits, 
+          storage_committed: 0, 
+          storage_used: 0, 
+          uptime: 0, 
+          rank: 0, 
+          version: '0.0.0',
           created_at: new Date().toISOString()
         });
       }
