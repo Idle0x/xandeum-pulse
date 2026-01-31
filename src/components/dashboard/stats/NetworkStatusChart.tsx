@@ -52,8 +52,8 @@ export const NetworkStatusChart = ({
     }));
   }, [history, config.sourceKey, countKey]);
 
-  // --- FIX: Use 'any' to avoid Readonly vs Mutable type conflict ---
-  const getElasticDomain = useCallback(([dataMin, dataMax]: any) => {
+  // --- FIX: Added ': [number, number]' return type ---
+  const getElasticDomain = useCallback(([dataMin, dataMax]: any): [number, number] => {
      if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 100];
 
      const buffer = 5;
