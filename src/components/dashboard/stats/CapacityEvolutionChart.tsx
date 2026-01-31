@@ -55,7 +55,7 @@ export const CapacityEvolutionChart = ({
     });
   }, [timeRange]);
 
-  // --- REFINED Y-AXIS DOMAIN LOGIC (Value Percentage) ---
+  // --- SYMMETRICAL Y-AXIS DOMAIN LOGIC (±5% Value) ---
   const getDomain = useCallback((args: any): [number, number] => {
     const [dataMin, dataMax] = args;
     
@@ -65,14 +65,14 @@ export const CapacityEvolutionChart = ({
     // If the entire dataset is 0 (e.g. empty network), force a small positive range
     if (dataMax === 0) return [0, 10];
 
-    // 1. Lower Bound: Lowest point minus 10% (Floor)
-    let lowerBound = dataMin * 0.90;
+    // 1. Lower Bound: Lowest point minus 5% (Floor)
+    let lowerBound = dataMin * 0.95;
     
     // 2. Upper Bound: Highest point plus 5% (Ceiling)
     const upperBound = dataMax * 1.05;
 
-    // Prevent negative lower bound if data is actually positive/zero
-    if (lowerBound < 0) lowerBound = 0;
+    // Prevent negative lower bound (unless data is actually negative)
+    if (lowerBound < 0 && dataMin >= 0) lowerBound = 0;
 
     return [lowerBound, upperBound];
   }, []);
