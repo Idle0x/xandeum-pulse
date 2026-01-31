@@ -71,7 +71,7 @@ export function TemporalChapter() {
                             Identity in a decentralized network is fluid. IPs change, versions upgrade, and hardware migrates.
                         </p>
                         <p className="text-zinc-400 leading-relaxed text-sm mt-4">
-                             The Temporal Engine solves the "Ship of Theseus" problem using a composite <strong>Stable ID Protocol</strong>. It anchors a node's reputation to a cryptographic hash of its public key, ensuring that its historical performance ledger survives physical relocation.
+                            The Temporal Engine solves the "Ship of Theseus" problem using a composite <strong>Stable ID Protocol</strong>. It anchors a node's reputation to a cryptographic hash of its public key, ensuring that its historical performance ledger survives physical relocation.
                         </p>
                     </div>
 
@@ -317,7 +317,7 @@ function ForensicSimulator() {
                 ></div>
             </div>
 
-            {/* Terminal Output */}
+            {/* Terminal Output (Fixed > characters) */}
             <div className="bg-zinc-900/50 rounded-xl p-4 font-mono text-[10px] border border-zinc-800/50 min-h-[80px] flex items-center relative z-10">
                 {currentSnap.type === 'OK' && (
                     <div className="text-zinc-400 w-full animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -325,8 +325,8 @@ function ForensicSimulator() {
                             <span className="text-blue-500 font-bold">✓ STATUS: NOMINAL</span>
                             <span>Δt: +15m</span>
                         </div>
-                        <span className="opacity-60 block">> Uptime incrementing normally (+{uptimeDelta}s).</span>
-                        <span className="opacity-60 block">> Heartbeat verified.</span>
+                        <span className="opacity-60 block">{'>'} Uptime incrementing normally (+{uptimeDelta}s).</span>
+                        <span className="opacity-60 block">{'>'} Heartbeat verified.</span>
                     </div>
                 )}
                 {currentSnap.type === 'ZOMBIE' && (
@@ -335,8 +335,8 @@ function ForensicSimulator() {
                             <span className="text-yellow-500 font-bold">⚠ STATUS: STAGNANT</span>
                             <span className="text-yellow-500/50">ANOMALY_DETECTED</span>
                         </div>
-                        <span className="opacity-80 block">> Clock advanced 15m.</span>
-                        <span className="text-yellow-500 block">> CRITICAL: Uptime delta only {uptimeDelta}s.</span>
+                        <span className="opacity-80 block">{'>'} Clock advanced 15m.</span>
+                        <span className="text-yellow-500 block">{'>'} CRITICAL: Uptime delta only {uptimeDelta}s.</span>
                     </div>
                 )}
                 {currentSnap.type === 'RESTART' && (
@@ -345,8 +345,8 @@ function ForensicSimulator() {
                             <span className="text-red-500 font-bold">⚠ STATUS: REBOOT</span>
                             <span className="text-red-500/50">VOLATILITY_SPIKE</span>
                         </div>
-                        <span className="opacity-80 block">> Uptime reset detected (10s).</span>
-                        <span className="text-red-400 block">> Penalty counter incremented.</span>
+                        <span className="opacity-80 block">{'>'} Uptime reset detected (10s).</span>
+                        <span className="text-red-400 block">{'>'} Penalty counter incremented.</span>
                     </div>
                 )}
             </div>
