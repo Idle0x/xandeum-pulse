@@ -14,7 +14,13 @@ interface CapacityEvolutionChartProps {
 }
 
 export const CapacityEvolutionChart = ({ 
-  history, loading, timeRange, onTimeRangeChange, capacityKey, usedKey 
+  history, 
+  loading, 
+  // CHANGED: Default to '30D'
+  timeRange = '30D', 
+  onTimeRangeChange, 
+  capacityKey, 
+  usedKey 
 }: CapacityEvolutionChartProps) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'COMMITTED' | 'USED'>('COMMITTED');
@@ -58,20 +64,13 @@ export const CapacityEvolutionChart = ({
   // --- SYMMETRICAL Y-AXIS DOMAIN LOGIC (±5% Value) ---
   const getDomain = useCallback((args: any): [number, number] => {
     const [dataMin, dataMax] = args;
-    
-    // Safety check for empty or invalid data
-    if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 1];
 
-    // If the entire dataset is 0 (e.g. empty network), force a small positive range
+    if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 1];
     if (dataMax === 0) return [0, 10];
 
-    // 1. Lower Bound: Lowest point minus 5% (Floor)
     let lowerBound = dataMin * 0.95;
-    
-    // 2. Upper Bound: Highest point plus 5% (Ceiling)
     const upperBound = dataMax * 1.05;
 
-    // Prevent negative lower bound (unless data is actually negative)
     if (lowerBound < 0 && dataMin >= 0) lowerBound = 0;
 
     return [lowerBound, upperBound];
