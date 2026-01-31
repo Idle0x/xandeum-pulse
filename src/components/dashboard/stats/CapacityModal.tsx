@@ -18,7 +18,8 @@ export const CapacityModal = ({ onClose, nodes }: CapacityModalProps) => {
   const [activeTab, setActiveTab] = useState<'ALL' | 'MAINNET' | 'DEVNET'>('ALL');
 
   // 1. DATA FETCHING
-  const [timeRange, setTimeRange] = useState<HistoryTimeRange>('24H');
+  // CHANGED: Default state to '30D'
+  const [timeRange, setTimeRange] = useState<HistoryTimeRange>('30D');
   const { history: evoHistory, loading: evoLoading } = useNetworkHistory(timeRange);
 
   const { history: trendHistory, growth, loading: trendLoading } = useNetworkHistory('30D');
