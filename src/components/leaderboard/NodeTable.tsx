@@ -91,12 +91,17 @@ export default function NodeTable({
         <div className="p-20 text-center text-zinc-600"><Search size={48} className="mx-auto mb-4 opacity-50" /><p>No nodes found.</p></div>
       ) : (
         <div className="divide-y-0 px-2 pb-2">
-          {nodes.slice(0, visibleCount).map((node) => {
+          {nodes.slice(0, visibleCount).map((node, index) => {
               const isMyNode = node.address && favorites.includes(node.address);
               // Ensure uniqueness by PubKey + Network + Address
               const compositeId = `${node.pubkey}-${node.network}-${node.address || 'no-ip'}`;
               const isExpanded = expandedNode === compositeId; 
               const flagUrl = node.location?.countryCode && node.location.countryCode !== 'XX' ? `https://flagcdn.com/w20/${node.location.countryCode.toLowerCase()}.png` : null;
+
+              // DYNAMIC RANK LOGIC:
+              // If viewing COMBINED, calculate rank on-the-fly (index + 1)
+              // If viewing specific network, use the official DB rank
+              const displayRank = networkFilter === 'COMBINED' ? index + 1 : node.rank;
 
               return (
               <div key={compositeId} id={`node-${compositeId}`} className={`relative transition-all duration-300 ease-out mb-2 rounded-xl border ${isExpanded ? 'scale-[1.02] z-10 bg-black border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.15)]' : 'scale-100 bg-zinc-900/30 border-transparent hover:scale-[1.01] hover:bg-zinc-800 hover:border-zinc-600'} ${isMyNode && !isExpanded ? 'border-yellow-500/30 bg-yellow-500/5' : ''}`}>
@@ -104,9 +109,9 @@ export default function NodeTable({
                   <div className="grid grid-cols-12 gap-2 md:gap-4 p-3 md:p-4 items-center cursor-pointer" onClick={() => handleRowClick(node)}>
                       <div className="col-span-2 md:col-span-1 flex flex-col justify-center items-center gap-1 relative">
                           <div className="flex items-center gap-1">
-                              {node.rank === 1 && <Trophy size={14} className="text-yellow-400" />}
-                              {node.rank > 1 && node.rank <= 3 && <Medal size={14} className={node.rank === 2 ? "text-zinc-300" : "text-amber-600"} />}
-                              <span className={`text-xs md:text-sm font-bold ${node.rank <= 3 ? 'text-white' : 'text-zinc-500'}`}>#{node.rank}</span>
+                              {displayRank === 1 && <Trophy size={14} className="text-yellow-400" />}
+                              {displayRank > 1 && displayRank <= 3 && <Medal size={14} className={displayRank === 2 ? "text-zinc-300" : "text-amber-600"} />}
+                              <span className={`text-xs md:text-sm font-bold ${displayRank <= 3 ? 'text-white' : 'text-zinc-500'}`}>#{displayRank}</span>
                           </div>
                           {networkFilter === 'COMBINED' && (<span className={`text-[8px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${node.network === 'MAINNET' ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'}`}>{node.network === 'MAINNET' ? 'MN' : 'DN'}</span>)}
                       </div>
