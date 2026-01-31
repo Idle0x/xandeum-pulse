@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   Server, Share2, Zap, ShieldAlert, 
   CheckCircle2, Network, Terminal, Activity, 
-  Cpu, ArrowRight, Database
+  Cpu, ArrowRight, Database, Loader2
 } from 'lucide-react';
 
 // --- CODE SNIPPET ---
@@ -31,7 +31,6 @@ class PulseEngine {
 }
 `;
 
-// *** RENAMED TO BrainChapter TO MATCH YOUR IMPORT ***
 export function BrainChapter() {
     return (
         <section className="max-w-6xl mx-auto px-6 py-24 space-y-24">
@@ -67,7 +66,7 @@ export function BrainChapter() {
                             Every data request triggers a race. The <strong>Hero Node</strong> (Blue) takes the express lane, usually winning by a margin of 200-500ms.
                         </p>
                         <p className="text-zinc-400 leading-relaxed text-sm mt-4">
-                            However, Heroes are fragile. If the Hero stalls (e.g., rate limits), the <strong>Swarm</strong> (Orange) naturally overtakes it without the UI hanging. When the Hero recovers, it boosts back into the lead, relegating the Swarm back to a support role.
+                            However, Heroes are fragile. If the Hero stalls (e.g., rate limits), the <strong>Swarm</strong> (Orange) naturally overtakes it. The system automatically spotlights the active provider, dimming the failed lane until recovery is confirmed.
                         </p>
                         
                         <div className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-xl mt-6">
@@ -75,7 +74,7 @@ export function BrainChapter() {
                                 <Activity size={12} /> Live Simulation
                             </div>
                             <p className="text-xs text-zinc-400">
-                                Watch the race on the right. <span className="text-white">Click the Hero</span> to trip it intentionally, or <span className="text-white">Click the Swarm</span> to boost it.
+                                This simulation runs on autopilot, cycling through 3 failure/recovery scenarios. <span className="text-white">Clicking nodes</span> acts as a catalyst to force immediate state changes.
                             </p>
                         </div>
                     </div>
@@ -154,14 +153,15 @@ export function BrainChapter() {
 }
 
 
-// --- SIMULATION 1: RPC RACEWAY ---
+// --- SIMULATION 1: RPC RACEWAY (SOPHISTICATED AUTOPILOT) ---
 function RpcRaceway() {
+    // State
     const [heroPos, setHeroPos] = useState(0);
     const [swarmPos, setSwarmPos] = useState(0);
-    const [status, setStatus] = useState<'IDLE' | 'RACING' | 'HERO_CRASHED' | 'FINISHED' | 'RECOVERING'>('IDLE');
+    const [scenario, setScenario] = useState<'SWARM_WIN' | 'HERO_RECOVER_CLEAN' | 'HERO_RECOVER_PATCH'>('HERO_RECOVER_PATCH');
+    const [phase, setPhase] = useState<'IDLE' | 'RACING' | 'HERO_CRASHED' | 'HERO_RECOVERING' | 'FINISHED' | 'GAP_FILLING' | 'COOLDOWN'>('IDLE');
+    const [spotlight, setSpotlight] = useState<'HERO' | 'SWARM' | 'NONE'>('NONE');
     const [logs, setLogs] = useState<Array<{msg: string, type: 'info'|'err'|'warn'|'success'}>>([]);
-    const [runCount, setRunCount] = useState(0);
-
     const logRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll logs
@@ -169,86 +169,122 @@ function RpcRaceway() {
         if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
     }, [logs]);
 
-    // Game Loop
+    const addLog = (msg: string, type: 'info'|'err'|'warn'|'success') => {
+        setLogs(prev => [...prev.slice(-5), { msg, type }]);
+    };
+
+    // --- MAIN GAME LOOP ---
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        let timer: NodeJS.Timeout;
 
-        const addLog = (msg: string, type: 'info'|'err'|'warn'|'success') => {
-            setLogs(prev => [...prev.slice(-4), { msg, type }]);
-        };
-
-        if (status === 'IDLE') {
-            // Start Race automatically after delay
-            setTimeout(() => {
-                setStatus('RACING');
-                addLog(`[System] Initializing Block #${9200 + runCount} fetch...`, 'info');
-                addLog(`[Hero] Connection established (latency: 12ms)`, 'info');
+        // 1. IDLE / INIT
+        if (phase === 'IDLE') {
+            timer = setTimeout(() => {
+                // Cycle Scenarios: 0 -> 1 -> 2 -> 0
+                const scenarios: any[] = ['SWARM_WIN', 'HERO_RECOVER_CLEAN', 'HERO_RECOVER_PATCH'];
+                const nextScenario = scenarios[(scenarios.indexOf(scenario) + 1) % scenarios.length];
+                
+                setScenario(nextScenario);
+                setHeroPos(0);
+                setSwarmPos(0);
+                setPhase('RACING');
+                setSpotlight('HERO'); // Hero starts strong
+                addLog(`[SYSTEM] Starting Scenario: ${nextScenario.replace(/_/g, ' ')}`, 'info');
+                addLog(`[HERO] Optimistic connection established.`, 'info');
             }, 1000);
         }
 
-        if (status === 'RACING' || status === 'HERO_CRASHED' || status === 'RECOVERING') {
-            interval = setInterval(() => {
+        // 2. RACING LOOP
+        if (phase === 'RACING' || phase === 'HERO_CRASHED' || phase === 'HERO_RECOVERING' || phase === 'GAP_FILLING') {
+            timer = setInterval(() => {
+                
+                // --- HERO LOGIC ---
                 setHeroPos(prev => {
                     if (prev >= 100) return 100;
                     
-                    // Crash Logic (Random)
-                    if (status === 'RACING' && Math.random() > 0.98 && prev > 20 && prev < 80) {
-                        setStatus('HERO_CRASHED');
-                        addLog(`[ERR] Hero RPC timeout (Rate Limit). Stall.`, 'err');
-                        addLog(`[Swarm] Failover active. Taking lead.`, 'warn');
+                    // Trigger CRASH at 30% if not winning clean
+                    if (phase === 'RACING' && prev > 30 && prev < 35) {
+                        setPhase('HERO_CRASHED');
+                        setSpotlight('SWARM'); // Spotlight shifts to Swarm
+                        addLog(`[ERR] Hero Rate Limit (429). Connection Dropped.`, 'err');
+                        addLog(`[SWARM] Failover active. Rerouting...`, 'warn');
+                        return prev; 
+                    }
+
+                    if (phase === 'HERO_CRASHED') {
+                        // If Scenario is Swarm Win, Hero stays dead.
+                        if (scenario === 'SWARM_WIN') return prev; 
                         
-                        // Auto-recover after 2 seconds
-                        setTimeout(() => {
-                            setStatus('RECOVERING');
-                            addLog(`[Hero] Service restored. Boosting...`, 'success');
-                        }, 2000);
+                        // Otherwise, recover after Swarm passes 60%
+                        if (swarmPos > 60 && Math.random() > 0.95) {
+                            setPhase('HERO_RECOVERING');
+                            setSpotlight('HERO'); // Spotlight back to Hero
+                            addLog(`[HERO] Circuit breaker reset. Boosting...`, 'success');
+                        }
                         return prev;
                     }
 
-                    if (status === 'HERO_CRASHED') return prev; // Stuck
-                    if (status === 'RECOVERING') return prev + 3; // Boost
-                    return prev + 1.5; // Normal speed
+                    if (phase === 'HERO_RECOVERING') return prev + 3.5; // Boost speed
+                    return prev + 1.2; // Normal speed
                 });
 
+                // --- SWARM LOGIC ---
                 setSwarmPos(prev => {
                     if (prev >= 100) return 100;
-                    return prev + 0.8; // Slow but steady
+                    return prev + 0.6; // Constant slow speed
                 });
+
+                // --- WIN CONDITION ---
+                if (heroPos >= 100 && phase !== 'FINISHED' && phase !== 'GAP_FILLING') {
+                    if (scenario === 'HERO_RECOVER_PATCH') {
+                        setPhase('GAP_FILLING');
+                        addLog(`[HERO] Payload secured. Waiting for integrity check...`, 'success');
+                    } else {
+                        setPhase('FINISHED');
+                        addLog(`[HERO] Payload secured. Integrity 100%.`, 'success');
+                    }
+                } else if (swarmPos >= 100 && phase !== 'FINISHED') {
+                    setPhase('FINISHED');
+                    addLog(`[SWARM] Backup payload secured. Hero bypassed.`, 'warn');
+                }
+
+                // --- GAP FILL LOGIC ---
+                if (phase === 'GAP_FILLING') {
+                    // Hero is done, Swarm keeps running till end
+                    if (swarmPos >= 100) {
+                        setPhase('FINISHED');
+                        addLog(`[MERGE] Swarm patched 12 missing transactions.`, 'info');
+                    }
+                }
 
             }, 30);
         }
 
-        return () => clearInterval(interval);
-    }, [status, runCount]);
-
-    // Win Condition Check
-    useEffect(() => {
-        if (status !== 'FINISHED') {
-            if (heroPos >= 100 || swarmPos >= 100) {
-                const winner = heroPos >= 100 ? 'HERO' : 'SWARM';
-                setStatus('FINISHED');
-                setLogs(prev => [...prev.slice(-4), { msg: `[${winner}] Block payload secured.`, type: 'success' }]);
-                
-                // Gap Fill Logic
-                if (winner === 'HERO') {
-                     setTimeout(() => {
-                        setLogs(prev => [...prev.slice(-4), { msg: `[Swarm] Arrived (+1.2s). Filling 2 missing chunks.`, type: 'warn' }]);
-                     }, 1000);
-                }
-
-                // Reset
-                setTimeout(() => {
-                    setHeroPos(0);
-                    setSwarmPos(0);
-                    setStatus('IDLE');
-                    setRunCount(c => c + 1);
-                }, 4000);
-            }
+        // 3. FINISHED -> COOLDOWN
+        if (phase === 'FINISHED') {
+            timer = setTimeout(() => {
+                setPhase('COOLDOWN');
+            }, 1000);
         }
-    }, [heroPos, swarmPos, status]);
+
+        // 4. COOLDOWN (Working State) -> IDLE
+        if (phase === 'COOLDOWN') {
+            timer = setTimeout(() => {
+                setPhase('IDLE');
+                setLogs([]); // Clear logs for next run
+            }, 3000); // 3 seconds working time
+        }
+
+        return () => clearInterval(timer);
+    }, [phase, heroPos, swarmPos, scenario]);
+
+
+    // --- RENDERING HELPERS ---
+    const isHeroDimmed = spotlight === 'SWARM';
+    const isSwarmDimmed = spotlight === 'HERO';
 
     return (
-        <div className="bg-[#080808] border border-zinc-800 rounded-3xl p-6 relative overflow-hidden shadow-2xl flex flex-col justify-between min-h-[360px]">
+        <div className="bg-[#080808] border border-zinc-800 rounded-3xl p-6 relative overflow-hidden shadow-2xl flex flex-col justify-between min-h-[380px]">
 
              {/* Header */}
              <div className="flex justify-between items-center mb-6 z-10 border-b border-zinc-900 pb-2">
@@ -256,8 +292,16 @@ function RpcRaceway() {
                     <Network size={16} className="text-zinc-500" />
                     <span className="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Orchestration View</span>
                 </div>
-                <div className="text-[9px] font-mono text-zinc-600 bg-zinc-900 px-2 py-0.5 rounded">
-                    BLOCK #{9200 + runCount}
+                <div className="flex items-center gap-2">
+                    {phase === 'COOLDOWN' && (
+                        <div className="flex items-center gap-2 bg-zinc-900 px-3 py-1 rounded-full border border-zinc-800 animate-pulse">
+                            <Loader2 size={10} className="animate-spin text-cyan-500"/>
+                            <span className="text-[9px] font-mono text-cyan-500">GARBAGE_COLLECTION...</span>
+                        </div>
+                    )}
+                    <div className="text-[9px] font-mono text-zinc-600 bg-zinc-900 px-2 py-0.5 rounded">
+                        SCENARIO: {scenario === 'SWARM_WIN' ? 'FAILOVER' : scenario === 'HERO_RECOVER_CLEAN' ? 'RECOVERY' : 'PATCHING'}
+                    </div>
                 </div>
              </div>
 
@@ -265,56 +309,40 @@ function RpcRaceway() {
              <div className="flex-1 flex flex-col gap-8 relative z-10 py-4">
                  
                  {/* 1. HERO LANE */}
-                 <div className="relative h-12 flex items-center">
-                     {/* Track Line */}
+                 <div className={`relative h-12 flex items-center transition-all duration-500 ${isHeroDimmed ? 'opacity-30 grayscale blur-[1px]' : 'opacity-100 grayscale-0'}`}>
+                     {/* Track */}
                      <div className="absolute w-full h-px bg-cyan-900/30"></div>
                      <div className="absolute w-full h-px bg-cyan-500/20 blur-[2px]"></div>
-                     
-                     {/* Label */}
                      <div className="absolute -left-2 -top-4 text-[9px] font-bold text-cyan-500/50 uppercase tracking-widest">Hero Node</div>
 
-                     {/* The Runner */}
+                     {/* Runner */}
                      <div 
-                        className={`absolute w-12 h-6 bg-cyan-500 rounded-full shadow-[0_0_20px_#06b6d4] flex items-center justify-center transition-all duration-75 cursor-pointer hover:scale-110 z-20 ${status === 'HERO_CRASHED' ? 'animate-shake bg-red-500 shadow-red-500' : ''}`}
+                        className={`absolute w-12 h-6 bg-cyan-500 rounded-full shadow-[0_0_20px_#06b6d4] flex items-center justify-center transition-all duration-75 z-20 
+                        ${phase === 'HERO_CRASHED' ? 'animate-shake bg-red-500 shadow-red-500' : ''}`}
                         style={{ left: `calc(${heroPos}% - 24px)` }}
-                        onClick={() => {
-                            if(status === 'RACING') {
-                                setStatus('HERO_CRASHED');
-                                setLogs(prev => [...prev, { msg: `[USER] Chaos Monkey triggered! Hero crashed.`, type: 'err' }]);
-                                setTimeout(() => setStatus('RECOVERING'), 2000);
-                            }
-                        }}
+                        onClick={() => { if(phase==='RACING') setPhase('HERO_CRASHED'); }} // User Catalyst
                      >
-                        {status === 'HERO_CRASHED' ? <ShieldAlert size={12} className="text-black" /> : <Zap size={12} className="text-black fill-black" />}
+                        {phase === 'HERO_CRASHED' ? <ShieldAlert size={12} className="text-black" /> : <Zap size={12} className="text-black fill-black" />}
                      </div>
-
-                     {/* Trail */}
                      <div className="absolute h-1 bg-gradient-to-r from-transparent to-cyan-500/50" style={{ width: `${heroPos}%`, left: 0 }}></div>
                  </div>
 
                  {/* 2. SWARM LANE */}
-                 <div className="relative h-12 flex items-center">
-                     {/* Track Line */}
+                 <div className={`relative h-12 flex items-center transition-all duration-500 ${isSwarmDimmed ? 'opacity-30 grayscale blur-[1px]' : 'opacity-100 grayscale-0'}`}>
+                     {/* Track */}
                      <div className="absolute w-full h-px bg-orange-900/30"></div>
-                     
-                     {/* Label */}
                      <div className="absolute -left-2 -top-4 text-[9px] font-bold text-orange-500/50 uppercase tracking-widest">Swarm Mesh</div>
 
-                     {/* The Runner (3 Dots) */}
+                     {/* Runner */}
                      <div 
-                        className="absolute flex gap-1 transition-all duration-75 cursor-pointer hover:scale-110 z-20"
+                        className="absolute flex gap-1 transition-all duration-75 z-20"
                         style={{ left: `calc(${swarmPos}% - 24px)` }}
-                        onClick={() => {
-                             setSwarmPos(p => Math.min(100, p + 15));
-                             setLogs(prev => [...prev, { msg: `[USER] Swarm boosted!`, type: 'warn' }]);
-                        }}
+                        onClick={() => setSwarmPos(p => Math.min(100, p+10))} // User Catalyst
                      >
                         <div className="w-3 h-3 bg-orange-500 rounded-full shadow-[0_0_10px_#f97316] animate-pulse"></div>
                         <div className="w-3 h-3 bg-orange-600 rounded-full shadow-[0_0_10px_#f97316] animate-bounce" style={{ animationDelay: '0.1s' }}></div>
                         <div className="w-3 h-3 bg-amber-500 rounded-full shadow-[0_0_10px_#f59e0b] animate-pulse" style={{ animationDelay: '0.2s' }}></div>
                      </div>
-
-                      {/* Trail */}
                       <div className="absolute h-1 bg-gradient-to-r from-transparent to-orange-500/30" style={{ width: `${swarmPos}%`, left: 0 }}></div>
                  </div>
 
@@ -325,7 +353,7 @@ function RpcRaceway() {
              </div>
 
              {/* TERMINAL LOG */}
-             <div className="bg-black/80 rounded-xl border border-zinc-800 p-3 h-28 flex flex-col gap-1 relative z-10 font-mono text-[10px] overflow-hidden">
+             <div className="bg-black/80 rounded-xl border border-zinc-800 p-3 h-32 flex flex-col gap-1 relative z-10 font-mono text-[10px] overflow-hidden">
                 <div className="absolute top-2 right-2 opacity-20"><Terminal size={14}/></div>
                 <div ref={logRef} className="overflow-y-auto flex flex-col gap-1 custom-scrollbar">
                     {logs.length === 0 && <span className="text-zinc-600 animate-pulse">Waiting for request...</span>}
