@@ -20,7 +20,6 @@ export const ConsensusConvergenceChart = ({
 }: ConsensusConvergenceChartProps) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
-  // The BFT Threshold for network failure
   const THRESHOLD = 66; 
 
   const fluidData = useMemo(() => {
@@ -30,20 +29,17 @@ export const ConsensusConvergenceChart = ({
     }));
   }, [history, dataKey]);
 
-  // --- 1. ELASTIC DOMAIN LOGIC ---
-  // Calculates the min/max of the view to ensure we zoom in on the action
-  const getElasticDomain = useCallback(([dataMin, dataMax]: [number, number]) => {
+  // --- FIX: Use 'any' to avoid Readonly vs Mutable type conflict ---
+  const getElasticDomain = useCallback(([dataMin, dataMax]: any) => {
      if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 100];
 
-     const buffer = 5; // 5% breathing room
+     const buffer = 5; 
      let min = dataMin - buffer;
      let max = dataMax + buffer;
 
-     // Clamp to reality
      if (min < 0) min = 0;
      if (max > 100) max = 100;
 
-     // Prevent flat-line errors (if min == max)
      if (min === max) {
          if (min === 0) max = 10;
          else if (max === 100) min = 90;
@@ -53,22 +49,17 @@ export const ConsensusConvergenceChart = ({
      return [min, max];
   }, []);
 
-  // --- 2. SPLIT GRADIENT OFFSET CALCULATION ---
-  // Calculates exactly where the 66% line is relative to the current view
   const gradientOffset = useMemo(() => {
     if (fluidData.length === 0) return 0;
 
     const dataMax = Math.max(...fluidData.map((i) => i.value));
     const dataMin = Math.min(...fluidData.map((i) => i.value));
     
-    // We must use the *Elastic Domain* values, not the raw data values, 
-    // because the gradient is drawn relative to the Y-Axis view, not the data limits.
     const [domainMin, domainMax] = getElasticDomain([dataMin, dataMax]);
 
-    if (domainMax <= THRESHOLD) return 0; // Everything is below 66% (All Red)
-    if (domainMin >= THRESHOLD) return 1; // Everything is above 66% (All Green)
+    if (domainMax <= THRESHOLD) return 0; 
+    if (domainMin >= THRESHOLD) return 1; 
 
-    // Calculate percentage position of the threshold line
     return (domainMax - THRESHOLD) / (domainMax - domainMin);
   }, [fluidData, getElasticDomain]);
 
@@ -96,8 +87,6 @@ export const ConsensusConvergenceChart = ({
 
   return (
     <div className="w-full h-full flex flex-col rounded-xl border border-zinc-800 bg-black/40 p-3 relative group">
-
-      {/* Header */}
       <div className="flex justify-between items-center mb-1 relative z-20 h-6 shrink-0">
          <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Convergence</span>
@@ -120,25 +109,19 @@ export const ConsensusConvergenceChart = ({
          </div>
       </div>
 
-      {/* Chart */}
       <div className="flex-1 w-full min-h-0 relative">
          {loading && <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/10 backdrop-blur-[1px] transition-opacity duration-300"><Loader2 className="w-4 h-4 animate-spin text-zinc-600"/></div>}
 
          <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={fluidData} margin={{ top: 5, right: 0, left: -2, bottom: 0 }}>
                <defs>
-                  {/* DYNAMIC SPLIT GRADIENT */}
                   <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
-                     {/* Top Section (Green) */}
                      <stop offset={gradientOffset} stopColor="#22c55e" stopOpacity={0.3} />
                      <stop offset={gradientOffset} stopColor="#22c55e" stopOpacity={0} />
-                     
-                     {/* Bottom Section (Red) - Starts exactly where green ends */}
                      <stop offset={gradientOffset} stopColor="#ef4444" stopOpacity={0.5} />
                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0.1} />
                   </linearGradient>
                   
-                  {/* Stroke Gradient (Solid Lines) */}
                   <linearGradient id="splitStroke" x1="0" y1="0" x2="0" y2="1">
                      <stop offset={gradientOffset} stopColor="#22c55e" stopOpacity={1} />
                      <stop offset={gradientOffset} stopColor="#ef4444" stopOpacity={1} />
@@ -171,8 +154,6 @@ export const ConsensusConvergenceChart = ({
                />
 
                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3f3f46', strokeWidth: 1 }} />
-
-               {/* The Threshold Line (Only visible if within view) */}
                <ReferenceLine y={THRESHOLD} stroke="#ef4444" strokeDasharray="3 3" strokeOpacity={0.5} />
 
                <Area 
