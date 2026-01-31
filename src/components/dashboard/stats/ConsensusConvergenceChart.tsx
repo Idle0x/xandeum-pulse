@@ -15,7 +15,8 @@ interface ConsensusConvergenceChartProps {
 export const ConsensusConvergenceChart = ({ 
   history, 
   loading, 
-  timeRange, 
+  // CHANGED: Default set to '30D' (will apply if parent passes undefined)
+  timeRange = '30D', 
   onTimeRangeChange, 
   dataKey,
 }: ConsensusConvergenceChartProps) => {
@@ -30,7 +31,7 @@ export const ConsensusConvergenceChart = ({
     }));
   }, [history, dataKey]);
 
-  // --- VIEW DOMAIN (Y-AXIS ZOOM) ---
+  // --- ELASTIC DOMAIN ---
   const getElasticDomain = useCallback(([dataMin, dataMax]: any): [number, number] => {
      if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 100];
 
@@ -50,8 +51,7 @@ export const ConsensusConvergenceChart = ({
      return [min, max];
   }, []);
 
-  // --- COLOR LOGIC (STRICT DATA ONLY) ---
-  // Fixes the "Coordinate Mismatch" by using data limits, not axis limits.
+  // --- STRICT COLOR LOGIC ---
   const gradientOffset = useMemo(() => {
     if (fluidData.length === 0) return 0;
 
@@ -67,6 +67,12 @@ export const ConsensusConvergenceChart = ({
 
     return (dataMax - THRESHOLD) / (dataMax - dataMin);
   }, [fluidData]);
+
+  // --- SAFETY SWITCH ---
+  // If offset is 1 (All Green), we force the bottom color to be Green too.
+  // This kills the "Red Bleed" artifact completely.
+  const bottomColor = gradientOffset >= 1 ? "#22c55e" : "#ef4444";
+  const topColor = gradientOffset <= 0 ? "#ef4444" : "#22c55e";
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -118,17 +124,18 @@ export const ConsensusConvergenceChart = ({
          {loading && <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/10 backdrop-blur-[1px] transition-opacity duration-300"><Loader2 className="w-4 h-4 animate-spin text-zinc-600"/></div>}
 
          <ResponsiveContainer width="100%" height="100%">
-            {/* Margin left -2 pulls the chart closer to the axis */}
             <AreaChart data={fluidData} margin={{ top: 5, right: 0, left: -2, bottom: 0 }}>
                <defs>
+                  {/* BACKGROUND: Pure Green Gradient */}
                   <linearGradient id="fillGradient" x1="0" y1="0" x2="0" y2="1">
                      <stop offset="0%" stopColor="#22c55e" stopOpacity={0.3} />
                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
                   </linearGradient>
 
+                  {/* STROKE: Dynamic Colors with Safety Switch */}
                   <linearGradient id="splitStroke" x1="0" y1="0" x2="0" y2="1">
-                     <stop offset={gradientOffset} stopColor="#22c55e" stopOpacity={1} />
-                     <stop offset={gradientOffset} stopColor="#ef4444" stopOpacity={1} />
+                     <stop offset={gradientOffset} stopColor={topColor} stopOpacity={1} />
+                     <stop offset={gradientOffset} stopColor={bottomColor} stopOpacity={1} />
                   </linearGradient>
                </defs>
 
@@ -151,7 +158,7 @@ export const ConsensusConvergenceChart = ({
 
                <YAxis 
                   domain={getElasticDomain} 
-                  width={24}  // FIXED: Reverted to original compact width
+                  width={24} // Compact width
                   tickFormatter={(val) => val.toFixed(0)} 
                   tick={{ fontSize: 9, fill: '#52525b' }} 
                   axisLine={false}
