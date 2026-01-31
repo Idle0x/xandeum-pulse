@@ -17,10 +17,11 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
 
   // 1. DATA FETCHING
-  const [timeRange, setTimeRange] = useState<HistoryTimeRange>('24H');
+  // CHANGED: Set default to '30D' as requested
+  const [timeRange, setTimeRange] = useState<HistoryTimeRange>('30D');
   const { history: convHistory, loading: convLoading } = useNetworkHistory(timeRange);
 
-  // Sparkline data
+  // Sparkline data (Always 30D for the background trend)
   const { history: trendHistory, loading: trendLoading } = useNetworkHistory('30D');
 
   const consensusKey: keyof NetworkHistoryPoint = 
@@ -145,7 +146,7 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                 <div className="absolute inset-0 z-0 opacity-10 transition-opacity pointer-events-none px-2 mt-4">
                     <HistoryChart 
                         data={sparkData} 
-                        color={chartColor} // Syncs with isStrong logic
+                        color={chartColor} 
                         loading={trendLoading} 
                         height={60} 
                     />
@@ -174,7 +175,7 @@ export const ConsensusModal = ({ onClose, nodes }: ConsensusModalProps) => {
                 timeRange={timeRange} 
                 onTimeRangeChange={setTimeRange}
                 dataKey={consensusKey}
-                color={chartColor} // Passed dynamic color
+                color={chartColor}
              />
           </div>
 
