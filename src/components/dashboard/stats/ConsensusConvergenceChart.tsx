@@ -9,6 +9,7 @@ interface ConsensusConvergenceChartProps {
   timeRange: HistoryTimeRange;
   onTimeRangeChange: (r: HistoryTimeRange) => void;
   dataKey: keyof NetworkHistoryPoint;
+  color?: string; // Added back to satisfy parent component, even if unused
 }
 
 export const ConsensusConvergenceChart = ({ 
@@ -16,7 +17,8 @@ export const ConsensusConvergenceChart = ({
   loading, 
   timeRange, 
   onTimeRangeChange, 
-  dataKey
+  dataKey,
+  color // Accepted but ignored in favor of Split Gradient logic
 }: ConsensusConvergenceChartProps) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
@@ -29,7 +31,7 @@ export const ConsensusConvergenceChart = ({
     }));
   }, [history, dataKey]);
 
-  // --- FIX: Added ': [number, number]' return type to satisfy Recharts strict typing ---
+  // --- ELASTIC DOMAIN LOGIC ---
   const getElasticDomain = useCallback(([dataMin, dataMax]: any): [number, number] => {
      if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 100];
 
