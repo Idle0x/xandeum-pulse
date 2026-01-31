@@ -148,7 +148,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats, initialNetwor
                         title={isToggled ? "Hide Nodes" : "Show Nodes Overlay"}
                       >
                         <Network size={8} />
-                        {isToggled ? 'Nodes On' : 'Nodes'}
+                        {isToggled ? 'Hide Nodes' : 'Show Nodes'}
                       </button>
                   </div>
                   <div className="text-xl md:text-2xl font-bold text-zinc-100 tracking-tight font-mono">
@@ -201,6 +201,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats, initialNetwor
           </div>
 
           <div className="flex items-center gap-2 w-full md:w-auto">
+            {/* NETWORK SWITCHER */}
             <div className="flex items-center bg-zinc-900 border border-zinc-800 p-0.5 rounded-lg mr-2">
                 {(['MAINNET', 'DEVNET', 'COMBINED'] as const).map((net) => (
                     <button
@@ -217,6 +218,7 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats, initialNetwor
                 ))}
             </div>
 
+            {/* TIME DROPDOWN */}
             <div className="relative">
                 <button 
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -240,7 +242,14 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats, initialNetwor
                 )}
             </div>
 
-            <button onClick={onClose} className="p-1.5 rounded-full hover:bg-zinc-900 text-zinc-500 hover:text-white transition"><X size={16} /></button>
+            {/* RED CLOSE BUTTON */}
+            <button 
+                onClick={onClose} 
+                className="p-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500/20 hover:text-red-400 transition-all backdrop-blur-sm shadow-sm"
+                title="Close Modal"
+            >
+                <X size={16} />
+            </button>
           </div>
         </div>
 
@@ -263,8 +272,8 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats, initialNetwor
                         <ComposedChart data={history} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                            <defs>
                               <linearGradient id="creditGrad" x1="0" y1="0" x2="0" y2="1">
-                                 <stop offset="5%" stopColor={networkScope === 'DEVNET' ? "#3b82f6" : "#eab308"} stopOpacity={0.15}/>
-                                 <stop offset="95%" stopColor={networkScope === 'DEVNET' ? "#3b82f6" : "#eab308"} stopOpacity={0}/>
+                                 <stop offset="5%" stopColor="#eab308" stopOpacity={0.15}/> {/* Fixed Yellow */}
+                                 <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
                               </linearGradient>
                            </defs>
                            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} opacity={0.3} />
@@ -309,13 +318,13 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats, initialNetwor
                                labelFormatter={(label) => new Date(label).toLocaleString()}
                            />
 
-                           {/* MAIN METRIC AREA (Mapped to Right Axis) */}
+                           {/* MAIN METRIC AREA (Mapped to Right Axis) - FIXED YELLOW */}
                            <Area 
                                 yAxisId="right"
                                 type="monotone" 
                                 dataKey={keys.credits} 
                                 name="Credits"
-                                stroke={networkScope === 'DEVNET' ? "#3b82f6" : "#eab308"} 
+                                stroke="#eab308" 
                                 strokeWidth={2} 
                                 fill="url(#creditGrad)" 
                                 animationDuration={1000} 
@@ -399,12 +408,13 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats, initialNetwor
                                    labelFormatter={(label) => new Date(label).toLocaleString()}
                                />
 
+                               {/* FIXED GREEN COLOR */}
                                <Line 
                                     yAxisId="right"
                                     type="monotone" 
                                     dataKey={keys.dominance} 
                                     name="Dominance"
-                                    stroke="#3b82f6" 
+                                    stroke="#10b981" 
                                     strokeWidth={2} 
                                     dot={false} 
                                     animationDuration={1000} 
@@ -490,12 +500,13 @@ export const LeaderboardAnalyticsModal = ({ onClose, currentStats, initialNetwor
                                    labelFormatter={(label) => new Date(label).toLocaleString()}
                                />
 
+                               {/* FIXED WHITE COLOR */}
                                <Line 
                                     yAxisId="right"
                                     type="monotone" 
                                     dataKey={keys.avg} 
                                     name="Avg Earnings"
-                                    stroke="#d4d4d8" 
+                                    stroke="#ffffff" 
                                     strokeWidth={2} 
                                     dot={false} 
                                     animationDuration={1000} 
