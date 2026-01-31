@@ -33,18 +33,13 @@ interface CreditNode {
 
 /**
  * Filters rows to ensure one entry per pubkey PER NETWORK.
- * Fix: Uses a composite key so a user on Mainnet AND Devnet counts for both.
  */
 function getUniqueFinancialRows(nodeRows: any[]) {
   const seen = new Set<string>();
   return nodeRows.filter(n => {
     if (!n.pubkey) return false;
-    
-    // FIX 2: Composite Key (Pubkey + Network)
-    // This allows the same pubkey to exist once on Mainnet and once on Devnet,
-    // but prevents multiple physical nodes on the same network from inflating credits.
+    // Composite Key (Pubkey + Network) ensures we count a user on Mainnet AND Devnet separately
     const uniqueKey = `${n.pubkey}-${n.network || 'MAINNET'}`;
-    
     if (seen.has(uniqueKey)) return false;
     seen.add(uniqueKey);
     return true;
@@ -76,7 +71,6 @@ function getConsensusMetrics(nodeList: any[]) {
 }
 
 function getFinancialMetrics(nodeRows: any[]) {
-  // DEDUPLICATION: Ensure we only count credits once per unique pubkey/network combo
   const uniqueRows = getUniqueFinancialRows(nodeRows);
 
   if (uniqueRows.length === 0) return { total: 0, avg: 0, dominance: 0, count: 0 };
@@ -92,14 +86,14 @@ function getFinancialMetrics(nodeRows: any[]) {
     total, 
     avg, 
     dominance: parseFloat(dominance.toFixed(2)),
-    count: uniqueRows.length // This is the "Actual Leaderboard Nodes"
+    count: uniqueRows.length 
   };
 }
 
 const getSafeKey = (c: CreditNode) => c.pod_id || c.pubkey || c.id || 'unknown';
 
 async function runMonitor() {
-  console.log("xx 🏥 Starting Pulse Monitor (Hybrid Physical/Financial Mode)...");
+  console.log("xx 🏥 Starting Pulse Monitor (Strict Leaderboard Mode)...");
 
   try {
     const [pulseRes, mainnetCreditsRes, devnetCreditsRes] = await Promise.allSettled([
@@ -126,7 +120,6 @@ async function runMonitor() {
     rawMainnetCredits.forEach(c => {
         const key = getSafeKey(c);
         if (key !== 'unknown') {
-            // Optional Safety: Sum duplicates if API returns same key twice
             const current = mainnetCreditMap.get(key) || 0;
             mainnetCreditMap.set(key, current + c.credits);
         }
@@ -136,7 +129,6 @@ async function runMonitor() {
     rawDevnetCredits.forEach(c => {
         const key = getSafeKey(c);
         if (key !== 'unknown') {
-             // Optional Safety: Sum duplicates
              const current = devnetCreditMap.get(key) || 0;
              devnetCreditMap.set(key, current + c.credits);
         }
@@ -148,10 +140,10 @@ async function runMonitor() {
       process.exit(0);
     }
 
-    const uniqueNodeRows: any[] = [];
-    const finalAllNodes: any[] = [];
-    const finalMainnet: any[] = [];
-    const finalDevnet: any[] = [];
+    const uniqueNodeRows: any[] = []; // Only for Leaderboard (Strictly Credited)
+    const finalAllNodes: any[] = [];  // For Dashboard Stats (Everything)
+    const finalMainnet: any[] = [];   // For Stats
+    const finalDevnet: any[] = [];    // For Stats
 
     // --- PHASE A: PROCESS PUBLIC NODES (RPC) ---
     for (const rpcNode of rpcNodes) {
@@ -159,59 +151,65 @@ async function runMonitor() {
       const net = rpcNode.network || 'MAINNET';
 
       let creditVal = 0;
+      let isCredited = false;
+
+      // Check if this node exists in the corresponding Credit Map
       if (net === 'MAINNET') {
+        isCredited = mainnetCreditMap.has(pubkey);
         creditVal = mainnetCreditMap.get(pubkey) || 0;
       } else {
+        isCredited = devnetCreditMap.has(pubkey);
         creditVal = devnetCreditMap.get(pubkey) || 0;
       }
 
       const finalCredits = creditVal > 0 ? creditVal : (rpcNode.credits || 0);
       const processedNode = { ...rpcNode, credits: finalCredits, is_ghost: false };
 
+      // 1. DASHBOARD: Always add to AllNodes for Capacity/Health stats (even if uncredited)
       finalAllNodes.push(processedNode);
       if (net === 'MAINNET') finalMainnet.push(processedNode);
       else finalDevnet.push(processedNode);
 
-      let ipOnly = rpcNode.address && rpcNode.address !== 'null' ? rpcNode.address.split(':')[0] : 'private';
-      const stableId = `${pubkey}-${ipOnly}-${net}`; 
+      // 2. LEADERBOARD: Only add to DB Rows if they exist in the API
+      if (isCredited) {
+        let ipOnly = rpcNode.address && rpcNode.address !== 'null' ? rpcNode.address.split(':')[0] : 'private';
+        const stableId = `${pubkey}-${ipOnly}-${net}`; 
 
-      uniqueNodeRows.push({
-        node_id: stableId,
-        pubkey: pubkey,
-        network: net,
-        health: Number(rpcNode.health || 0),
-        credits: finalCredits,
-        storage_committed: Number(rpcNode.storage_committed || 0),
-        storage_used: Number(rpcNode.storage_used || 0),
-        uptime: Number(rpcNode.uptime || 0),
-        rank: 0,
-        version: rpcNode.version || '0.0.0',
-        created_at: new Date().toISOString()
-      });
+        uniqueNodeRows.push({
+            node_id: stableId,
+            pubkey: pubkey,
+            network: net,
+            health: Number(rpcNode.health || 0),
+            credits: finalCredits,
+            storage_committed: Number(rpcNode.storage_committed || 0),
+            storage_used: Number(rpcNode.storage_used || 0),
+            uptime: Number(rpcNode.uptime || 0),
+            rank: 0,
+            version: rpcNode.version || '0.0.0',
+            created_at: new Date().toISOString()
+        });
+      }
     }
 
-    // --- PHASE B: PROCESS GHOST NODES (Remaining in Maps) ---
-    // FIX 1: Filter out keys strictly by NETWORK to avoid cross-network contamination
+    // --- PHASE B: PROCESS GHOST NODES (Strictly Credited by Definition) ---
     
-    // Create sets of active keys SPECIFIC to each network
+    // Sets of active keys PER NETWORK
     const activeMainnetKeys = new Set(
         rpcNodes.filter(n => (n.network || 'MAINNET') === 'MAINNET').map(n => n.pubkey)
     );
-
     const activeDevnetKeys = new Set(
         rpcNodes.filter(n => n.network === 'DEVNET').map(n => n.pubkey)
     );
 
     const processGhosts = (map: Map<string, number>, network: string) => {
-      // Select the correct set to check against
       const activeSetToCheck = network === 'MAINNET' ? activeMainnetKeys : activeDevnetKeys;
 
       for (const [pubkey, credits] of map.entries()) {
-        // Only skip if this specific pubkey is active ON THIS SPECIFIC NETWORK
         if (activeSetToCheck.has(pubkey)) continue; 
 
         const ghostNode = { pubkey, network, address: 'private', health: 0, uptime: 0, credits, is_ghost: true };
         
+        // Ghosts are credited by definition, so they go EVERYWHERE
         finalAllNodes.push(ghostNode);
         if (network === 'MAINNET') finalMainnet.push(ghostNode);
         else finalDevnet.push(ghostNode);
@@ -236,6 +234,7 @@ async function runMonitor() {
     processGhosts(devnetCreditMap, 'DEVNET');
 
     // --- 4. AGGREGATES ---
+    // Calculates Stats using ALL nodes (Credited + Uncredited)
     const calcStats = (nodes: any[]) => {
       let cap = 0, used = 0, healthSum = 0, healthCount = 0, stabSum = 0, stabCount = 0;
       for (const n of nodes) {
@@ -263,15 +262,15 @@ async function runMonitor() {
     const mainnetConsensus = getConsensusMetrics(finalMainnet);
     const devnetConsensus = getConsensusMetrics(finalDevnet);
 
-    // FINANCIALS (Deduplicated)
+    // FINANCIALS (Calculated using ONLY Credited Nodes)
     const globalFin = getFinancialMetrics(uniqueNodeRows);
     const mainnetFin = getFinancialMetrics(uniqueNodeRows.filter(n => n.network === 'MAINNET'));
     const devnetFin = getFinancialMetrics(uniqueNodeRows.filter(n => n.network === 'DEVNET'));
 
     // --- 5. INSERT ---
     const { error: netError } = await supabase.from('network_snapshots').insert({
-      // Dashboard (Physical)
-      total_nodes: finalAllNodes.length,
+      // Dashboard (Physical Reality - Includes the 40 uncredited nodes)
+      total_nodes: finalAllNodes.length, // Will show 247 for devnet context
       total_capacity: globalStats.cap,
       total_used: globalStats.used,
       avg_health: globalStats.avgHealth,
@@ -279,8 +278,8 @@ async function runMonitor() {
       consensus_score: globalConsensus.score,    
       consensus_version: globalConsensus.version,
 
-      // Leaderboard (Unique)
-      total_unique_providers: globalFin.count,
+      // Leaderboard Stats (Financial Reality - Strictly the 207)
+      total_unique_providers: globalFin.count, // Will show 207
       total_credits: globalFin.total,
       avg_credits: globalFin.avg,
       top10_dominance: globalFin.dominance,
@@ -298,8 +297,8 @@ async function runMonitor() {
       mainnet_dominance: mainnetFin.dominance,
 
       // Devnet
-      devnet_nodes: finalDevnet.length,
-      devnet_unique_providers: devnetFin.count,
+      devnet_nodes: finalDevnet.length, // This will be 247
+      devnet_unique_providers: devnetFin.count, // This will be 207
       devnet_capacity: devnetStats.cap,
       devnet_used: devnetStats.used,
       devnet_avg_health: devnetStats.avgHealth,
@@ -313,6 +312,7 @@ async function runMonitor() {
     if (netError) console.error('❌ Network Snapshot Failed:', netError.message);
     else console.log(`✅ Saved: Physical(${finalAllNodes.length}) vs Unique(${globalFin.count})`);
 
+    // Only inserting Credited Nodes into the Leaderboard Table
     const { error: nodeError } = await supabase.from('node_snapshots').insert(uniqueNodeRows);
     if (nodeError) console.error('❌ Node Snapshots Failed:', nodeError.message);
 
