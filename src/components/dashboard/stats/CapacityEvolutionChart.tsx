@@ -55,24 +55,23 @@ export const CapacityEvolutionChart = ({
     });
   }, [timeRange]);
 
-  // --- REFINED Y-AXIS DOMAIN LOGIC ---
+  // --- REFINED Y-AXIS DOMAIN LOGIC (Value Percentage) ---
   const getDomain = useCallback((args: any): [number, number] => {
     const [dataMin, dataMax] = args;
+    
+    // Safety check for empty or invalid data
     if (!isFinite(dataMin) || !isFinite(dataMax)) return [0, 1];
 
-    const range = dataMax - dataMin;
+    // If the entire dataset is 0 (e.g. empty network), force a small positive range
+    if (dataMax === 0) return [0, 10];
 
-    if (range === 0) {
-        if (dataMax === 0) return [0, 10]; 
-        return [dataMax * 0.9, dataMax * 1.05]; 
-    }
+    // 1. Lower Bound: Lowest point minus 10% (Floor)
+    let lowerBound = dataMin * 0.90;
+    
+    // 2. Upper Bound: Highest point plus 5% (Ceiling)
+    const upperBound = dataMax * 1.05;
 
-    const topPadding = range * 0.05;    
-    const bottomPadding = range * 0.10; 
-
-    let lowerBound = dataMin - bottomPadding;
-    let upperBound = dataMax + topPadding;
-
+    // Prevent negative lower bound if data is actually positive/zero
     if (lowerBound < 0) lowerBound = 0;
 
     return [lowerBound, upperBound];
@@ -128,7 +127,6 @@ export const CapacityEvolutionChart = ({
             </button>
             {isDropdownOpen && (
                 <div className="absolute right-0 top-full mt-1 w-20 py-1 rounded border border-zinc-800 bg-black shadow-xl flex flex-col z-30">
-                    {/* Added '3D' to the array */}
                     {(['24H', '3D', '7D', '30D', 'ALL'] as const).map((r) => (
                         <button key={r} onClick={() => { onTimeRangeChange(r); setIsDropdownOpen(false); }} className="px-2 py-1.5 text-left text-[9px] font-bold uppercase text-zinc-500 hover:bg-zinc-900 hover:text-white">
                             {r === 'ALL' ? 'MAX' : r}
