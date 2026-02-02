@@ -32,6 +32,17 @@ interface CreditNode {
 // --- HELPERS ---
 
 /**
+ * Splits an array into chunks to avoid database payload limits.
+ */
+function chunkArray<T>(array: T[], size: number): T[][] {
+  const result: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    result.push(array.slice(i, i + size));
+  }
+  return result;
+}
+
+/**
  * Filters rows to ensure one entry per pubkey PER NETWORK.
  */
 function getUniqueFinancialRows(nodeRows: any[]) {
@@ -177,7 +188,7 @@ async function runMonitor() {
       // 2. LEADERBOARD: Insert ONLY if Credited AND Not Seen Yet
       if (isCredited) {
         const uniqueKey = `${pubkey}-${net}`;
-        
+
         if (!seenFinancialKeys.has(uniqueKey)) {
             seenFinancialKeys.add(uniqueKey); // Mark as seen
 
@@ -204,7 +215,7 @@ async function runMonitor() {
     // --- PHASE B: PROCESS GHOST NODES ---
     // Ghosts are unique by definition (they come from the Map keys), 
     // but we still check the Set just to be absolutely safe.
-    
+
     const activeMainnetKeys = new Set(
         rpcNodes.filter(n => (n.network || 'MAINNET') === 'MAINNET').map(n => n.pubkey)
     );
@@ -223,7 +234,7 @@ async function runMonitor() {
         seenFinancialKeys.add(uniqueKey);
 
         const ghostNode = { pubkey, network, address: 'private', health: 0, uptime: 0, credits, is_ghost: true };
-        
+
         finalAllNodes.push(ghostNode);
         if (network === 'MAINNET') finalMainnet.push(ghostNode);
         else finalDevnet.push(ghostNode);
@@ -249,7 +260,7 @@ async function runMonitor() {
 
     // --- PHASE C: SPLIT SORT & RANK ASSIGNMENT ---
     // Fix: Sort Mainnet and Devnet independently so ranks are accurate per network
-    
+
     // 1. Separate
     const mainnetRows = uniqueNodeRows.filter(n => n.network === 'MAINNET');
     const devnetRows = uniqueNodeRows.filter(n => n.network === 'DEVNET');
@@ -299,7 +310,9 @@ async function runMonitor() {
     const mainnetFin = getFinancialMetrics(mainnetRows);
     const devnetFin = getFinancialMetrics(devnetRows);
 
-    // --- 5. INSERT ---
+    // --- 5. INSERT (BATCHED) ---
+    console.log(`💾 Saving Network Snapshot...`);
+
     const { error: netError } = await supabase.from('network_snapshots').insert({
       // Dashboard (Physical Reality)
       total_nodes: finalAllNodes.length, 
@@ -341,14 +354,34 @@ async function runMonitor() {
       devnet_dominance: devnetFin.dominance
     });
 
-    if (netError) console.error('❌ Network Snapshot Failed:', netError.message);
-    else console.log(`✅ Saved: Physical(${finalAllNodes.length}) vs Unique(${globalFin.count})`);
+    if (netError) {
+      console.error('❌ Network Snapshot Failed:', netError.message);
+    } else {
+      console.log(`✅ Network Snapshot Saved.`);
+    }
 
-    // Insert Final Ranked Rows
-    const { error: nodeError } = await supabase.from('node_snapshots').insert(finalRankedRows);
-    if (nodeError) console.error('❌ Node Snapshots Failed:', nodeError.message);
+    // BATCH INSERT NODE SNAPSHOTS
+    // We split the rows into smaller chunks to avoid the "Internal server error" (500)
+    // which happens when the payload is too large for Supabase.
+    const BATCH_SIZE = 500;
+    const batches = chunkArray(finalRankedRows, BATCH_SIZE);
 
+    console.log(`📦 Batching ${finalRankedRows.length} node rows into ${batches.length} chunks...`);
+
+    for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        const { error: nodeError } = await supabase.from('node_snapshots').insert(batch);
+        
+        if (nodeError) {
+            console.error(`❌ Batch ${i + 1} Failed:`, nodeError.message);
+        } else {
+            console.log(`   🔹 Batch ${i + 1}/${batches.length} saved (${batch.length} rows)`);
+        }
+    }
+
+    console.log("✅ Monitor run complete.");
     process.exit(0);
+
   } catch (error: any) {
     console.error("🔥 FATAL ERROR:", error.message);
     process.exit(1);
